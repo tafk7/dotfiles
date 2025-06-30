@@ -3,6 +3,14 @@
 # Personal setup script - Personal tools and entertainment
 # This file is sourced by install.sh when --personal flag is used
 
+# Enable strict error handling
+set -e
+set -u
+set -o pipefail
+
+# Error trap for cleanup
+trap 'handle_error "personal_setup.sh at line $LINENO"' ERR
+
 personal_log "Configuring personal environment..."
 
 # Get package manager type

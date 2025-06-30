@@ -1,125 +1,232 @@
-" Configure terminal color scheme
-" set term=screen-256color
-set term=xterm-256color
-if &term =~ '256color'
-    " disable Background Color Erase (BCE) so that color schemes
-    " render properly when inside 256-color tmux and GNU screen.
-    " see also http://snk.tuxfamily.org/log/vim-256color-bce.html
-    set t_ut=
-endif
+" Modern Vim Configuration
+" Part of dotfiles - https://github.com/yourusername/dotfiles
 
+" ==============================================================================
+" Basic Settings
+" ==============================================================================
 
-set background=dark
-set mouse=a
+" Use Vim settings, not Vi
+set nocompatible
 
-autocmd vimenter * colorscheme gruvbox
+" Enable modern Vim features not compatible with Vi
+set encoding=utf-8
+set fileencoding=utf-8
 
-" Load color scheme
-"colorscheme neuromancer
-"colorscheme lizard 
-"colorscheme gruvbox
-"colorscheme molokai
-"colorscheme solarized
-
-" Start Pathogen package manager
-execute pathogen#infect()
-
-" Use ag
-let g:ackprg = 'ag --nogroup --nocolor --column'
-
-" Enable syntax highlighting, file type detection, file type specific indentation, and plugins.
+" Enable file type detection and plugins
 filetype on
-filetype indent on
 filetype plugin on
+filetype indent on
+
+" Enable syntax highlighting
 syntax enable
 syntax on
 
-" Disable blinking and bells
-set noeb vb t_vb=
-au GUIEnter * set vb t_vb=
+" ==============================================================================
+" Visual Settings
+" ==============================================================================
 
-" Set cursor style
-let &t_SI.="\e[5 q" "SI = INSERT mode
-" let &t_SR.="\e[4 q" "SR = REPLACE mode
-let &t_EI.="\e[1 q" "EI = NORMAL mode (ELSE)
+" Color scheme configuration
+set background=dark
+if (has("termguicolors"))
+    set termguicolors
+endif
 
-" Show command, useful for # of characters/lines in Visual selection
+" Configure terminal colors for better compatibility
+set term=xterm-256color
+if &term =~ '256color'
+    " Disable Background Color Erase (BCE) for proper rendering
+    " in 256-color tmux and GNU screen
+    set t_ut=
+endif
+
+" Try to load gruvbox colorscheme, fallback to desert
+try
+    colorscheme gruvbox
+catch
+    colorscheme desert
+endtry
+
+" Show line numbers
+set number
+set relativenumber
+
+" Highlight current line
+set cursorline
+
+" Show matching brackets
+set showmatch
+
+" Always show status line
+set laststatus=2
+
+" Show command in bottom bar
 set showcmd
 
-" Set tab to be 4 space characters
-set tabstop=4
-set shiftwidth=4
-set expandtab
+" Visual autocomplete for command menu
+set wildmenu
+set wildmode=longest:full,full
+set wildignorecase
 
-" Smart case matching for search
-set smartcase
-set ignorecase
+" Redraw only when needed (faster macros)
+set lazyredraw
 
-" Enable mouse
-set mouse=an
-set ttymouse=xterm2
+" ==============================================================================
+" Search Settings
+" ==============================================================================
 
-" Set line numbers
-set number
-highlight LineNr ctermfg=grey
-
-" Turn off wrapping
-set nowrap
-
-" Highlight searches
+" Highlight search results
 set hlsearch
 
-" Clear search highlighting
-map <Space> :noh<cr>
+" Incremental search
+set incsearch
 
-" Remap C-e and C-y to 3 lines
-nnoremap <C-e> 3<C-e>
-nnoremap <C-y> 3<C-y>
+" Case-insensitive search
+set ignorecase
 
-" Remap F9 to previous tab and F10 to next tab
-noremap <F10> :<C-U>tabnext<CR>
-noremap <F9> :<C-U>tabprevious<CR>
-noremap <C-Tab> :<C-U>tabnext<CR>
-noremap <C-S-Tab> :<C-U>tabprevious<CR>
-noremap <F2> :<C-U>tabm-1<CR>
-noremap <F3> :<C-U>tabm+1<CR>
+" Smart case (case-sensitive if uppercase used)
+set smartcase
 
-" Automatically change working directory
+" Clear search highlighting with Space
+nnoremap <Space> :nohlsearch<CR>
+
+" ==============================================================================
+" Indentation and Formatting
+" ==============================================================================
+
+" Spaces instead of tabs
+set expandtab
+
+" Number of spaces per tab
+set tabstop=4
+set softtabstop=4
+set shiftwidth=4
+
+" Auto indent
+set autoindent
+set smartindent
+
+" Wrap lines at convenient points
+set linebreak
+
+" Don't wrap lines by default
+set nowrap
+
+" Show invisible characters
+set list
+set listchars=tab:▸\ ,trail:·,extends:❯,precedes:❮,nbsp:×
+
+" ==============================================================================
+" Mouse and Clipboard
+" ==============================================================================
+
+" Enable mouse support
+if has('mouse')
+    set mouse=a
+    if !has('nvim')
+        set ttymouse=xterm2
+    endif
+endif
+
+" Use system clipboard
+if has('clipboard')
+    if has('unnamedplus')
+        set clipboard=unnamedplus
+    else
+        set clipboard=unnamed
+    endif
+endif
+
+" ==============================================================================
+" File Management
+" ==============================================================================
+
+" Disable swap files
+set noswapfile
+
+" Disable backup files
+set nobackup
+set nowritebackup
+
+" Keep undo history across sessions
+if has('persistent_undo')
+    set undofile
+    set undodir=~/.vim/undo
+    if !isdirectory(&undodir)
+        call mkdir(&undodir, 'p')
+    endif
+endif
+
+" Auto read when file is changed externally
+set autoread
+
+" Automatically change working directory to current file
 set autochdir
 
-" Split vertical window to the right, horizontal windows below
+" ==============================================================================
+" Window Management
+" ==============================================================================
+
+" Split windows to the right and below
 set splitright
 set splitbelow
 
-" FZF funtime path for Vim
-set rtp+=~/.fzf
+" Minimum window height
+set winminheight=0
 
-" Nerdtree stuff
-" call plug#begin()
-" Plug 'scrooloose/nerdtree'
-" call plug#end()
-" map <C-n> :NERDTreeToggle<CR>
+" Easy window navigation
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
 
-" Load color cycle script
-"runtime autoload/cyclecolor.vim
+" ==============================================================================
+" Key Mappings
+" ==============================================================================
 
-" Provide versions of cut and delete in normal and visual modes that don't
-" yank the elements. These disable yank by using the black hole register.
+" Set leader key
+let mapleader = ","
+
+" Fast saving
+nnoremap <leader>w :w!<CR>
+
+" Fast quitting
+nnoremap <leader>q :q<CR>
+
+" Move between tabs
+nnoremap <F9> :tabprevious<CR>
+nnoremap <F10> :tabnext<CR>
+nnoremap <F2> :tabm -1<CR>
+nnoremap <F3> :tabm +1<CR>
+
+" Open file under cursor in new vertical split
+nnoremap <F8> :vertical wincmd f<CR>
+
+" Move lines up and down
+nnoremap <A-j> :m .+1<CR>==
+nnoremap <A-k> :m .-2<CR>==
+vnoremap <A-j> :m '>+1<CR>gv=gv
+vnoremap <A-k> :m '<-2<CR>gv=gv
+
+" Better scrolling
+nnoremap <C-e> 3<C-e>
+nnoremap <C-y> 3<C-y>
+
+" Delete without yanking (using black hole register)
 nnoremap <leader>d "_d
-nnoremap <leader>D "_d
+nnoremap <leader>D "_D
 nnoremap <leader>c "_c
 nnoremap <leader>C "_C
 vnoremap <leader>d "_d
 vnoremap <leader>D "_D
 vnoremap <leader>c "_c
 vnoremap <leader>C "_C
+nnoremap <Del> "_x
+vnoremap <Del> "_x
 
-" Override the default behavior of the <Del> key, and prevent it from
-" automatically yanking the text it deletes.
-noremap <Del> "_x
+" Replace without yanking
+vnoremap <leader>p "_dP
 
-" Override the default behavior of the paste command in visual mode. Instead
-" of yanking the selection that was pasted over, simply delete it.
+" Paste in visual mode without yanking
 function! RestoreRegister()
     let @" = s:restore_reg
     return ''
@@ -131,25 +238,199 @@ endfunction
 vnoremap <silent> <expr> p <sid>Repl()
 vnoremap <silent> <expr> P <sid>Repl()
 
-" Ignore case for file autocompletion
-set wildignorecase
+" ==============================================================================
+" Sound and Visual Bell Settings
+" ==============================================================================
 
-" Disable Swap Files
-set noswapfile
+" Disable error bells
+set noerrorbells
+set visualbell
+set t_vb=
+autocmd GUIEnter * set visualbell t_vb=
 
-" Disable Autocomment
-set formatoptions-=cro
+" ==============================================================================
+" Cursor Settings
+" ==============================================================================
 
-" Set .ps1 filetype to .tcl to make syntax nice
-au BufNewFile,BufRead,BufReadPost *.ps1 set syntax=tcl
+" Set cursor styles for different modes
+let &t_SI.="\e[5 q" " SI = INSERT mode (blinking bar)
+let &t_EI.="\e[1 q" " EI = NORMAL mode (blinking block)
 
-" Set .hwlib.yml filetype to .tcl to make syntax nice
-au BufNewFile,BufRead,BufReadPost *.hwlib.yml set syntax=tcl
+" ==============================================================================
+" Plugin Configuration (if plugins are installed)
+" ==============================================================================
 
-" Set .yml filetype to .tcl to make syntax nice
-au BufNewFile,BufRead,BufReadPost *.yml set syntax=tcl
+" FZF configuration (if installed)
+if isdirectory($HOME . '/.fzf')
+    set rtp+=~/.fzf
+    nnoremap <C-p> :FZF<CR>
+    nnoremap <leader>b :Buffers<CR>
+    nnoremap <leader>f :Files<CR>
+    nnoremap <leader>g :Rg<CR>
+endif
 
-set rtp+=~/.fzf
+" Use ripgrep for grep if available
+if executable('rg')
+    set grepprg=rg\ --vimgrep\ --smart-case\ --follow
+endif
 
-" Remap F8 to do gf, but split in new window
-nnoremap <F8> :vertical wincmd f<CR>
+" Use ag (silver searcher) if available but rg is not
+if !executable('rg') && executable('ag')
+    set grepprg=ag\ --vimgrep
+    let g:ackprg = 'ag --vimgrep --nogroup --nocolor --column'
+endif
+
+" ==============================================================================
+" Auto Commands
+" ==============================================================================
+
+" Return to last edit position when opening files
+augroup remember_position
+    autocmd!
+    autocmd BufReadPost *
+        \ if line("'\"") > 0 && line("'\"") <= line("$") |
+        \   exe "normal! g`\"" |
+        \ endif
+augroup END
+
+" Automatically remove trailing whitespace on save
+augroup trim_whitespace
+    autocmd!
+    autocmd BufWritePre * :%s/\s\+$//e
+augroup END
+
+" Disable automatic comment insertion
+augroup no_auto_comment
+    autocmd!
+    autocmd FileType * setlocal formatoptions-=cro
+augroup END
+
+" ==============================================================================
+" File Type Specific Settings
+" ==============================================================================
+
+" Python
+augroup python_files
+    autocmd!
+    autocmd FileType python setlocal expandtab shiftwidth=4 softtabstop=4
+augroup END
+
+" YAML
+augroup yaml_files
+    autocmd!
+    autocmd FileType yaml setlocal expandtab shiftwidth=2 softtabstop=2
+augroup END
+
+" JSON
+augroup json_files
+    autocmd!
+    autocmd FileType json setlocal expandtab shiftwidth=2 softtabstop=2
+augroup END
+
+" Markdown
+augroup markdown_files
+    autocmd!
+    autocmd FileType markdown setlocal wrap linebreak nolist
+augroup END
+
+" Shell scripts
+augroup shell_files
+    autocmd!
+    autocmd FileType sh setlocal expandtab shiftwidth=4 softtabstop=4
+augroup END
+
+" ==============================================================================
+" GUI Settings (if using gVim)
+" ==============================================================================
+
+if has('gui_running')
+    " Remove toolbar
+    set guioptions-=T
+    " Remove scrollbars
+    set guioptions-=r
+    set guioptions-=L
+    " Use console dialogs
+    set guioptions+=c
+    " Set font
+    if has('gui_gtk')
+        set guifont=Cascadia\ Code\ PL\ 12
+    elseif has('gui_macvim')
+        set guifont=Cascadia\ Code\ PL:h12
+    elseif has('gui_win32')
+        set guifont=Cascadia_Code_PL:h12:cANSI
+    endif
+endif
+
+" ==============================================================================
+" Performance Settings
+" ==============================================================================
+
+" Limit syntax highlighting for long lines
+set synmaxcol=500
+
+" Don't highlight huge files
+autocmd BufWinEnter * if line('$') > 20000 | syntax clear | endif
+
+" Faster scrolling
+set ttyfast
+
+" ==============================================================================
+" Security Settings
+" ==============================================================================
+
+" Disable modelines for security
+set nomodeline
+set modelines=0
+
+" Secure external command execution
+set secure
+
+" ==============================================================================
+" Convenience Functions
+" ==============================================================================
+
+" Toggle between number and relativenumber
+function! ToggleNumber()
+    if(&relativenumber == 1)
+        set norelativenumber
+        set number
+    else
+        set relativenumber
+    endif
+endfunction
+nnoremap <leader>n :call ToggleNumber()<CR>
+
+" Strip trailing whitespace
+function! StripTrailingWhitespace()
+    let save_cursor = getpos(".")
+    %s/\s\+$//e
+    call setpos('.', save_cursor)
+endfunction
+nnoremap <leader>ss :call StripTrailingWhitespace()<CR>
+
+" ==============================================================================
+" Status Line
+" ==============================================================================
+
+" Simple but informative status line
+set statusline=
+set statusline+=%f                          " File path
+set statusline+=\ %m                        " Modified flag
+set statusline+=\ %r                        " Readonly flag
+set statusline+=\ %h                        " Help file flag
+set statusline+=%=                          " Left/right separator
+set statusline+=%y                          " File type
+set statusline+=\ [%{&fileencoding?&fileencoding:&encoding}]  " Encoding
+set statusline+=\ [%{&fileformat}]          " File format
+set statusline+=\ %p%%                      " Percentage through file
+set statusline+=\ %l:%c                     " Line:Column
+set statusline+=\ 
+
+" ==============================================================================
+" Local Configuration
+" ==============================================================================
+
+" Source local configuration if it exists
+if filereadable(expand("~/.vimrc.local"))
+    source ~/.vimrc.local
+endif

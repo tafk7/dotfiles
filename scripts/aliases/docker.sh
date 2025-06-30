@@ -31,10 +31,15 @@ alias dprunea='docker system prune -af'
 
 # Useful functions
 
-# Enter a running container
+# Enter a running container (with proper escaping)
 denter() {
     if [[ -z "$1" ]]; then
         echo "Usage: denter <container_name_or_id>"
+        return 1
+    fi
+    # Validate container name/id format
+    if [[ ! "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+        echo "Error: Invalid container name or ID"
         return 1
     fi
     docker exec -it "$1" /bin/bash || docker exec -it "$1" /bin/sh
@@ -52,11 +57,14 @@ drun() {
     docker run -it --rm "$@"
 }
 
-# Stop all running containers
+# Stop all running containers (safely)
 dstopall() {
-    local containers=$(docker ps -q)
+    local containers
+    containers=$(docker ps -q)
     if [[ -n "$containers" ]]; then
-        docker stop $containers
+        # Use array to handle container IDs safely
+        IFS=$'\n' read -rd '' -a container_array <<< "$containers"
+        docker stop "${container_array[@]}"
     else
         echo "No running containers"
     fi

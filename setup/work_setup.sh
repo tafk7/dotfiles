@@ -3,6 +3,14 @@
 # Work setup script - Professional development tools
 # This file is sourced by install.sh when --work flag is used
 
+# Enable strict error handling
+set -e
+set -u
+set -o pipefail
+
+# Error trap for cleanup
+trap 'handle_error "work_setup.sh at line $LINENO"' ERR
+
 work_log "Configuring work environment..."
 
 # Install Azure CLI
@@ -11,11 +19,43 @@ install_azure_cli() {
     
     case $DISTRO in
         "ubuntu"|"debian")
-            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+            # Secure Azure CLI installation for Debian/Ubuntu
+            work_log "Adding Microsoft repository securely..."
+            
+            # Install prerequisites
+            safe_sudo apt-get update
+            safe_sudo apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
+            
+            # Download and verify Microsoft signing key
+            local temp_dir=$(mktemp -d -m 700)
+            local ms_key="$temp_dir/microsoft.asc"
+            local ms_key_url="https://packages.microsoft.com/keys/microsoft.asc"
+            local ms_key_checksum="bc528686b5086ded5e1d5453f0768ee85e0126bafc0ed167a470a4fbc91fd3f1"
+            
+            if verify_download "$ms_key_url" "$ms_key_checksum" "$ms_key" "Microsoft GPG key"; then
+                # Import the key
+                safe_sudo apt-key add "$ms_key"
+                
+                # Add repository
+                local repo_entry="deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main"
+                echo "$repo_entry" | safe_sudo tee /etc/apt/sources.list.d/azure-cli.list
+                
+                # Update and install
+                safe_sudo apt-get update
+                safe_sudo apt-get install -y azure-cli
+            else
+                error "Failed to download Microsoft signing key"
+                rm -rf "$temp_dir"
+                return 1
+            fi
+            
+            rm -rf "$temp_dir"
             ;;
         "fedora"|"rhel"|"centos")
-            sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-            sudo dnf install -y azure-cli
+            # Import Microsoft key and install via dnf
+            work_log "Installing via Microsoft repository..."
+            safe_sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+            safe_sudo dnf install -y azure-cli
             ;;
         "arch"|"manjaro")
             if command -v yay &> /dev/null; then
@@ -48,16 +88,54 @@ install_vscode() {
     
     case $DISTRO in
         "ubuntu"|"debian")
-            curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-            echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list
-            sudo apt update
-            sudo apt install -y code
+            # Secure VS Code installation for Debian/Ubuntu
+            work_log "Adding Microsoft repository securely for VS Code..."
+            
+            # Install prerequisites if not already present
+            safe_sudo apt-get update
+            safe_sudo apt-get install -y ca-certificates curl apt-transport-https gnupg
+            
+            # Download and add Microsoft signing key
+            local temp_dir=$(mktemp -d -m 700)
+            local ms_key="$temp_dir/microsoft.asc"
+            local ms_key_url="https://packages.microsoft.com/keys/microsoft.asc"
+            local ms_key_checksum="bc528686b5086ded5e1d5453f0768ee85e0126bafc0ed167a470a4fbc91fd3f1"
+            
+            if verify_download "$ms_key_url" "$ms_key_checksum" "$ms_key" "Microsoft GPG key"; then
+                # Import the key
+                safe_sudo apt-key add "$ms_key"
+                
+                # Add repository
+                local repo_entry="deb [arch=amd64,arm64,armhf] https://packages.microsoft.com/repos/code stable main"
+                echo "$repo_entry" | safe_sudo tee /etc/apt/sources.list.d/vscode.list
+                
+                # Update and install
+                safe_sudo apt-get update
+                safe_sudo apt-get install -y code
+            else
+                error "Failed to download Microsoft signing key for VS Code"
+                rm -rf "$temp_dir"
+                return 1
+            fi
+            
+            rm -rf "$temp_dir"
             ;;
         "fedora"|"rhel"|"centos")
-            sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-            sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
-            sudo dnf check-update
-            sudo dnf install -y code
+            # Import Microsoft key and install via dnf
+            work_log "Installing VS Code via Microsoft repository..."
+            safe_sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+            
+            # Create repository file securely
+            local repo_content="[code]
+name=Visual Studio Code
+baseurl=https://packages.microsoft.com/yumrepos/vscode
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc"
+            
+            echo "$repo_content" | safe_sudo tee /etc/yum.repos.d/vscode.repo
+            safe_sudo dnf check-update
+            safe_sudo dnf install -y code
             ;;
         "arch"|"manjaro")
             if command -v yay &> /dev/null; then
@@ -72,7 +150,7 @@ install_vscode() {
             # Fallback to snap
             if command -v snap &> /dev/null; then
                 work_log "Using snap as fallback..."
-                sudo snap install code --classic
+                safe_sudo snap install code --classic
             else
                 warn "VS Code installation not configured for $DISTRO"
                 work_log "Manual install: https://code.visualstudio.com/docs/setup/linux"
