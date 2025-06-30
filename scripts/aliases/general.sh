@@ -68,9 +68,6 @@ alias ta='tmux attach -t'
 alias tl='tmux list-sessions'
 alias tk='tmux kill-session -t'
 
-# Git shortcut
-alias g='git'
-
 # File viewing and editing
 alias vi='vim'
 alias nano='nano -w'
@@ -103,3 +100,6 @@ alias zshrc='vim ~/.zshrc'
 alias count='find . -type f | wc -l'
 alias cpv='cp -v'
 alias rmv='rm -v'
+
+# Markdown viewing with glow
+alias md='glow -p'  # Page through markdown files

@@ -2,8 +2,13 @@
 
 # WSL-specific aliases and functions for Windows integration
 
-# Windows paths
-export WIN_HOME="/mnt/c/Users/$(whoami)"
+# Only load these aliases on WSL systems
+if ! command -v wslpath >/dev/null 2>&1; then
+    return 0
+fi
+
+# Windows paths - using $USER instead of $(whoami) for security
+export WIN_HOME="/mnt/c/Users/$USER"
 export WIN_DESKTOP="$WIN_HOME/Desktop"
 export WIN_DOWNLOADS="$WIN_HOME/Downloads"
 export WIN_DOCUMENTS="$WIN_HOME/Documents"
@@ -16,7 +21,7 @@ alias cddl='cd $WIN_DOWNLOADS'
 alias cddocs='cd $WIN_DOCUMENTS'
 
 # Windows program shortcuts
-alias open='explorer.exe'
+alias open-explorer='explorer.exe'
 alias notepad='notepad.exe'
 alias clip='clip.exe'
 alias pwsh='powershell.exe'
@@ -27,8 +32,6 @@ alias explorer='explorer.exe .'
 alias e='explorer.exe .'
 
 # Clipboard integration
-alias pbcopy='clip.exe'
-alias pbpaste='powershell.exe -command "Get-Clipboard"'
 alias cwd='pwd | clip.exe'
 
 # Path conversion
@@ -37,7 +40,6 @@ alias lpath='wslpath -u'
 
 # SSH management (existing functionality)
 alias win-ssh='ls -la $WIN_SSH'
-alias sync-ssh='copy-windows-ssh'
 
 # Functions
 
@@ -66,46 +68,8 @@ winopen() {
     fi
 }
 
-# SSH Functions (moved from functions/ssh-helpers.sh)
+# Note: Core WSL functions (SSH management, clipboard, etc.) are handled in wsl/core.sh
+# This file only contains simple aliases and basic functions
 
-# Copy SSH keys from Windows to WSL
-copy-windows-ssh() {
-    local windows_ssh="/mnt/c/Users/$(whoami)/.ssh"
-    local wsl_ssh="$HOME/.ssh"
-    
-    if [[ ! -d "$windows_ssh" ]]; then
-        echo "Windows SSH directory not found at $windows_ssh"
-        return 1
-    fi
-    
-    mkdir -p "$wsl_ssh"
-    
-    # Copy all SSH keys
-    cp "$windows_ssh"/* "$wsl_ssh/" 2>/dev/null
-    
-    # Fix permissions
-    chmod 700 "$wsl_ssh"
-    chmod 600 "$wsl_ssh"/id_* 2>/dev/null
-    chmod 644 "$wsl_ssh"/*.pub 2>/dev/null
-    
-    echo "SSH keys copied from Windows to WSL"
-}
-
-# List Windows SSH keys
-list-windows-ssh() {
-    ls -la "/mnt/c/Users/$(whoami)/.ssh/"
-}
-
-# Use specific Windows SSH key
-use-windows-key() {
-    local key_name=${1:-id_rsa}
-    local windows_ssh="/mnt/c/Users/$(whoami)/.ssh"
-    
-    cp "$windows_ssh/$key_name" ~/.ssh/
-    cp "$windows_ssh/$key_name.pub" ~/.ssh/
-    chmod 600 ~/.ssh/$key_name
-    chmod 644 ~/.ssh/$key_name.pub
-    
-    ssh-add ~/.ssh/$key_name
-    echo "Added Windows SSH key: $key_name"
-}
+# SSH import functionality (main alias)
+alias sync-ssh='import_windows_ssh_keys'
