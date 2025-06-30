@@ -3,6 +3,14 @@
 # Base setup script - Core packages and configurations for everyone
 # This file is sourced by install.sh
 
+# Enable strict error handling
+set -e
+set -u
+set -o pipefail
+
+# Error trap for cleanup
+trap 'handle_error "base_setup.sh at line $LINENO"' ERR
+
 log "Configuring base environment..."
 
 # Get package manager type
@@ -47,12 +55,18 @@ if [[ "$IS_WSL" == true ]]; then
     build_package_list wsl_package_mappings wsl_packages "$pm"
 fi
 
-# Install packages
-install_packages base_packages "base"
+# Install packages with retry logic
+log "Installing base packages..."
+if ! retry_network_operation 3 5 "install_packages base_packages 'base'"; then
+    error "Failed to install base packages after retries"
+    return 1
+fi
 
 if [[ "$IS_WSL" == true ]]; then
     wsl_log "Installing WSL-specific packages..."
-    install_packages wsl_packages "WSL"
+    if ! retry_network_operation 3 5 "install_packages wsl_packages 'WSL'"; then
+        warn "Failed to install some WSL packages"
+    fi
 fi
 
 success "Base packages installed"

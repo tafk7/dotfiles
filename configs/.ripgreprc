@@ -1,0 +1,150 @@
+# Ripgrep configuration file
+# https://github.com/BurntSushi/ripgrep
+# Part of dotfiles - https://github.com/yourusername/dotfiles
+#
+# Set RIPGREP_CONFIG_PATH environment variable to use this file:
+# export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
+
+# ==============================================================================
+# Search Options
+# ==============================================================================
+
+# Search case-insensitively if pattern is all lowercase
+--smart-case
+
+# Follow symlinks
+--follow
+
+# Search hidden files and directories
+--hidden
+
+# Enable PCRE2 regex engine (if compiled with PCRE2 support)
+# --pcre2
+
+# Maximum number of columns to show
+--max-columns=150
+
+# Show preview of long lines
+--max-columns-preview
+
+# ==============================================================================
+# Output Options
+# ==============================================================================
+
+# Add line numbers to output
+--line-number
+
+# Show column numbers
+--column
+
+# Pretty print output with colors
+--color=auto
+
+# Group matches by file
+--heading
+
+# ==============================================================================
+# Performance Options
+# ==============================================================================
+
+# Use memory maps when possible
+--mmap
+
+# Number of threads to use (0 = number of CPU cores)
+--threads=0
+
+# ==============================================================================
+# File Type Definitions
+# ==============================================================================
+
+# Add custom file types
+--type-add=config:*.{yml,yaml,toml,ini,conf,cfg}
+--type-add=web:*.{html,htm,css,scss,sass,less,js,jsx,ts,tsx,vue}
+--type-add=shell:*.{sh,bash,zsh,fish}
+--type-add=docker:Dockerfile*,docker-compose*.yml
+--type-add=terraform:*.{tf,tfvars}
+--type-add=ansible:*.{yml,yaml}
+
+# ==============================================================================
+# Global Ignore Patterns
+# ==============================================================================
+
+# Version control
+--glob=!.git/
+--glob=!.svn/
+--glob=!.hg/
+
+# Dependencies and build artifacts
+--glob=!node_modules/
+--glob=!vendor/
+--glob=!target/
+--glob=!dist/
+--glob=!build/
+--glob=!__pycache__/
+--glob=!*.pyc
+
+# IDE and editor files
+--glob=!.idea/
+--glob=!.vscode/
+--glob=!*.swp
+--glob=!*.swo
+--glob=!*~
+
+# Temporary files
+--glob=!*.tmp
+--glob=!*.temp
+--glob=!*.cache
+--glob=!*.log
+
+# macOS
+--glob=!.DS_Store
+
+# Large binary files
+--glob=!*.{jpg,jpeg,png,gif,bmp,ico,pdf}
+--glob=!*.{zip,tar,gz,bz2,7z,rar}
+--glob=!*.{mp4,avi,mov,mkv,mp3,wav}
+--glob=!*.{exe,dll,so,dylib}
+
+# ==============================================================================
+# Specific Ignore Files
+# ==============================================================================
+
+# Ignore patterns from .gitignore
+# This requires ripgrep 13.0.0 or later
+# --ignore-file=.gitignore
+
+# Custom ignore file
+# --ignore-file=.rgignore
+
+# ==============================================================================
+# Color Scheme
+# ==============================================================================
+
+# Match colors
+--colors=match:fg:yellow
+--colors=match:bg:black
+--colors=match:style:bold
+
+# Line number colors
+--colors=line:fg:green
+--colors=line:style:bold
+
+# Column colors
+--colors=column:fg:green
+--colors=column:style:bold
+
+# Path colors
+--colors=path:fg:blue
+--colors=path:style:bold
+
+# ==============================================================================
+# Aliases (for common searches)
+# ==============================================================================
+
+# These can be used with shell aliases:
+# alias rgpy='rg --type py'
+# alias rgjs='rg --type js'
+# alias rgts='rg --type ts'
+# alias rgphp='rg --type php'
+# alias rggo='rg --type go'
+# alias rgyaml='rg --type yaml'

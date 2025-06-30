@@ -1,24 +1,38 @@
 #!/bin/bash
 
 # Main Dotfiles Installation Script
-# Usage: ./install.sh [--work] [--personal] [--force] [--skip-existing] [--help]
+# Usage: ./install.sh [--work] [--personal] [--force] [--skip-existing] [--recover] [--rollback] [--help]
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="$HOME/dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
 
+# Load security functions
+if [[ -f "$DOTFILES_DIR/scripts/security/core.sh" ]]; then
+    source "$DOTFILES_DIR/scripts/security/core.sh"
+else
+    echo "ERROR: Security functions not found. Exiting for safety."
+    exit 1
+fi
+
+# Load minimal installation helpers
+if [[ -f "$DOTFILES_DIR/scripts/install/state.sh" ]]; then
+    source "$DOTFILES_DIR/scripts/install/state.sh"
+fi
+if [[ -f "$DOTFILES_DIR/scripts/install/error_handler.sh" ]]; then
+    source "$DOTFILES_DIR/scripts/install/error_handler.sh"
+fi
+
 # Parse command line arguments
 INSTALL_WORK=false
 INSTALL_PERSONAL=false
 FORCE_MODE=false
-SKIP_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --work) INSTALL_WORK=true; shift ;;
         --personal) INSTALL_PERSONAL=true; shift ;;
         --force) FORCE_MODE=true; shift ;;
-        --skip-existing) SKIP_MODE=true; shift ;;
         -h|--help) show_help; exit 0 ;;
         *) echo "Unknown option: $1"; show_help; exit 1 ;;
     esac
@@ -90,6 +104,35 @@ update_system() {
 }
 
 # Unified package installation
+install_single_package() {
+    local package="$1"
+    local pm="${2:-$(get_package_manager)}"
+    
+    # Validate package name
+    if ! validate_package_name "$package"; then
+        error "Invalid package name: $package"
+        return 1
+    fi
+    
+    case $pm in
+        "apt")
+            if ! dpkg -l | grep -q "^ii  $package "; then
+                safe_sudo apt install -y "$package"
+            fi
+            ;;
+        "dnf")
+            sudo dnf install -y "$package"
+            ;;
+        "pacman")
+            sudo pacman -S --noconfirm "$package"
+            ;;
+        *)
+            warn "Cannot install package on $DISTRO"
+            return 1
+            ;;
+    esac
+}
+
 install_packages() {
     local -n package_array=$1
     local description="$2"
@@ -97,24 +140,25 @@ install_packages() {
     
     [[ ${#package_array[@]} -eq 0 ]] && return 0
     
+    
     log "Installing $description packages..."
     
     case $pm in
         "apt")
             for pkg in "${package_array[@]}"; do
                 if ! dpkg -l | grep -q "^ii  $pkg "; then
-                    sudo apt install -y "$pkg" || warn "Failed: $pkg"
+                    safe_sudo apt install -y "$pkg" || warn "Failed: $pkg"
                 fi
             done
             ;;
         "dnf")
             for pkg in "${package_array[@]}"; do
-                sudo dnf install -y "$pkg" || warn "Failed: $pkg"
+                safe_sudo dnf install -y "$pkg" || warn "Failed: $pkg"
             done
             ;;
         "pacman")
             for pkg in "${package_array[@]}"; do
-                sudo pacman -S --noconfirm "$pkg" || warn "Failed: $pkg"
+                safe_sudo pacman -S --noconfirm "$pkg" || warn "Failed: $pkg"
             done
             ;;
         *)
@@ -164,48 +208,20 @@ install_vscode_extensions() {
     done
 }
 
-# Safe Python package installation
+# Simple Python package installation
 install_python_package() {
     local package="$1"
-    
-    # Check if package is installed
-    if pip3 show "$package" &>/dev/null; then
-        local installed_version=$(pip3 show "$package" | grep Version | awk '{print $2}')
-        log "Python package $package already installed (version $installed_version)"
-        
-        # Skip if in skip mode
-        if [[ "$SKIP_MODE" == true ]]; then
-            return 0
-        fi
-        
-        # Force upgrade if in force mode
-        if [[ "$FORCE_MODE" == true ]]; then
-            log "Force mode: Upgrading $package"
-            pip3 install --user --upgrade "$package"
-            return 0
-        fi
-        
-        # Check if update available (only in interactive mode)
-        local latest_version=$(pip3 index versions "$package" 2>/dev/null | grep -m1 "Available versions" | awk '{print $3}' | tr -d ',')
-        
-        if [[ -n "$latest_version" ]] && [[ "$installed_version" != "$latest_version" ]]; then
-            echo "Update available for $package: $installed_version → $latest_version"
-            read -p "Update? [y/N]: " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                pip3 install --user --upgrade "$package"
-            fi
-        fi
-    else
-        log "Installing Python package: $package"
-        pip3 install --user "$package"
-    fi
+    log "Installing Python package: $package"
+    pip3 install --user "$package" || warn "Failed to install $package"
 }
 
 # Package name resolution
 resolve_package_name() {
     local mapping="$1"
     local pm="$2"
+    
+    # Sanitize input
+    mapping="$(sanitize_input "$mapping")"
     
     [[ "$mapping" != *":"* ]] && { echo "$mapping"; return; }
     
@@ -234,7 +250,7 @@ backup_dotfiles() {
     log "Backing up existing dotfiles to $BACKUP_DIR"
     mkdir -p "$BACKUP_DIR"
     
-    local files=(".zshrc" ".tmux.conf" ".gitconfig" ".vimrc" ".vim" ".ssh/config")
+    local files=(".zshrc" ".tmux.conf" ".gitconfig" ".vimrc" ".vim" ".ssh/config" ".profile" ".editorconfig" ".ripgreprc" ".config/bat" ".config/fd")
     for file in "${files[@]}"; do
         if [[ -e "$HOME/$file" ]]; then
             mkdir -p "$BACKUP_DIR/$(dirname "$file")"
@@ -250,6 +266,7 @@ create_safe_symlink() {
     local target="$2"
     local config_name="$(basename "$target")"
     
+    
     # If target doesn't exist, create symlink
     if [[ ! -e "$target" ]]; then
         ln -s "$source" "$target"
@@ -263,11 +280,6 @@ create_safe_symlink() {
         return 0
     fi
     
-    # Handle skip mode
-    if [[ "$SKIP_MODE" == true ]]; then
-        log "Skipping existing $config_name (--skip-existing mode)"
-        return 0
-    fi
     
     # Handle force mode
     if [[ "$FORCE_MODE" == true ]]; then
@@ -321,13 +333,18 @@ create_safe_symlink() {
 create_symlinks() {
     log "Creating symlinks..."
     
-    # Core config files
-    local configs=(".zshrc" ".tmux.conf" ".gitconfig" ".vimrc")
+    # Core config files with enhanced processing
+    local configs=(".zshrc" ".tmux.conf" ".gitconfig" ".vimrc" ".profile" ".editorconfig" ".ripgreprc")
     for config in "${configs[@]}"; do
         if [[ -f "$DOTFILES_DIR/configs/$config" ]]; then
             create_safe_symlink "$DOTFILES_DIR/configs/$config" "$HOME/$config"
+        else
+            warn "Config file not found: $DOTFILES_DIR/configs/$config"
         fi
     done
+    
+    # Create .config directory symlinks
+    setup_config_directory_links
     
     # VS Code settings
     setup_vscode_config
@@ -335,7 +352,38 @@ create_symlinks() {
     # Executable scripts
     setup_local_bin
     
+    
     success "Symlinks created"
+}
+
+setup_config_directory_links() {
+    log "Setting up .config directory links..."
+    
+    # Create .config directory if it doesn't exist
+    mkdir -p "$HOME/.config"
+    
+    # Link bat configuration
+    if [[ -d "$DOTFILES_DIR/configs/.config/bat" ]]; then
+        mkdir -p "$HOME/.config"
+        create_safe_symlink "$DOTFILES_DIR/configs/.config/bat" "$HOME/.config/bat"
+    fi
+    
+    # Link fd configuration  
+    if [[ -d "$DOTFILES_DIR/configs/.config/fd" ]]; then
+        mkdir -p "$HOME/.config"
+        create_safe_symlink "$DOTFILES_DIR/configs/.config/fd" "$HOME/.config/fd"
+    fi
+    
+    # Set ripgrep config environment variable in shell config
+    if [[ -f "$DOTFILES_DIR/configs/.ripgreprc" ]]; then
+        local ripgrep_export='export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"'
+        if ! grep -q "RIPGREP_CONFIG_PATH" "$HOME/.zshrc" 2>/dev/null; then
+            echo "" >> "$HOME/.zshrc"
+            echo "# Ripgrep configuration" >> "$HOME/.zshrc"
+            echo "$ripgrep_export" >> "$HOME/.zshrc"
+            log "Added RIPGREP_CONFIG_PATH to .zshrc"
+        fi
+    fi
 }
 
 setup_vscode_config() {
@@ -395,13 +443,6 @@ setup_shell_integration() {
         if [[ ! -L "$HOME/.zshrc" ]] || [[ "$(readlink "$HOME/.zshrc")" != "$DOTFILES_DIR/configs/.zshrc" ]]; then
             warn "Found existing .zshrc with custom content"
             
-            # Handle skip mode
-            if [[ "$SKIP_MODE" == true ]]; then
-                warn "Skipping shell integration (--skip-existing mode)"
-                echo "To enable dotfiles integration manually, add to your .zshrc:"
-                echo "source $DOTFILES_DIR/configs/.zshrc"
-                return 0
-            fi
             
             # Handle force mode
             if [[ "$FORCE_MODE" == true ]]; then
@@ -487,7 +528,37 @@ install_shell() {
     # Oh My Zsh
     [[ ! -d "$HOME/.oh-my-zsh" ]] && {
         log "Installing Oh My Zsh..."
-        sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        local temp_dir=$(mktemp -d -m 700)
+        local install_script="$temp_dir/install.sh"
+        
+        # Download and verify Oh My Zsh installer
+        local oh_my_zsh_url="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+        local oh_my_zsh_checksum="b1c3baa891427ed3e592e8c69a693fb3f20ac039a09203de3e0c0ef7ba059c3e"
+        
+        # Download and verify installer script
+        if ! verify_download "$oh_my_zsh_url" \
+                           "$oh_my_zsh_checksum" \
+                           "$install_script" \
+                           "Oh My Zsh installer"; then
+            error "Failed to download or verify Oh My Zsh installer"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        
+        # Basic validation - check it's a shell script and contains expected content
+        if [[ -f "$install_script" ]] && \
+           head -1 "$install_script" | grep -q "^#!/" && \
+           grep -q "Oh My Zsh" "$install_script"; then
+            log "Oh My Zsh installer validated"
+            chmod +x "$install_script"
+            RUNZSH=no CHSH=no sh "$install_script" --unattended
+        else
+            error "Oh My Zsh installer validation failed"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        
+        rm -rf "$temp_dir"
     }
     
     # Plugins and theme
@@ -525,17 +596,102 @@ install_fonts() {
     
     if ! fc-list | grep -q "Cascadia Code PL"; then
         log "Installing Cascadia Code PL..."
-        local temp_dir=$(mktemp -d)
-        (
-            cd "$temp_dir"
-            curl -L -o cascadia.zip "https://github.com/microsoft/cascadia-code/releases/download/v2111.01/CascadiaCode-2111.01.zip" &&
-            unzip -q cascadia.zip &&
-            cp ttf/CascadiaCodePL*.ttf "$HOME/.local/share/fonts/" &&
-            fc-cache -f -v &&
-            success "Cascadia Code PL installed"
-        ) || warn "Failed to install Cascadia Code font"
+        local temp_dir=$(mktemp -d -m 700)
+        local font_archive="$temp_dir/cascadia.zip"
+        
+        # Cascadia Code v2111.01 download with verification
+        local font_url="https://github.com/microsoft/cascadia-code/releases/download/v2111.01/CascadiaCode-2111.01.zip"
+        local expected_hash="51fd68176dffb87e2fbc79381aef7f5c9488b58918dee223cd7439b5aa14e712"
+        
+        if verify_download "$font_url" "$expected_hash" "$font_archive" "Cascadia Code font"; then
+            (
+                cd "$temp_dir"
+                unzip -q cascadia.zip &&
+                cp ttf/CascadiaCodePL*.ttf "$HOME/.local/share/fonts/" &&
+                fc-cache -f -v &&
+                success "Cascadia Code PL installed"
+            ) || warn "Failed to extract and install Cascadia Code font"
+        else
+            warn "Failed to download or verify Cascadia Code font"
+        fi
+        
         rm -rf "$temp_dir"
     fi
+}
+
+# Import Windows SSH files with validation
+import_windows_ssh_files() {
+    local win_ssh_dir="$1"
+    local import_all="${2:-false}"
+    
+    # SSH key files to consider
+    local ssh_files=(id_rsa id_rsa.pub id_ed25519 id_ed25519.pub id_ecdsa id_ecdsa.pub known_hosts config)
+    
+    for file in "${ssh_files[@]}"; do
+        local win_file="$win_ssh_dir/$file"
+        local local_file="$HOME/.ssh/$file"
+        
+        # Skip if Windows file doesn't exist
+        [[ ! -e "$win_file" ]] && continue
+        
+        # Skip if local file exists and we're not importing all
+        if [[ "$import_all" == false && -e "$local_file" ]]; then
+            continue
+        fi
+        
+        # Handle different file types
+        case "$file" in
+            id_*|*.pub)
+                # SSH key files - validate before copying
+                if [[ "$file" =~ \.pub$ ]]; then
+                    # Public keys - basic validation
+                    if [[ -f "$win_file" ]] && grep -qE "^(ssh-rsa|ssh-ed25519|ecdsa-sha2)" "$win_file"; then
+                        if secure_copy_ssh_key "$win_file" "$local_file" true; then
+                            wsl_log "Imported SSH public key: $file"
+                        else
+                            warn "Failed to import SSH public key: $file"
+                        fi
+                    else
+                        warn "Invalid SSH public key format: $file"
+                    fi
+                elif validate_ssh_key "$win_file"; then
+                    # Private keys - full validation
+                    if secure_copy_ssh_key "$win_file" "$local_file" true; then
+                        wsl_log "Imported SSH private key: $file"
+                    else
+                        warn "Failed to import SSH private key: $file"
+                    fi
+                else
+                    warn "Invalid SSH key, skipping: $file"
+                fi
+                ;;
+            known_hosts)
+                # Known hosts file - basic validation
+                if [[ -f "$win_file" ]] && [[ -s "$win_file" ]]; then
+                    # Use install for atomic permission setting
+                    install -m 644 "$win_file" "$local_file"
+                    wsl_log "Imported known_hosts"
+                else
+                    warn "Invalid or empty known_hosts file"
+                fi
+                ;;
+            config)
+                # SSH config file - basic validation
+                if [[ -f "$win_file" ]] && [[ -s "$win_file" ]]; then
+                    # Basic validation - check it looks like SSH config
+                    if head -10 "$win_file" | grep -q -E "^(Host|HostName|User|Port|IdentityFile)" || [[ ! -s "$win_file" ]]; then
+                        # Use install for atomic permission setting
+                        install -m 644 "$win_file" "$local_file"
+                        wsl_log "Imported SSH config"
+                    else
+                        warn "SSH config file appears invalid, skipping"
+                    fi
+                else
+                    warn "Invalid or empty SSH config file"
+                fi
+                ;;
+        esac
+    done
 }
 
 setup_ssh() {
@@ -566,11 +722,6 @@ setup_ssh() {
             if [[ ${#existing_files[@]} -gt 0 ]]; then
                 warn "Found existing SSH files: ${existing_files[*]}"
                 
-                # Handle skip mode
-                if [[ "$SKIP_MODE" == true ]]; then
-                    wsl_log "Skipping SSH import (--skip-existing mode)"
-                    return 0
-                fi
                 
                 # Handle force mode
                 if [[ "$FORCE_MODE" == true ]]; then
@@ -593,20 +744,12 @@ setup_ssh() {
                             local ssh_backup="$HOME/.ssh.backup.$(date +%Y%m%d-%H%M%S)"
                             cp -r "$HOME/.ssh" "$ssh_backup"
                             wsl_log "Backed up SSH to $ssh_backup"
-                            # Import all
-                            cp "$win_ssh"/{id_*,known_hosts,config} "$HOME/.ssh/" 2>/dev/null
+                            # Import all with validation
+                            import_windows_ssh_files "$win_ssh" true
                             ;;
                         3)
-                            # Import only missing files
-                            for file in "$win_ssh"/{id_*,known_hosts,config}; do
-                                if [[ -e "$file" ]]; then
-                                    local basename=$(basename "$file")
-                                    if [[ ! -e "$HOME/.ssh/$basename" ]]; then
-                                        cp "$file" "$HOME/.ssh/" 2>/dev/null
-                                        wsl_log "Imported missing file: $basename"
-                                    fi
-                                fi
-                            done
+                            # Import only missing files with validation
+                            import_windows_ssh_files "$win_ssh" false
                             ;;
                         *)
                             wsl_log "Skipping SSH import"
@@ -615,8 +758,8 @@ setup_ssh() {
                     esac
                 fi
             else
-                # No existing files, safe to import
-                cp "$win_ssh"/{id_*,known_hosts,config} "$HOME/.ssh/" 2>/dev/null
+                # No existing files, safe to import with validation
+                import_windows_ssh_files "$win_ssh" true
             fi
             
             # Fix permissions
@@ -639,11 +782,20 @@ setup_wsl() {
     
     wsl_log "Configuring WSL integration..."
     
-    # Browser integration
-    command -v wslview >/dev/null && {
-        grep -q "export BROWSER=wslview" "$HOME/.zshrc" 2>/dev/null ||
-            echo 'export BROWSER=wslview' >> "$HOME/.zshrc"
-    }
+    # Source core WSL functions
+    if [[ -f "$DOTFILES_DIR/scripts/wsl/core.sh" ]]; then
+        source "$DOTFILES_DIR/scripts/wsl/core.sh"
+        
+        # Setup WSL environment
+        setup_wsl_environment
+        
+        # Setup clipboard integration
+        setup_wsl_clipboard
+        
+        wsl_log "WSL integration complete"
+    else
+        warn "WSL core functions not found"
+    fi
 }
 
 setup_docker() {
@@ -731,7 +883,6 @@ Options:
   --work           Install work-specific tools (Azure CLI, VS Code)
   --personal       Install personal tools (currently just ffmpeg)
   --force          Force installation, overwrite existing files
-  --skip-existing  Skip all existing files and configurations
   -h, --help       Show this help
 
 Examples:
@@ -740,12 +891,6 @@ Examples:
   $0 --personal        # Base + personal tools
   $0 --work --personal # Everything
   $0 --force           # Overwrite existing configs (with backups)
-  $0 --skip-existing   # Preserve all existing files
-
-Safety modes:
-  Interactive (default): Asks before overwriting existing files
-  Force (--force):       Backs up and overwrites existing files
-  Skip (--skip-existing): Preserves all existing configurations
 
 This script provides a modern development environment with:
 - Zsh shell with Oh My Zsh and plugins
