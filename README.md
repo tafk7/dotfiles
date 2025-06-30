@@ -119,7 +119,11 @@ dotfiles/
 ├── setup/                  # Modular setup scripts
 │   ├── base_setup.sh      # Core packages for everyone
 │   ├── work_setup.sh      # Work-specific tools
-│   └── personal_setup.sh  # Personal tools (minimal)
+│   ├── personal_setup.sh  # Personal tools (minimal)
+│   └── ai_setup.sh        # AI tools (Claude Code and prompts)
+├── ai/                     # AI prompts and commands
+│   ├── CLAUDE.md          # Claude-specific guidance
+│   └── ...                # Additional AI prompts and tools
 ├── docs/                   # Documentation
 │   ├── aliases.md         # Complete alias reference
 │   ├── architecture.md    # System design and architecture
