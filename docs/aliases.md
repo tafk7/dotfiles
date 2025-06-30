@@ -116,10 +116,7 @@
 
 ### Git Functions
 
-| Function | Usage | When to Use |
-|----------|-------|-------------|
-| `gundo` | `gundo` | Undo last commit, keep changes |
-| `gquick "msg"` | `gquick "fix typo"` | Add all, commit, and push |
+> **Note**: Advanced git functions are available but not yet implemented in this version.
 
 ## Docker
 
@@ -151,23 +148,13 @@
 
 ### Docker Functions
 
-| Function | Usage | When to Use |
-|----------|-------|-------------|
-| `denter <id>` | `denter web` | Open shell in container |
-| `dclean` | `dclean` | Nuclear cleanup (removes everything) |
-| `drun <image>` | `drun ubuntu:latest` | Quick interactive container |
-| `dstopall` | `dstopall` | Stop all running containers |
+> **Note**: Advanced docker functions are available but not yet implemented in this version.
 
 ## WSL Specific
 
 ### Windows Navigation
 
-| Alias | Command | When to Use |
-|-------|---------|-------------|
-| `cdwin` | `cd /mnt/c/Users/<you>` | Go to Windows home |
-| `cddesk` | `cd` to Desktop | Quick access to Windows Desktop |
-| `cddl` | `cd` to Downloads | Access Windows Downloads |
-| `cddocs` | `cd` to Documents | Access Windows Documents |
+> **Note**: Advanced Windows navigation aliases are planned for future implementation.
 
 ### Windows Integration
 
@@ -203,12 +190,7 @@
 
 ### WSL Functions
 
-| Function | Usage | When to Use |
-|----------|-------|-------------|
-| `winapp <app>` | `winapp chrome google.com` | Launch any Windows app |
-| `winopen <file>` | `winopen report.pdf` | Open file with Windows default app |
-| `copy-windows-ssh` | `copy-windows-ssh` | Copy all SSH keys from Windows |
-| `use-windows-key <name>` | `use-windows-key id_ed25519` | Use specific Windows SSH key |
+> **Note**: Advanced WSL integration functions are planned for future implementation.
 
 ### Practical WSL Examples
 
@@ -231,61 +213,27 @@ wpath ./config.json | pbcopy
 
 ## Archive Operations
 
-| Alias | Command | When to Use |
-|-------|---------|-------------|
-| `untar <file>` | `tar -zxvf` | Extract .tar.gz files |
-| `tarc <name> <files>` | `tar -czf` | Create .tar.gz archive |
-| `tarx <file>` | `tar -xvf` | Extract any .tar file |
+> **Note**: Specialized archive aliases are available through standard tar commands. Use `tar --help` for options.
 
-## Security Features
+## Alias Safety
 
-### Alias Safety Changes
+For system stability, some traditional command overrides have been implemented as new aliases:
 
-For system stability and security, some traditional overrides have been changed to safer alternatives:
-
-| Old (Dangerous) | New (Safe) | Reason |
+| Original Command | Safe Alias | Purpose |
 |-----------------|------------|---------|
-| `alias find='fd'` | `alias f='fd'` | Preserves system `find` command for scripts |
-| `alias cat='bat'` | `alias c='bat'` | Preserves standard `cat` output format |
-| `alias tar='tar -czf'` | `alias tarc='tar -czf'` | Allows all `tar` operations, not just create |
-
-### Enhanced Process Search
-
-The `psg` function has been improved:
-
-```bash
-# New enhanced function with usage help
-psg chrome          # Find Chrome processes
-psg                 # Shows usage help
-```
+| `find` | `f` | Preserves system `find` for scripts |
+| `cat` | `c` / `view` | Preserves standard `cat` output |
+| `grep` | (uses ripgrep) | Much faster searching |
 
 ### Access Original Commands
 
-If you need the original commands, use these methods:
+If you need the original commands:
 
 ```bash
-\find . -name "*.txt"     # Original find command
-\cat file.txt             # Original cat command  
-\tar -xvf archive.tar     # Original tar command
-command find . -name "*.txt"  # Alternative method
+\cat file.txt             # Bypass alias
+command cat file.txt      # Alternative method
 ```
 
-## Security Enhancements
-
-### Download Verification
-- All downloads now use SHA256 verification
-- Network operations include retry logic
-- HTTPS-only policy for all external downloads
-
-### SSH Key Management
-- Individual SSH key validation before import
-- Automatic permission fixing
-- Secure backup before modifications
-
-### Input Validation
-- Package names validated to prevent injection
-- Path construction protected against traversal attacks
-- User input sanitized across all interactive operations
 
 ## Quick Tips
 

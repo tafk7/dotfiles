@@ -34,7 +34,7 @@ source $ZSH/oh-my-zsh.sh
 # User configuration
 export LANG=en_US.UTF-8
 export EDITOR='vim'
-export VISUAL='vim'
+# VISUAL is set in .profile
 
 # PATH additions
 export PATH="$HOME/.local/bin:$PATH"
@@ -71,12 +71,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 
-# Python configuration
-export PYTHONDONTWRITEBYTECODE=1
-
-# Docker configuration
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
+# Development environment variables are set in .profile
 
 # WSL specific configuration
 if [[ -n "$WSL_DISTRO_NAME" ]]; then
@@ -106,4 +101,4 @@ fi
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # Local configuration (not tracked in git)
-[[ -f ~/.zshrc.local ]] && source ~/.zshrc.localexport PATH="$HOME/.local/bin:$PATH"
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

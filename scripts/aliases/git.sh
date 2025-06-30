@@ -14,16 +14,10 @@ alias gc='git commit'
 alias gcm='git commit -m'
 alias gca='git commit --amend'
 
-# Branches (converted to functions for safety)
-gb() {
-    git branch "${@}"
-}
-gco() {
-    git checkout "${@}"
-}
-gcb() {
-    git checkout -b "${@}"
-}
+# Branches
+alias gb='git branch'
+alias gco='git checkout'
+alias gcb='git checkout -b'
 
 # Push/pull
 alias gp='git push'
