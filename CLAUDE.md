@@ -41,21 +41,32 @@ When modifying this codebase:
 
 ### Core Components
 
-1. **install.sh** - Main installer framework that:
-   - Detects Linux distribution (Ubuntu/Debian, Fedora/RHEL, Arch)
-   - Detects WSL environment
-   - Backs up existing dotfiles
-   - Orchestrates modular setup scripts
+1. **install.sh** (75 lines) - Main orchestrator that:
+   - Loads modular core components
+   - Coordinates installation workflow
+   - Handles template processing
 
-2. **setup/** - Modular installation scripts:
-   - Each handles specific package categories
-   - Uses unified package management functions
-   - Supports apt, dnf, pacman, snap, npm
+2. **scripts/core/** - Core framework modules:
+   - `common.sh` - Shared utilities (is_wsl, get_windows_username, safe_sudo)
+   - `cli.sh` - Command-line argument parsing
+   - `environment.sh` - OS/WSL/package manager detection
+   - `packages.sh` - Unified cross-distribution package management
+   - `files.sh` - Backup and symlink operations (includes git config template processing)
+   - `validation.sh` - Essential pre/post installation validation (117 lines, optimized)
+   - `orchestration.sh` - Installation workflow management (includes setup_ssh, setup_wsl)
+   - `logging.sh` - Consistent output formatting (30 lines, simplified)
 
-3. **scripts/** - Shell enhancements:
+3. **setup/** - Package installation modules:
+   - `base_setup.sh` - Essential tools everyone needs
+   - `work_setup.sh` - Professional development tools
+   - `personal_setup.sh` - Personal preferences
+   - `ai_setup.sh` - AI tools (Claude Code and prompts)
+
+4. **scripts/** - Runtime enhancements:
    - `aliases/` - Command shortcuts (auto-sourced)
    - `functions/` - Utility functions (auto-sourced)
-   - `bin/` - Executable scripts (added to PATH)
+   - `security/` - Security utilities (core.sh, ssh.sh)
+   - `wsl/` - Windows Subsystem for Linux integration
 
 ### Key Design Patterns
 
@@ -81,11 +92,11 @@ When modifying this codebase:
 
 ### Important Functions
 
-- `handle_error()` - Consistent error reporting
+- `safe_sudo()` - Secure sudo wrapper with transparency
 - `log()`, `success()`, `warn()`, `error()` - Colored logging
 - `install_packages()` - Unified package installation
 - `create_symlinks()` - Configuration file management
-- `copy-windows-ssh()` - WSL SSH key import
+- `import_windows_ssh_keys()` - WSL SSH key import
 
 ## Development Guidelines
 
@@ -99,16 +110,38 @@ When modifying this codebase:
 
 3. **Testing**: No formal test suite exists. Test manually in clean environments before changes.
 
+4. **Module dependencies**: Load order matters - common.sh must be loaded first, then logging.sh, before other modules.
+
 4. **Logging**: Use provided logging functions for consistent output formatting.
 
 5. **Python tools**: Work setup includes Python formatters (black, flake8, mypy, pylint) installed via pip3.
 
 6. **Package verification**: After installation, verify critical commands exist to catch package name differences.
 
+## AI Tools Installation
+
+The dotfiles include an optional AI setup that installs:
+1. **Claude Code** - Terminal-based AI coding assistant
+2. **Custom AI prompts** - Curated prompts for enhanced AI interactions
+
+### Installation
+```bash
+./install.sh --ai  # Install just AI tools
+./install.sh --work --personal --ai  # Complete setup with AI
+```
+
+### Post-Installation
+After installation:
+1. Authenticate Claude Code:
+   - Option 1: `claude --auth` (interactive)
+   - Option 2: `export ANTHROPIC_API_KEY=your_key`
+2. Access prompts: `~/.claude/`
+3. Start coding: `claude` in any project directory
+
 ## Common Tasks
 
 ### Adding a new tool
-1. Determine which setup script it belongs in (base/work/personal)
+1. Determine which setup script it belongs in (base/work/personal/ai)
 2. Add package mapping: `"tool:apt-name:dnf-name:pacman-name"`
 3. Test installation on target distributions
 

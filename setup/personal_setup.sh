@@ -1,35 +1,24 @@
 #!/bin/bash
-
-# Personal setup script - Personal tools and entertainment
+# Personal setup script - Personal tools and entertainment  
 # This file is sourced by install.sh when --personal flag is used
 
-# Enable strict error handling
-set -e
-set -u
-set -o pipefail
-
-# Error trap for cleanup
-trap 'handle_error "personal_setup.sh at line $LINENO"' ERR
-
-personal_log "Configuring personal environment..."
-
-# Get package manager type
-pm=$(get_package_manager)
-[[ "$pm" == "unknown" ]] && { warn "Unknown package manager for $DISTRO"; return 1; }
-
-# Define personal package mappings
-declare -a personal_package_mappings=(
-    # Media tools
-    "ffmpeg"
+# Main personal package installation function
+install_personal_packages() {
+    log "Installing personal packages..."
     
-    # Add packages as needed
-)
-
-# Build and install personal packages
-declare -a personal_packages
-build_package_list personal_package_mappings personal_packages "$pm"
-install_packages personal_packages "personal"
-
-# Create personal directories and aliases
-
-success "Personal environment configured"
+    # Get package manager type
+    local pm=$(get_package_manager)
+    
+    # Define personal package mappings: generic:apt:dnf:pacman
+    local personal_mappings=(
+        # Media tools (command-line only)
+        "ffmpeg:ffmpeg:ffmpeg:ffmpeg"
+    )
+    
+    # Build and install personal packages
+    local packages=()
+    build_package_list personal_mappings packages "$pm"
+    install_packages packages "personal packages"
+    
+    success "Personal environment configured"
+}

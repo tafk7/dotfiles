@@ -57,14 +57,11 @@ drun() {
     docker run -it --rm "$@"
 }
 
-# Stop all running containers (safely)
+# Stop all running containers
 dstopall() {
-    local containers
-    containers=$(docker ps -q)
+    local containers=$(docker ps -q)
     if [[ -n "$containers" ]]; then
-        # Use array to handle container IDs safely
-        IFS=$'\n' read -rd '' -a container_array <<< "$containers"
-        docker stop "${container_array[@]}"
+        docker stop $containers
     else
         echo "No running containers"
     fi
