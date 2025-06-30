@@ -87,17 +87,23 @@ build_package_list() {
     result_array=()
     
     for mapping in "${mapping_array[@]}"; do
+        local package_name=""
         case "$pm" in
             apt)
-                result_array+=($(echo "$mapping" | cut -d: -f2))
+                package_name=$(echo "$mapping" | cut -d: -f2)
                 ;;
             dnf)
-                result_array+=($(echo "$mapping" | cut -d: -f3))
+                package_name=$(echo "$mapping" | cut -d: -f3)
                 ;;
             pacman)
-                result_array+=($(echo "$mapping" | cut -d: -f4))
+                package_name=$(echo "$mapping" | cut -d: -f4)
                 ;;
         esac
+        
+        # Skip packages marked as "SKIP"
+        if [[ "$package_name" != "SKIP" && -n "$package_name" ]]; then
+            result_array+=("$package_name")
+        fi
     done
 }
 
