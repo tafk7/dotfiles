@@ -188,6 +188,25 @@ install_vscode_microsoft() {
     return 1
 }
 
+# Clean up broken Microsoft repositories
+cleanup_microsoft_repos() {
+    if [[ "$PACKAGE_MANAGER" == "apt" ]]; then
+        work_log "Cleaning up broken Microsoft repositories..."
+        
+        # Remove problematic repository files
+        safe_sudo rm -f /etc/apt/sources.list.d/azure-cli.list
+        safe_sudo rm -f /etc/apt/sources.list.d/vscode.list
+        
+        # Remove old keyring if it exists
+        safe_sudo rm -f /usr/share/keyrings/microsoft-archive-keyring.gpg
+        
+        # Update package lists
+        safe_sudo apt-get update >/dev/null 2>&1 || true
+        
+        work_log "Microsoft repositories cleaned up"
+    fi
+}
+
 # Export functions for use by other scripts
 export -f setup_microsoft_key setup_microsoft_apt_repo setup_microsoft_dnf_repo
-export -f install_azure_cli_microsoft install_vscode_microsoft
+export -f install_azure_cli_microsoft install_vscode_microsoft cleanup_microsoft_repos
