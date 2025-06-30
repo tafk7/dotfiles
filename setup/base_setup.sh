@@ -34,6 +34,7 @@ install_base_packages() {
         
         # Development
         "python3-pip:python3-pip:python3-pip:python-pip"
+        "pipx:pipx:pipx:python-pipx"
         "nodejs:nodejs:nodejs:nodejs"
         "npm:npm:npm:npm"
         
