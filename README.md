@@ -1,6 +1,6 @@
 # Dotfiles
 
-Modern Linux development environment with automatic setup and cross-distribution support.
+Modern Linux development environment with automatic setup, cross-distribution support, and enterprise security features.
 
 ## Quick Start
 
@@ -16,6 +16,10 @@ Modern Linux development environment with automatic setup and cross-distribution
 
 # Everything
 ./install.sh --work --personal
+
+# Safe modes for existing installations
+./install.sh --skip-existing   # Skip all existing configurations
+./install.sh --force          # Backup and replace existing files
 ```
 
 ## What You Get
@@ -79,11 +83,13 @@ win-home                   # Go to Windows user directory
 
 ## Shell Features
 
-### Modern CLI Tools
+### Modern CLI Tools (Safe Aliases)
 - `ls` → `eza --icons` (colorized with Git status)
-- `cat` → `bat` (syntax highlighting and line numbers)
-- `find` → `fdfind` (faster, respects .gitignore)
+- `c` / `view` → `bat` (syntax highlighting and line numbers) 
+- `f` → `fd` (faster find, respects .gitignore)
 - `grep` → `ripgrep` (much faster searching)
+
+> **Note:** Safe aliases preserve original commands for system compatibility. Use `\cat`, `\find`, etc. for original commands.
 
 ### tmux Shortcuts
 ```bash
@@ -103,18 +109,23 @@ Alt-Arrow                  # Switch panes (no prefix needed)
 ### Useful Aliases
 ```bash
 # System
-update                     # Update all packages
-install package            # Install package
 reload                     # Reload shell config
-
-# Development
-serve                      # Start Python HTTP server
+psg chrome                 # Find processes by name
 myip                       # Get public IP address
 
-# Git shortcuts  
+# Development  
 gs                         # git status
 ga                         # git add
 gc                         # git commit
+
+# Archive operations (safe alternatives)
+tarc archive.tar.gz files/ # Create compressed archive
+tarx archive.tar           # Extract archive
+untar archive.tar.gz       # Extract gzipped archive
+
+# Process search with help
+psg                        # Shows usage help
+psg <name>                 # Find processes matching name
 ```
 
 ## File Structure
@@ -137,12 +148,16 @@ dotfiles/
 │       └── settings.json   # VS Code settings
 └── scripts/
     ├── aliases/            # Shell aliases
-    │   ├── general.sh     # General aliases
+    │   ├── general.sh     # General aliases (safe versions)
     │   ├── wsl.sh         # WSL-specific aliases
-    │   └── git.sh         # Git aliases
+    │   ├── git.sh         # Git aliases
+    │   └── docker.sh      # Docker aliases
     ├── functions/          # Shell functions
     │   ├── help-tmux.sh   # tmux help function
     │   └── wsl.sh         # WSL utility functions
+    ├── security/           # Security utilities
+    │   ├── core.sh        # Security functions
+    │   └── templates.sh   # Configuration templates
     └── bin/               # Executable scripts
 ```
 
@@ -157,6 +172,38 @@ dotfiles/
 - **Native Linux** - Full feature set
 - **WSL 1/2** - Includes Windows integration features
 
+## Security Features
+
+### Download Security
+- **SHA256 verification** for all downloaded files
+- **HTTPS-only** policy for external downloads  
+- **Network retry logic** with exponential backoff
+- **Download validation** before execution
+
+### Input Protection
+- **Package name validation** to prevent injection attacks
+- **Path traversal protection** for file operations
+- **User input sanitization** across all interactive operations
+- **Command validation** before execution
+
+### SSH Security
+- **Individual key validation** before import
+- **Secure permission management** (600/644) automatically applied
+- **Backup creation** before SSH modifications
+- **Key format verification** using ssh-keygen
+
+### Installation Safety
+- **Interactive confirmation** for privilege escalation
+- **Timestamped backups** of existing configurations
+- **Safe symlink creation** with conflict resolution
+- **Configuration validation** before activation
+
+### System Protection
+- **Safe aliases** that don't override critical system commands
+- **Original command access** via `\command` or `command command`
+- **Error trapping** with cleanup on failures
+- **Strict mode** (`set -e`, `set -u`, `set -o pipefail`) in setup scripts
+
 ## Safety Features
 
 ### Backup Protection
@@ -168,11 +215,54 @@ dotfiles/
 - Stops installation on critical failures
 - Continues with warnings for optional components
 - Clear error messages with context
+- Comprehensive troubleshooting guide included
 
 ### Non-Destructive
-- Never overwrites existing configurations
+- Never overwrites existing configurations without confirmation
 - Uses symlinks for easy management
 - Preserves original files in backup directory
+- Multiple safety modes (interactive/force/skip)
+
+## Troubleshooting
+
+### Common Issues
+
+**Installation fails with "checksum verification failed":**
+```bash
+# Clear cache and retry
+rm -rf /tmp/dotfiles-*
+./install.sh --force
+```
+
+**"Package not found" errors:**
+```bash
+# Update package lists
+sudo apt update  # or dnf update / pacman -Sy
+./install.sh --skip-existing
+```
+
+**Permission denied errors:**
+```bash
+# Refresh sudo permissions
+sudo -v
+./install.sh
+```
+
+**WSL SSH import issues:**
+```bash
+# Check Windows SSH directory
+ls /mnt/c/Users/$(whoami)/.ssh/
+# Manual sync if needed
+sync-windows-ssh
+```
+
+For comprehensive troubleshooting, see [SECURITY_TROUBLESHOOTING.md](SECURITY_TROUBLESHOOTING.md).
+
+### Getting Help
+
+- **Alias reference**: See [scripts/aliases/ALIAS_CHEATSHEET.md](scripts/aliases/ALIAS_CHEATSHEET.md)
+- **Security issues**: See [SECURITY_TROUBLESHOOTING.md](SECURITY_TROUBLESHOOTING.md)  
+- **tmux help**: Run `help-tmux` after installation
 
 ## Customization
 

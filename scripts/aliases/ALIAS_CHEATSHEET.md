@@ -1,5 +1,7 @@
 # Dotfiles Alias Cheat Sheet
 
+> **Security Update:** Some aliases have been changed for system safety. See [Security Features](#security-features) section for details.
+
 ## Navigation & Files
 
 | Alias | Command | When to Use |
@@ -14,8 +16,9 @@
 | `la` | `eza -A --icons` | List all except . and .. |
 | `l` | `eza -CF --icons` | Compact multi-column list |
 | `tree` | `eza --tree --icons` | Show directory tree |
-| `cat` | `bat` or `batcat` | View file with syntax highlighting |
-| `find` | `fd` or `fdfind` | Fast file search |
+| `c` | `bat` or `batcat` | View file with syntax highlighting |
+| `view` | `bat` or `batcat` | Alternative syntax highlighting viewer |
+| `f` | `fd` or `fdfind` | Fast file search |
 
 ## System & Process
 
@@ -26,7 +29,7 @@
 | `du1` | `du -h --max-depth=1` | Size of current directory contents |
 | `free` | `free -h` | Check memory usage |
 | `ps` | `ps auxf` | Show all processes with tree |
-| `psg <name>` | `ps aux \| grep` | Find specific process |
+| `psg <name>` | Process search function | Find processes by name (try: `psg chrome`) |
 | `psmem` | Sort processes by memory | Find memory hogs |
 | `pscpu` | Sort processes by CPU | Find CPU hogs |
 | `htop` | Better process viewer | Monitor system resources |
@@ -231,7 +234,58 @@ wpath ./config.json | pbcopy
 | Alias | Command | When to Use |
 |-------|---------|-------------|
 | `untar <file>` | `tar -zxvf` | Extract .tar.gz files |
-| `tar <name> <files>` | `tar -czf` | Create .tar.gz archive |
+| `tarc <name> <files>` | `tar -czf` | Create .tar.gz archive |
+| `tarx <file>` | `tar -xvf` | Extract any .tar file |
+
+## Security Features
+
+### Alias Safety Changes
+
+For system stability and security, some traditional overrides have been changed to safer alternatives:
+
+| Old (Dangerous) | New (Safe) | Reason |
+|-----------------|------------|---------|
+| `alias find='fd'` | `alias f='fd'` | Preserves system `find` command for scripts |
+| `alias cat='bat'` | `alias c='bat'` | Preserves standard `cat` output format |
+| `alias tar='tar -czf'` | `alias tarc='tar -czf'` | Allows all `tar` operations, not just create |
+
+### Enhanced Process Search
+
+The `psg` function has been improved:
+
+```bash
+# New enhanced function with usage help
+psg chrome          # Find Chrome processes
+psg                 # Shows usage help
+```
+
+### Access Original Commands
+
+If you need the original commands, use these methods:
+
+```bash
+\find . -name "*.txt"     # Original find command
+\cat file.txt             # Original cat command  
+\tar -xvf archive.tar     # Original tar command
+command find . -name "*.txt"  # Alternative method
+```
+
+## Security Enhancements
+
+### Download Verification
+- All downloads now use SHA256 verification
+- Network operations include retry logic
+- HTTPS-only policy for all external downloads
+
+### SSH Key Management
+- Individual SSH key validation before import
+- Automatic permission fixing
+- Secure backup before modifications
+
+### Input Validation
+- Package names validated to prevent injection
+- Path construction protected against traversal attacks
+- User input sanitized across all interactive operations
 
 ## Quick Tips
 
@@ -239,4 +293,6 @@ wpath ./config.json | pbcopy
 - **Combine aliases**: `gaa && gcm "update" && gp`
 - **Check what an alias does**: `type <alias>`
 - **List all aliases**: `alias`
-- **Temporarily bypass alias**: `\command` (e.g., `\cat` uses original cat)
+- **Use original commands**: `\command` or `command command`
+- **Process search help**: Run `psg` without arguments for usage
+- **Archive operations**: Use `tarc` to create, `tarx` to extract, `untar` for .gz files

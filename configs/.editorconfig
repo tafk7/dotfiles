@@ -1,0 +1,223 @@
+# EditorConfig is awesome: https://EditorConfig.org
+# This file defines coding styles for multiple editors and IDEs
+# Part of dotfiles - https://github.com/yourusername/dotfiles
+
+# Top-most EditorConfig file
+root = true
+
+# ==============================================================================
+# Default Settings for All Files
+# ==============================================================================
+
+[*]
+# Use spaces for indentation
+indent_style = space
+
+# Default indentation size
+indent_size = 4
+
+# Unix-style newlines with a newline ending every file
+end_of_line = lf
+insert_final_newline = true
+
+# Remove trailing whitespace
+trim_trailing_whitespace = true
+
+# UTF-8 encoding
+charset = utf-8
+
+# Maximum line length
+max_line_length = 100
+
+# ==============================================================================
+# Programming Languages
+# ==============================================================================
+
+# Python
+[*.{py,pyw}]
+indent_size = 4
+max_line_length = 88  # Black formatter default
+
+# JavaScript, TypeScript, JSX, TSX
+[*.{js,jsx,ts,tsx,mjs,cjs}]
+indent_size = 2
+max_line_length = 80
+
+# Java, C, C++, C#
+[*.{java,c,cpp,cc,cxx,h,hpp,cs}]
+indent_size = 4
+
+# Go
+[*.go]
+indent_style = tab
+indent_size = 4
+
+# Rust
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+# Ruby
+[*.{rb,rake}]
+indent_size = 2
+
+# PHP
+[*.php]
+indent_size = 4
+
+# Shell scripts
+[*.{sh,bash,zsh}]
+indent_size = 4
+
+# PowerShell
+[*.{ps1,psm1,psd1}]
+indent_size = 4
+
+# ==============================================================================
+# Web Technologies
+# ==============================================================================
+
+# HTML
+[*.{html,htm}]
+indent_size = 2
+
+# CSS, SCSS, SASS, LESS
+[*.{css,scss,sass,less}]
+indent_size = 2
+
+# Vue components
+[*.vue]
+indent_size = 2
+
+# ==============================================================================
+# Data and Configuration Files
+# ==============================================================================
+
+# JSON
+[*.json]
+indent_size = 2
+
+# YAML
+[*.{yml,yaml}]
+indent_size = 2
+
+# TOML
+[*.toml]
+indent_size = 2
+
+# XML
+[*.{xml,xsd,xsl,xslt,svg}]
+indent_size = 2
+
+# INI files
+[*.{ini,conf}]
+indent_size = 4
+
+# ==============================================================================
+# Documentation
+# ==============================================================================
+
+# Markdown
+[*.{md,markdown}]
+max_line_length = off
+trim_trailing_whitespace = false  # Preserve trailing spaces for line breaks
+
+# reStructuredText
+[*.rst]
+indent_size = 3
+
+# AsciiDoc
+[*.{adoc,asciidoc}]
+indent_size = 2
+
+# ==============================================================================
+# Build and Project Files
+# ==============================================================================
+
+# Makefile
+[{Makefile,makefile,GNUmakefile}]
+indent_style = tab
+indent_size = 4
+
+# Dockerfile
+[{Dockerfile,dockerfile}]
+indent_size = 4
+
+# Docker Compose
+[{docker-compose.yml,docker-compose.yaml}]
+indent_size = 2
+
+# Gradle
+[*.gradle]
+indent_size = 4
+
+# Maven
+[pom.xml]
+indent_size = 2
+
+# ==============================================================================
+# Version Control
+# ==============================================================================
+
+# Git config files
+[.git*]
+indent_size = 4
+
+# Git commit messages
+[COMMIT_EDITMSG]
+max_line_length = 72
+
+# ==============================================================================
+# Special Files
+# ==============================================================================
+
+# Package files
+[{package.json,package-lock.json,composer.json,Gemfile,Cargo.toml}]
+indent_size = 2
+
+# CI/CD Configuration
+[{.travis.yml,.gitlab-ci.yml,.github/workflows/*.yml,azure-pipelines.yml}]
+indent_size = 2
+
+# EditorConfig itself
+[.editorconfig]
+indent_size = 2
+
+# Vim configuration
+[{.vimrc,*.vim}]
+indent_size = 4
+
+# ==============================================================================
+# Overrides for Specific Projects
+# ==============================================================================
+
+# Prettier configuration
+[{.prettierrc,.prettierrc.json,.prettierrc.yml,.prettierrc.yaml}]
+indent_size = 2
+
+# ESLint configuration
+[{.eslintrc,.eslintrc.json,.eslintrc.yml,.eslintrc.yaml}]
+indent_size = 2
+
+# Babel configuration
+[{.babelrc,.babelrc.json,babel.config.js}]
+indent_size = 2
+
+# ==============================================================================
+# Binary Files (Excluded from Processing)
+# ==============================================================================
+
+# Images
+[*.{png,jpg,jpeg,gif,ico,svg,webp}]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# Fonts
+[*.{woff,woff2,ttf,otf,eot}]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# Archives
+[*.{zip,tar,gz,bz2,7z,rar}]
+insert_final_newline = false
+trim_trailing_whitespace = false
