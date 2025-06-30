@@ -10,13 +10,20 @@ source "$SCRIPT_DIR/../security/core.sh"  # For verify_download
 
 # Microsoft GPG key details
 declare -g MS_KEY_URL="https://packages.microsoft.com/keys/microsoft.asc"
-declare -g MS_KEY_CHECKSUM="bc528686b5086ded5e1d5453f0768ee85e0126bafc0ed167a470a4fbc91fd3f1"
+declare -g MS_KEY_CHECKSUM="2fa9c05d591a1582a9aba276272478c262e95ad00acf60eaee1644d93941e3c6"
 
 # Download and verify Microsoft GPG key
 setup_microsoft_key() {
     local temp_dir=$(mktemp -d)
     chmod 700 "$temp_dir"
     local ms_key="$temp_dir/microsoft.asc"
+    
+    # Ensure we can write to the temp file
+    if ! touch "$ms_key" 2>/dev/null; then
+        error "Cannot create temporary file: $ms_key"
+        rm -rf "$temp_dir"
+        return 1
+    fi
     
     if verify_download "$MS_KEY_URL" "$MS_KEY_CHECKSUM" "$ms_key" "Microsoft GPG key"; then
         echo "$ms_key"  # Return path to verified key
