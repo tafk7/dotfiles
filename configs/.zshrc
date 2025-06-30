@@ -106,4 +106,4 @@ fi
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # Local configuration (not tracked in git)
-[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.localexport PATH="$HOME/.local/bin:$PATH"

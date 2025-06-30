@@ -14,10 +14,16 @@ alias gc='git commit'
 alias gcm='git commit -m'
 alias gca='git commit --amend'
 
-# Branches
-alias gb='git branch'
-alias gco='git checkout'
-alias gcb='git checkout -b'
+# Branches (converted to functions for safety)
+gb() {
+    git branch "${@}"
+}
+gco() {
+    git checkout "${@}"
+}
+gcb() {
+    git checkout -b "${@}"
+}
 
 # Push/pull
 alias gp='git push'
@@ -39,9 +45,13 @@ gundo() {
     git reset HEAD~1 --soft
 }
 
-# Quick commit and push
+# Quick commit and push (with input validation)
 gquick() {
+    if [[ -z "$1" ]]; then
+        echo "Error: Commit message required"
+        return 1
+    fi
     git add .
-    git commit -m "$1"
+    git commit -m "${1}"
     git push
 }

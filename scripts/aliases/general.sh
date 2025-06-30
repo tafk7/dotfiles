@@ -9,17 +9,20 @@ alias la='eza -A --icons'
 alias l='eza -CF --icons'
 alias tree='eza --tree --icons'
 
-# OS-aware aliases for bat and fd
+# OS-aware aliases for bat and fd (safe aliases that don't override system commands)
 if command -v batcat &> /dev/null; then
-    alias cat='batcat'
+    alias c='batcat'
+    alias view='batcat'
 elif command -v bat &> /dev/null; then
-    alias cat='bat'
+    alias c='bat'
+    alias view='bat'
 fi
 
 if command -v fdfind &> /dev/null; then
-    alias find='fdfind'
+    alias f='fdfind'
+    alias fd='fdfind'
 elif command -v fd &> /dev/null; then
-    alias find='fd'
+    alias f='fd'
 fi
 
 # Directory navigation
@@ -43,7 +46,15 @@ alias df='df -h'
 alias du='du -h'
 alias free='free -h'
 alias ps='ps auxf'
-alias psg='ps aux | grep -v grep | grep -i -e VSZ -e'
+# Process search function
+psg() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: psg <process_name>"
+        echo "Search for running processes matching the given name"
+        return 1
+    fi
+    ps aux | grep -v grep | grep -i "$1"
+}
 
 # Network
 alias ping='ping -c 5'
@@ -66,9 +77,10 @@ alias nano='nano -w'
 alias less='less -R'
 alias more='less'
 
-# Archive operations
+# Archive operations (safe aliases that don't override tar)
 alias untar='tar -zxvf'
-alias tar='tar -czf'
+alias tarc='tar -czf'  # tar create
+alias tarx='tar -xvf'  # tar extract
 
 # Process management
 alias psmem='ps auxf | sort -nr -k 4'
