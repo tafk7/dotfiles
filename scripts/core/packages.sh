@@ -141,6 +141,17 @@ install_npm_packages() {
     
     if command -v npm >/dev/null 2>&1; then
         log "Installing NPM packages..."
+        
+        # Configure npm for user-space global installs if not already configured
+        if [[ ! -d "$HOME/.npm-global" ]]; then
+            mkdir -p "$HOME/.npm-global"
+            npm config set prefix "$HOME/.npm-global"
+            log "Configured npm for user-space global installations"
+            
+            # Add to PATH for current session
+            export PATH="$HOME/.npm-global/bin:$PATH"
+        fi
+        
         for package in "${npm_packages[@]}"; do
             if npm install -g "$package"; then
                 success "Installed npm: $package"
@@ -180,13 +191,30 @@ install_python_package() {
     
     if command -v pip3 >/dev/null 2>&1; then
         log "Installing Python package: $description..."
-        if pip3 install --user "$package"; then
+        
+        # Try pipx first (preferred for tools in PEP 668 environments)
+        if command -v pipx >/dev/null 2>&1; then
+            if pipx install "$package" 2>/dev/null; then
+                success "Installed Python package via pipx: $description"
+                return 0
+            fi
+        fi
+        
+        # Try pip with --user flag
+        if pip3 install --user "$package" 2>/dev/null; then
             success "Installed Python package: $description"
             return 0
-        else
-            warn "Failed to install Python package: $description"
-            return 1
         fi
+        
+        # Try with --break-system-packages as last resort (PEP 668 override)
+        if pip3 install --user --break-system-packages "$package" 2>/dev/null; then
+            success "Installed Python package (PEP 668 override): $description"
+            return 0
+        fi
+        
+        warn "Failed to install Python package: $description"
+        log "Consider installing pipx: sudo apt install pipx"
+        return 1
     else
         warn "pip3 not available, skipping Python package: $description"
         return 1

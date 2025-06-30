@@ -14,7 +14,8 @@ declare -g MS_KEY_CHECKSUM="bc528686b5086ded5e1d5453f0768ee85e0126bafc0ed167a470
 
 # Download and verify Microsoft GPG key
 setup_microsoft_key() {
-    local temp_dir=$(mktemp -d -m 700)
+    local temp_dir=$(mktemp -d)
+    chmod 700 "$temp_dir"
     local ms_key="$temp_dir/microsoft.asc"
     
     if verify_download "$MS_KEY_URL" "$MS_KEY_CHECKSUM" "$ms_key" "Microsoft GPG key"; then
