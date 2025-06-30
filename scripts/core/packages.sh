@@ -80,22 +80,22 @@ install_single_package() {
 
 # Build package list from mapping
 build_package_list() {
-    local -n mappings=$1
-    local -n packages=$2
+    local -n mapping_array=$1
+    local -n result_array=$2
     local pm="$3"
     
-    packages=()
+    result_array=()
     
-    for mapping in "${mappings[@]}"; do
+    for mapping in "${mapping_array[@]}"; do
         case "$pm" in
             apt)
-                packages+=($(echo "$mapping" | cut -d: -f2))
+                result_array+=($(echo "$mapping" | cut -d: -f2))
                 ;;
             dnf)
-                packages+=($(echo "$mapping" | cut -d: -f3))
+                result_array+=($(echo "$mapping" | cut -d: -f3))
                 ;;
             pacman)
-                packages+=($(echo "$mapping" | cut -d: -f4))
+                result_array+=($(echo "$mapping" | cut -d: -f4))
                 ;;
         esac
     done
