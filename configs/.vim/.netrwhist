@@ -1,0 +1,4 @@
+let g:netrw_dirhistmax  =10
+let g:netrw_dirhistcnt =2
+let g:netrw_dirhist_2='/home/tafk/finn_builds/code_gen_ipgen_LayerNorm_hls_0_pwt8yuk_'
+let g:netrw_dirhist_1='/mnt/c/dev/ScaleHLS-HIDA/build'
