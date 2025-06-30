@@ -1,0 +1,134 @@
+[user]
+    # TODO: Set your name and email
+    # name = Your Name
+    # email = your.email@example.com
+
+[core]
+    editor = vim
+    whitespace = fix,-indent-with-non-tab,trailing-space,cr-at-eol
+    pager = less -F -X
+    autocrlf = input
+
+[color]
+    ui = auto
+    branch = auto
+    diff = auto
+    status = auto
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "diff"]
+    meta = yellow bold
+    frag = magenta bold
+    old = red bold
+    new = green bold
+
+[color "status"]
+    added = yellow
+    changed = green
+    untracked = cyan
+
+[alias]
+    # Basic shortcuts
+    st = status -sb
+    co = checkout
+    br = branch
+    ci = commit
+    ca = commit -a
+    cm = commit -m
+    cam = commit -am
+    
+    # Log viewing
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+    ll = log --pretty=format:"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]" --decorate --numstat
+    ls = log --pretty=format:"%C(yellow)%h%Cred%d %Creset%s%Cblue [%cn]" --decorate
+    lds = log --pretty=format:"%C(yellow)%h %ad%Cred%d %Creset%s%Cblue [%cn]" --decorate --date=short
+    le = log --oneline --decorate
+    
+    # Diff shortcuts
+    d = diff
+    dc = diff --cached
+    ds = diff --staged
+    dw = diff --word-diff
+    
+    # Branch management
+    bd = branch -d
+    bD = branch -D
+    branches = branch -a
+    remotes = remote -v
+    
+    # Stash operations
+    sl = stash list
+    sa = stash apply
+    ss = stash save
+    sp = stash pop
+    sd = stash drop
+    
+    # Working with remotes
+    p = push
+    pl = pull
+    f = fetch
+    fp = fetch --prune
+    pu = push -u origin HEAD
+    
+    # Undo operations
+    undo = reset HEAD~1 --mixed
+    amend = commit -a --amend
+    unstage = reset HEAD --
+    discard = checkout --
+    
+    # Finding things
+    grep = grep -Ii
+    find = "!git ls-files | grep -i"
+    
+    # Show verbose output about tags, branches or remotes
+    tags = tag -l
+    
+    # List contributors with number of commits
+    contributors = shortlog --summary --numbered
+    
+    # Show the last tag
+    lasttag = describe --tags --abbrev=0
+    
+    # Quick look at all repository
+    overview = log --all --oneline --no-merges
+    
+    # Today's work
+    today = log --since=midnight --author='$(git config user.name)' --oneline
+    
+    # List aliases
+    aliases = config --get-regexp alias
+    
+    # Interactive rebase with the given number of latest commits
+    reb = "!r() { git rebase -i HEAD~$1; }; r"
+
+[push]
+    default = simple
+    followTags = true
+
+[pull]
+    rebase = false
+
+[merge]
+    tool = vimdiff
+    conflictstyle = diff3
+
+[diff]
+    tool = vimdiff
+    algorithm = patience
+    compactionHeuristic = true
+
+[rerere]
+    enabled = true
+
+[help]
+    autocorrect = 1
+
+[fetch]
+    prune = true
+
+[init]
+    defaultBranch = main
