@@ -15,8 +15,12 @@ install_work_packages() {
     # Install Python development tools
     install_python_tools
     
-    # Install VS Code extensions
-    install_work_vscode_extensions
+    # Install VS Code extensions only on non-WSL systems
+    if ! is_wsl; then
+        install_work_vscode_extensions
+    else
+        log "Skipping VS Code extensions on WSL - extensions should be managed from Windows VS Code"
+    fi
     
     success "Work environment configured"
 }
@@ -29,18 +33,22 @@ install_microsoft_tools() {
     if [[ -f "$DOTFILES_DIR/scripts/install/microsoft.sh" ]]; then
         source "$DOTFILES_DIR/scripts/install/microsoft.sh"
         
-        # Install Azure CLI
+        # Install Azure CLI (needed on all systems)
         if install_azure_cli_microsoft; then
             success "Azure CLI installed - login with: az login"
         else
             warn "Azure CLI installation failed"
         fi
         
-        # Install VS Code
-        if install_vscode_microsoft; then
-            success "VS Code installed"
+        # Install VS Code only on non-WSL systems
+        if ! is_wsl; then
+            if install_vscode_microsoft; then
+                success "VS Code installed"
+            else
+                warn "VS Code installation failed"
+            fi
         else
-            warn "VS Code installation failed"
+            log "Skipping VS Code installation on WSL - use VS Code from Windows with Remote-WSL extension"
         fi
     else
         warn "Microsoft integration not found, skipping Azure CLI and VS Code"
