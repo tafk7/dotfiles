@@ -225,21 +225,108 @@ show_next_steps() {
     echo
     success "Installation completed! 🎉"
     echo
-    echo "Next steps:"
-    echo "1. Restart your shell or run: source ~/.bashrc"
-    echo "2. Configure Git with your details (if not already done)"
-    echo "3. Review the alias cheat sheet: cat ~/.dotfiles/docs/aliases.md"
-    
-    if is_wsl; then
-        echo "4. WSL-specific features are now available (win-ssh, sync-ssh, etc.)"
-    fi
-    
-    if [[ "$INSTALL_AI" == true ]]; then
-        echo "5. AI tools installed! Authenticate Claude Code with: claude --auth"
-        echo "   AI prompts available at: ~/.claude/"
-    fi
-    
+    echo "=== Next Steps ==="
     echo
-    echo "Backup created at: $BACKUP_DIR"
-    echo "Dotfiles repository: $DOTFILES_DIR"
+    
+    # Basic steps (always shown)
+    echo "1. Restart your shell or run: source ~/.bashrc"
+    echo "2. Review available aliases and functions: alias | less"
+    
+    # Git configuration check
+    if ! git config --global user.name >/dev/null 2>&1; then
+        echo "3. Configure Git with your information:"
+        echo "   git config --global user.name \"Your Name\""
+        echo "   git config --global user.email \"your.email@example.com\""
+    fi
+    
+    # Zsh/Powerlevel10k setup (zsh is now installed by default)
+    if [[ -f "$HOME/.zshrc" ]]; then
+        echo
+        echo "=== Zsh Shell Configuration ==="
+        
+        # Check if zsh is the default shell
+        if [[ "$SHELL" != "$(which zsh)" ]]; then
+            echo "• Make Zsh your default shell: chsh -s \$(which zsh)"
+            echo "  (You'll need to log out and back in for this to take effect)"
+        fi
+        
+        if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+            echo "• Install Oh My Zsh: sh -c \"\$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\""
+        fi
+        
+        if [[ ! -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]]; then
+            echo "• Install Powerlevel10k theme:"
+            echo "  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.oh-my-zsh/custom/themes/powerlevel10k"
+        fi
+        
+        if [[ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]] && [[ ! -f "$HOME/.p10k.zsh" ]]; then
+            echo "• Configure Powerlevel10k: p10k configure"
+        fi
+        
+        if [[ -d "$HOME/.oh-my-zsh" ]] && [[ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]] && [[ -f "$HOME/.p10k.zsh" ]]; then
+            echo "• Zsh with Powerlevel10k is fully configured! 🚀"
+        fi
+    fi
+    
+    # Work-specific steps
+    if [[ "$INSTALL_WORK" == true ]]; then
+        echo
+        echo "=== Work Tools Installed ==="
+        if command -v az >/dev/null 2>&1; then
+            echo "• Azure CLI: Login with 'az login'"
+        fi
+        if ! is_wsl && command -v code >/dev/null 2>&1; then
+            echo "• VS Code: Launch with 'code .'"
+            echo "  Extensions installed: Python, Prettier, Docker, TypeScript, Tailwind"
+        fi
+        echo "• Node.js tools: yarn, typescript, eslint, prettier, nodemon"
+        echo "• Python tools: black, flake8, mypy, pylint"
+        if command -v npm >/dev/null 2>&1; then
+            echo "• NPM global packages installed in: ~/.npm-global"
+        fi
+    fi
+    
+    # Personal-specific steps
+    if [[ "$INSTALL_PERSONAL" == true ]]; then
+        echo
+        echo "=== Personal Tools Installed ==="
+        echo "• Media tools: ffmpeg available for video/audio processing"
+    fi
+    
+    # AI-specific steps
+    if [[ "$INSTALL_AI" == true ]]; then
+        echo
+        echo "=== AI Tools Installed ==="
+        echo "• Claude Code: Authenticate with 'claude --auth'"
+        echo "• AI prompts available at: ~/.claude/"
+        echo "• Start coding with AI: 'claude' in any project directory"
+    fi
+    
+    # WSL-specific features
+    if is_wsl; then
+        echo
+        echo "=== WSL Features Available ==="
+        echo "• Import SSH keys from Windows: sync-ssh"
+        echo "• Clipboard integration: pbcopy/pbpaste aliases"
+        if [[ "$INSTALL_WORK" == true ]]; then
+            echo "• VS Code: Use from Windows with Remote-WSL extension"
+        fi
+    fi
+    
+    # Helpful commands
+    echo
+    echo "=== Helpful Commands ==="
+    echo "• View all aliases: alias"
+    echo "• Reload shell config: reload"
+    echo "• Search processes: psg <name>"
+    echo "• View markdown files: md <file>"
+    
+    # Installation info
+    echo
+    echo "=== Installation Info ==="
+    echo "• Backup created at: $BACKUP_DIR"
+    echo "• Dotfiles location: $DOTFILES_DIR"
+    if [[ -f "$STATE_FILE" ]]; then
+        echo "• Installation log: $STATE_FILE"
+    fi
 }
