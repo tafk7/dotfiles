@@ -22,6 +22,9 @@ install_base_packages() {
         "zip:zip:zip:zip"
         "jq:jq:jq:jq"
         
+        # Shell
+        "zsh:zsh:zsh:zsh"
+        
         # Modern CLI tools
         "eza:eza:eza:eza"
         "bat:bat:bat:bat"
