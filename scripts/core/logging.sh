@@ -10,15 +10,15 @@ declare -g BLUE='\033[0;34m' PURPLE='\033[0;35m' CYAN='\033[0;36m' NC='\033[0m'
 # State tracking
 declare -g STATE_FILE="${STATE_FILE:-$HOME/.dotfiles_state}"
 
-# Core logging functions
-log() { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Core logging functions - output to stderr to avoid interfering with command substitution
+log() { echo -e "${BLUE}[INFO]${NC} $1" >&2; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1" >&2; }
+warn() { echo -e "${YELLOW}[WARNING]${NC} $1" >&2; }
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 
 # Specialized logging functions
-wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
-work_log() { echo -e "${CYAN}[WORK]${NC} $1"; }
+wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1" >&2; }
+work_log() { echo -e "${CYAN}[WORK]${NC} $1" >&2; }
 
 # Simple action logging for tracking progress
 log_action() {
