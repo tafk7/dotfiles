@@ -12,6 +12,7 @@ run_installation() {
     fi
     
     # Phase 1: System preparation
+    cleanup_broken_repos
     update_system
     create_backup
     
@@ -49,6 +50,29 @@ run_installation() {
     
     success "Installation completed successfully!"
     show_next_steps
+}
+
+# Clean up broken repositories from previous runs
+cleanup_broken_repos() {
+    log "Checking for broken repositories..."
+    
+    # Check if Microsoft integration is available and clean up if needed
+    if [[ -f "$DOTFILES_DIR/scripts/install/microsoft.sh" ]]; then
+        source "$DOTFILES_DIR/scripts/install/microsoft.sh"
+        
+        # Check if Microsoft repos exist and are causing issues
+        if [[ -f /etc/apt/sources.list.d/azure-cli.list ]] || [[ -f /etc/apt/sources.list.d/vscode.list ]]; then
+            # Test if apt update would fail due to Microsoft repos
+            if ! safe_sudo apt-get update >/dev/null 2>&1; then
+                log "Found broken Microsoft repositories, cleaning up..."
+                cleanup_microsoft_repos
+            else
+                log "Microsoft repositories are working correctly"
+            fi
+        fi
+    fi
+    
+    log "Repository cleanup completed"
 }
 
 # Run base setup
