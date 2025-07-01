@@ -26,11 +26,25 @@ setup_microsoft_key_apt() {
     fi
     
     if verify_download "$MS_KEY_URL" "$MS_KEY_CHECKSUM" "$ms_key" "Microsoft GPG key"; then
-        # Import the key for apt (convert to gpg format)
-        if gpg --dearmor < "$ms_key" | safe_sudo tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null; then
-            success "Microsoft GPG key imported for apt"
+        # Verify the key file exists before processing
+        if [[ ! -f "$ms_key" ]]; then
+            error "Microsoft key file disappeared: $ms_key"
             rm -rf "$temp_dir"
-            return 0
+            return 1
+        fi
+        
+        # Import the key for apt (convert to gpg format)
+        if cat "$ms_key" | gpg --dearmor | safe_sudo tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null; then
+            # Verify the key was actually imported
+            if [[ -f /usr/share/keyrings/microsoft-archive-keyring.gpg ]]; then
+                success "Microsoft GPG key imported for apt"
+                rm -rf "$temp_dir"
+                return 0
+            else
+                error "Microsoft GPG key file not found after import"
+                rm -rf "$temp_dir"
+                return 1
+            fi
         else
             error "Failed to import Microsoft GPG key for apt"
             rm -rf "$temp_dir"
@@ -92,8 +106,7 @@ setup_microsoft_apt_repo() {
         # Update package lists
         safe_sudo apt-get update
         
-        # Clean up
-        rm -rf "$(dirname "$ms_key")"
+        # Note: temp_dir already cleaned up in setup_microsoft_key_apt
         return 0
     else
         error "Failed to download Microsoft signing key for $tool_name"
@@ -124,8 +137,7 @@ gpgkey=$MS_KEY_URL"
             safe_sudo dnf check-update
         fi
         
-        # Clean up
-        rm -rf "$(dirname "$ms_key")"
+        # Note: temp_dir already cleaned up in setup_microsoft_key_dnf
         return 0
     else
         error "Failed to download Microsoft signing key for $tool_name"
@@ -139,6 +151,9 @@ install_azure_cli_microsoft() {
     
     case $PACKAGE_MANAGER in
         "apt")
+            # Clean up any broken repos first
+            cleanup_microsoft_repos
+            
             if setup_microsoft_apt_repo "azure-cli" "azure-cli"; then
                 safe_sudo apt-get install -y azure-cli
                 return 0
@@ -176,15 +191,22 @@ install_vscode_microsoft() {
     
     case $PACKAGE_MANAGER in
         "apt")
-            # VS Code has different architecture requirements
-            if setup_microsoft_apt_repo "vscode" "code"; then
-                # Fix the repository entry for VS Code with modern signed-by
-                local repo_entry="deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/code stable main"
-                echo "$repo_entry" | safe_sudo tee /etc/apt/sources.list.d/vscode.list
-                safe_sudo apt-get update
-                safe_sudo apt-get install -y code
-                return 0
+            # Clean up any broken repos first
+            safe_sudo rm -f /etc/apt/sources.list.d/vscode.list
+            
+            # First ensure GPG key is imported
+            if ! [[ -f /usr/share/keyrings/microsoft-archive-keyring.gpg ]]; then
+                setup_microsoft_key_apt || return 1
             fi
+            
+            # VS Code uses 'stable' not Ubuntu codename
+            local repo_entry="deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/code stable main"
+            echo "$repo_entry" | safe_sudo tee /etc/apt/sources.list.d/vscode.list
+            
+            # Update and install
+            safe_sudo apt-get update
+            safe_sudo apt-get install -y code
+            return 0
             ;;
         "dnf")
             if setup_microsoft_dnf_repo "vscode" "https://packages.microsoft.com/yumrepos/vscode"; then
