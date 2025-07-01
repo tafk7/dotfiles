@@ -29,9 +29,6 @@ install_microsoft_tools() {
     if [[ -f "$DOTFILES_DIR/scripts/install/microsoft.sh" ]]; then
         source "$DOTFILES_DIR/scripts/install/microsoft.sh"
         
-        # Clean up any broken Microsoft repositories first
-        cleanup_microsoft_repos
-        
         # Install Azure CLI
         if install_azure_cli_microsoft; then
             success "Azure CLI installed - login with: az login"
