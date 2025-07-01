@@ -12,8 +12,8 @@ source "$SCRIPT_DIR/../security/core.sh"  # For verify_download
 declare -g MS_KEY_URL="https://packages.microsoft.com/keys/microsoft.asc"
 declare -g MS_KEY_CHECKSUM="2fa9c05d591a1582a9aba276272478c262e95ad00acf60eaee1644d93941e3c6"
 
-# Download and verify Microsoft GPG key
-setup_microsoft_key() {
+# Download and verify Microsoft GPG key for apt systems
+setup_microsoft_key_apt() {
     local temp_dir=$(mktemp -d)
     chmod 700 "$temp_dir"
     local ms_key="$temp_dir/microsoft.asc"
@@ -26,8 +26,46 @@ setup_microsoft_key() {
     fi
     
     if verify_download "$MS_KEY_URL" "$MS_KEY_CHECKSUM" "$ms_key" "Microsoft GPG key"; then
-        echo "$ms_key"  # Return path to verified key
-        return 0
+        # Import the key for apt (convert to gpg format)
+        if gpg --dearmor < "$ms_key" | safe_sudo tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null; then
+            success "Microsoft GPG key imported for apt"
+            rm -rf "$temp_dir"
+            return 0
+        else
+            error "Failed to import Microsoft GPG key for apt"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+    else
+        rm -rf "$temp_dir"
+        return 1
+    fi
+}
+
+# Download and verify Microsoft GPG key for dnf systems
+setup_microsoft_key_dnf() {
+    local temp_dir=$(mktemp -d)
+    chmod 700 "$temp_dir"
+    local ms_key="$temp_dir/microsoft.asc"
+    
+    # Ensure we can write to the temp file
+    if ! touch "$ms_key" 2>/dev/null; then
+        error "Cannot create temporary file: $ms_key"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    if verify_download "$MS_KEY_URL" "$MS_KEY_CHECKSUM" "$ms_key" "Microsoft GPG key"; then
+        # Import the key for dnf/rpm
+        if safe_sudo rpm --import "$ms_key"; then
+            success "Microsoft GPG key imported for dnf"
+            rm -rf "$temp_dir"
+            return 0
+        else
+            error "Failed to import Microsoft GPG key for dnf"
+            rm -rf "$temp_dir"
+            return 1
+        fi
     else
         rm -rf "$temp_dir"
         return 1
@@ -45,12 +83,8 @@ setup_microsoft_apt_repo() {
     safe_sudo apt-get update
     safe_sudo apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
     
-    # Get verified Microsoft key
-    local ms_key
-    if ms_key=$(setup_microsoft_key); then
-        # Import the key (modern method)
-        gpg --dearmor < "$ms_key" | safe_sudo tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null
-        
+    # Download and import Microsoft key
+    if setup_microsoft_key_apt; then
         # Add repository with signed-by
         local repo_entry="deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/$repo_path/ $(lsb_release -cs) main"
         echo "$repo_entry" | safe_sudo tee "/etc/apt/sources.list.d/$tool_name.list"
@@ -74,11 +108,8 @@ setup_microsoft_dnf_repo() {
     
     work_log "Adding Microsoft repository for $tool_name..."
     
-    # Get verified Microsoft key
-    local ms_key
-    if ms_key=$(setup_microsoft_key); then
-        # Import the key
-        safe_sudo rpm --import "$ms_key"
+    # Download and import Microsoft key
+    if setup_microsoft_key_dnf; then
         
         # Create repository file if provided
         if [[ -n "$repo_url" ]]; then
@@ -208,5 +239,5 @@ cleanup_microsoft_repos() {
 }
 
 # Export functions for use by other scripts
-export -f setup_microsoft_key setup_microsoft_apt_repo setup_microsoft_dnf_repo
+export -f setup_microsoft_key_apt setup_microsoft_key_dnf setup_microsoft_apt_repo setup_microsoft_dnf_repo
 export -f install_azure_cli_microsoft install_vscode_microsoft cleanup_microsoft_repos
