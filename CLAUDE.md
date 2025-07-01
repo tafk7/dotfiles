@@ -19,8 +19,29 @@ This is a dotfiles management system for Linux environments (including WSL). It 
 # Personal utilities setup  
 ./install.sh --personal
 
+# AI tools (Claude Code and prompts)
+./install.sh --ai
+
+# Force overwrite existing configs
+./install.sh --force
+
 # Complete setup
-./install.sh --work --personal
+./install.sh --work --personal --ai
+```
+
+### Runtime Commands (Available After Installation)
+```bash
+# Reload shell configuration without restarting
+reload
+
+# Import SSH keys from Windows (WSL only)
+sync-ssh
+
+# Search for running processes
+psg <name>
+
+# View markdown files with syntax highlighting  
+md <file>
 ```
 
 ### Development Workflow
@@ -34,8 +55,21 @@ When modifying this codebase:
 
 2. **Package mapping format**: `"generic:apt:dnf:pacman"`
    Example: `"exa:eza:exa:exa"` maps to the correct package name per distro
+   Use `"SKIP"` for packages not available on a distribution
 
 3. **Testing changes**: Always test in a clean environment before committing
+
+## Installation Workflow
+
+The system follows a strict 7-phase installation process:
+
+1. **Pre-installation validation** - Checks git, curl, bash 4+, disk space (100MB minimum)
+2. **System preparation** - Cleans broken repos, updates system, creates backup directory  
+3. **Base setup** - Installs essential tools (always runs)
+4. **Optional components** - Work/Personal/AI tools based on flags
+5. **Configuration** - Creates symlinks, processes templates, sets up shell integration
+6. **WSL-specific setup** - SSH key import, clipboard integration (if WSL detected)
+7. **Post-installation validation** - Verifies critical installations and symlinks
 
 ## Architecture
 
@@ -73,8 +107,9 @@ When modifying this codebase:
 1. **Cross-distribution package management**:
    ```bash
    declare -a package_mappings=(
-     "build-essential:build-essential:make gcc:base-devel"
-     "exa:eza:exa:exa"
+     "build-essential:build-essential:make gcc gcc-c++ kernel-devel:base-devel"
+     "eza:eza:eza:eza"
+     "glow:SKIP:SKIP:glow"  # Use SKIP when package unavailable
    )
    build_package_list package_mappings packages "$pm"
    install_packages packages "description"
@@ -82,13 +117,24 @@ When modifying this codebase:
 
 2. **Non-destructive installation**:
    - Uses symlinks instead of copying files
-   - Backs up existing dotfiles to `~/.dotfiles_backup_TIMESTAMP`
+   - Backs up existing dotfiles to `~/dotfiles-backup-TIMESTAMP` (note: changed format)
    - Easy rollback by removing symlinks
 
 3. **WSL integration**:
-   - Auto-imports SSH keys from Windows
-   - Clipboard integration (pbcopy/pbpaste)
-   - Path conversion utilities
+   - Auto-imports SSH keys from Windows using `sync-ssh`
+   - Clipboard integration (pbcopy/pbpaste aliases)
+   - Path conversion utilities and Windows username detection
+
+4. **Error handling and safety**:
+   - `safe_sudo()` shows commands before execution for transparency
+   - Scripts use `set -e` for fail-fast behavior
+   - Graceful degradation for optional features
+   - Colored logging with specific message types
+
+5. **Module loading dependencies**:
+   - `common.sh` must be loaded first (provides core utilities)
+   - `logging.sh` must be loaded second (provides colored output)
+   - Other modules can be loaded in any order
 
 ### Important Functions
 
@@ -112,11 +158,21 @@ When modifying this codebase:
 
 4. **Module dependencies**: Load order matters - common.sh must be loaded first, then logging.sh, before other modules.
 
-4. **Logging**: Use provided logging functions for consistent output formatting.
+5. **Logging**: Use provided logging functions for consistent output formatting:
+   - `log()` (blue) - General information
+   - `success()` (green) - Successful operations
+   - `warn()` (yellow) - Warnings and fallbacks
+   - `error()` (red) - Errors and failures  
+   - `wsl_log()` (purple) - WSL-specific messages
 
-5. **Python tools**: Work setup includes Python formatters (black, flake8, mypy, pylint) installed via pip3.
+6. **Python tools**: Handles PEP 668 restrictions with fallback chain:
+   - Try `pipx` first (user-isolated environments)
+   - Fall back to `pip --user` (user-space installation)
+   - Last resort: `pip --break-system-packages`
 
-6. **Package verification**: After installation, verify critical commands exist to catch package name differences.
+7. **NPM configuration**: Sets up user-space global installations in `~/.npm-global` to avoid permission issues
+
+8. **Package verification**: After installation, verify critical commands exist to catch package name differences.
 
 ## AI Tools Installation
 
@@ -151,7 +207,27 @@ After installation:
 3. Run `reload` alias to test without restarting shell
 
 ### Debugging installation issues
-1. Check package manager detection in `install.sh`
-2. Verify package name mappings are correct
+1. Check package manager detection in `scripts/core/environment.sh`
+2. Verify package name mappings are correct for target distribution
 3. Look for error messages in red (ERROR) output
 4. WSL-specific issues show in purple (WSL) messages
+5. For Microsoft repository issues, check GPG key verification and checksums
+6. Use `./install.sh --force` to overwrite existing configurations
+
+## WSL-Specific Features
+
+### SSH Key Management
+- `sync-ssh` command imports SSH keys from Windows SSH agent
+- Keys are copied with proper permissions (600 for private, 644 for public)
+- Automatically detects Windows username for key import path
+
+### Windows Integration
+- Clipboard aliases: `pbcopy` and `pbpaste` for cross-platform compatibility
+- Path conversion utilities for Windows/WSL interoperability
+- Windows username detection for cross-system operations
+
+### WSL Detection
+Uses multiple methods to detect WSL environment:
+- `/proc/sys/fs/binfmt_misc/WSLInterop` file existence
+- `WSL_DISTRO_NAME` environment variable
+- Graceful fallback for different WSL versions
