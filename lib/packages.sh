@@ -44,7 +44,7 @@ install_packages() {
     
     if [[ ${#AVAILABLE_PACKAGES[@]} -eq 0 ]]; then
         warn "No packages available for installation"
-        return 0
+        return 1  # Return failure so fallback methods can be triggered
     fi
     
     log "Installing packages: ${AVAILABLE_PACKAGES[*]}"
