@@ -1,0 +1,47 @@
+# Development artifacts
+docs/archive/
+
+# Local configuration overrides
+*.local
+
+# Theme system runtime files
+.config/dotfiles/current-theme
+.config/dotfiles/theme-backups/
+
+# Vim runtime files
+plugged/
+autoload/plug.vim
+.netrwhist
+undo/
+*.swp
+*.swo
+*~
+
+# Shell history
+.bash_history
+.zsh_history
+
+# Oh My Zsh (managed externally)
+.oh-my-zsh/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace

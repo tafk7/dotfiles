@@ -4,50 +4,47 @@ This guide explains how to customize and extend the dotfiles system for your spe
 
 ## Adding Custom Packages
 
-### 1. Choose the Right Setup Script
+### 1. Choose the Right Package Category
 
-- **`base_setup.sh`** - Essential tools that everyone needs (git, curl, vim, etc.)
-- **`work_setup.sh`** - Professional development tools (VS Code, Azure CLI, Node.js/Python dev tools)
-- **`personal_setup.sh`** - Personal preferences and utilities
-- **`ai_setup.sh`** - AI tools (Claude Code and prompts)
+- **Base packages** - Essential tools that everyone needs (git, curl, vim, etc.)
+- **Work packages** - Professional development tools (Docker, Azure CLI, Node.js/Python dev tools)
+- **Personal packages** - Personal preferences and utilities
 
-### 2. Package Mapping Format
+### 2. Adding a New Package
 
-Packages use a cross-distribution mapping format:
-```bash
-"generic_name:apt_name:dnf_name:pacman_name"
-```
+The system is Ubuntu-only, so package names are straightforward.
 
-Examples:
-```bash
-"exa:eza:exa:exa"  # Different names across distros
-"git:git:git:git"  # Same name across distros
-"git"              # Can omit if same across all distros
-```
+### 3. For Base Packages
 
-### 3. Adding a New Package
-
-Edit the appropriate setup script and add to the package_mappings array:
+Edit `lib/packages.sh` and add to the `base_packages` array (line ~32):
 
 ```bash
-declare -a package_mappings=(
+local base_packages=(
     # ... existing packages ...
-    "your-tool:apt-name:dnf-name:pacman-name"
+    "your-package"
 )
 ```
 
-### 4. Adding npm packages (work_setup.sh)
+### 4. For Work Packages
+
+Edit the `install_work_packages()` function in `lib/packages.sh` (line ~181):
 
 ```bash
-declare -a work_npm_packages=("yarn" "typescript" "your-npm-package")
+# For npm packages:
+local npm_packages=("yarn" "eslint" "prettier" "your-npm-package")
+
+# For Python packages:
+local python_packages=("black" "ruff" "your-python-package")
 ```
 
-### 5. Adding VS Code Extensions (work_setup.sh)
+### 5. For Personal Packages
+
+Edit `lib/packages.sh` and add to the `personal_packages` array (line ~253):
 
 ```bash
-declare -a work_vscode_extensions=(
-    "ms-vscode-remote.remote-wsl"
-    "your.extension"
+local personal_packages=(
+    # ... existing packages ...
+    "your-personal-package"
 )
 ```
 
@@ -60,18 +57,14 @@ Place your configuration file in the `configs/` directory:
 cp ~/.your-config configs/.your-config
 ```
 
-### 2. Update Symlink Creation
+### 2. Update Configuration Mappings
 
-Edit `scripts/core/files.sh` and add to the configs array in the `create_symlinks()` function:
+Edit `install.sh` and add to the `config_mappings` array (line ~125):
 ```bash
-local configs=(".gitconfig" ".profile" ".editorconfig" ".ripgreprc" ".vimrc" ".tmux.conf" ".your-config")
-```
-
-### 3. Update Backup List
-
-Also in `files.sh`, add to the backup files array in the `backup_existing_configs()` function:
-```bash
-local files=("... existing files ..." ".your-config")
+config_mappings=(
+    # ... existing mappings ...
+    "$CONFIGS_DIR/your-config:$HOME/.your-config"
+)
 ```
 
 ## Adding Custom Aliases or Functions
@@ -240,19 +233,12 @@ install_your_software || warn "Your Software installation failed"
 4. **Test across distributions** - If sharing, ensure package names work everywhere
 5. **Backup first** - The installer creates backups, but manual backups are good too
 
-## Distribution-Specific Notes
+## Ubuntu-Specific Notes
 
-### Ubuntu/Debian (apt)
-- Use `apt-get` commands with `-y` flag
+- The system uses `apt-get` commands with `-y` flag
 - Some packages have different names (e.g., `fd-find` instead of `fd`)
-
-### Fedora/RHEL (dnf)
-- Use `dnf` commands with `-y` flag
-- Enable EPEL repository if needed for RHEL
-
-### Arch/Manjaro (pacman)
-- Use `pacman -S --noconfirm`
-- AUR packages require an AUR helper like `yay`
+- Docker requires adding official Docker repository
+- Azure CLI requires Microsoft repository
 
 ## Contributing Back
 
@@ -267,6 +253,6 @@ If you create useful customizations that others might benefit from:
 
 If you're unsure about something:
 1. Look at existing implementations in the setup files
-2. Check the security functions in `scripts/security/core.sh`
+2. Check the security functions in `lib/core.sh`
 3. Test in a safe environment first
 4. Follow the patterns used by existing code
