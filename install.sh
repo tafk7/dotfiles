@@ -87,6 +87,13 @@ EOF
 create_config_symlinks() {
     log "Creating configuration symlinks..."
     
+    # Validate configs directory exists
+    if [[ ! -d "$CONFIGS_DIR" ]]; then
+        error "Configs directory not found: $CONFIGS_DIR"
+        error "Expected to find config files in this directory"
+        return 1
+    fi
+    
     local backup_dir
     if ! backup_dir=$(create_backup_dir); then
         error "Failed to create backup directory"
