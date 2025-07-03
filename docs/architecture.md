@@ -1,271 +1,373 @@
-# Dotfiles Architecture
+# Simplified Dotfiles Architecture
 
 ## Overview
 
-This dotfiles system is designed as a modular, cross-platform Linux configuration management framework. It emphasizes security, maintainability, and ease of use while supporting multiple Linux distributions and WSL environments.
+This dotfiles system is designed as a streamlined, Ubuntu-focused configuration management framework. It emphasizes simplicity, maintainability, and essential functionality while removing unnecessary complexity.
 
 ## Design Principles
 
-1. **Modularity** - Each component has a single, well-defined responsibility
-2. **Non-destructive** - Always backs up existing configurations before changes
-3. **Cross-platform** - Works across Ubuntu/Debian, Fedora/RHEL, and Arch Linux
+1. **Simplicity** - Just 3 focused files with clear responsibilities
+2. **Non-destructive** - Always backs up existing configurations before changes  
+3. **Ubuntu-focused** - Optimized for Ubuntu/WSL environments only
 4. **Security-first** - HTTPS only, checksum verification, safe operations
-5. **User-friendly** - Clear feedback, interactive prompts, comprehensive documentation
+5. **Human-readable** - Any developer can understand the entire system in 20 minutes
+6. **Visible configs** - No hidden source files, easy to discover and edit
 
 ## System Architecture
 
 ```
 ┌─────────────────┐
-│   install.sh    │  ← Entry point & orchestrator
+│   install.sh    │  ← Entry point (243 lines)
 └────────┬────────┘
          │
-         ├─── Core Modules ──────────────────────┐
-         │                                       │
-    ┌────▼─────┐  ┌──────────┐  ┌──────────┐   │
-    │ common   │  │ logging  │  │ environ  │   │
-    └──────────┘  └──────────┘  └──────────┘   │
-                                                │
-    ┌──────────┐                                │
-    │   cli    │                                │
-    └──────────┘                                │
-                                                │
-    ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-    │ packages │  │  files   │  │validation│   │
-    └──────────┘  └──────────┘  └──────────┘   │
-                                                │
-    ┌────────────────────────────────────────┐  │
-    │           orchestration                │◄─┘
-    └────────────────────────────────────────┘
-                       │
-         ┌─────────────┼─────────────────────┐
-         │             │             │         │
-    ┌────▼────┐  ┌────▼────┐  ┌────▼────┐  ┌────▼────┐
-    │  base   │  │  work   │  │personal │  │   ai    │
-    │ setup   │  │ setup   │  │ setup   │  │ setup   │
-    └─────────┘  └─────────┘  └─────────┘  └─────────┘
+         ├─── Simplified Modules ────────┐
+         │                               │
+    ┌────▼─────┐          ┌─────────────▼┐
+    │lib/      │          │configs/      │
+    │core.sh   │          │(visible      │
+    │(313      │          │ files)       │
+    │ lines)   │          │              │
+    └──────────┘          └──────────────┘
+         │
+    ┌────▼─────┐          ┌──────────────┐
+    │lib/      │          │scripts/      │
+    │packages  │          │aliases &     │
+    │.sh       │          │functions     │
+    │(288      │          │              │
+    │ lines)   │          └──────────────┘
+    └──────────┘
 ```
 
-## Core Modules
+## Core Components
 
-### 1. **scripts/core/common.sh**
-Shared utilities used across modules:
-- `is_wsl()` - Check if running in WSL environment
-- `get_windows_username()` - Get Windows username in WSL
+### 1. install.sh (238 lines)
+**Main orchestrator and entry point**
 
-### 2. **scripts/core/logging.sh**
-Provides unified logging functions with color-coded output:
-- `log()` - General information (blue)
-- `error()` - Error messages (red)
-- `warn()` - Warnings (yellow)
-- `success()` - Success messages (green)
-- `wsl_log()` - WSL-specific messages (purple)
-- `work_log()` - Work setup messages (cyan)
-- `log_action()` - Track actions to state file
+```bash
+├── Command line parsing (--work, --personal, --force, --help)
+├── Help system and user guidance  
+├── Configuration symlink creation
+├── Shell integration setup
+└── Installation workflow coordination
+```
 
-### 3. **scripts/core/environment.sh**
-Detects and configures the runtime environment:
-- OS validation (Linux only)
-- WSL detection and version
-- Package manager detection (apt/dnf/pacman)
-- Environment variable setup
+**Key Functions:**
+- `parse_arguments()` - Handle CLI flags
+- `show_help()` - Display usage information
+- `create_config_symlinks()` - Link visible configs to hidden destinations
+- `run_installation()` - Coordinate entire installation process
 
-### 4. **scripts/core/cli.sh**
-Handles command-line argument parsing:
-- `--work` - Install professional development tools
-- `--personal` - Install personal preferences
-- `--ai` - Install AI development tools (Claude Code)
-- `--force` - Force overwrite existing configs
-- `--help` - Show usage information
+### 2. lib/core.sh (313 lines)
+**Core utilities and system operations**
 
-### 5. **scripts/core/packages.sh**
-Unified package management across distributions:
-- Package name mapping system
-- Distribution-specific installation commands
-- Support for apt, dnf, pacman, snap, npm, pip
-- Retry logic for network operations
+```bash
+├── Logging system (colored output)
+├── WSL detection and integration
+├── Environment validation  
+├── File operations (symlinks, backups)
+├── SSH key management
+└── Security functions
+```
 
-### 6. **scripts/core/files.sh**
-File operations and configuration management:
-- Backup creation with timestamps
-- Safe symlink creation with conflict resolution
-- Configuration file deployment
-- Template processing (Git config)
-- Vim and zsh configuration handling
-- VS Code settings deployment
+**Key Functions:**
+- `log()`, `success()`, `warn()`, `error()` - Colored output functions
+- `is_wsl()` - Detect Windows Subsystem for Linux
+- `get_windows_username()` - Cross-platform user detection
+- `safe_sudo()` - Transparent sudo operations
+- `create_backup_dir()` - Timestamped backup creation
+- `safe_symlink()` - Non-destructive symlink creation
+- `setup_wsl_clipboard()` - pbcopy/pbpaste integration
+- `import_windows_ssh_keys()` - SSH key synchronization
+- `validate_prerequisites()` - Pre-installation checks
+- `validate_installation()` - Post-installation verification
 
-### 7. **scripts/core/validation.sh**
-Configuration and system validation:
-- Pre-installation checks (commands, disk space, bash version)
-- Shell script syntax validation
-- JSON/JSONC validation
-- Git config validation
-- Symlink integrity checking
-- Post-installation verification
+### 3. lib/packages.sh
+**Package management and installation**
 
-### 8. **scripts/core/orchestration.sh**
-Workflow coordination and phase management:
-1. Pre-installation validation
-2. System update and backup
-3. Base package installation
-4. Optional work/personal/ai packages
-5. Configuration deployment
-6. Shell integration setup
-7. SSH setup (via setup_ssh())
-8. WSL setup (via setup_wsl())
-9. Post-installation validation
+```bash
+├── Ubuntu package installation
+├── Docker setup (always installed)  
+├── Azure CLI installation (work flag)
+├── Node.js development tools
+├── Python development tools
+└── WSL-specific packages
+```
 
-## Module Dependencies
+**Key Functions:**
+- `install_single_package()` - Individual package installation
+- `install_packages()` - Bulk package installation
+- `install_base_packages()` - Essential tools for everyone
+- `install_docker()` - Container platform setup
+- `install_work_packages()` - Professional development tools
+- `install_azure_cli_ubuntu()` - Cloud development tools
+- `install_nodejs_tools()` - JavaScript ecosystem
+- `install_python_tools()` - Python development environment
+- `install_personal_packages()` - Media and entertainment tools
 
-The core modules must be loaded in a specific order due to dependencies:
+### 4. scripts/
+**Runtime scripts and shell configuration**
 
-1. **common.sh** - No dependencies (loaded first)
-2. **logging.sh** - Depends on color definitions only
-3. **environment.sh** - Depends on common.sh (is_wsl) and logging.sh
-4. **cli.sh** - Depends on logging.sh
-5. **packages.sh** - Depends on logging.sh and security/core.sh (safe_sudo)
-6. **files.sh** - Depends on common.sh, logging.sh, and environment variables
-7. **validation.sh** - Depends on logging.sh
-8. **orchestration.sh** - Depends on all above modules
+The scripts directory contains modular components loaded at shell startup:
 
-## Security Components
+```
+scripts/
+├── env/
+│   └── common.sh          # Environment variables and settings
+├── aliases/               # Shell aliases organized by category
+│   ├── general.sh        # Common command aliases (ls, cd, etc.)
+│   ├── docker.sh         # Docker shortcuts
+│   ├── git.sh           # Git workflow aliases
+│   └── wsl.sh           # WSL-specific integrations
+├── functions/            # Reusable shell functions
+│   ├── shared.sh        # Common utilities (mkcd, extract, etc.)
+│   └── help-tmux.sh     # Tmux helper functions
+└── theme-switcher.sh    # Interactive theme management
+```
 
-The dotfiles system implements defense-in-depth security across all operations.
+**Key Features:**
+- **Environment Setup**: Centralized environment variables in `env/common.sh`
+- **WSL Detection**: Automatic detection and configuration for WSL environments
+- **Modular Loading**: Shell configs source these files dynamically
+- **SSH Key Import**: `sync-ssh` command for WSL users to import Windows SSH keys
 
-### Core Security Module (`scripts/security/core.sh`)
+## Configuration Management
 
-Essential security functions:
-- `safe_sudo()` - Transparent sudo operations with proper error handling
-- `verify_download()` - SHA256 checksum verification for all external downloads
-- `sanitize_input()` - Input validation to prevent injection attacks
-- `retry_network_operation()` - Resilient network operations with exponential backoff
+### Visible Configuration Files
 
-### SSH Security Module (`scripts/security/ssh.sh`)
+All configuration files are stored visibly (no leading dots) for easy discovery and editing:
 
-SSH key management with enhanced security:
-- Individual key validation using ssh-keygen before any operations
-- Atomic permission setting (600 for private keys, 644 for public)
-- Secure key copying with automatic backup creation
-- Windows SSH key import validation (WSL environments)
-- SSH config syntax validation before deployment
+```
+configs/
+├── bashrc              → ~/.bashrc
+├── zshrc               → ~/.zshrc  
+├── init.vim            → ~/.config/nvim/init.vim
+├── tmux.conf           → ~/.tmux.conf
+├── gitconfig           → ~/.gitconfig (template processed)
+├── editorconfig        → ~/.editorconfig
+├── profile             → ~/.profile
+├── ripgreprc           → ~/.ripgreprc
+└── config/             → ~/.config/
+    ├── bat/config      → ~/.config/bat/config
+    └── fd/ignore       → ~/.config/fd/ignore
+```
 
-### Security Features Throughout
+**Benefits:**
+- Tab completion works when editing configs
+- Easy to find and browse in file managers
+- Clear file organization  
+- Still symlinked to expected hidden locations
 
-**Download Security:**
-- HTTPS-only policy enforced for all external resources
-- SHA256 verification against known checksums
-- Network retry logic with exponential backoff
-- Download validation before execution
+### Template Processing
 
-**Input Protection:**
-- Package name validation for all package manager operations
-- Path construction protected against directory traversal
-- User input sanitization in interactive prompts
-- Safe file operations with automatic backups
+The system supports dynamic configuration through templates:
 
-**Installation Safety:**
-- Timestamped backups of all existing configurations
-- Safe symlink creation with conflict detection
-- Comprehensive error handling and rollback capability
-- Non-destructive operations by default
+- **gitconfig**: Prompts for user name and email, processes `{{GIT_NAME}}` and `{{GIT_EMAIL}}` placeholders
+- **Future templates**: Easy to add new template variables
 
-**System Protection:**
-- Safe aliases that preserve original command access
-- No direct command overrides that could break system scripts
-- Modular architecture prevents cascading failures
+## Installation Workflow
 
-## Integration Modules
+The system follows a clean, linear workflow:
 
-### **scripts/wsl/core.sh**
+```
+1. Prerequisites Validation
+   ├── Check bash version (4.0+)
+   ├── Verify required commands (curl, wget, git)
+   ├── Check available disk space (100MB+)
+   └── Detect Ubuntu version and WSL
+
+2. Package Installation  
+   ├── Update apt package lists
+   ├── Install base packages (always)
+   ├── Install Docker (always)
+   ├── Install work packages (optional)
+   ├── Install personal packages (optional)
+   └── Install WSL packages (if applicable)
+
+3. Configuration Setup
+   ├── Create timestamped backup directory
+   ├── Process git config template  
+   ├── Create symlinks for all configs
+   └── Setup shell integration
+
+4. WSL Integration (if applicable)
+   ├── Setup clipboard integration (pbcopy/pbpaste)
+   ├── Import SSH keys from Windows
+   └── Configure cross-platform utilities
+
+5. Final Setup & Validation
+   ├── Configure NPM global directory
+   ├── Verify critical symlinks exist
+   ├── Display success message and next steps
+   └── Return success/failure status
+```
+
+## Package Categories
+
+### Base Packages (Always Installed)
+Essential tools for any Ubuntu development environment:
+
+```bash
+# Build and development essentials
+build-essential, curl, wget, git, unzip, zip, jq
+
+# Modern shell environment  
+zsh, neovim
+
+# Enhanced CLI tools
+eza (with tree functionality), bat, fd-find, ripgrep, fzf
+
+# Development platforms
+python3-pip, pipx, nodejs, npm
+
+# System utilities
+net-tools, fontconfig, openssh-client
+
+# Container platform
+docker-ce, docker-compose (with user group setup)
+```
+
+### Work Packages (--work flag)
+Professional development tools:
+
+```bash
+# Cloud development
+azure-cli (Ubuntu-specific installation)
+
+# Node.js ecosystem  
+yarn, eslint, prettier
+
+# Python development
+black, ruff (via pipx for isolation)
+```
+
+### Personal Packages (--personal flag)
+Media and entertainment tools:
+
+```bash
+# Media processing
+ffmpeg, yt-dlp
+```
+
+### WSL Packages (Automatic if WSL detected)
 Windows Subsystem for Linux integration:
-- Windows username detection
-- Path conversion utilities
-- Clipboard integration (pbcopy/pbpaste)
-- Windows application aliases
 
-### **scripts/install/microsoft.sh**
-Microsoft tool installation:
-- Azure CLI setup
-- VS Code installation
-- Repository management
-
-## Setup Modules
-
-### **setup/base_setup.sh**
-Core packages installed for all users:
-- Essential development tools (git, curl, vim, build tools)
-- Modern CLI replacements (eza, bat, fd, ripgrep, fzf)
-- Docker and container tools
-- Node.js and Python package managers
-- System utilities and fonts
-
-### **setup/work_setup.sh**
-Professional development environment:
-- VS Code with curated extensions
-- Azure CLI for cloud development
-- Node.js toolchain (yarn, TypeScript, ESLint, Prettier)
-- Python development tools (black, flake8, mypy, pylint)
-
-### **setup/personal_setup.sh**
-Personal utilities and preferences:
-- Media tools and applications
-- Additional CLI utilities
-
-### **setup/ai_setup.sh**
-AI development tools:
-- Claude Code terminal assistant
-- AI prompt library deployment
-- Node.js 18+ validation for compatibility
-
-## Package Management Strategy
-
-The system uses a mapping approach for cross-distribution compatibility:
-
-```
-"generic:apt:dnf:pacman"
-"eza:eza:eza:eza"
-"fd:fd-find:fd-find:fd"
+```bash
+# WSL utilities
+socat, wslu
 ```
 
-This allows a single package list to work across all supported distributions.
+## Runtime Integration
 
-## Configuration Deployment
+### Shell Integration
+The system integrates with shell environments through:
 
-Configurations are deployed as symlinks from `configs/` to the user's home directory:
-- Non-destructive installation
-- Automatic backups of existing files
-- Interactive conflict resolution
-- Template processing for dynamic values
+```
+scripts/
+├── aliases/            # Command shortcuts
+│   ├── docker.sh      # Docker command aliases
+│   ├── general.sh     # Modern CLI replacements  
+│   ├── git.sh         # Git workflow shortcuts
+│   └── wsl.sh         # WSL-specific commands
+└── functions/          # Utility functions
+    └── help-tmux.sh   # tmux helper functions
+```
+
+**Auto-loading**: All `.sh` files are automatically sourced on shell startup
+
+### Available Commands
+
+After installation, these commands become available:
+
+```bash
+# Shell management
+reload              # Reload shell without restart
+
+# Process management  
+psg <name>          # Search running processes
+
+# File operations
+md <file>           # View markdown with syntax highlighting
+
+# WSL integration (if applicable)
+sync-ssh            # Import SSH keys from Windows
+pbcopy / pbpaste    # Cross-platform clipboard
+```
+
+## Security Architecture
+
+### Safe Operations
+- **safe_sudo()**: Shows commands before execution for transparency
+- **Automatic backups**: All existing configs backed up before changes
+- **Input validation**: User-provided data is validated before use
+- **Fail-fast**: Scripts exit immediately on any error
+
+### Download Security
+- **HTTPS-only**: All external downloads use secure connections
+- **Checksum verification**: Security-critical downloads verified
+- **Temporary files**: Proper cleanup of temporary files and directories
+
+### Permission Management
+- **SSH keys**: Proper permissions (600 for private, 644 for public)
+- **Directories**: Secure permissions for sensitive directories
+- **Docker group**: Safe addition to docker group for container access
+
+## Extensibility
+
+### Adding New Packages
+1. **Base packages**: Edit `base_packages` array in `lib/packages.sh`
+2. **Work packages**: Add to `install_work_packages()` function
+3. **Personal packages**: Add to `personal_packages` array
+
+### Adding New Configurations
+1. Create config file in `configs/` (no leading dot)
+2. Add mapping to `config_mappings` array in `install.sh`
+3. System automatically creates symlink to hidden destination
+
+### Adding Runtime Features
+1. **Aliases**: Create `.sh` file in `scripts/aliases/`
+2. **Functions**: Create `.sh` file in `scripts/functions/`  
+3. Files are automatically sourced on shell startup
 
 ## Error Handling
 
-The system implements multiple layers of error handling:
-1. `set -e` for fail-fast behavior
-2. Module validation on load
-3. Function-level error checking
-4. User-friendly error messages
-5. Cleanup on failure
+### Validation Strategy
+- **Pre-installation**: Check prerequisites before starting
+- **During installation**: Validate each step before proceeding
+- **Post-installation**: Verify critical components are working
 
-## Extension Points
+### Recovery Mechanisms
+- **Automatic backups**: Easy rollback if issues occur
+- **Graceful degradation**: Optional features fail safely
+- **Clear error messages**: Specific guidance when things go wrong
 
-The architecture is designed for easy extension:
-1. Add packages to setup scripts
-2. Create new aliases in `scripts/aliases/`
-3. Add functions to `scripts/functions/`
-4. Create new setup modules for specific use cases
-5. Add configuration templates to `configs/`
+## Performance Characteristics
 
-## Performance Considerations
+### Installation Speed
+- **Streamlined process**: No complex orchestration overhead
+- **Parallel operations**: Multiple packages installed efficiently
+- **Minimal dependencies**: Only essential components included
 
-- Modular loading reduces parse time
-- Parallel operations where possible
-- Minimal external command usage
-- Efficient package manager detection caching
+### Resource Usage
+- **Small footprint**: ~800 lines of code total
+- **Efficient operations**: No redundant or duplicate processes
+- **Clean dependencies**: Clear module relationships
 
-## Future Enhancements
+---
 
-Potential areas for expansion:
-1. Configuration drift detection
-2. Automated testing framework
-3. Remote deployment capabilities
-4. Plugin system for third-party extensions
-5. GUI configuration tool
+## Comparison with Original Architecture
+
+### Before: Complex 8-Module System
+- 8 core modules with intricate dependencies
+- Cross-platform package management complexity
+- 264-line Microsoft integration
+- 7-phase orchestrated installation
+- 1,400+ lines of code
+
+### After: Simple 3-File System  
+- 3 focused files with clear responsibilities
+- Ubuntu-only simplicity
+- Integrated Azure CLI (30 lines)
+- Linear installation process
+- 800 lines of code
+
+**Result**: 43% code reduction while maintaining all essential functionality and improving maintainability.

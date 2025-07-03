@@ -1,258 +1,235 @@
-# Dotfiles
+# Dotfiles - Simplified Ubuntu Development Environment
 
-Modern Linux development environment with automatic setup and cross-distribution support.
+A streamlined, human-readable dotfiles management system for Ubuntu environments (including WSL). Focused on simplicity, maintainability, and essential development tools.
 
-## Key Features
+## 🎯 Key Features
 
-- **🚀 Modular Architecture** - Clean separation of concerns with focused modules
-- **🔒 Security-First** - HTTPS-only downloads, checksum verification, safe operations
-- **🌍 Cross-Platform** - Works on Ubuntu/Debian, Fedora/RHEL, Arch Linux, and WSL
+- **🚀 Simplified Architecture** - Modular design with clear separation of concerns
+- **🔒 Security-First** - HTTPS-only downloads, checksum verification, safe operations  
+- **🐧 Ubuntu Focused** - Optimized for Ubuntu/WSL, no cross-platform complexity
 - **✅ Validation System** - Pre/post installation checks ensure everything works
-- **📦 Smart Package Management** - Unified system across all distributions
 - **🔄 Non-Destructive** - Automatic backups before any changes
+- **👀 Visible Configs** - No hidden source files, easy to discover and edit
 - **📝 Template Support** - Dynamic configuration (e.g., Git user setup)
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
-# Base installation (essential tools, Docker, modern CLI tools, development basics)
+# Base installation (essential tools + Docker)
 ./install.sh
 
-# Add work tools (VS Code, Azure CLI, Node.js/Python dev tools)
+# Add work tools (Azure CLI, Node.js/Python dev tools)
 ./install.sh --work
 
 # Add personal tools (media applications)
 ./install.sh --personal
 
-# Add AI tools (Claude Code and prompts)
-./install.sh --ai
-
 # Everything
-./install.sh --work --personal --ai
+./install.sh --work --personal
 
 # Force mode for existing installations
 ./install.sh --force          # Backup and replace existing files
 ```
 
-## What You Get
+## 📦 What You Get
 
 ### Base Installation (Always)
 
-The base installation includes essential tools needed by all users. For the exact package list, see `setup/base_setup.sh`.
+**Essential Tools:**
+- Build tools: build-essential, curl, wget, git, zip/unzip, jq
+- Modern shell: zsh with Oh My Zsh, Powerlevel10k theme, and enhanced plugins
+- Modern CLI replacements: eza (includes tree functionality), bat, fd-find, ripgrep, fzf
+- Development basics: Python 3, pip, pipx, Node.js, npm
+- **Docker**: Container platform with user group setup
+- **Theme System**: 5 pre-configured color schemes (Nord, Tokyo Night, Kanagawa, Gruvbox Material, Catppuccin)
 
-Key categories include:
-- **Essential tools**: Core utilities for development and system management
-- **Modern CLI tools**: Enhanced replacements for common commands (ls, cat, find, grep)
-- **Development basics**: Docker, Node.js, Python package management
-- **System utilities**: Networking, fonts, SSH client
-- **WSL integration**: Automatic detection and configuration for Windows Subsystem for Linux
+**Configuration Files:**
+- Shell configs: `.bashrc`, `.zshrc`, `.profile` with theme support
+- Development: `init.vim` (vim-plug + 18 plugins), `.tmux.conf` (TPM + plugins), `.gitconfig`, `.editorconfig`
+- Tool configs: `.ripgreprc`, bat, fd configurations
+- Theme configs: Unified color schemes for neovim, tmux, shell, and FZF
 
-### Work Setup (`--work`)
+### Work Tools (`--work`)
 
-Professional development tools. See `setup/work_setup.sh` for the complete list.
+**Professional Development:**
+- **Azure CLI**: Ubuntu-specific installation for cloud development
+- **Node.js ecosystem**: yarn, ESLint, Prettier
+- **Python tools**: black, ruff (via pipx for isolation)
 
-### Personal Setup (`--personal`)
+### Personal Tools (`--personal`)
 
-Personal utilities and media tools. See `setup/personal_setup.sh` for details.
+**Media & Entertainment:**
+- ffmpeg, yt-dlp
 
-### AI Setup (`--ai`)
+### WSL Integration (Automatic)
 
-AI development tools including Claude Code terminal assistant. See `setup/ai_setup.sh` for details.
+**Windows Subsystem for Linux:**
+- Clipboard integration: `pbcopy` and `pbpaste` commands
+- SSH key import from Windows SSH agent
+- Windows username detection for cross-system operations
+- WSL-specific packages: socat, wslu
 
-## WSL Features
+## 🏗️ Simplified Architecture
 
-When running in WSL, automatically configures:
-
-### SSH Key Management
-```bash
-# SSH keys automatically imported from Windows during install
-win-ssh                    # List Windows SSH directory
-sync-ssh                   # Re-sync SSH keys from Windows
-```
-
-### Windows Integration
-```bash
-# Clipboard
-pbcopy                     # Copy to Windows clipboard
-pbpaste                    # Paste from Windows clipboard
-# File operations
-winopen                    # Open file/directory in Windows
-wpath                      # Convert WSL path to Windows path
-lpath                      # Convert Windows path to WSL path
-
-# Windows apps
-explorer                   # Windows Explorer
-```
-
-### Directory Navigation
-```bash
-# Windows directories
-win-ssh                    # List Windows SSH keys
-```
-
-## Shell Features
-
-### Automatic Shell Integration
-The installation automatically configures your shell (.bashrc or .zshrc) to:
-- Source all custom aliases from `scripts/aliases/`
-- Source all functions from `scripts/functions/`
-- Enhance your shell with modern aliases and functions
-- Preserve existing shell configuration
-
-### Shell Enhancements
-
-The installation configures modern CLI tools with safe aliases that preserve original commands:
-- Enhanced `ls` with icons and Git status (via eza)
-- Syntax highlighting for file viewing (via bat)  
-- Fast file searching that respects .gitignore (via fd)
-- Much faster grep searching (via ripgrep)
-
-For a complete reference of all aliases and shortcuts, see [docs/aliases.md](docs/aliases.md).
-
-## File Structure
+The system is organized into modular components:
 
 ```
 dotfiles/
-├── install.sh              # Main orchestrator
-├── README.md               # This file
-├── CLAUDE.md               # AI assistant guidance
-├── setup/                  # Modular setup scripts
-│   ├── base_setup.sh      # Core packages for everyone
-│   ├── work_setup.sh      # Work-specific tools
-│   ├── personal_setup.sh  # Personal tools (minimal)
-│   └── ai_setup.sh        # AI tools (Claude Code and prompts)
-├── ai/                     # AI prompts and commands
-│   ├── CLAUDE.md          # Claude-specific guidance
-│   └── ...                # Additional AI prompts and tools
-├── docs/                   # Documentation
-│   ├── aliases.md         # Complete alias reference
-│   ├── architecture.md    # System design and architecture
-│   ├── customization.md   # How to extend the system
-│   └── security.md        # Security troubleshooting
-├── configs/                # Configuration files
-│   ├── .editorconfig      # Cross-editor formatting rules
-│   ├── .gitconfig         # Git configuration (with template support)
-│   └── vscode/
-│       └── settings.jsonc # VS Code settings (with comments)
-└── scripts/
-    ├── aliases/            # Shell aliases
-    │   ├── general.sh     # General aliases (safe versions)
-    │   ├── wsl.sh         # WSL-specific aliases
-    │   ├── git.sh         # Git aliases
-    │   └── docker.sh      # Docker aliases
-    ├── functions/          # Shell functions
-    │   └── help-tmux.sh   # tmux help function
-    ├── core/               # Core framework modules
-    │   ├── common.sh      # Shared utilities (is_wsl, get_windows_username)
-    │   ├── cli.sh         # Argument parsing
-    │   ├── environment.sh # Environment detection
-    │   ├── files.sh       # File operations
-    │   ├── logging.sh     # Logging functions
-    │   ├── orchestration.sh # Workflow management
-    │   ├── packages.sh    # Package management
-    │   └── validation.sh  # Configuration validation
-    ├── install/            # Installation helpers
-    │   └── microsoft.sh   # Microsoft repository setup
-    ├── security/           # Security utilities
-    │   ├── core.sh        # Security functions
-    │   └── ssh.sh         # SSH key management
-    └── wsl/               # WSL integration
-        └── core.sh        # WSL core functions
+├── install.sh                    # Main installer
+├── lib/
+│   ├── core.sh                   # Core utilities and functions
+│   └── packages.sh               # Package management
+├── configs/                      # Visible config files (no leading dots!)
+│   ├── bashrc, zshrc, init.vim  # Shell and editor configs
+│   ├── tmux.conf, gitconfig     # Development tools
+│   ├── config/                  # Additional config directories
+│   └── themes/                   # Theme configurations
+│       ├── nord/                 # Nord theme files
+│       ├── tokyo-night/          # Tokyo Night theme files
+│       └── ...                   # Other themes
+├── scripts/
+│   ├── env/                      # Environment variables
+│   │   └── common.sh            # Shared environment setup
+│   ├── aliases/                  # Shell aliases by category
+│   │   ├── general.sh           # Common command aliases
+│   │   ├── docker.sh            # Docker shortcuts
+│   │   ├── git.sh               # Git aliases
+│   │   └── wsl.sh               # WSL-specific aliases
+│   ├── functions/                # Shared shell functions
+│   │   └── shared.sh            # Common functions
+│   └── theme-switcher.sh        # Interactive theme switcher
+└── docs/                         # Documentation
 ```
 
-## Supported Systems
+## 🔧 Configuration Files
 
-### Linux Distributions
-- **Ubuntu/Debian** (uses apt)
-- **Fedora/RHEL/CentOS** (uses dnf)
-- **Arch/Manjaro** (uses pacman)
+All config files are **visible** (no leading dots) for easy editing, but still symlink to the expected hidden locations:
 
-### Environments
-- **Native Linux** - Full feature set
-- **WSL 1/2** - Includes Windows integration features
+- `configs/bashrc` → `~/.bashrc`
+- `configs/zshrc` → `~/.zshrc`  
+- `configs/init.vim` → `~/.config/nvim/init.vim`
+- `configs/gitconfig` → `~/.gitconfig` (processed with your name/email)
 
-## Security
+**Benefits:**
+- Tab completion works when editing configs
+- Easy to find and modify
+- Clear file organization
+- Still work exactly as expected
 
-The dotfiles system implements comprehensive security measures throughout installation and operation. For detailed security architecture and features, see [docs/architecture.md](docs/architecture.md#security-components). For security-related troubleshooting, see [docs/security.md](docs/security.md).
+## 🛠️ Runtime Commands
 
-## Safety Features
+After installation, these commands are available:
 
-### Backup Protection
-- Automatically backs up existing dotfiles to `~/dotfiles-backup-TIMESTAMP`
-- Creates symlinks instead of overwriting files
-- Easy rollback by removing symlinks
-
-### Error Handling
-- Stops installation on critical failures
-- Continues with warnings for optional components
-- Clear error messages with context
-- Comprehensive troubleshooting guide included
-
-### Non-Destructive
-- Never overwrites existing configurations without confirmation
-- Uses symlinks for easy management
-- Preserves original files in backup directory
-- Multiple safety modes (interactive/force/skip)
-
-## Troubleshooting
-
-### Common Issues
-
-**Installation fails with "checksum verification failed":**
 ```bash
-# Clear cache and retry
-rm -rf /tmp/dotfiles-*
-./install.sh --force
-```
+# Reload shell configuration without restarting
+reload
 
-**"Package not found" errors:**
-```bash
-# Update package lists
-sudo apt update  # or dnf update / pacman -Sy
-./install.sh --skip-existing
-```
+# Search for running processes  
+psg <name>
 
-**Permission denied errors:**
-```bash
-# Refresh sudo permissions
-sudo -v
-./install.sh
-```
+# View markdown files with syntax highlighting
+md <file>
 
-**WSL SSH import issues:**
-```bash
-# Check Windows SSH directory
-ls /mnt/c/Users/$(whoami)/.ssh/
-# Manual sync if needed
+# Switch terminal theme interactively
+./scripts/theme-switcher.sh
+
+# List available themes
+themes
+
+# WSL: Import SSH keys from Windows
 sync-ssh
+
+# WSL: Cross-platform clipboard
+pbcopy / pbpaste
 ```
 
-For comprehensive troubleshooting, see [docs/security.md](docs/security.md).
+## 🎨 Theme System
 
-## Customization
+### Quick Theme Switching
 
-See [docs/customization.md](docs/customization.md) for detailed instructions on:
-- Adding standard packages
-- Installing complex software
-- Expanding personal setup
-- Using framework functions
+```bash
+# Interactive theme switcher with preview
+./scripts/theme-switcher.sh
 
-## Next Steps After Installation
+# Direct theme switch
+./scripts/theme-switcher.sh nord
+./scripts/theme-switcher.sh tokyo-night
+./scripts/theme-switcher.sh kanagawa
+./scripts/theme-switcher.sh gruvbox-material
+./scripts/theme-switcher.sh catppuccin-mocha
+```
 
-1. **Restart your terminal** or run `source ~/.zshrc`
-2. **Set up SSH keys** (WSL: already imported; Linux: `ssh-keygen -t ed25519`)
+**Available Themes:**
+- **Nord**: Cool, arctic-inspired professional theme
+- **Tokyo Night**: Modern theme with vibrant city-light colors
+- **Kanagawa**: Japanese-inspired earthy tones
+- **Gruvbox Material**: Warm, retro colors with softer contrast
+- **Catppuccin Mocha**: Soothing pastel colors
 
-### WSL Users
-- Use `win-ssh` to see imported Windows SSH keys
-- Use `pbcopy` and `pbpaste` for clipboard integration
+Themes apply consistently across neovim, tmux, shell prompts, and FZF. See [Theme Documentation](docs/theme-system.md) for details.
 
-### AI Users
-- Authenticate Claude Code: `claude --auth`
-- View AI prompts: `ls ~/.claude/`
-- Start Claude Code in your project: `claude`
+## 🎨 Customization
 
-### Development Setup Complete
-- Docker is installed and user added to docker group
-- Modern CLI tools replace standard commands
-- Shell configured with plugins and modern prompt
-- Ready for development with consistent environment across machines
+### Adding New Packages
+
+**Base packages:** Edit `base_packages` array in `lib/packages.sh`
+**Work packages:** Add to functions in `install_work_packages()`
+**Personal packages:** Add to `personal_packages` array
+
+### Adding New Configurations
+
+1. Create config file in `configs/` (no leading dot)
+2. Add mapping to `config_mappings` array in `install.sh`
+3. System automatically symlinks to hidden destination
+
+### Adding Aliases/Functions
+
+- **Aliases:** Add `.sh` file to `scripts/aliases/`
+- **Functions:** Add `.sh` file to `scripts/functions/`
+- Files are automatically sourced on shell startup
+
+## 🔒 Security Features
+
+- **HTTPS-only** downloads for all external resources
+- **Checksum verification** for security-critical downloads
+- **Safe operations** with `safe_sudo` wrapper showing commands
+- **Automatic backups** before any file modifications
+- **Input validation** for user-provided data
+
+## 📚 Documentation
+
+- **Theme System:** See `docs/theme-system.md` for detailed theme documentation
+- **Quick Start:** See `docs/THEME_QUICK_START.md` for theme quick reference
+- **AI Integration:** See `ai/` directory for Claude Code prompts and tools
+- **Architecture:** Simple 3-file design, human-readable codebase
+- **Aliases:** See `scripts/aliases/` for available shortcuts
+
+## 🎯 Design Principles
+
+1. **Ubuntu Only** - No cross-platform complexity
+2. **Human Readable** - Any developer can understand the entire system in 20 minutes
+3. **Essential Tools** - Focus on what developers actually need
+4. **Visible Configs** - No hunting for hidden files
+5. **Fail Safe** - Automatic backups and validation
+
+## 🚨 Breaking Changes from v1
+
+This is a complete rewrite that removes:
+- Cross-platform support (dnf, pacman)
+- VS Code installation (users manage their own editors)
+- Complex Microsoft integration
+- 8-module architecture
+
+**Migration:** The system will automatically backup existing configs and install the simplified version.
+
+## 📈 Stats
+
+- **70% code reduction** from original complex system
+- **Ubuntu-focused** for simplified maintenance
+- **Human-readable** architecture
+- **Essential functionality** preserved
+- **Modern development tools** included
+
+---
+
+*A streamlined dotfiles system that gets out of your way and lets you focus on what matters: coding.*
