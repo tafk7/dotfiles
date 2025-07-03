@@ -317,6 +317,7 @@ validate_installation() {
                 if [[ ! -r "$file" ]]; then
                     error "Symlink target not readable: $file -> $(readlink "$file")"
                     ((failed_validations++))
+                fi
             fi
         fi
     done
