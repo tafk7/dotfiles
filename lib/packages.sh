@@ -76,6 +76,9 @@ install_base_packages() {
         "zip"
         "jq"
         
+        # Repository management
+        "software-properties-common"
+        
         # Shell and modern CLI tools
         "zsh"
         "neovim"
@@ -122,23 +125,8 @@ install_modern_cli_tools() {
         fi
     fi
     
-    # Try to install glow via package manager first, fallback to snap or GitHub
-    if ! command_exists glow; then
-        if ! install_packages "glow"; then
-            log "glow not available in repos, trying snap..."
-            if command_exists snap; then
-                if safe_sudo snap install glow; then
-                    success "glow installed via snap"
-                else
-                    log "snap install failed, installing from GitHub..."
-                    install_glow_from_github
-                fi
-            else
-                log "snap not available, installing from GitHub..."
-                install_glow_from_github
-            fi
-        fi
-    fi
+    # Skip glow installation - use bat for markdown viewing instead
+    log "Skipping glow - will use bat for markdown viewing"
 }
 
 # Install eza from GitHub releases
@@ -166,30 +154,6 @@ install_eza_from_github() {
     fi
 }
 
-# Install glow from GitHub releases
-install_glow_from_github() {
-    log "Installing glow from GitHub releases..."
-    
-    local glow_version="v1.5.1"  # Latest stable as of Ubuntu 24.04
-    local glow_url="https://github.com/charmbracelet/glow/releases/download/${glow_version}/glow_${glow_version#v}_linux_x86_64.tar.gz"
-    local temp_dir=$(mktemp -d)
-    
-    if curl -fsSL "$glow_url" -o "$temp_dir/glow.tar.gz"; then
-        cd "$temp_dir"
-        tar -xzf glow.tar.gz
-        if [[ -f "glow" ]]; then
-            safe_sudo mv glow /usr/local/bin/glow
-            safe_sudo chmod +x /usr/local/bin/glow
-            success "glow installed from GitHub"
-        else
-            warn "Failed to extract glow binary"
-        fi
-        cd - >/dev/null
-        rm -rf "$temp_dir"
-    else
-        warn "Failed to download glow from GitHub"
-    fi
-}
 
 # Install Docker with Ubuntu-specific setup
 install_docker() {
@@ -253,6 +217,15 @@ install_docker() {
 # Install WSL-specific packages
 install_wsl_packages() {
     wsl_log "Installing WSL-specific packages..."
+    
+    # Ensure universe repository is enabled for wslu
+    log "Ensuring universe repository is enabled..."
+    if ! safe_sudo add-apt-repository -y universe; then
+        warn "Failed to add universe repository"
+    fi
+    
+    # Update package lists after adding repository
+    safe_sudo apt-get update
     
     local wsl_packages=(
         "socat"
@@ -349,6 +322,12 @@ install_python_tools() {
     fi
     
     log "Installing Python development tools..."
+    
+    # Ensure pipx PATH is set up if pipx is available
+    if command_exists pipx; then
+        log "Ensuring pipx PATH configuration..."
+        pipx ensurepath >/dev/null 2>&1 || warn "Could not configure pipx PATH automatically"
+    fi
     
     # Modern Python tools - ruff replaces flake8, mypy, pylint
     local python_packages=("black" "ruff")
