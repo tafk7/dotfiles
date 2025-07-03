@@ -1,0 +1,18 @@
+#!/bin/bash
+# Gruvbox Material color palette for preview
+
+# Background colors
+export THEME_BG_R=40 THEME_BG_G=40 THEME_BG_B=40        # bg #282828
+export THEME_FG_R=212 THEME_FG_G=190 THEME_FG_B=152     # fg #d4be98
+
+# Primary colors
+export THEME_PRIMARY_R=125 THEME_PRIMARY_G=174 THEME_PRIMARY_B=163   # aqua #7daea3
+export THEME_SECONDARY_R=216 THEME_SECONDARY_G=166 THEME_SECONDARY_B=87 # yellow #d8a657
+
+# Accent colors
+export THEME_RED_R=234 THEME_RED_G=105 THEME_RED_B=98       # red #ea6962
+export THEME_ORANGE_R=231 THEME_ORANGE_G=138 THEME_ORANGE_B=78  # orange #e78a4e
+export THEME_YELLOW_R=216 THEME_YELLOW_G=166 THEME_YELLOW_B=87  # yellow #d8a657
+export THEME_GREEN_R=169 THEME_GREEN_G=182 THEME_GREEN_B=101    # green #a9b665
+export THEME_BLUE_R=125 THEME_BLUE_G=174 THEME_BLUE_B=163      # aqua #7daea3
+export THEME_PURPLE_R=211 THEME_PURPLE_G=134 THEME_PURPLE_B=155 # purple #d3869b

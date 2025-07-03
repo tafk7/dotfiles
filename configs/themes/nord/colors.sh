@@ -1,0 +1,18 @@
+#!/bin/bash
+# Nord color palette for preview
+# https://www.nordtheme.com/docs/colors-and-palettes
+
+# Polar Night (dark colors)
+export THEME_BG_R=46 THEME_BG_G=52 THEME_BG_B=64        # nord0 #2E3440
+export THEME_FG_R=216 THEME_FG_G=222 THEME_FG_B=233     # nord4 #D8DEE9
+
+# Frost (blue colors)
+export THEME_PRIMARY_R=136 THEME_PRIMARY_G=192 THEME_PRIMARY_B=208      # nord8 #88C0D0
+export THEME_SECONDARY_R=129 THEME_SECONDARY_G=161 THEME_SECONDARY_B=193 # nord9 #81A1C1
+
+# Aurora (accent colors)
+export THEME_RED_R=191 THEME_RED_G=97 THEME_RED_B=106         # nord11 #BF616A
+export THEME_ORANGE_R=208 THEME_ORANGE_G=135 THEME_ORANGE_B=112 # nord12 #D08770
+export THEME_YELLOW_R=235 THEME_YELLOW_G=203 THEME_YELLOW_B=139 # nord13 #EBCB8B
+export THEME_GREEN_R=163 THEME_GREEN_G=190 THEME_GREEN_B=140   # nord14 #A3BE8C
+export THEME_PURPLE_R=180 THEME_PURPLE_G=142 THEME_PURPLE_B=173 # nord15 #B48EAD

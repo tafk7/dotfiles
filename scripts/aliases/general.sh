@@ -2,12 +2,20 @@
 
 # General aliases for modern CLI tools and productivity
 
-# Modern replacements for classic commands
-alias ls='eza --icons'
-alias ll='eza -alF --icons'
-alias la='eza -A --icons'
-alias l='eza -CF --icons'
-alias tree='eza --tree --icons'
+# Modern replacements for classic commands (standardized)
+if command -v eza >/dev/null 2>&1; then
+    alias ls='eza --color=always --group-directories-first'
+    alias ll='eza -l --color=always --group-directories-first --time-style=long-iso'
+    alias la='eza -la --color=always --group-directories-first --time-style=long-iso'
+    alias l='eza -CF --color=always --group-directories-first'
+    alias tree='eza --tree --color=always --group-directories-first'
+else
+    alias ls='ls --color=auto'
+    alias ll='ls -alF'
+    alias la='ls -A'
+    alias l='ls -CF'
+    alias tree='tree -C'
+fi
 
 # OS-aware aliases for bat and fd (safe aliases that don't override system commands)
 if command -v batcat &> /dev/null; then
@@ -69,7 +77,11 @@ alias tl='tmux list-sessions'
 alias tk='tmux kill-session -t'
 
 # File viewing and editing
-alias vi='vim'
+# Backward compatibility for vim users
+if command -v nvim >/dev/null 2>&1; then
+    alias vim='nvim'
+    alias vi='nvim'
+fi
 alias nano='nano -w'
 alias less='less -R'
 alias more='less'
@@ -92,9 +104,18 @@ alias ducks='du -cks * | sort -rn | head'
 alias h='history'
 alias hgrep='history | grep'
 
-# Reload shell
-alias reload='source ~/.zshrc'
-alias zshrc='vim ~/.zshrc'
+# Reload shell (works for both bash and zsh)
+if [[ -n "$ZSH_VERSION" ]]; then
+    alias reload='source ~/.zshrc'
+    alias zshrc='vim ~/.zshrc'
+elif [[ -n "$BASH_VERSION" ]]; then
+    alias reload='source ~/.bashrc'
+    alias bashrc='vim ~/.bashrc'
+fi
+
+# Theme management
+alias theme-switch='$DOTFILES_DIR/scripts/theme-switcher.sh'
+alias themes='echo "Available themes: nord, kanagawa, tokyo-night, gruvbox-material, catppuccin-mocha"'
 
 # Quick file operations
 alias count='find . -type f | wc -l'
