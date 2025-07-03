@@ -3,8 +3,8 @@
 # Ubuntu-only support with essential packages
 
 # Source core functions
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/core.sh"
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$LIB_DIR/core.sh"
 
 # Check if packages are available in repositories
 check_package_availability() {
