@@ -35,17 +35,54 @@ get_windows_username() {
         # Try multiple methods to get Windows username
         local win_user=""
         
-        # Method 1: From /mnt/c/Users directory
-        if [[ -d "/mnt/c/Users" ]]; then
-            win_user=$(ls /mnt/c/Users | grep -v "^Public$" | grep -v "^Default" | head -1)
+        # Method 1: Use powershell.exe to get actual Windows username
+        if command -v powershell.exe >/dev/null 2>&1; then
+            win_user=$(powershell.exe -NoProfile -Command '$env:USERNAME' 2>/dev/null | tr -d '\r\n' | tr -d ' ')
+            # Validate it's not empty or a system account
+            if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
+                win_user=""
+            fi
         fi
         
-        # Method 2: From environment variables if available
-        if [[ -z "$win_user" && -n "${LOGNAME:-}" ]]; then
-            win_user="$LOGNAME"
+        # Method 2: Try to get the user who owns the WSL instance
+        if [[ -z "$win_user" ]] && command -v wslpath >/dev/null 2>&1; then
+            # Get the Windows profile directory and extract username from it
+            local win_profile=$(cmd.exe /c "echo %USERPROFILE%" 2>/dev/null | tr -d '\r\n')
+            if [[ -n "$win_profile" ]]; then
+                # Extract username from path like C:\Users\username
+                win_user=$(echo "$win_profile" | sed 's/.*\\Users\\\([^\\]*\).*/\1/')
+                # Validate it's not a system folder
+                if [[ "$win_user" == "Public" ]] || [[ "$win_user" == "Default" ]] || [[ "$win_user" == "All Users" ]]; then
+                    win_user=""
+                fi
+            fi
         fi
         
-        # Method 3: From current user as fallback
+        # Method 3: Use cmd.exe as fallback
+        if [[ -z "$win_user" ]] && command -v cmd.exe >/dev/null 2>&1; then
+            win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
+            # Validate it's not empty or a system account
+            if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
+                win_user=""
+            fi
+        fi
+        
+        # Method 4: Check for actual user directories in /mnt/c/Users
+        if [[ -z "$win_user" ]] && [[ -d "/mnt/c/Users" ]]; then
+            # Look for directories that have a Desktop folder (indicating real user accounts)
+            for dir in /mnt/c/Users/*/; do
+                local dirname=$(basename "$dir")
+                # Skip system folders
+                if [[ "$dirname" != "Public" && "$dirname" != "Default" && "$dirname" != "All Users" && "$dirname" != "Default User" ]]; then
+                    if [[ -d "$dir/Desktop" ]]; then
+                        win_user="$dirname"
+                        break
+                    fi
+                fi
+            done
+        fi
+        
+        # Method 5: From current user as final fallback
         if [[ -z "$win_user" ]]; then
             win_user="$USER"
         fi
