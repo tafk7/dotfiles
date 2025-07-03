@@ -295,17 +295,28 @@ validate_installation() {
     
     local failed_validations=0
     
-    # Check critical symlinks
+    # Check critical files (some are symlinks, .gitconfig is templated)
     local critical_files=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.config/nvim/init.vim" "$HOME/.gitconfig")
     for file in "${critical_files[@]}"; do
-        if [[ ! -L "$file" ]]; then
-            error "Critical symlink missing: $file"
-            ((failed_validations++))
-        else
-            # Validate symlink target exists and is readable
-            if [[ ! -r "$file" ]]; then
-                error "Symlink target not readable: $file -> $(readlink "$file")"
+        if [[ "$file" == "$HOME/.gitconfig" ]]; then
+            # .gitconfig is a templated file, not a symlink
+            if [[ ! -f "$file" ]]; then
+                error "Git config file missing: $file"
                 ((failed_validations++))
+            elif [[ ! -r "$file" ]]; then
+                error "Git config file not readable: $file"
+                ((failed_validations++))
+            fi
+        else
+            # All other files should be symlinks
+            if [[ ! -L "$file" ]]; then
+                error "Critical symlink missing: $file"
+                ((failed_validations++))
+            else
+                # Validate symlink target exists and is readable
+                if [[ ! -r "$file" ]]; then
+                    error "Symlink target not readable: $file -> $(readlink "$file")"
+                    ((failed_validations++))
             fi
         fi
     done

@@ -79,12 +79,10 @@ install_base_packages() {
         # Shell and modern CLI tools
         "zsh"
         "neovim"
-        "eza"
         "bat" 
         "fd-find"
         "ripgrep"
         "fzf"
-        "glow"
         
         # Development essentials
         "python3-pip"
