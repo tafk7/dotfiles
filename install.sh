@@ -135,21 +135,27 @@ create_config_symlinks() {
         fi
     done
     
-    # Handle directories
-    local dir_mappings=(
-        "config:.config"
+    # Handle config subdirectories (not the entire .config)
+    # Symlink specific subdirectories from configs/config/
+    local config_subdirs=(
+        "config/bat:.config/bat"
+        "config/fd:.config/fd"
     )
     
-    for mapping in "${dir_mappings[@]}"; do
+    for mapping in "${config_subdirs[@]}"; do
         local source_name="${mapping%:*}"
         local target_name="${mapping#*:}"
         local source="$CONFIGS_DIR/$source_name"
         local target="$HOME/$target_name"
         
+        # Create parent directory if needed
+        local target_parent=$(dirname "$target")
+        mkdir -p "$target_parent"
+        
         if [[ -d "$source" ]]; then
             safe_symlink "$source" "$target" "$backup_dir"
         else
-            warn "Config directory not found: $source"
+            warn "Config subdirectory not found: $source"
         fi
     done
     
