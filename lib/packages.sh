@@ -90,8 +90,6 @@ install_base_packages() {
         # Development essentials
         "python3-pip"
         "pipx"
-        "nodejs"
-        "npm"
         
         # System utilities
         "openssh-client"
@@ -101,6 +99,9 @@ install_base_packages() {
     
     # Install packages that may need alternative installation methods
     install_modern_cli_tools
+    
+    # Install Node.js (handle separately due to npm conflicts)
+    install_nodejs
     
     # Install Docker (requires special handling)
     install_docker
@@ -211,6 +212,62 @@ install_docker() {
             error "Failed to add user to docker group"
             return 1
         fi
+    fi
+}
+
+# Install Node.js and npm
+install_nodejs() {
+    log "Installing Node.js and npm..."
+    
+    # First, check if nodejs is already installed
+    if command_exists node; then
+        log "Node.js is already installed: $(node --version)"
+        if command_exists npm; then
+            log "npm is already installed: $(npm --version)"
+            return 0
+        fi
+    fi
+    
+    # Try to install nodejs with npm included
+    # On Ubuntu 24.04, nodejs package should include npm
+    if safe_sudo apt-get install -y nodejs; then
+        # Check if npm came with nodejs
+        if command_exists npm; then
+            success "Node.js and npm installed successfully"
+            return 0
+        else
+            # If npm isn't included, try to install it separately
+            log "npm not included with nodejs, attempting separate installation..."
+            if safe_sudo apt-get install -y npm; then
+                success "npm installed successfully"
+                return 0
+            else
+                warn "Failed to install npm package, trying NodeSource repository..."
+            fi
+        fi
+    fi
+    
+    # Fallback: Use NodeSource repository for latest Node.js
+    log "Installing Node.js from NodeSource repository..."
+    
+    # Install dependencies
+    safe_sudo apt-get install -y ca-certificates curl gnupg
+    
+    # Add NodeSource GPG key
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | safe_sudo gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+    
+    # Add NodeSource repository (Node.js 20.x LTS)
+    NODE_MAJOR=20
+    echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | safe_sudo tee /etc/apt/sources.list.d/nodesource.list
+    
+    # Update and install
+    safe_sudo apt-get update
+    if safe_sudo apt-get install -y nodejs; then
+        success "Node.js and npm installed from NodeSource"
+        return 0
+    else
+        error "Failed to install Node.js"
+        return 1
     fi
 }
 
