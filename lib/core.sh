@@ -2,6 +2,10 @@
 # Core utilities for simplified dotfiles installation
 # Ubuntu-only support, human-readable, well-engineered
 
+# Prevent double-sourcing
+[[ -n "${DOTFILES_CORE_LOADED:-}" ]] && return 0
+readonly DOTFILES_CORE_LOADED=1
+
 set -e
 
 # Colors for output
@@ -83,7 +87,9 @@ detect_environment() {
 }
 
 # Path constants  
-readonly DOTFILES_BACKUP_PREFIX="$HOME/dotfiles-backup"
+if [[ -z "${DOTFILES_BACKUP_PREFIX:-}" ]]; then
+    readonly DOTFILES_BACKUP_PREFIX="$HOME/dotfiles-backup"
+fi
 
 # Create backup directory with timestamp
 create_backup_dir() {
