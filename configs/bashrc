@@ -1,3 +1,6 @@
+# Set DOTFILES_DIR for this installation
+export DOTFILES_DIR="/home/tafk/dotfiles"
+
 # Modern Bash Configuration - Power User Setup
 # Part of dotfiles - optimized for development workflow
 
