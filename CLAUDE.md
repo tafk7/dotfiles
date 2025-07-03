@@ -49,6 +49,16 @@ psg <name>      # Search for running processes
 md <file>       # View markdown files with syntax highlighting
 ```
 
+### Custom Aliases
+```bash
+# Add custom aliases to your personal file
+echo 'alias ll="ls -la"' >> ~/dotfiles/scripts/aliases/custom.sh
+echo 'alias ..="cd .."' >> ~/dotfiles/scripts/aliases/custom.sh
+
+# Reload shell to apply changes
+reload
+```
+
 ## Architecture
 
 The codebase is organized into modular components:
