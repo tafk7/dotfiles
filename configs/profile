@@ -1,0 +1,87 @@
+# ~/.profile: executed by the command interpreter for login shells.
+# This file is sourced by sh-compatible shells for login sessions.
+
+# If not running interactively, don't do anything
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
+# Set PATH so it includes user's private bin directories
+if [ -d "$HOME/bin" ] ; then
+    PATH="$HOME/bin:$PATH"
+fi
+
+if [ -d "$HOME/.local/bin" ] ; then
+    PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Add /usr/local/bin to PATH if it exists
+if [ -d "/usr/local/bin" ] ; then
+    PATH="/usr/local/bin:$PATH"
+fi
+
+# Editor is set in scripts/env/common.sh with neovim preference
+
+# Set default pager
+export PAGER=less
+export LESS='-F -g -i -M -R -S -w -X -z-4'
+
+# History settings
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+
+# Set language environment
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+# Set timezone if not set
+if [ -z "$TZ" ]; then
+    export TZ="UTC"
+fi
+
+# XDG directories
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+
+# Development environment
+export TERM="xterm-256color"
+
+# Node.js settings
+if command -v node >/dev/null 2>&1; then
+    export NODE_OPTIONS="--max-old-space-size=4096"
+fi
+
+# Python settings
+export PYTHONDONTWRITEBYTECODE=1
+export PIP_REQUIRE_VIRTUALENV=false
+
+# Docker settings
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
+# WSL specific settings
+if [ -n "$WSL_DISTRO_NAME" ]; then
+    # Windows interop
+    export WSLENV="USERPROFILE/pu:APPDATA/pu"
+    
+    # Fix for WSL PATH pollution
+    if [ -n "$PATH" ]; then
+        export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "/mnt/c" | tr '\n' ':' | sed 's/:$//')
+        export PATH="$PATH:/mnt/c/Windows/System32:/mnt/c/Windows"
+    fi
+fi
+
+# Load shell-specific configuration
+if [ -n "$BASH_VERSION" ]; then
+    # include .bashrc if it exists
+    if [ -f "$HOME/.bashrc" ]; then
+        . "$HOME/.bashrc"
+    fi
+elif [ -n "$ZSH_VERSION" ]; then
+    # include .zshrc if it exists
+    if [ -f "$HOME/.zshrc" ]; then
+        . "$HOME/.zshrc"
+    fi
+fi

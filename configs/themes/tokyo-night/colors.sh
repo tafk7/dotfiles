@@ -1,0 +1,18 @@
+#!/bin/bash
+# Tokyo Night color palette for preview
+
+# Background colors
+export THEME_BG_R=26 THEME_BG_G=27 THEME_BG_B=38        # bg #1a1b26
+export THEME_FG_R=169 THEME_FG_G=177 THEME_FG_B=214     # fg #a9b1d6
+
+# Primary colors
+export THEME_PRIMARY_R=122 THEME_PRIMARY_G=162 THEME_PRIMARY_B=247    # blue #7aa2f7
+export THEME_SECONDARY_R=187 THEME_SECONDARY_G=154 THEME_SECONDARY_B=247 # purple #bb9af7
+
+# Accent colors
+export THEME_RED_R=247 THEME_RED_G=118 THEME_RED_B=142      # red #f7768e
+export THEME_ORANGE_R=255 THEME_ORANGE_G=158 THEME_ORANGE_B=100 # orange #ff9e64
+export THEME_YELLOW_R=224 THEME_YELLOW_G=175 THEME_YELLOW_B=104 # yellow #e0af68
+export THEME_GREEN_R=158 THEME_GREEN_G=206 THEME_GREEN_B=106   # green #9ece6a
+export THEME_CYAN_R=125 THEME_CYAN_G=207 THEME_CYAN_B=255     # cyan #7dcfff
+export THEME_MAGENTA_R=187 THEME_MAGENTA_G=154 THEME_MAGENTA_B=247 # magenta #bb9af7

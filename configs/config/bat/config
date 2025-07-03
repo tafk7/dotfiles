@@ -1,0 +1,99 @@
+# Bat configuration file
+# https://github.com/sharkdp/bat
+# Part of dotfiles - https://github.com/yourusername/dotfiles
+
+# ==============================================================================
+# Theme Configuration
+# ==============================================================================
+
+# Set the theme for syntax highlighting
+# Theme is set via BAT_THEME environment variable in shell config
+# Run `bat --list-themes` to see all available themes
+
+# ==============================================================================
+# Display Options
+# ==============================================================================
+
+# Show line numbers
+--number
+
+# Use "default" for traditional less-like paging
+# Use "never" to disable paging
+# Use "always" to always use pager
+--paging="auto"
+
+# Specify the pager to use
+--pager="less -RF"
+
+# Show non-printable characters
+# Options: -A,--show-all, -n,--number, -p,--plain
+# --show-all
+
+# ==============================================================================
+# Syntax Mapping
+# ==============================================================================
+
+# Map specific file extensions to languages
+# Format: --map-syntax='pattern:language'
+
+# Shell configurations
+--map-syntax='.zshrc:Bourne Again Shell (bash)'
+--map-syntax='.bashrc:Bourne Again Shell (bash)'
+--map-syntax='.profile:Bourne Again Shell (bash)'
+--map-syntax='**/aliases/*:Bourne Again Shell (bash)'
+--map-syntax='**/functions/*:Bourne Again Shell (bash)'
+
+# Docker files
+--map-syntax='Dockerfile*:Dockerfile'
+--map-syntax='docker-compose*.yml:YAML'
+
+# Configuration files
+--map-syntax='.env*:DotENV'
+--map-syntax='*.conf:INI'
+--map-syntax='*.cfg:INI'
+
+# Ignore files
+--map-syntax='.gitignore:Git Ignore'
+--map-syntax='.dockerignore:Git Ignore'
+--map-syntax='.npmignore:Git Ignore'
+
+# ==============================================================================
+# Style Configuration
+# ==============================================================================
+
+# Configure style elements
+# Options: auto, full, plain, changes, header, header-filename, header-filesize, grid, rule, numbers, snip
+--style="auto"
+
+# ==============================================================================
+# Performance
+# ==============================================================================
+
+# Specify when to use colored output
+# Options: auto, never, always
+--color="auto"
+
+# Highlight lines that have changed (requires git)
+# --diff
+
+# ==============================================================================
+# Integration Options
+# ==============================================================================
+
+# Use italic text in the output
+--italic-text="always"
+
+# Specify the width of the tab character
+--tabs=4
+
+# Wrap long lines
+# Options: auto, never, character
+--wrap="auto"
+
+# ==============================================================================
+# File Processing
+# ==============================================================================
+
+# Exclude files matching these patterns from being processed
+# --ignored-suffix=".bak"
+# --ignored-suffix=".swp"

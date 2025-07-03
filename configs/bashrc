@@ -1,0 +1,197 @@
+# Modern Bash Configuration - Power User Setup
+# Part of dotfiles - optimized for development workflow
+
+# ==============================================================================
+# Core Shell Settings
+# ==============================================================================
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+# Shell options for better UX
+shopt -s histappend                # Append to history, don't overwrite
+shopt -s checkwinsize              # Check window size after each command
+shopt -s cdspell                   # Correct minor spelling errors in cd
+shopt -s dirspell                  # Correct spelling errors in directory names
+shopt -s autocd                    # Auto cd when typing directory name
+shopt -s globstar                  # Enable ** recursive globbing
+shopt -s nocaseglob               # Case-insensitive globbing
+shopt -s extglob                  # Extended globbing patterns
+
+# Better completion
+if ! shopt -oq posix; then
+    if [ -f /usr/share/bash-completion/bash_completion ]; then
+        . /usr/share/bash-completion/bash_completion
+    elif [ -f /etc/bash_completion ]; then
+        . /etc/bash_completion
+    fi
+fi
+
+# Completion for modern tools
+complete -cf sudo
+complete -cf man
+
+# ==============================================================================
+# History Configuration - Power User Setup
+# ==============================================================================
+
+# History settings
+HISTFILE=~/.bash_history
+HISTSIZE=50000
+HISTFILESIZE=100000
+HISTCONTROL=ignoreboth:erasedups   # Ignore duplicates and lines starting with space
+HISTTIMEFORMAT="%F %T "            # Add timestamps to history
+HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"  # Ignore common commands
+
+# Real-time history sharing (efficient version)
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+
+# ==============================================================================
+# Load Shared Environment
+# ==============================================================================
+
+# Source shared environment variables
+if [[ -f "$DOTFILES_DIR/scripts/env/common.sh" ]]; then
+    source "$DOTFILES_DIR/scripts/env/common.sh"
+fi
+
+# Load theme configuration if available
+if [[ -f "$HOME/.config/dotfiles/theme.sh" ]]; then
+    source "$HOME/.config/dotfiles/theme.sh"
+fi
+
+# ==============================================================================
+# Modern CLI Tool Configuration
+# ==============================================================================
+
+# FZF bash-specific configuration
+if command -v fzf >/dev/null 2>&1; then
+    [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+    
+    # Enhanced FZF key bindings
+    bind '"\C-f": "fzf-file-widget"'
+    bind '"\C-r": "fzf-history-widget"'
+    bind '"\ec": "fzf-cd-widget"'
+fi
+
+# ==============================================================================
+# Git Integration
+# ==============================================================================
+
+# Git-aware prompt function
+git_prompt() {
+    local git_status git_branch
+    if git_branch=$(git symbolic-ref --short HEAD 2>/dev/null); then
+        git_status=$(git status --porcelain 2>/dev/null)
+        if [[ -n $git_status ]]; then
+            echo " ${PROMPT_COLOR_GIT_DIRTY}($git_branch*)${PROMPT_COLOR_RESET}"
+        else
+            echo " ${PROMPT_COLOR_GIT_CLEAN}($git_branch)${PROMPT_COLOR_RESET}"
+        fi
+    fi
+}
+
+# Default prompt colors (overridden by theme if loaded)
+if [[ -z "$PROMPT_COLOR_USER" ]]; then
+    export PROMPT_COLOR_USER='\[\e[38;5;108m\]'
+    export PROMPT_COLOR_HOST='\[\e[38;5;214m\]'
+    export PROMPT_COLOR_PATH='\[\e[38;5;108m\]'
+    export PROMPT_COLOR_GIT_CLEAN='\[\e[38;5;142m\]'
+    export PROMPT_COLOR_GIT_DIRTY='\[\e[38;5;167m\]'
+    export PROMPT_COLOR_SUCCESS='\[\e[38;5;142m\]'
+    export PROMPT_COLOR_ERROR='\[\e[38;5;167m\]'
+    export PROMPT_COLOR_RESET='\[\e[0m\]'
+fi
+
+# Dynamic prompt with git integration
+set_prompt() {
+    local exit_code=$?
+    local prompt_symbol
+    
+    # Show exit code if non-zero
+    if [[ $exit_code -ne 0 ]]; then
+        prompt_symbol="${PROMPT_COLOR_ERROR}✗${PROMPT_COLOR_RESET}"
+    else
+        prompt_symbol="${PROMPT_COLOR_SUCCESS}✓${PROMPT_COLOR_RESET}"
+    fi
+    
+    # Build prompt
+    PS1="${PROMPT_COLOR_USER}\u${PROMPT_COLOR_RESET}@${PROMPT_COLOR_HOST}\h${PROMPT_COLOR_RESET}:${PROMPT_COLOR_PATH}\w${PROMPT_COLOR_RESET}"
+    PS1+="$(git_prompt)"
+    PS1+=" ${prompt_symbol} "
+}
+
+PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
+
+# ==============================================================================
+# Smart Aliases - Modern CLI Tools
+# ==============================================================================
+
+# Aliases are loaded from scripts/aliases/*.sh files
+
+# ==============================================================================
+# Load Shared Functions
+# ==============================================================================
+
+# Functions are loaded from scripts/functions/*.sh files
+
+# ==============================================================================
+# Node.js and Development Tools
+# ==============================================================================
+
+# Node Version Manager
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# Python and Docker aliases are loaded from scripts/aliases/
+# Theme aliases are loaded from scripts/aliases/general.sh
+
+# ==============================================================================
+# WSL Integration
+# ==============================================================================
+
+if [[ "$IS_WSL" == "true" ]]; then
+    # WSL-specific aliases
+    alias open='explorer.exe'
+    
+    # Windows integration
+    alias winget='/mnt/c/Windows/System32/winget.exe'
+    alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
+    
+    # Display is set in scripts/env/common.sh
+fi
+
+# ==============================================================================
+# Dotfiles Integration
+# ==============================================================================
+
+# Load dotfiles functions and aliases
+if [[ -d "$DOTFILES_DIR" ]]; then
+    # Load functions
+    for file in "$DOTFILES_DIR"/scripts/functions/*.sh; do
+        [[ -r "$file" ]] && source "$file"
+    done
+    
+    # Load aliases  
+    for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
+        [[ -r "$file" ]] && source "$file"
+    done
+fi
+
+# ==============================================================================
+# Local Configuration
+# ==============================================================================
+
+# Source local configuration if it exists (not tracked in git)
+[[ -f ~/.bashrc.local ]] && source ~/.bashrc.local
+
+# Welcome message (only for interactive shells)
+if [[ $- == *i* ]]; then
+    echo -e "${PROMPT_COLOR_SUCCESS}Bash ${BASH_VERSION%.*} loaded with power user configuration${PROMPT_COLOR_RESET}"
+    if command -v git >/dev/null 2>&1; then
+        echo -e "${PROMPT_COLOR_USER}Git: $(git --version | cut -d' ' -f3)${PROMPT_COLOR_RESET}"
+    fi
+    if [[ -n "$DOTFILES_THEME" ]]; then
+        echo -e "${PROMPT_COLOR_HOST}Theme: $DOTFILES_THEME${PROMPT_COLOR_RESET}"
+    fi
+fi
