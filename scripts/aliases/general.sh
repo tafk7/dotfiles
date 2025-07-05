@@ -128,3 +128,7 @@ if command -v batcat &> /dev/null; then
 elif command -v bat &> /dev/null; then
     alias md='bat --style=plain --language=markdown'  # View markdown files
 fi
+
+# Dotfiles management
+alias update-configs='$DOTFILES_DIR/scripts/update-configs.sh'
+alias update-configs-force='$DOTFILES_DIR/scripts/update-configs.sh --force'
