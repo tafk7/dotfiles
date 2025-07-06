@@ -20,83 +20,28 @@ Move artifact from temporary workspace to production location with full integrat
 <task>Promote $ARGUMENTS to production</task>
 
 <phases>
-### Phase 1: Analyze
-1. Validate readiness (READY_ prefix, no TODOs)
-2. Determine destination by file type
-3. Check conflicts and dependencies
-
-### Phase 2: Execute  
-1. Run pre-flight checklist:
-   - No debug code or console.logs
-   - Proper error handling
-   - Tests pass
-   - Documentation accurate
-2. Copy to destination with imports update
-3. Run tests/linting
-
-### Phase 3: Verify
-1. Confirm all tests pass
-2. Update devlog with promotion
-3. Clean up original
+1. **Analyze** - Validate readiness, determine destination, check conflicts
+2. **Execute** - Run pre-flight checklist, copy with import updates, test
+3. **Verify** - Confirm tests pass, update devlog, clean up original
 </phases>
 
-<destinations>
-| Type | Pattern | Destination |
-|------|---------|-------------|
-| Docs | *.md | docs/ |
-| Code | *.py/js/ts | src/[module]/ |
-| Tests | test_*, *.test.* | tests/ |
-| Config | *.json/yaml | root or config/ |
-| Assets | images, data | assets/ |
-</destinations>
-
 <conditional>
-If code file:
-- Run type checking
-- Verify test coverage
-- Check import paths
-
-If documentation:
-- Update relative links
-- Verify examples work
-- Check formatting
-
-If config file:
-- Validate schema
-- Check env variables
-- Test in isolation
+Destinations: Docs(*.md)→docs/ | Code(*.py/js/ts)→src/ | Tests→tests/ | Config→root/config/ | Assets→assets/
+Type checks: Code(types,coverage,imports) | Docs(links,examples,format) | Config(schema,env,isolation) | Assets(optimize,naming,structure)
+Pre-flight: No debug code, proper error handling, tests pass, docs accurate
 </conditional>
 
 
 <output>
 ```
 PROMOTION ANALYSIS: [filename]
-============================
-Status: READY
-Destination: [path]
-Conflicts: [none/exists]
-Issues: [N TODOs]
+Status: READY | Destination: [path] | Conflicts: [none/exists] | Issues: [N TODOs]
 
 Proceed? (yes/no)
 ```
 
-After promotion:
-1. Log in devlog_YYMM.md
-2. Update imports across codebase
-3. Commit with descriptive message
+After promotion: Log in devlog, update imports, commit with message
+If fails: Git revert, restore artifact, document reason
 </output>
-
-<rollback>
-If promotion fails:
-- Use git to revert changes
-- Restore original artifact
-- Document failure reason
-</rollback>
-
-# File type specific checks integrated into conditionals above:
-# - Code: test suite, imports, types
-# - Docs: links, examples, formatting
-# - Config: schema, env vars, compatibility
-# - Assets: optimization, naming, structure
 
 Promotion transforms experiments into production excellence - quality gates protect The Sublime.

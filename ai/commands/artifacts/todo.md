@@ -9,14 +9,14 @@ Generate issue for: $ARGUMENTS
 ## Context
 - Time: !`date "+%Y-%m-%d %H:%M"`
 - Next ID: !`ls artifacts/issues/TODO-*.md 2>/dev/null | wc -l | xargs -I {} expr {} + 1 || echo "1"`
-- Year: !`date "+%Y"`
+- Year: !`date "+%y"`
 
 ## Task
 
 <task>Create TODO issue for: $ARGUMENTS</task>
 
 <requirements>
-1. Generate `artifacts/issues/TODO-YYYY-NNN_description.md`
+1. Generate `artifacts/issues/TODO-YYMM-NNN_description.md`
 2. Include full context for future resumption
 3. Add clear success criteria and implementation steps
 4. Log creation in devlog
@@ -29,65 +29,35 @@ Generate issue for: $ARGUMENTS
 4. **Log** - Update devlog with creation
 </phases>
 
-<conditional>
-Parse priority from $ARGUMENTS:
-- "P0" or "blocking" → P0 with urgency context
-- "bug" → Add reproduction steps, error messages, test links
-- Effort: defaults to Medium if unspecified
-</conditional>
-
 <template>
 ```markdown
 # $ARGUMENTS
 
-**Created**: YYYY-MM-DD HH:MM
-**Status**: Open
-**Priority**: [P0: Blocking | P1: Important | P2: Enhancement]
+**Created**: YYYY-MM-DD HH:MM | **Status**: Open
+**Priority**: [P0: Blocking | P1: Important | P2: Enhancement]  
 **Effort**: [Small: <2hr | Medium: 2-8hr | Large: >1 day]
 
-## Context
-[Why this exists, how discovered, devlog/PR links]
+## Context & Current State
+[Why this exists, what's broken/missing, file paths]
 
-## Current State
-[What exists now - file paths, code snippets]
-[What's broken or missing]
-
-## Desired State
-[Success criteria]
-[Example of desired behavior]
+## Desired State & Success Criteria
+[Goals, examples, acceptance criteria]
 
 ## How to Start
-1. Read: [files to review]
-2. Run: [commands to reproduce]
-3. Check: artifacts/context/[relevant].md
+1. Read: [files] | 2. Run: [commands] | 3. Check: artifacts/context/
 
-## Implementation Notes
-- [Technical approach]
-- [Constraints or gotchas]
-
-## Checklist
-- [ ] [Implementation steps]
-- [ ] Tests added
-- [ ] Documentation updated
-- [ ] Devlog entry created
+## Implementation
+- Technical approach | Constraints | Gotchas
+- [ ] Implementation steps | [ ] Tests | [ ] Docs | [ ] Devlog
 
 ## References
-- Related: [TODO-NNN, PR#]
-- Artifacts: [sketches, analyses]
+Related: [TODO-YYMM-NNN] | Artifacts: [sketches, analyses]
 ```
 </template>
 
-# Type-specific sections added automatically:
-# - Bugs: reproduction steps, error messages
-# - Features: user stories, acceptance criteria
-# - Refactoring: migration plan
-# - Tech Debt: how incurred, remediation path
-
-<error-handling>
-- Duplicate ID: Increment and retry
-- Missing context: Gather from git history
-- Invalid priority: Default to P1
-- Long description: Truncate filename, keep full in content
-</error-handling>
+<conditional>
+Parse: P0/blocking→urgency, bug→reproduction, default effort Medium | Types: Bug/Feature/Refactor/TechDebt auto-sections
+Errors: Duplicate ID(increment), Missing context(git history), Invalid priority(P1 default)
+</conditional>
 
 Comprehensive context today prevents confusion tomorrow - capture everything.

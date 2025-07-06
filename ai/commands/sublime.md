@@ -19,9 +19,17 @@ Analyze code against The Sublime principles for comprehensive improvement recomm
 
 <requirements>
 1. Analyze code quality against Prime Directives
+   - Code smells and anti-patterns
+   - Maintainability and readability issues
 2. Apply Core Axioms to identify improvements
+   - Unnecessary complexity and over-engineering
+   - Opportunities for deletion and simplification
 3. Detect Cardinal Sins and their violations
+   - Non-idiomatic code and custom implementations
+   - Library replacement opportunities
 4. Generate prioritized recommendations
+   - Breaking changes with migration paths
+   - Long-term vs short-term tradeoffs
 </requirements>
 
 <phases>
@@ -32,38 +40,10 @@ Analyze code against The Sublime principles for comprehensive improvement recomm
 </phases>
 
 <conditional>
-If deep analysis requested:
-- Include dependency graphs
-- Measure cyclomatic complexity
-- Profile performance bottlenecks
-
-If quick review requested:
-- Focus on top 5 issues
-- Provide 1-hour fixes
-- Skip migration planning
+If deep: dependency graphs, complexity, performance | If quick: top 5 issues, 1hr fixes, skip migration
+Focus areas: Security(OWASP,auth,data) | Performance(BigO,cache,DB) | Maintainability(clarity,docs,tests) | Architecture(coupling,cohesion,SOLID)
 </conditional>
 
-<analysis>
-### Quality Assessment
-- Code smells and anti-patterns
-- Maintainability and readability issues
-- Technical debt identification
-
-### Simplicity Review  
-- Unnecessary complexity
-- Over-engineered solutions
-- Opportunities for deletion
-
-### Standards Compliance
-- Non-idiomatic code
-- Custom implementations of standard patterns
-- Library replacement opportunities
-
-### Breaking Changes
-- Improvements requiring breaking changes
-- Migration paths for each change
-- Long-term vs short-term tradeoffs
-</analysis>
 
 <output>
 Create `artifacts/analyses/YYMMDD_HHMM_sublime_analysis.md`:
@@ -73,20 +53,17 @@ Create `artifacts/analyses/YYMMDD_HHMM_sublime_analysis.md`:
 Date: YYYY-MM-DD HH:MM
 
 ## Executive Summary
-- Health score: X/10
-- Critical issues: N
-- Quick wins: N
+Health score: X/10 | Critical: N | Quick wins: N
 
 ## Critical Issues (P0)
 [Immediate attention required]
 
-## Important Improvements (P1)
+## Important Improvements (P1)  
 [Significant quality improvements]
 
 ## Library Replacements
 | Current | Suggested | Benefit |
 |---------|-----------|---------|
-| ...     | ...       | ...     |
 
 ## Quick Wins (<1hr each)
 [Low-effort, high-impact changes]
@@ -95,12 +72,6 @@ Date: YYYY-MM-DD HH:MM
 [Prioritized action plan]
 ```
 </output>
-
-# Focus areas (use --focus flag):
-# - Security: OWASP top 10, auth patterns, data handling
-# - Performance: Big-O analysis, caching, DB queries
-# - Maintainability: clarity, docs, test coverage
-# - Architecture: coupling, cohesion, SOLID
 
 <error-handling>
 - Large codebase: Sample intelligently, focus on hot paths
