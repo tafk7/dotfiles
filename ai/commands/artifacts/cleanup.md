@@ -4,20 +4,22 @@ description: Remove old artifacts while preserving issues and context
 
 # Artifacts Cleanup
 
-Remove stale artifacts while preserving important persistent files.
+Clean up: $ARGUMENTS
 
 ## Context
 - Current date: !`date +%Y-%m-%d`
-- Cleanup threshold: 30 days
+- Threshold: !`echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"` days
+- Mode: !`[[ "$ARGUMENTS" == *"--dry-run"* ]] && echo "DRY RUN" || echo "EXECUTE"`
 - Protected: issues/, context/, current devlog
-- Candidates: !`find artifacts -type f -mtime +30 2>/dev/null | grep -v -E "(issues/|context/|devlog_)" | wc -l || echo "0"`
+- Candidates: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|context/|devlog_)" | wc -l || echo "0"`
+- Total size: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|context/|devlog_)" -exec du -ch {} + | tail -1 | cut -f1 || echo "0"`
 
 ## Task
 
-<task>Clean up artifacts older than 30 days</task>
+<task>Clean up artifacts older than specified threshold</task>
 
 <requirements>
-1. Identify cleanup candidates (30+ days old)
+1. Identify cleanup candidates
 2. Check for references in issues, devlog, git
 3. Warn about READY_ files and large files
 4. Execute removal after confirmation
@@ -25,21 +27,9 @@ Remove stale artifacts while preserving important persistent files.
 </requirements>
 
 <rules>
-**Preserve:**
-- issues/ and context/ (permanent)
-- Current/previous month devlogs
-- Files with BLOCKED_ prefix
-- Recently modified (<7 days)
-
-**Warn about:**
-- READY_ files not promoted
-- Files >1MB
-- Files referenced in issues
-
-**Remove:**
-- 30+ days old
-- No active references
-- Not specially marked
+**Preserve:** issues/, context/, current devlog, BLOCKED_ files, <7 days old
+**Warn:** READY_ files, >1MB files, referenced in issues
+**Remove:** Old files with no active references or special markers
 </rules>
 
 <output>
@@ -77,4 +67,22 @@ After confirmation:
 3. Show completion summary
 </output>
 
-Use --dry-run flag to preview without removing.
+<conditional>
+If --dry-run specified:
+- Show analysis only
+- No files removed
+- Clear preview marking
+
+If file count > 50:
+- Group by type
+- Show size totals
+- Batch confirmation
+</conditional>
+
+# Argument handling:
+# - No args: 30-day default
+# - Number: Custom threshold (e.g., "14")
+# - --dry-run: Preview only
+# - Combinations: "--dry-run 7"
+
+Clean artifacts, free mind. Every byte reclaimed fuels future creation.

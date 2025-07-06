@@ -22,6 +22,20 @@ Generate issue for: $ARGUMENTS
 4. Log creation in devlog
 </requirements>
 
+<phases>
+1. **Parse** - Extract priority and effort from $ARGUMENTS
+2. **Generate** - Create issue file with unique ID
+3. **Document** - Add comprehensive context
+4. **Log** - Update devlog with creation
+</phases>
+
+<conditional>
+Parse priority from $ARGUMENTS:
+- "P0" or "blocking" → P0 with urgency context
+- "bug" → Add reproduction steps, error messages, test links
+- Effort: defaults to Medium if unspecified
+</conditional>
+
 <template>
 ```markdown
 # $ARGUMENTS
@@ -63,11 +77,17 @@ Generate issue for: $ARGUMENTS
 ```
 </template>
 
-<variations>
-- **Bugs**: Add reproduction steps, error messages
-- **Features**: Add user stories, acceptance criteria  
-- **Refactoring**: Add migration plan
-- **Tech Debt**: Add how incurred, remediation
-</variations>
+# Type-specific sections added automatically:
+# - Bugs: reproduction steps, error messages
+# - Features: user stories, acceptance criteria
+# - Refactoring: migration plan
+# - Tech Debt: how incurred, remediation path
 
-Focus on capturing everything needed to resume work in the future.
+<error-handling>
+- Duplicate ID: Increment and retry
+- Missing context: Gather from git history
+- Invalid priority: Default to P1
+- Long description: Truncate filename, keep full in content
+</error-handling>
+
+Comprehensive context today prevents confusion tomorrow - capture everything.

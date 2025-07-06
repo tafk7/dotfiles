@@ -9,6 +9,8 @@ Rapid experimentation sandbox for $ARGUMENTS. Quality suspended. Discovery prior
 ## Context
 - Experiment: !`date "+%Y%m%d_%H%M"`
 - Mode: EXPLORATION
+- Language: !`echo "$ARGUMENTS" | grep -oE "(python|js|typescript|go|rust)" | head -1 || echo "auto"`
+- Existing sketches: !`ls artifacts/sketches/*explore* 2>/dev/null | wc -l || echo "0"`
 
 ## Task
 
@@ -21,6 +23,18 @@ Everything is allowed:
 - Failed attempts are valuable - keep them commented
 - Speed and learning over polish
 </permissions>
+
+<conditional>
+If language detected:
+- Use appropriate extension
+- Add language-specific boilerplate
+- Include relevant imports
+
+If similar exploration exists:
+- Reference previous attempts
+- Build on learned lessons
+- Note evolution of understanding
+</conditional>
 
 <process>
 1. **Create sketch file**: `artifacts/sketches/YYMMDD_HHMM_explore_[topic].[ext]`
@@ -65,8 +79,26 @@ Everything is allowed:
    ```
 </process>
 
-<output>
-Educational sketches + documented learnings + clear next steps
+<phases>
+1. **Setup** - Create exploration workspace
+2. **Experiment** - Try multiple approaches
+3. **Document** - Capture learnings
+4. **Evaluate** - Determine next steps
+</phases>
+
+# Output follows process documentation format above
 
 The code is disposable. The knowledge is permanent.
-</output>
+
+<error-handling>
+- Syntax errors: Keep as comments with "FAILED:" prefix
+- Import errors: Document what was attempted
+- Logic errors: Explain expected vs actual
+- Performance issues: Note bottlenecks found
+</error-handling>
+
+# Exploration types (integrate into sketch header):
+# - Algorithm: complexity, edge cases
+# - API: endpoints, auth, responses
+# - Library: alternatives, benchmarks  
+# - Pattern: implementations, tradeoffs
