@@ -1,5 +1,5 @@
 ---
-descrption: Create issue file with full context
+description: Create comprehensive issue file with full context
 ---
 
 # Create TODO
@@ -11,33 +11,18 @@ Generate issue for: $ARGUMENTS
 - Next ID: !`ls artifacts/issues/TODO-*.md 2>/dev/null | wc -l | xargs -I {} expr {} + 1 || echo "1"`
 - Year: !`date "+%Y"`
 
-## Your Task
+## Task
 
-Create `artifacts/issues/TODO-YYYY-NNN_description.md`:
-(YYYY=year, NNN=zero-padded ID, description=snake_case summary)
+<task>Create TODO issue for: $ARGUMENTS</task>
 
-```markdown
-# $ARGUMENTS
+<requirements>
+1. Generate `artifacts/issues/TODO-YYYY-NNN_description.md`
+2. Include full context for future resumption
+3. Add clear success criteria and implementation steps
+4. Log creation in devlog
+</requirements>
 
-**Created**: YYYY-MM-DD HH:MM
-**Status**: Open
-**Priority**: [P0: Blocking | P1: Important---
-description: Create comprehensive issue file with full context
----
-
-# Create TODO
-
-Generate issue for: $ARGUMENTS
-
-## Context
-- Time: !`date "+%Y-%m-%d %H:%M"`
-- Next ID: !`ls artifacts/issues/TODO-*.md 2>/dev/null | wc -l | xargs -I {} expr {} + 1 || echo "1"`
-- Location: !`pwd`
-
-## Your Task
-
-Create `artifacts/issues/TODO-YYYY-NNN_description.md`:
-
+<template>
 ```markdown
 # $ARGUMENTS
 
@@ -47,49 +32,42 @@ Create `artifacts/issues/TODO-YYYY-NNN_description.md`:
 **Effort**: [Small: <2hr | Medium: 2-8hr | Large: >1 day]
 
 ## Context
-[Why this issue exists and how we got here]
-[Link to devlog entry or PR where discovered]
+[Why this exists, how discovered, devlog/PR links]
 
 ## Current State
-[What exists now - be specific]
-[Include file paths and code snippets]
+[What exists now - file paths, code snippets]
 [What's broken or missing]
 
 ## Desired State
-[Clear success criteria]
-[What the solution should achieve]
-[Include example of desired behavior]
+[Success criteria]
+[Example of desired behavior]
 
 ## How to Start
-1. Read: [specific files to review]
-2. Run: [commands to see the problem]
-3. Check: [related artifacts/docs]
-4. Context: artifacts/context/[relevant].md
+1. Read: [files to review]
+2. Run: [commands to reproduce]
+3. Check: artifacts/context/[relevant].md
 
 ## Implementation Notes
-- [Technical approach suggestions]
-- [Potential solutions or patterns]
-- [Known constraints or gotchas]
-- [Relevant project edicts]
+- [Technical approach]
+- [Constraints or gotchas]
 
 ## Checklist
-- [ ] [Specific implementation steps]
-- [ ] Tests added/updated
+- [ ] [Implementation steps]
+- [ ] Tests added
 - [ ] Documentation updated
 - [ ] Devlog entry created
 
 ## References
-- Related: [TODO-NNN, PR#, commits]
+- Related: [TODO-NNN, PR#]
 - Artifacts: [sketches, analyses]
-- External: [docs, library links]
 ```
+</template>
 
-Add entry to devlog: `**Issue Created**: TODO-YYYY-NNN_description.md`
-
-Adapt template based on type:
+<variations>
 - **Bugs**: Add reproduction steps, error messages
-- **Features**: Add user stories, acceptance criteria
-- **Refactoring**: Add migration plan, backwards compatibility
-- **Tech Debt**: Add how incurred, remediation approach
+- **Features**: Add user stories, acceptance criteria  
+- **Refactoring**: Add migration plan
+- **Tech Debt**: Add how incurred, remediation
+</variations>
 
 Focus on capturing everything needed to resume work in the future.
