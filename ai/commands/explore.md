@@ -1,5 +1,5 @@
 ---
-description: Quick experimentation mode for exploring ideas without quality constrains
+description: Quick experimentation mode for exploring ideas without quality constraints
 ---
 
 # Exploration Mode
@@ -7,35 +7,23 @@ description: Quick experimentation mode for exploring ideas without quality cons
 Rapid experimentation sandbox for $ARGUMENTS. Quality suspended. Discovery prioritized.
 
 ## Context
-- Experiment timestamp: !`date "+%Y%m%d_%H%M"`
+- Experiment: !`date "+%Y%m%d_%H%M"`
 - Mode: EXPLORATION
-- Quality gates: DISABLED
 
-## Your Task
+## Task
 
-### Exploration Principles
+<task>Explore $ARGUMENTS</task>
 
-**Permission to be Messy**
-The goal is learning, not shipping. Failed experiments are victories.
+<permissions>
+Everything is allowed:
+- Global variables, console.log debugging, hardcoded values
+- Copy from Stack Overflow, ignore performance/security
+- Failed attempts are valuable - keep them commented
+- Speed and learning over polish
+</permissions>
 
-**Anything Goes:**
-- Global variables? Fine.
-- Console.log debugging? Perfect.
-- Hardcoded values? Go for it.
-- Copy from Stack Overflow? Absolutely.
-- Performance? Ignore it.
-- Security? Not today.
-- Error handling? Skip it.
-- Best practices? Suspended.
-
-Speed matters. Understanding matters. Polish doesn't.
-
-### Explore: $ARGUMENTS
-
-1. **Create Sketch File**
-   Generate in `artifacts/sketches/YYMMDD_HHMM_explore_[description].[ext]`
-
-   Add header comment:
+<process>
+1. **Create sketch file**: `artifacts/sketches/YYMMDD_HHMM_explore_[topic].[ext]`
    ```
    /*
     * EXPLORATION SKETCH
@@ -45,76 +33,40 @@ Speed matters. Understanding matters. Polish doesn't.
     */
    ```
 
-2. **Experiment Freely**
-   - Try multiple approaches in the same file
-   - Leave failed attempts commented out (they're learning!)
-   - Use print statements liberally
-   - Break all the rules if it helps you learn faster
+2. **Experiment freely** - Try multiple approaches, break rules, learn fast
 
-3. **Document Discoveries**
-   Update `artifacts/devlog_YYMM.md`:
+3. **Document discoveries** in `artifacts/devlog_YYMM.md`:
    ```markdown
    ## YYYY-MM-DD HH:MM - EXPLORATION: [Topic]
-
+   
    **Question**: What happens if...?
-   **Sketch**: [sketch filename]
-
+   **Sketch**: [filename]
+   
    **Discoveries**:
-   - [Thing learned]
+   - [Key learning]
    - [Surprise found]
-   - [What didn't work and why]
-
-   **Next Steps**:
-   - [ ] Worth pursuing to production?
-   - [ ] Need more exploration?
-   - [ ] Dead end - document why
+   - [What failed and why]
+   
+   **Next**: [ ] Production worthy? [ ] More exploration? [ ] Dead end?
    ```
 
-4. **If Promising** → Create Elevation Plan
-   If the exploration shows promise, create issue in `artifacts/issues/`:
+4. **If promising**, create `artifacts/issues/elevate_[topic].md`:
    ```markdown
-   # Elevate Exploration: [Description]
-
-   Created from: [sketch filename]
-
-   ## What We Learned
-   - [Key insights from exploration]
-
-   ## Path to Production
-   1. [How to properly implement]
-   2. [Architecture considerations]
-   3. [Required cleanup]
-
-   ## Estimated Effort
-   - Exploration took: X hours
-   - Production version: Y hours
+   # Elevate: [Description]
+   From: [sketch filename]
+   
+   ## Learned
+   - [Key insights]
+   
+   ## Production Path
+   - [Implementation steps]
+   
+   ## Effort: X hours explored → Y hours to ship
    ```
+</process>
 
-### What Exploration Creates
-
-**Valuable Artifacts:**
-- Learning documentation
-- Proof of concepts
-- Failed experiment insights
-- Decision evidence
-
-**Not Suitable For:**
-- Production use
-- Code examples
-- Performance benchmarks
-- Copy-paste templates
+<output>
+Educational sketches + documented learnings + clear next steps
 
 The code is disposable. The knowledge is permanent.
-
-### The Explorer's Mindset
-
-> "In exploration mode, the only failure is not learning something new"
-
-Questions worth exploring:
-- What happens if we try...?
-- Is it even possible to...?
-- How does X really work?
-- What's the simplest way to...?
-- Can we break this?
-
-**Output**: Educational sketches + documented learnings + clear next steps
+</output>

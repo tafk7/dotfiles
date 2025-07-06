@@ -1,5 +1,5 @@
 ---
-descrption: Prioritize delivery over perfection - get it working and shipped
+description: Prioritize delivery over perfection - get it working and shipped
 ---
 
 # Ship It Mode
@@ -9,53 +9,49 @@ Get $ARGUMENTS working now. Quality later. Document everything.
 ## Context
 - Timestamp: !`date "+%Y-%m-%d %H:%M"`
 - Mode: SHIP IT
-- Ship count this month: !`grep -c "SHIP MODE:" artifacts/devlog_*.md 2>/dev/null || echo 0`
 
-## Your Task
+## Task
 
-### Ship Mode Principles
+<task>Ship $ARGUMENTS immediately</task>
 
-**Working > Perfect** - If it runs, it ships.
-**Today > Tomorrow** - Quick fixes now, elegance later.
-**Progress > Polish** - User value first, code beauty second.
+<principles>
+- Working > Perfect
+- Today > Tomorrow  
+- Progress > Polish
+</principles>
 
-### Execute: $ARGUMENTS
+<process>
+1. **Make it work**
+   - Fastest path wins
+   - Copy-paste OK, hard-code OK
+   - One test minimum
+   - Critical errors only
 
-**1. Make It Work**
-- Fastest path wins
-- Copy-paste OK
-- Hard-code OK
-- One test minimum
-- Critical errors only
+2. **Document shortcuts** in `artifacts/devlog_YYMM.md`:
+   ```markdown
+   ## SHIP MODE: [Task] - YYYY-MM-DD HH:MM
+   Why: [Urgent reason]
+   Shortcuts: [What corners cut]
+   Cleanup: TODO-YYYY-NNN_[description].md
+   ```
 
-**2. Document Immediately**
+3. **Create redemption issue** `artifacts/issues/TODO-YYYY-NNN_[description].md`:
+   ```markdown
+   # Cleanup: [Description]
+   
+   ## Shortcuts Taken
+   - [Each compromise]
+   
+   ## Path to Quality
+   - [Steps to reach proper implementation]
+   
+   ## Acceptance Criteria
+   - [ ] [Specific improvements needed]
+   ```
+</process>
 
-Devlog entry + Redemption issue:
-```markdown
-## SHIP MODE: [Task] - YYYY-MM-DD HH:MM
-Why: [Urgent reason]
-Shortcuts: [What corners cut]
-Cleanup: TODO-YYYY-NNN_[description].md
-```
+<output>
+Working code + documented shortcuts + redemption plan
 
-Issue must include:
-- Each shortcut taken
-- Steps to reach Sublime quality
-- Clear acceptance criteria
-
-### Ship Mode IS:
-✓ Emergency escape hatch
-✓ Documented compromise
-✓ Temporary pragmatism
-
-### Ship Mode IS NOT:
-✗ Normal development
-✗ License for broken code
-✗ Permanent solution
-
-> "Perfect code that ships beats perfect code that doesn't"
-> - The Sublime Paradox
-
-Every shortcut must be documented. Every compromise needs a restoration plan.
-
-**Output**: Working code + documented shortcuts + redemption plan
+Ship mode is an emergency escape hatch, not normal development.
+</output>
