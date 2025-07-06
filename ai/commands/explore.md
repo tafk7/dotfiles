@@ -24,81 +24,35 @@ Everything is allowed:
 - Speed and learning over polish
 </permissions>
 
-<conditional>
-If language detected:
-- Use appropriate extension
-- Add language-specific boilerplate
-- Include relevant imports
-
-If similar exploration exists:
-- Reference previous attempts
-- Build on learned lessons
-- Note evolution of understanding
-</conditional>
-
 <process>
 1. **Create sketch file**: `artifacts/sketches/YYMMDD_HHMM_explore_[topic].[ext]`
-   ```
-   /*
-    * EXPLORATION SKETCH
-    * Question: [What we're trying to learn]
-    * Date: YYYY-MM-DD HH:MM
-    * Status: EXPERIMENTAL
-    */
-   ```
+   - Use detected language extension or .txt
+   - Add boilerplate header with question/date/status
+   - Reference similar explorations if they exist
 
 2. **Experiment freely** - Try multiple approaches, break rules, learn fast
 
-3. **Document discoveries** in `artifacts/devlog_YYMM.md`:
-   ```markdown
-   ## YYYY-MM-DD HH:MM - EXPLORATION: [Topic]
-   
-   **Question**: What happens if...?
-   **Sketch**: [filename]
-   
-   **Discoveries**:
-   - [Key learning]
-   - [Surprise found]
-   - [What failed and why]
-   
-   **Next**: [ ] Production worthy? [ ] More exploration? [ ] Dead end?
-   ```
+3. **Document discoveries** in devlog with sketch filename, key learnings, next steps
 
-4. **If promising**, create `artifacts/issues/elevate_[topic].md`:
-   ```markdown
-   # Elevate: [Description]
-   From: [sketch filename]
-   
-   ## Learned
-   - [Key insights]
-   
-   ## Production Path
-   - [Implementation steps]
-   
-   ## Effort: X hours explored → Y hours to ship
-   ```
+4. **If promising**, create elevation issue with production path
 </process>
 
 <phases>
 1. **Setup** - Create exploration workspace
-2. **Experiment** - Try multiple approaches
+2. **Experiment** - Try multiple approaches  
 3. **Document** - Capture learnings
 4. **Evaluate** - Determine next steps
 </phases>
 
-# Output follows process documentation format above
+<conditional>
+If language detected: Use appropriate extension, add boilerplate, include imports
+If similar exploration exists: Reference previous attempts, build on lessons
+If syntax/import/logic errors: Keep as "FAILED:" comments, document attempts
+If promising results: Create elevation issue with production path
+
+Exploration types for sketch headers:
+- Algorithm: complexity, edge cases | API: endpoints, auth, responses  
+- Library: alternatives, benchmarks | Pattern: implementations, tradeoffs
+</conditional>
 
 The code is disposable. The knowledge is permanent.
-
-<error-handling>
-- Syntax errors: Keep as comments with "FAILED:" prefix
-- Import errors: Document what was attempted
-- Logic errors: Explain expected vs actual
-- Performance issues: Note bottlenecks found
-</error-handling>
-
-# Exploration types (integrate into sketch header):
-# - Algorithm: complexity, edge cases
-# - API: endpoints, auth, responses
-# - Library: alternatives, benchmarks  
-# - Pattern: implementations, tradeoffs

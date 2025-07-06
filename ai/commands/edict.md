@@ -16,79 +16,37 @@ Check if $ARGUMENTS (or current directory) violates any project edicts (constrai
 <task>Verify edict compliance for $ARGUMENTS</task>
 
 <requirements>
-1. Parse edicts from CLAUDE.md (if not found, report and exit)
-2. Check target against each active edict
-3. Identify violations, warnings, and expired edicts
-4. Generate compliance report
+1. Parse edicts from CLAUDE.md (exit if missing)
+2. Check compliance: Compatibility, Performance, Security, Dependencies, Architecture  
+3. Categorize findings and generate actionable report
 </requirements>
 
 <phases>
-1. **Parse** - Extract edicts from CLAUDE.md
-2. **Check** - Verify compliance for each edict
-3. **Analyze** - Categorize findings
-4. **Report** - Generate actionable output
+1. **Parse** - Extract edicts | 2. **Check** - Verify compliance
+3. **Analyze** - Categorize findings | 4. **Report** - Generate output
 </phases>
-
-<compliance-checks>
-- **Compatibility**: API contracts, breaking changes, data formats
-- **Performance**: Resource constraints, operation limits
-- **Security**: Validations, unsafe operations, compliance rules
-- **Dependencies**: Authorized libraries, versions, licenses
-- **Architecture**: Pattern violations, boundaries, coupling
-</compliance-checks>
 
 <output>
 Create `artifacts/analyses/YYMMDD_HHMM_edict_compliance.md`:
 
 ```markdown
-# Edict Compliance Report
-Target: [checked]
-Date: YYYY-MM-DD HH:MM
-
-## Summary
-✅ Compliant: N
-❌ Violations: N
-⚠️  Warnings: N
+# Edict Compliance Report  
+Target: [checked] | Date: YYYY-MM-DD HH:MM
+✅ Compliant: N | ❌ Violations: N | ⚠️ Warnings: N
 
 ## ❌ VIOLATIONS
 ### Edict.Category.N
-**Violated**: [constraint]
-**Found**: [violation]
-**Location**: file:line
-**Fix**: [required change]
-
-## ⚠️  WARNINGS
-[Potential issues with recommendations]
+Violated: [constraint] | Found: [violation] | Location: file:line | Fix: [change]
 
 ## Actions Required
-1. [Priority fixes]
-2. [Next steps]
+[Priority fixes and next steps]
 ```
 </output>
 
 <conditional>
-If no violations:
-- Highlight exemplary compliance
-- Suggest edict removal candidates
-- Note redemption progress
-
-If critical violations:
-- Mark with ❌ CRITICAL
-- Provide immediate fix steps
-- Block further operations
+No violations: Highlight compliance, suggest removal candidates | Critical: Mark ❌ CRITICAL, immediate fixes, block ops
+Errors: Missing CLAUDE.md(exit), Malformed(skip), Access denied(note), Large codebase(sample)
+Modes: Quick(summary), Full(detailed), CI(parseable), Redemption(progress)
 </conditional>
-
-# Analysis modes:
-# - Quick: Summary only, no details
-# - Full: Deep analysis with recommendations  
-# - CI: Exit codes and parseable output
-# - Redemption: Progress toward edict removal
-
-<error-handling>
-- Missing CLAUDE.md: Exit with clear message
-- Malformed edicts: Skip with warning
-- Access denied: Note files that couldn't be checked
-- Large codebase: Sample intelligently
-</error-handling>
 
 Every edict expires eventually - compliance today, freedom tomorrow.

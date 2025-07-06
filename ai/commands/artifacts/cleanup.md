@@ -29,7 +29,7 @@ Clean up: $ARGUMENTS
 <rules>
 **Preserve:** issues/, context/, current devlog, BLOCKED_ files, <7 days old
 **Warn:** READY_ files, >1MB files, referenced in issues
-**Remove:** Old files with no active references or special markers
+**Remove:** Old files without special markers
 </rules>
 
 <output>

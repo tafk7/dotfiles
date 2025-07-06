@@ -51,13 +51,13 @@ Last cleanup: YYYY-MM-DD | Last promotion: YYYY-MM-DD
 
 ### Open Issues (N)
 HIGH PRIORITY
-> TODO-YYYY-NNN: [Description] (blocked N days)
+> TODO-YYMM-NNN: [Description] (blocked N days)
 
 STANDARD
-- TODO-YYYY-NNN: [Description] (N days)
+- TODO-YYMM-NNN: [Description] (N days)
 
 TECHNICAL DEBT
-- TODO-YYYY-NNN: [Ship mode cleanup] (N days)
+- TODO-YYMM-NNN: [Ship mode cleanup] (N days)
 
 ## Artifact Analysis
 < 7 days:  [===========] N files
@@ -75,7 +75,7 @@ TECHNICAL DEBT
 ## Quick Actions
 > Promote: /artifacts/promote READY_filename.ext
 > Cleanup: /artifacts/cleanup (N candidates)
-> Review: TODO-YYYY-NNN (blocked)
+> Review: TODO-YYMM-NNN (blocked)
 ```
 </output>
 
