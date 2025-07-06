@@ -7,9 +7,11 @@ description: Apply The Sublime standard to analyze and improve code
 Analyze code against The Sublime principles for comprehensive improvement recommendations.
 
 ## Context
-- Target: $ARGUMENTS (or current directory if not specified)
-- Git status: !`git status -s 2>/dev/null || echo "Not a git repository"`
-- Project config: !`test -f CLAUDE.md && echo "Project CLAUDE.md found" || echo "No project config"`
+- Target: !`echo "${ARGUMENTS:-.}"`
+- Files to analyze: !`find "${ARGUMENTS:-.}" -type f -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" 2>/dev/null | wc -l || echo "0"`
+- Git status: !`git status -s 2>/dev/null | wc -l || echo "No git"`
+- Project config: !`test -f CLAUDE.md && echo "Found" || echo "Not found"`
+- Analysis depth: !`[[ "$ARGUMENTS" == *"--deep"* ]] && echo "DEEP" || echo "STANDARD"`
 
 ## Task
 
@@ -22,13 +24,32 @@ Analyze code against The Sublime principles for comprehensive improvement recomm
 4. Generate prioritized recommendations
 </requirements>
 
+<phases>
+1. **Scan** - Inventory codebase structure
+2. **Analyze** - Apply Sublime principles
+3. **Prioritize** - Rank improvements by impact
+4. **Plan** - Create actionable roadmap
+</phases>
+
+<conditional>
+If deep analysis requested:
+- Include dependency graphs
+- Measure cyclomatic complexity
+- Profile performance bottlenecks
+
+If quick review requested:
+- Focus on top 5 issues
+- Provide 1-hour fixes
+- Skip migration planning
+</conditional>
+
 <analysis>
 ### Quality Assessment
 - Code smells and anti-patterns
 - Maintainability and readability issues
 - Technical debt identification
 
-### Simplicity Review
+### Simplicity Review  
 - Unnecessary complexity
 - Over-engineered solutions
 - Opportunities for deletion
@@ -75,4 +96,17 @@ Date: YYYY-MM-DD HH:MM
 ```
 </output>
 
-Be thorough, specific, and transformative. Focus on actionable improvements over philosophical discussion.
+# Focus areas (use --focus flag):
+# - Security: OWASP top 10, auth patterns, data handling
+# - Performance: Big-O analysis, caching, DB queries
+# - Maintainability: clarity, docs, test coverage
+# - Architecture: coupling, cohesion, SOLID
+
+<error-handling>
+- Large codebase: Sample intelligently, focus on hot paths
+- Missing tests: Note as critical issue
+- Legacy code: Provide incremental migration path
+- External dependencies: Check for better alternatives
+</error-handling>
+
+Every deletion brings clarity. Every simplification reveals truth. The Sublime awaits.
