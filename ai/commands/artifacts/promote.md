@@ -1,6 +1,5 @@
 ---
-descrption: Promote artifacts to production with full integration and verification
-allowed-tools: Bash(cp:*), Bash(mv:*), Bash(mkdir:*), Bash(git:*), Bash(grep:*), ReadFile, WriteFile
+description: Promote artifacts to production with full integration and verification
 ---
 
 # Promote Artifact
@@ -8,211 +7,79 @@ allowed-tools: Bash(cp:*), Bash(mv:*), Bash(mkdir:*), Bash(git:*), Bash(grep:*),
 Move artifact from temporary workspace to production location with full integration.
 
 ## Context
-- Target file: $ARGUMENTS
-- File exists: !`test -f "$ARGUMENTS" && echo "Yes" || echo "No"`
-- File type: !`file -b "$ARGUMENTS" 2>/dev/null || echo "Unknown"`
-- Status prefix: !`basename "$ARGUMENTS" | grep -E "^(READY_|WIP_|BLOCKED_)" | cut -d_ -f1 || echo "none"`
-- Modified: !`stat -c %y "$ARGUMENTS" 2>/dev/null | cut -d' ' -f1 || echo "Unknown"`
+- Target: $ARGUMENTS
+- Exists: !`test -f "$ARGUMENTS" && echo "Yes" || echo "No"`
+- Type: !`file -b "$ARGUMENTS" 2>/dev/null || echo "Unknown"`
+- Status: !`basename "$ARGUMENTS" | grep -E "^(READY_|WIP_|BLOCKED_)" | cut -d_ -f1 || echo "none"`
 
-## Your Task
+## Task
 
-Execute promotion in three phases: **Analyze → Execute → Verify**
+<task>Promote $ARGUMENTS to production</task>
 
-Each phase must complete successfully before proceeding to the next. Track all changes for potential rollback.
+<phases>
+### Phase 1: Analyze
+1. Validate readiness (check READY_ prefix, scan for TODOs)
+2. Determine destination by file type
+3. Check for conflicts and dependencies
 
-### PHASE 1: Analyze
+### Phase 2: Execute  
+1. Run pre-flight checklist
+2. Copy to destination
+3. Update all imports and references
+4. Run tests/linting
 
-**1.1 Validate Readiness**
-- Confirm file exists and is readable
-- Check for READY_ prefix (warn if missing)
-- Scan for TODO/FIXME/HACK comments
-- Review git history for recent changes
-- Check if already promoted (look for metadata)
+### Phase 3: Verify
+1. Confirm all tests pass
+2. Update devlog with promotion record
+3. Clean up original artifact
+</phases>
 
-**1.2 Determine Destination**
-Based on file type and content:
+<destinations>
+| Type | Pattern | Destination |
+|------|---------|-------------|
+| Docs | *.md | docs/ |
+| Code | *.py/js/ts | src/[module]/ |
+| Tests | test_*, *.test.* | tests/ |
+| Config | *.json/yaml | root or config/ |
+| Assets | images, data | assets/ |
+</destinations>
 
-| Type | Pattern | Default Destination |
-|------|---------|-------------------|
-| Documentation | `*.md` in analyses/, designs/ | `docs/` (architecture/, api/, etc.) |
-| Source Code | `*.py`, `*.js`, `*.ts` | `src/[module]/` based on imports |
-| Tests | `test_*.py`, `*.test.js` | `tests/[module]/` |
-| Config | `*.json`, `*.yaml` | Project root or `config/` |
-| Assets | Images, data files | `assets/` or `public/` |
+<checklist>
+**Code Files:**
+- [ ] No debug statements
+- [ ] Proper imports
+- [ ] Error handling
+- [ ] No hardcoded data
 
-**1.3 Check for Conflicts**
-- Does destination file exist?
-- Are there naming conflicts?
-- Will this break existing imports?
-- Are there uncommitted changes?
+**Documentation:**
+- [ ] Relative links
+- [ ] No artifacts/ refs
+- [ ] Tested examples
+</checklist>
 
-Generate analysis report:
+<output>
 ```
 PROMOTION ANALYSIS: [filename]
 ============================
-Status: [READY/NOT READY]
-Type: [Code/Doc/Config/Asset]
-Destination: [proposed path]
-Conflicts: [none/file exists/naming]
-Quality Issues: [N TODOs, N FIXMEs]
-Dependencies: [list affected files]
+Status: READY
+Destination: [path]
+Conflicts: [none/exists]
+Issues: [N TODOs]
 
-[!] Warnings:
-- [Any blocking issues]
-
-Proceed? [Requires confirmation]
+Proceed? (yes/no)
 ```
 
-### PHASE 2: Execute
+After promotion:
+1. Log in devlog_YYMM.md
+2. Update imports across codebase
+3. Commit with descriptive message
+</output>
 
-**2.1 Pre-flight Check**
-Create dynamic checklist based on file type:
+<rollback>
+If promotion fails:
+- Use git to revert changes
+- Restore original artifact
+- Document failure reason
+</rollback>
 
-For **Code Files**:
-```
-[ ] No console.log/print debug statements
-[ ] Imports use project conventions
-[ ] Function/class names follow standards
-[ ] Basic error handling present
-[ ] No hardcoded test data
-[ ] No exploration comments ("HACK", "TODO: clean up")
-```
-
-For **Documentation**:
-```
-[ ] Links use relative paths
-[ ] Code examples are tested
-[ ] Headers follow hierarchy
-[ ] Metadata updated (if needed)
-[ ] No references to artifacts/
-```
-
-For **Config Files**:
-```
-[ ] No development-only settings
-[ ] Secrets use environment variables
-[ ] Schema validates
-[ ] Comments explain non-obvious settings
-```
-
-**2.2 Track Changes**
-Before making any changes:
-```bash
-# Create promotion transaction log
-echo "PROMOTION START: $(date)" > .promotion_log
-echo "File: $ARGUMENTS" >> .promotion_log
-echo "Destination: [destination]" >> .promotion_log
-echo "Affected files:" >> .promotion_log
-```
-
-**2.3 Execute Promotion**
-
-For **Documentation**:
-1. Copy to destination
-2. Update relative links
-3. Add to doc index/TOC
-4. Update cross-references
-
-For **Code**:
-1. Copy to destination with proper naming
-2. Update import paths within file
-3. Find and update imports in other files:
-   ```bash
-   # Find all potential imports
-   grep -r "artifacts.*$(basename $FILE)" src/ tests/
-   grep -r "from.*artifacts" --include="*.py" .
-   grep -r "require.*artifacts" --include="*.js" .
-   grep -r "import.*artifacts" --include="*.ts" .
-   ```
-4. Update module exports/index files
-5. Run linter on promoted file
-6. Run tests to verify nothing broke
-
-### PHASE 3: Verify
-
-**3.1 Run Verification**
-Based on what was promoted:
-
-For **Code**:
-- Run test suite
-- Check for import errors
-- Verify linting passes
-- Ensure no broken dependencies
-
-For **Documentation**:
-- Check all links work
-- Verify images load
-- Confirm formatting renders
-
-**3.2 Update Records**
-
-Add to devlog:
-```markdown
-## YYYY-MM-DD HH:MM - PROMOTED: [filename]
-**From**: artifacts/[path]
-**To**: [destination]
-**Changes made**:
-- [List each file modified]
-- [Import updates made]
-**Verification**: All tests pass
-```
-
-If artifact has frontmatter, add:
-```yaml
-promoted-to: [destination]
-promoted-date: YYYY-MM-DD
-```
-
-**3.3 Cleanup**
-After successful verification:
-1. Remove original artifact (or move to `.artifacts_archive/`)
-2. Update any TODO issues referencing this file
-3. Commit all changes with message:
-   ```
-   Promote [filename] to production
-
-   - Moved from artifacts/ to [destination]
-   - Updated N import statements
-   - All tests passing
-   ```
-
-### Rollback Procedure
-
-If anything fails, use the promotion log:
-```bash
-# Review what was changed
-cat .promotion_log
-
-# Revert all changes
-git checkout -- [affected files from log]
-
-# Restore artifact if removed
-git checkout -- [original artifact]
-
-# Clean up log
-rm .promotion_log
-```
-
-### Edge Cases
-
-**File exists at destination**:
-> Prompt: "Overwrite, merge, or rename?"
-> If merge: Show diff first
-
-**Breaking changes detected**:
-> Create adapter layer or migration guide
-> Document in devlog and TODO issue
-
-**Import cycles created**:
-> Detect before promotion
-> Suggest refactoring to break cycle
-
-**Exploration patterns remaining**:
-> Global variables, hardcoded values
-> Refactor during promotion, not after
-
-### Remember
-
-Promotion transforms quick explorations into production code. The artifact was created to learn; promotion requires care to integrate. Quality gates ensure exploration patterns don't pollute production.
-
-This command embodies the Axiom of Standards: promoted code follows project conventions, not exploration shortcuts.
+Quality gates ensure exploration patterns don't pollute production.
