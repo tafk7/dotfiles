@@ -44,7 +44,7 @@ Generate issue for: $ARGUMENTS
 [Goals, examples, acceptance criteria]
 
 ## How to Start
-1. Read: [files] | 2. Run: [commands] | 3. Check: artifacts/context/
+1. Read: [files] | 2. Run: [commands] | 3. Check: artifacts/reference/
 
 ## Implementation
 - Technical approach | Constraints | Gotchas
@@ -59,5 +59,13 @@ Related: [TODO-YYMM-NNN] | Artifacts: [sketches, analyses]
 Parse: P0/blocking→urgency, bug→reproduction, default effort Medium | Types: Bug/Feature/Refactor/TechDebt auto-sections
 Errors: Duplicate ID(increment), Missing context(git history), Invalid priority(P1 default)
 </conditional>
+
+<error-handling>
+Duplicate ID: Auto-increment to next available number
+Missing issues directory: Create artifacts/issues/ automatically
+Invalid priority: Default to P1 with note in file
+Empty arguments: Prompt for description
+Write failure: Check permissions, suggest alternative location
+</error-handling>
 
 Comprehensive context today prevents confusion tomorrow - capture everything.

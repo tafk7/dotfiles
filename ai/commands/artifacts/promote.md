@@ -44,4 +44,12 @@ After promotion: Log in devlog, update imports, commit with message
 If fails: Git revert, restore artifact, document reason
 </output>
 
+<error-handling>
+File not found: List available READY_ files as suggestions
+Permission denied: Check file ownership and permissions
+Target exists: Prompt for overwrite confirmation
+Invalid path: Suggest correct destination based on file type
+No READY_ prefix: Remind about workflow requirements
+</error-handling>
+
 Promotion transforms experiments into production excellence - quality gates protect The Sublime.
