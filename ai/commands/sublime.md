@@ -15,7 +15,7 @@ Analyze code against The Sublime principles for comprehensive improvement recomm
 
 ## Task
 
-<task>Sublime Analysis</task>
+<task>Sublime analysis of $ARGUMENTS</task>
 
 <requirements>
 1. Analyze code quality against Prime Directives
