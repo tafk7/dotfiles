@@ -25,21 +25,9 @@ Get $ARGUMENTS working now. Quality later. Document everything.
 </principles>
 
 <conditional>
-If CRITICAL urgency:
-- Skip all non-essential checks
-- Focus on core functionality only
-- Document every shortcut taken
-
-If existing implementation:
-- Patch minimally
-- Preserve working code
-- Add targeted fixes only
-
-# Scenarios:
-# Hotfix: Production issue, minimal change, immediate deploy
-# Deadline: Feature delivery, accept tech debt, plan cleanup
-# Demo: Working prototype, hardcoded data OK
-# Emergency: System down, restore service first
+If CRITICAL: Skip checks, core functionality only, document shortcuts
+If existing: Patch minimally, preserve working code, targeted fixes only
+Scenarios: Hotfix(prod issue, minimal), Deadline(tech debt OK), Demo(prototype, hardcode OK), Emergency(restore first)
 </conditional>
 
 <process>
@@ -54,10 +42,10 @@ If existing implementation:
    ## SHIP MODE: [Task] - YYYY-MM-DD HH:MM
    Why: [Urgent reason]
    Shortcuts: [What corners cut]
-   Cleanup: TODO-YYYY-NNN_[description].md
+   Cleanup: TODO-YYMM-NNN_[description].md
    ```
 
-3. **Create redemption issue** `artifacts/issues/TODO-YYYY-NNN_[description].md`:
+3. **Create redemption issue** `artifacts/issues/TODO-YYMM-NNN_[description].md`:
    ```markdown
    # Cleanup: [Description]
    

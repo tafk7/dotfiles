@@ -41,16 +41,10 @@ Record: $ARGUMENTS
 **Impact**: [Quantify: lines reduced, performance gained, bugs fixed]
 **Artifacts**: [Files created in artifacts/]
 **Promoted**: [Files moved to production]
-**Issues**: [Created: TODO-NNN | Resolved: TODO-NNN]
+**Issues**: [Created: TODO-YYMM-NNN | Resolved: TODO-YYMM-NNN]
 
-# Type-specific additions:
-# Bug Fix: error message, root cause, fix
-# Feature: user story, acceptance criteria
-# Refactor: lines reduced, complexity metrics
-# Research: questions answered, decisions made
-
-# Milestones (>30% improvement):
-# === MILESTONE: [Achievement] ===
+# Type additions: Bug(error,cause,fix), Feature(story,criteria), Refactor(metrics), Research(decisions)
+# Milestones: === MILESTONE: [Achievement] === (>30% improvement)
 ```
 </template>
 

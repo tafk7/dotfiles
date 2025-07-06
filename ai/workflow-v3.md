@@ -30,10 +30,16 @@ Everything in `artifacts/` is experimentation. Production code lives in `src/`, 
 ### Development Log
 Track daily progress in `artifacts/devlog_YYMM.md`:
 ```markdown
-## YYYY-MM-DD HH:MM - [Task]: [Description]
-**Impact**: [What changed]
-**Artifacts**: [Files created/modified]
-**Next**: [Follow-up actions]
+## YYYY-MM-DD HH:MM
+
+**Task**: [Description]
+**Impact**: [Quantify: lines reduced, performance gained, bugs fixed]
+**Artifacts**: [Files created in artifacts/]
+**Promoted**: [Files moved to production]
+**Issues**: [Created: TODO-YYMM-NNN | Resolved: TODO-YYMM-NNN]
+
+# Type additions: Bug(error,cause,fix), Feature(story,criteria), Refactor(metrics), Research(decisions)
+# Milestones: === MILESTONE: [Achievement] === (>30% improvement)
 ```
 
 ### Issue Tracking
