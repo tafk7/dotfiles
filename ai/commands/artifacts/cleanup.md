@@ -10,9 +10,9 @@ Clean up: $ARGUMENTS
 - Current date: !`date +%Y-%m-%d`
 - Threshold: !`echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"` days
 - Mode: !`[[ "$ARGUMENTS" == *"--dry-run"* ]] && echo "DRY RUN" || echo "EXECUTE"`
-- Protected: issues/, context/, current devlog
-- Candidates: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|context/|devlog_)" | wc -l || echo "0"`
-- Total size: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|context/|devlog_)" -exec du -ch {} + | tail -1 | cut -f1 || echo "0"`
+- Protected: issues/, reference/, current devlog
+- Candidates: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|reference/|devlog_)" | wc -l || echo "0"`
+- Total size: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|reference/|devlog_)" -exec du -ch {} + | tail -1 | cut -f1 || echo "0"`
 
 ## Task
 
@@ -27,7 +27,7 @@ Clean up: $ARGUMENTS
 </requirements>
 
 <rules>
-**Preserve:** issues/, context/, current devlog, BLOCKED_ files, <7 days old
+**Preserve:** issues/, reference/, current devlog, BLOCKED_ files, <7 days old
 **Warn:** READY_ files, >1MB files, referenced in issues
 **Remove:** Old files without special markers
 </rules>
