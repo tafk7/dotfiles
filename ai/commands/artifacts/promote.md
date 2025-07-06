@@ -10,7 +10,10 @@ Move artifact from temporary workspace to production location with full integrat
 - Target: $ARGUMENTS
 - Exists: !`test -f "$ARGUMENTS" && echo "Yes" || echo "No"`
 - Type: !`file -b "$ARGUMENTS" 2>/dev/null || echo "Unknown"`
-- Status: !`basename "$ARGUMENTS" | grep -E "^(READY_|WIP_|BLOCKED_)" | cut -d_ -f1 || echo "none"`
+- Status: !`basename "$ARGUMENTS" | grep -E "^(READY_|WIP_|BLOCKED_)" | cut -d_ -f1 || echo "UNPREFIXED"`
+- Size: !`test -f "$ARGUMENTS" && du -h "$ARGUMENTS" | cut -f1 || echo "N/A"`
+- TODOs: !`test -f "$ARGUMENTS" && grep -c "TODO" "$ARGUMENTS" 2>/dev/null || echo "0"`
+- Age: !`test -f "$ARGUMENTS" && echo $(( ($(date +%s) - $(stat -c %Y "$ARGUMENTS" 2>/dev/null || echo 0)) / 86400 )) || echo "N/A"` days
 
 ## Task
 
@@ -18,20 +21,23 @@ Move artifact from temporary workspace to production location with full integrat
 
 <phases>
 ### Phase 1: Analyze
-1. Validate readiness (check READY_ prefix, scan for TODOs)
+1. Validate readiness (READY_ prefix, no TODOs)
 2. Determine destination by file type
-3. Check for conflicts and dependencies
+3. Check conflicts and dependencies
 
 ### Phase 2: Execute  
-1. Run pre-flight checklist
-2. Copy to destination
-3. Update all imports and references
-4. Run tests/linting
+1. Run pre-flight checklist:
+   - No debug code or console.logs
+   - Proper error handling
+   - Tests pass
+   - Documentation accurate
+2. Copy to destination with imports update
+3. Run tests/linting
 
 ### Phase 3: Verify
 1. Confirm all tests pass
-2. Update devlog with promotion record
-3. Clean up original artifact
+2. Update devlog with promotion
+3. Clean up original
 </phases>
 
 <destinations>
@@ -44,18 +50,23 @@ Move artifact from temporary workspace to production location with full integrat
 | Assets | images, data | assets/ |
 </destinations>
 
-<checklist>
-**Code Files:**
-- [ ] No debug statements
-- [ ] Proper imports
-- [ ] Error handling
-- [ ] No hardcoded data
+<conditional>
+If code file:
+- Run type checking
+- Verify test coverage
+- Check import paths
 
-**Documentation:**
-- [ ] Relative links
-- [ ] No artifacts/ refs
-- [ ] Tested examples
-</checklist>
+If documentation:
+- Update relative links
+- Verify examples work
+- Check formatting
+
+If config file:
+- Validate schema
+- Check env variables
+- Test in isolation
+</conditional>
+
 
 <output>
 ```
@@ -82,4 +93,10 @@ If promotion fails:
 - Document failure reason
 </rollback>
 
-Quality gates ensure exploration patterns don't pollute production.
+# File type specific checks integrated into conditionals above:
+# - Code: test suite, imports, types
+# - Docs: links, examples, formatting
+# - Config: schema, env vars, compatibility
+# - Assets: optimization, naming, structure
+
+Promotion transforms experiments into production excellence - quality gates protect The Sublime.

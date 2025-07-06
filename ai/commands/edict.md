@@ -22,6 +22,13 @@ Check if $ARGUMENTS (or current directory) violates any project edicts (constrai
 4. Generate compliance report
 </requirements>
 
+<phases>
+1. **Parse** - Extract edicts from CLAUDE.md
+2. **Check** - Verify compliance for each edict
+3. **Analyze** - Categorize findings
+4. **Report** - Generate actionable output
+</phases>
+
 <compliance-checks>
 - **Compatibility**: API contracts, breaking changes, data formats
 - **Performance**: Resource constraints, operation limits
@@ -59,4 +66,29 @@ Date: YYYY-MM-DD HH:MM
 ```
 </output>
 
-Report violations clearly. If compliant, note redemption opportunities.
+<conditional>
+If no violations:
+- Highlight exemplary compliance
+- Suggest edict removal candidates
+- Note redemption progress
+
+If critical violations:
+- Mark with ❌ CRITICAL
+- Provide immediate fix steps
+- Block further operations
+</conditional>
+
+# Analysis modes:
+# - Quick: Summary only, no details
+# - Full: Deep analysis with recommendations  
+# - CI: Exit codes and parseable output
+# - Redemption: Progress toward edict removal
+
+<error-handling>
+- Missing CLAUDE.md: Exit with clear message
+- Malformed edicts: Skip with warning
+- Access denied: Note files that couldn't be checked
+- Large codebase: Sample intelligently
+</error-handling>
+
+Every edict expires eventually - compliance today, freedom tomorrow.
