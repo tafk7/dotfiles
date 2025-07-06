@@ -40,6 +40,33 @@ Verify code compliance with project constraints (edicts) defined in CLAUDE.md.
 ```
 **Creates**: `artifacts/analyses/YYMMDD_HHMM_edict_compliance.md`
 
+### `/context` - Build Mental Model
+Deep analysis to establish comprehensive understanding before implementation.
+```
+/context                   # Analyze current directory
+/context src/auth         # Analyze specific component
+/context lib/parser       # Understand library structure
+```
+**Returns**: Comprehensive analysis in chat with mental model, navigation guide, and insights
+
+### `/scribe` - Generate Documentation
+Deep analysis followed by creation of permanent documentation with visual diagrams.
+```
+/scribe                    # Document current project
+/scribe src/api           # Document API module
+/scribe lib/auth          # Document authentication library
+```
+**Creates**: 1-5 files in `docs/` with README, architecture docs, and mermaid diagrams
+
+### `/explain` - Deep Understanding Analysis
+Perform deep analysis to understand and explain code/systems with educational focus.
+```
+/explain                   # Explain current directory
+/explain src/auth.py      # Explain specific file
+/explain lib/parser       # Explain component/library
+```
+**Creates**: `artifacts/analyses/YYMMDD_HHMM_explain_[target].md` with mental models, architecture diagrams, and navigation guides
+
 ## Artifact Management Commands
 
 ### `/artifacts/status` - Project Health Overview
@@ -85,6 +112,15 @@ Clean up stale artifacts while preserving important files and references.
 /artifacts/cleanup --dry-run   # Preview without removing
 ```
 
+### `/cleanup` - Post-Implementation Polish
+Analyze code for dead weight, redundancy, and artifacts to polish for release.
+```
+/cleanup                   # Analyze current directory
+/cleanup src/feature       # Analyze specific path
+/cleanup src/ --aggressive # Feature branch cleanup
+```
+**Creates**: `artifacts/analyses/YYMMDD_HHMM_cleanup_analysis.md`
+
 ## Quality Philosophy Spectrum
 
 Commands represent different quality levels for different scenarios:
@@ -95,34 +131,49 @@ No quality          Balanced            Perfect quality
 constraints         approach            standards
 
 /explore            /artifacts/*         /sublime
-/ship               Normal dev           /edict
+/ship               /context             /edict
+                    /scribe              
+                    /explain
+                    /cleanup
 ```
 
 ## Workflow Example
 
 ```bash
-# 1. Start with exploration
+# 1. Build understanding first
+/context src/feature
+
+# 2. Deep dive when needed
+/explain src/complex_module
+
+# 3. Start with exploration
 /explore new feature idea
 
-# 2. If promising, create TODO
+# 4. If promising, create TODO
 /artifacts/todo implement feature properly
 
-# 3. When urgent, ship it
+# 5. When urgent, ship it
 /ship hotfix for production bug
 
-# 4. Log progress
+# 6. Log progress
 /artifacts/log shipped emergency fix, created cleanup TODO
 
-# 5. Later, analyze quality
+# 7. Polish before review
+/cleanup src/hotfix
+
+# 8. Later, analyze quality
 /sublime src/hotfix
 
-# 6. Check status regularly
+# 9. Document important modules
+/scribe src/core
+
+# 10. Check status regularly
 /artifacts/status
 
-# 7. Promote when ready
+# 11. Promote when ready
 /artifacts/promote artifacts/READY_feature.py
 
-# 8. Clean up periodically
+# 12. Clean up periodically
 /artifacts/cleanup --dry-run
 ```
 
@@ -142,7 +193,7 @@ artifacts/
 ├── analyses/           # Sublime & edict reports
 ├── designs/            # Architecture proposals
 ├── sketches/           # Exploration experiments
-├── context/            # Permanent references
+├── reference/          # Permanent project references
 └── checklists/         # Complex task tracking
 ```
 

@@ -1,74 +1,136 @@
-# workflow.md - Development Workflow
+# workflow.md - Development Process
+
+This document defines a structured development workflow that separates experimental work from production code, ensuring clean version control and clear progression from ideas to implementation.
 
 ## Directory Structure
 
 ```
 project/
-├── artifacts/               # Temporary development work
-│   ├── devlog_YYMM.md       # Monthly development log
-│   ├── issues/              # TODO tracking with full context
-│   ├── analyses/            # Code analyses (human-facing)
-│   ├── designs/             # Architecture proposals
-│   ├── sketches/            # Quick experiments
-│   ├── context/             # AI reference (permanent)
-│   ├── tests/               # Experimental tests
-│   └── output/              # Generated artifacts
-├── src/                     # Production code
-├── tests/                   # Production tests
-└── docs/                    # Permanent documentation
+├── artifacts/           # Temporary development work
+│   ├── devlog_YYMM.md   # Monthly progress log
+│   ├── issues/          # Deferred work with context
+│   ├── analyses/        # Code analyses and explanations
+│   ├── designs/         # Architecture proposals
+│   ├── sketches/        # Quick experiments
+│   ├── reference/       # Permanent AI references
+│   └── checklists/      # Complex task tracking
+├── src/                 # Production code
+├── tests/               # Production tests
+└── docs/                # Permanent documentation
 ```
 
-## Core Principles
+## Core Concepts
 
 ### Temporal Artifacts
-Everything in `artifacts/` is temporary experimentation toward The Sublime. Production code lives in `src/`, `tests/`, and `docs/`.
+Everything in `artifacts/` is experimentation. Production code lives in `src/`, `tests/`, and `docs/`.
 
-### Timestamp Convention
-All artifact files use: `YYMMDD_HHMM_description.ext`
-- Example: `241215_1430_auth_refactoring.md`
-- Optional status markers: `WIP_`, `READY_`, `BLOCKED_`, `DEPRECATED_`
+### Documentation Audiences
+- **AI-optimized**: `reference/` and `checklists/` contain structured data for AI context
+- **Human-readable**: Other artifacts use clear prose and visual diagrams (see ~/.claude/mermaid_reference.md)
+- **Both**: Code and architecture diagrams serve all audiences effectively
+
+### Naming Convention
+`YYMMDD_HHMM_description.ext` (e.g., `241215_1430_auth_refactor.md`)
 
 ### Development Log
-Track progress in `artifacts/devlog_YYMM.md`:
-- Daily entries with task, impact, and artifacts created
-- Clara adds milestones for significant achievements
-- Links to issues created and code promoted
+Track daily progress in `artifacts/devlog_YYMM.md`:
+```markdown
+## YYYY-MM-DD HH:MM
+
+**Task**: [Description]
+**Impact**: [Quantify: lines reduced, performance gained, bugs fixed]
+**Artifacts**: [Files created in artifacts/]
+**Promoted**: [Files moved to production]
+**Issues**: [Created: TODO-YYMM-NNN | Resolved: TODO-YYMM-NNN]
+
+# Type additions: Bug(error,cause,fix), Feature(story,criteria), Refactor(metrics), Research(decisions)
+# Milestones: === MILESTONE: [Achievement] === (>30% improvement)
+```
 
 ### Issue Tracking
-Deferred work goes in `artifacts/issues/TODO-YYYY-NNN_description.md`:
-- Full context to resume work later
-- Current state, desired state, and implementation notes
-- References to related artifacts and code
-- Status: Open → In Progress → Resolved/Cancelled
+Deferred work in `artifacts/issues/TODO-YYMM-NNN_description.md`:
+- Full context to resume later
+- Current state, desired state, implementation notes
+- Status: Open → In Progress → Resolved
 
-### Context Files
-Permanent AI reference in `artifacts/context/`:
-- Precise definitions tied to project edicts
-- Implementation mappings to actual code
-- Never deleted, always kept current
+### Reference Files
+Permanent references in `artifacts/reference/`:
+- `architecture.md` - System design decisions
+- `api_contracts.md` - API specifications
+- `security.md` - Security requirements
+- `performance.md` - Performance constraints
+- `dependencies.md` - Library choices
+
+## Task Execution Patterns
+
+<task>Complex Feature Implementation</task>
+<process>
+1. Create checklist in artifacts/checklists/
+2. Analyze existing patterns
+3. Design in artifacts/designs/
+4. Implement incrementally
+5. Add comprehensive tests
+6. Update documentation
+7. Run validation sequence
+</process>
+
+<task>Bug Fix</task>
+<requirements>
+- Reproduce issue first
+- Add failing test
+- Implement minimal fix
+- Verify all tests pass
+- Log in devlog
+</requirements>
+
+<task>Refactoring</task>
+<approach>
+1. Document current behavior
+2. Add tests if missing
+3. Refactor incrementally
+4. Verify behavior unchanged
+5. Update documentation
+</approach>
+
+<task>Code Analysis</task>
+<focus>
+- Sublime alignment check
+- Deletion opportunities
+- Library replacement candidates
+- Complexity reduction
+</focus>
 
 ## Artifact Lifecycle
 
-**Create** → **Develop** → **Promote** → **Clean**
+1. **Create** with timestamp in appropriate subdirectory
+2. **Develop** iteratively within artifacts/
+3. **Validate** against quality gates
+4. **Promote** to production when ready
+5. **Clean** stale artifacts periodically
 
-1. Create with timestamp in appropriate subdirectory
-2. Iterate and refine during development
-3. Promote to production when ready:
-   - Documentation → Copy to `docs/`
-   - Code → Integrate into `src/` with proper imports
-4. Clean up stale artifacts periodically
+## Quality Gates
 
-## Integration with The Sublime
+Before promoting artifacts:
+- [ ] Linting passes
+- [ ] Type checking passes
+- [ ] Tests cover new functionality
+- [ ] Documentation updated
+- [ ] Aligns with project edicts
 
-This workflow serves The Sublime by:
-- **Encouraging experimentation** in isolated artifacts
-- **Maintaining quality gates** at promotion boundaries
-- **Preserving context** for long-term understanding
-- **Tracking real progress** through honest devlog entries
-- **Enabling continuous improvement** via issue tracking
+## Progress Tracking
 
-The artifacts directory is a laboratory where we experiment freely, fail safely, and promote only what achieves The Sublime.
+Update format for complex tasks:
+```markdown
+## [Task Name] - Status Update
+✅ Completed: [What's done]
+🔄 In Progress: [Current work]
+📋 Next Steps: [What's planned]
+⚠️ Blockers: [Any issues]
+```
 
----
-
-For detailed commands and templates, see the slash command reference.
+## Monthly Summary
+Track in devlog:
+- Artifacts created
+- Promoted to production
+- Technical debt paid
+- Quality metrics improved

@@ -49,4 +49,11 @@ Errors: Missing CLAUDE.md(exit), Malformed(skip), Access denied(note), Large cod
 Modes: Quick(summary), Full(detailed), CI(parseable), Redemption(progress)
 </conditional>
 
+<error-handling>
+Missing CLAUDE.md: Exit with clear message about requirements
+Malformed edicts: Skip invalid sections, note in report
+Access denied: Document accessible files only
+Parse errors: Graceful degradation with partial results
+</error-handling>
+
 Every edict expires eventually - compliance today, freedom tomorrow.
