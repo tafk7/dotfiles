@@ -125,8 +125,8 @@ Promote validated artifacts from temporary workspace to production locations.
 ### `/artifacts/cleanup` - Remove Old Artifacts
 Clean up stale artifacts while preserving important files and references.
 ```
-/artifacts/cleanup         # Remove files >30 days old
-/artifacts/cleanup 14      # Remove files >14 days old
+/artifacts/cleanup         # Remove files >14 days old
+/artifacts/cleanup 7       # Remove files >7 days old
 /artifacts/cleanup --dry-run   # Preview without removing
 ```
 
@@ -157,6 +157,32 @@ Generate actionable step-by-step implementation checklist from plans.
 ```
 **Creates**: `artifacts/checklists/YYMMDD_HHMM_checklist_[description].md`
 
+### `/implement` - Execute Checklist
+Execute checklist items with real-time progress tracking and devlog updates.
+```
+/implement artifacts/checklists/auth_checklist.md  # Execute full checklist
+/implement checklist.md Phase 1-3                 # Execute specific phases
+/implement plan.md --dry-run                       # Preview execution
+```
+**Updates**: Checklist file with progress + devlog entry
+
+### `/git/commit` - Generate Commit Messages
+Analyze staged changes to generate descriptive commit message based solely on content.
+```
+/git/commit                # Generate message for staged changes
+/git/commit --amend       # Generate message for amending last commit
+```
+**Returns**: Executable git command with appropriate commit message
+
+### `/git/diff` - Summarize Changes
+Analyze unstaged changes since last commit and provide summary of modifications.
+```
+/git/diff                  # Summarize unstaged changes
+/git/diff --staged        # Include staged changes
+/git/diff src/auth        # Changes in specific area
+```
+**Returns**: Clear summary of what changed, grouped by component
+
 ## Quality Philosophy Spectrum
 
 Commands represent different code quality approaches for different scenarios:
@@ -177,6 +203,7 @@ quality            improvement           speed
 - `/scribe` - Documentation (post-code)
 - `/explain` - Learning (educational)
 - `/artifacts/*` - Project management
+- `/git/*` - Version control assistance
 
 ## Workflow Example
 
@@ -214,13 +241,19 @@ quality            improvement           speed
 # 11. Document important modules
 /scribe src/core
 
-# 12. Check status regularly
+# 12. Check changes before commit
+/git/diff
+
+# 13. Generate commit message
+/git/commit
+
+# 14. Check status regularly
 /artifacts/status
 
-# 13. Promote when ready
+# 15. Promote when ready
 /artifacts/promote artifacts/READY_feature.py
 
-# 14. Clean up periodically
+# 16. Clean up periodically
 /artifacts/cleanup --dry-run
 ```
 
@@ -287,15 +320,13 @@ artifacts/
 **`/refine`** - Incremental improvement
 - No args: Analyze current directory
 - `path`: Analyze specific file/directory
-- `--focus [complexity|performance|patterns]`: Refinement focus
-- `--depth [shallow|deep]`: Analysis depth
+- `--focus [area]`: Specific refinement focus
 
 **`/profile`** - Performance investigation
 - No args: Profile current directory
 - `path`: Analyze specific file/directory
 - `--memory`: Focus on memory usage patterns
 - `--cpu`: Focus on computational bottlenecks
-- `--deep`: Include dependency analysis
 
 **`/architect`** - System design
 - `system-name`: Design new system/service/feature
@@ -310,6 +341,11 @@ artifacts/
 - No args: Generate from current conversation
 - `file path`: Generate from plan file
 - Examples: "plan.md", "artifacts/analyses/design.md"
+
+**`/implement`** - Execute checklist
+- `checklist-path`: Required path to checklist file
+- `Phase 1-3` or `Quick Wins`: Execute specific phases only
+- `--dry-run`: Preview execution without changes
 
 ### Artifact Commands
 
@@ -334,9 +370,20 @@ artifacts/
 - File type determines destination automatically
 
 **`/artifacts/cleanup`** - Remove old artifacts
-- No args: Remove files >30 days old
+- No args: Remove files >14 days old
 - `number`: Remove files >N days old
 - `--dry-run`: Preview without removing
+
+### Git Commands
+
+**`/git/commit`** - Generate commit messages
+- No args: Analyze all staged changes
+- `--amend`: Generate message for amending last commit
+
+**`/git/diff`** - Summarize changes
+- No args: Show unstaged changes
+- `--staged`: Include staged changes
+- `file/path`: Show changes for specific area
 
 ## Best Practices
 
