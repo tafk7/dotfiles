@@ -1,5 +1,5 @@
 ---
-description: Build deep understanding and mental model of repository or topic
+description: Build AI's internal understanding for implementation work
 ---
 
 # Build Context
@@ -9,8 +9,8 @@ Deep analysis of $ARGUMENTS to establish comprehensive understanding before impl
 ## Context
 - Target: !`echo "${ARGUMENTS:-.}"`
 - Repository: !`git rev-parse --is-inside-work-tree 2>/dev/null && echo "Yes" || echo "No"`
-- Code files: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" \) 2>/dev/null | wc -l || echo "0"`
-- Lines: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo "0"`
+- Code files: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" \) 2>/dev/null | wc -l || echo "0"`
+- Lines: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" \) 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo "0"`
 - Tests: !`find "${ARGUMENTS:-.}" -name "*test*" -o -name "*spec*" 2>/dev/null | wc -l || echo "0"`
 
 ## Task
@@ -86,4 +86,4 @@ Huge codebase: Sample core paths | No docs: Infer from structure
 Complex deps: Simplified view | Access denied: Available info only
 </error-handling>
 
-*Context is the lens through which chaos becomes clarity.*
+Context is the lens through which chaos becomes clarity.

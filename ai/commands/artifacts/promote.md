@@ -19,6 +19,15 @@ Move artifact from temporary workspace to production location with full integrat
 
 <task>Promote $ARGUMENTS to production</task>
 
+<requirements>
+1. Validate artifact is marked READY_ and has no TODOs
+2. Determine correct production destination based on file type
+3. Check for conflicts at destination location
+4. Update all imports and references after move
+5. Verify tests pass with new location
+6. Update devlog with promotion details
+</requirements>
+
 <phases>
 1. **Analyze** - Validate readiness, determine destination, check conflicts
 2. **Execute** - Run pre-flight checklist, copy with import updates, test
@@ -52,4 +61,4 @@ Invalid path: Suggest correct destination based on file type
 No READY_ prefix: Remind about workflow requirements
 </error-handling>
 
-Promotion transforms experiments into production excellence - quality gates protect The Sublime.
+Promotion transforms experiments into production excellence. Quality gates protect integrity. Arete!

@@ -9,7 +9,7 @@ Post-implementation analysis of $ARGUMENTS to identify and remove technical debr
 ## Context
 - Target: !`echo "${ARGUMENTS:-.}"`
 - Size: !`du -sh "${ARGUMENTS:-.}" 2>/dev/null | cut -f1 || echo "0"`
-- Tech debt: !`rg -c "TODO|FIXME|HACK|XXX" "${ARGUMENTS:-.}" 2>/dev/null | wc -l || echo "0"`
+- Tech debt: !`rg -l "TODO|FIXME|HACK|XXX" "${ARGUMENTS:-.}" 2>/dev/null | wc -l || echo "0"`
 - Temp files: !`find "${ARGUMENTS:-.}" -name "*.tmp" -o -name "*.bak" -o -name "*.orig" -o -name "*~" 2>/dev/null | wc -l || echo "0"`
 
 ## Task
@@ -59,7 +59,7 @@ Dead code: N | Duplicates: N | Artifacts: N | Size: X MB → Y MB
 
 ## Quick Commands
 find . \( -name "*.tmp" -o -name "*.bak" -o -name "*.orig" -o -name "*~" \) -delete
-rg -l "console\.log|debugger" | xargs -I {} sed -i.bak '/console\.log\|debugger/d' {}
+rg -l "console\.log|debugger" | xargs -I {} sed -i '/console\.log\|debugger/d' {}
 git clean -ndx  # Preview untracked files (-fdx to delete)
 
 ## Verify After
