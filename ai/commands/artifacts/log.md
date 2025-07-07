@@ -6,58 +6,35 @@ description: Log development progress with automatic milestone detection
 
 Record: $ARGUMENTS
 
-## Context
-- Time: !`date "+%Y-%m-%d %H:%M"`
-- Branch: !`git branch --show-current 2>/dev/null || echo "main"`
-- Open TODOs: !`find artifacts/issues -name "TODO-*.md" 2>/dev/null | wc -l || echo "0"`
-- Recent artifacts: !`find artifacts -type f -mmin -60 2>/dev/null | grep -v devlog | wc -l || echo "0"`
-- Last commit: !`git log -1 --format="%h %s" 2>/dev/null || echo "No commits"`
-- Devlog exists: !`test -f "artifacts/devlog_$(date +%y%m).md" && echo "Yes" || echo "No"`
-
 ## Task
 
 <task>Log progress for: $ARGUMENTS</task>
 
 <requirements>
-1. Add entry to `artifacts/devlog_YYMM.md`
+1. Add entry to artifacts/devlog_YYMM.md
 2. Quantify real impact (lines, performance, bugs)
-3. Link artifacts created in last hour
-4. Update referenced issue status
-5. Add milestone marker for major achievements (>30% improvement)
+3. Link recent artifacts and issues
+4. Mark milestones for major achievements
 </requirements>
 
 <phases>
-1. **Analyze** - Gather metrics and changes
-2. **Document** - Write structured entry
-3. **Link** - Connect artifacts and issues
-4. **Milestone** - Mark significant achievements
+1. **Document** - Write structured entry with impact
+2. **Link** - Connect artifacts and issues
+3. **Review** - Check for milestone achievements
 </phases>
 
-<template>
-```markdown
-## YYYY-MM-DD HH:MM
-
-**Task**: $ARGUMENTS
-**Impact**: [Quantify: lines reduced, performance gained, bugs fixed]
-**Artifacts**: [Files created in artifacts/]
-**Promoted**: [Files moved to production]
-**Issues**: [Created: TODO-YYMM-NNN | Resolved: TODO-YYMM-NNN]
-
-# Type additions: Bug(error,cause,fix), Feature(story,criteria), Refactor(metrics), Research(decisions)
-# Milestones: === MILESTONE: [Achievement] === (>30% improvement)
-```
-</template>
+<output>
+Append to artifacts/devlog_YYMM.md
+</output>
 
 <conditional>
-If no devlog exists: Create with proper header
-If milestone detected: Add marker and update metrics
+If no devlog exists: Create with header
+If major achievement: Add milestone marker
 </conditional>
 
 <error-handling>
-- Missing devlog: Create with proper header
-- Invalid date: Use current timestamp
-- No artifacts: Note exploration/planning phase
-- Failed linking: Log anyway, fix references later
+Missing devlog: Create new file
+No recent work: Note planning/research phase
 </error-handling>
 
 Real impact compounds - every honest entry builds momentum toward perfection.

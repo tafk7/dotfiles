@@ -6,12 +6,6 @@ description: Analyze code for dead weight, redundancy, and artifacts to polish f
 
 Post-implementation analysis of $ARGUMENTS to identify and remove technical debris.
 
-## Context
-- Target: !`echo "${ARGUMENTS:-.}"`
-- Size: !`du -sh "${ARGUMENTS:-.}" 2>/dev/null | cut -f1 || echo "0"`
-- Tech debt: !`rg -l "TODO|FIXME|HACK|XXX" "${ARGUMENTS:-.}" 2>/dev/null | wc -l || echo "0"`
-- Temp files: !`find "${ARGUMENTS:-.}" -name "*.tmp" -o -name "*.bak" -o -name "*.orig" -o -name "*~" 2>/dev/null | wc -l || echo "0"`
-
 ## Task
 
 <task>Analyze $ARGUMENTS for cleanup opportunities</task>
@@ -24,20 +18,16 @@ Post-implementation analysis of $ARGUMENTS to identify and remove technical debr
 </requirements>
 
 <phases>
-1. **Scan** - Find cleanup targets | 2. **Risk** - Assess safety
-3. **Report** - Actionable plan
+1. **Scan** - Find cleanup targets and assess safety
+2. **Analyze** - Identify risks and dependencies
+3. **Report** - Generate actionable plan
 </phases>
 
-<conditional>
-Production: Conservative | Feature branch: Aggressive
-Tests exist: Bold cleanup | No tests: Flag all deletions
-Language: JS/TS(imports) | Python(__all__) | Go(unused) | All(temp files)
-</conditional>
-
 <output>
-Create `artifacts/analyses/YYMMDD_HHMM_cleanup_analysis.md`:
+artifacts/analyses/YYMMDD_HHMM_cleanup_analysis.md
+</output>
 
-```markdown
+<template>
 # Cleanup Analysis - [Target]
 Date: YYYY-MM-DD HH:MM
 
@@ -47,7 +37,7 @@ Dead code: N | Duplicates: N | Artifacts: N | Size: X MB → Y MB
 ## 🟢 Safe to Remove
 - [ ] *.tmp, *.bak files (N files, X KB)
 - [ ] console.log statements (N instances)
-- [ ] Commented imports (N files)
+- [ ] [Other safe deletions]
 
 ## 🟡 Review First
 - [ ] UnusedFunction() - file.js:42 - No refs found
@@ -55,22 +45,12 @@ Dead code: N | Duplicates: N | Artifacts: N | Size: X MB → Y MB
 
 ## 🔴 Tech Debt
 - TODO: Error handling - file.js:25
-- Commented block - file.js:200-300
+- [Other debt items]
+</template>
 
-## Quick Commands
-find . \( -name "*.tmp" -o -name "*.bak" -o -name "*.orig" -o -name "*~" \) -delete
-rg -l "console\.log|debugger" | xargs -I {} sed -i '/console\.log\|debugger/d' {}
-git clean -ndx  # Preview untracked files (-fdx to delete)
-
-## Verify After
-- [ ] Tests pass
-- [ ] Build succeeds
-```
-</output>
-
-<error-handling>
-Large codebase: Sample key directories | No tests: Mark high-risk
-External deps: Check usage first | Binary files: Skip
-</error-handling>
+<conditional>
+If production: Conservative approach
+If no tests: Flag all deletions as high-risk
+</conditional>
 
 Polish reveals quality - remove the unnecessary to illuminate the essential.
