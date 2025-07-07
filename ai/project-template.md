@@ -49,7 +49,7 @@ src/
 └── types/           # Type definitions
 ```
 
-## Preferred Libraries
+## Preferred Solutions
 - State: Redux Toolkit
 - Forms: React Hook Form
 - Dates: date-fns

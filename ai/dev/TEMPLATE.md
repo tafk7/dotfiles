@@ -28,8 +28,16 @@ description: [Action-oriented description, max 10 words]
 </requirements>
 
 <phases>
+# Choose format based on workflow:
+# Option A - Parallel/grouped phases (can happen together):
 1. **[Phase]** - [Brief description] | 2. **[Phase]** - [Description]
 3. **[Phase]** - [Description] | 4. **[Phase]** - [Final phase]
+
+# Option B - Sequential phases (must happen in order):
+1. **[Phase]** - [Must complete before next]
+2. **[Phase]** - [Depends on previous]
+3. **[Phase]** - [Depends on previous]
+4. **[Phase]** - [Final sequential step]
 </phases>
 
 <output>
@@ -62,6 +70,26 @@ Errors: [Error type]([handling]), [Another error]([resolution])
 [Missing dependency]: [Clear message and alternative]
 [Invalid input]: [Default behavior or prompt]
 </error-handling>
+
+# OPTIONAL SECTIONS (use when beneficial):
+
+# <template> - For commands that generate structured output
+# <template>
+# ```format
+# [Template content for users to fill in]
+# ```
+# </template>
+
+# <rules> - For commands with important constraints/guidelines
+# <rules>
+# - [Constraint or guideline]
+# - [Another important rule]
+# </rules>
+
+# <visualization> - For commands that create diagrams
+# <visualization>
+# [Guidance on diagram types, best practices, and formatting]
+# </visualization>
 
 # Arguments: $ARGUMENTS accepts:
 # - No args: [Default behavior - typically current directory]

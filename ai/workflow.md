@@ -31,11 +31,12 @@ Everything in `artifacts/` is experimentation. Production code lives in `src/`, 
 
 ### Naming Convention
 `YYMMDD_HHMM_description.ext` (e.g., `241215_1430_auth_refactor.md`)
+Use `date +%y%m%d_%H%M` to get accurate timestamp.
 
 ### Development Log
 Track daily progress in `artifacts/devlog_YYMM.md`:
 ```markdown
-## YYYY-MM-DD HH:MM
+## YYYY-MM-DD HH:MM  # Use: date "+%Y-%m-%d %H:%M"
 
 **Task**: [Description]
 **Impact**: [Quantify: lines reduced, performance gained, bugs fixed]
@@ -59,7 +60,7 @@ Permanent references in `artifacts/reference/`:
 - `api_contracts.md` - API specifications
 - `security.md` - Security requirements
 - `performance.md` - Performance constraints
-- `dependencies.md` - Library choices
+- `dependencies.md` - External dependencies and rationale
 
 ## Task Execution Patterns
 
@@ -94,10 +95,10 @@ Permanent references in `artifacts/reference/`:
 
 <task>Code Analysis</task>
 <focus>
-- Sublime alignment check
+- Arete alignment check
 - Deletion opportunities
-- Library replacement candidates
 - Complexity reduction
+- Pattern violations
 </focus>
 
 ## Artifact Lifecycle
