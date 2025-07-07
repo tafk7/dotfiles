@@ -8,7 +8,7 @@ Generate issue for: $ARGUMENTS
 
 ## Context
 - Time: !`date "+%Y-%m-%d %H:%M"`
-- Next ID: !`ls artifacts/issues/TODO-*.md 2>/dev/null | wc -l | xargs -I {} expr {} + 1 || echo "1"`
+- Next ID: !`find artifacts/issues -name "TODO-*.md" 2>/dev/null | wc -l | awk '{print $1 + 1}'`
 - Year: !`date "+%y"`
 
 ## Task

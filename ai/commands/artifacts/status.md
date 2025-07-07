@@ -35,47 +35,25 @@ Filter: $ARGUMENTS (e.g., "issues", "ready", "old", or file pattern)
 
 <output>
 ```
-========================================
-        ARTIFACTS STATUS REPORT
-========================================
-Generated: YYYY-MM-DD HH:MM
-
-## Overview
-Total: N | Open issues: N | Storage: X MB
-Last cleanup: YYYY-MM-DD | Last promotion: YYYY-MM-DD
+ARTIFACTS STATUS - YYYY-MM-DD HH:MM
+Total: N files | Issues: N open | Storage: X MB
 
 ## Active Work
-### Current Development
-- Devlog: artifacts/devlog_YYMM.md (N entries)
-- Last: YYYY-MM-DD - [Subject]
+Devlog: devlog_YYMM.md - [Last entry subject]
+Issues: N high priority, N standard, N tech debt
 
-### Open Issues (N)
-HIGH PRIORITY
-> TODO-YYMM-NNN: [Description] (blocked N days)
+## Files by Age
+Recent (<7d): N files
+Active (7-30d): N files  
+Stale (>30d): N files [cleanup candidates]
 
-STANDARD
-- TODO-YYMM-NNN: [Description] (N days)
+## Action Items
+! READY_file.ext → production path
+! TODO-YYMM-NNN: [High priority issue]
+* N orphaned files detected
+* N cleanup candidates
 
-TECHNICAL DEBT
-- TODO-YYMM-NNN: [Ship mode cleanup] (N days)
-
-## Artifact Analysis
-< 7 days:  [===========] N files
-7-30 days: [=====      ] N files
-> 30 days: [==         ] N files (cleanup candidates)
-
-## Ready for Production
-[!] READY_filename.ext -> src/module/file.ext
-[!] mentioned_in_devlog.js -> Ready since YYYY-MM-DD
-
-## Detected Issues
-* Orphaned: filename.ext (no references)
-* Duplicate: explore_auth.js, explore_authentication.py
-
-## Quick Actions
-> Promote: /artifacts/promote READY_filename.ext
-> Cleanup: /artifacts/cleanup (N candidates)
-> Review: TODO-YYMM-NNN (blocked)
+Quick: /promote READY_file | /cleanup N files | /todo review
 ```
 </output>
 
@@ -87,5 +65,12 @@ TECHNICAL DEBT
 # - "old": Show cleanup candidates with space savings
 # - Team mode: Include author attribution
 # - Summary mode: High-level counts only
+
+<error-handling>
+Missing artifacts directory: Create empty directory and report
+No matching files: Display helpful message with examples
+Permission denied: Show accessible files only
+Large artifact count: Paginate or summarize results
+</error-handling>
 
 Clear visibility enables decisive action - status illuminates the path forward.

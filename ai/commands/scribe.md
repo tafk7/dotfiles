@@ -1,5 +1,5 @@
 ---
-description: Deep analysis and focused documentation generation for repositories or topics
+description: Generate permanent project documentation in docs/
 ---
 
 # Scribe
@@ -16,52 +16,56 @@ Target: $ARGUMENTS
 ## Task
 <task>Analyze $ARGUMENTS to understand its essence, then create 1-5 documentation files that capture what matters most. Use mermaid diagrams to visualize architecture, workflows, and relationships.</task>
 
-## Phases
+<requirements>
+1. Maximum 5 documentation files per analysis
+2. Prioritize clarity and visual understanding over completeness
+3. Include mermaid diagrams where they clarify key concepts
+4. Write for future confused developers
+5. Explain the "why" before the "how"
+</requirements>
 
+<phases>
 1. **Discovery** - Map structure and assess scope
 2. **Analysis** - Deep dive into patterns and purpose
 3. **Synthesis** - Identify key documentation needs
 4. **Documentation** - Generate human-readable artifacts
-
-## Process
-
-### Phase 1: Discovery
-- Map structure, boundaries, and entry points
-- Catalog existing documentation
-- Assess complexity and scale
-
-### Phase 2: Analysis
-- Trace critical paths and workflows
-- Identify core patterns and relationships
-- Extract design decisions and trade-offs
-
-### Phase 3: Synthesis
-- Build comprehensive mental model
-- Determine essential vs optional content
-- Select optimal documentation structure
-
-### Phase 4: Documentation
-- Generate 1-5 focused files
-- Create mermaid diagrams for clarity
-- Ensure practical, maintainable output
+</phases>
 
 <output>
 Create permanent documentation in `docs/` (or specified location):
 
-### Documentation Patterns
-**Simple**: Single README with overview, quickstart, concepts, and examples
-**Complex**: README + ARCHITECTURE + GUIDE + API/CONTRIBUTING as needed
+**Simple Project**: Single README.md
+```markdown
+# [Project Name]
+[One-line description]
+
+## Overview
+[What and why, with architecture diagram]
+
+## Quick Start
+[Minimal steps to get running]
+
+## Core Concepts
+[Key ideas with examples]
+
+## API/Usage
+[Main interfaces and patterns]
+```
+
+**Complex System**: Multiple focused files
+- README.md - Overview and quick start
+- ARCHITECTURE.md - System design with diagrams
+- GUIDE.md - Detailed usage and workflows
+- API.md - Reference documentation
+- CONTRIBUTING.md - Development setup
+
+### Visualization Guidelines
+Use mermaid diagrams for:
+- Architecture: flowchart TD for system overview
+- Workflows: sequence diagrams for interactions
+- State: stateDiagram-v2 for lifecycles
+- Data: erDiagram for relationships
 </output>
-
-<visualization>
-### Mermaid Best Practices (see ~/.claude/mermaid_reference.md)
-- Choose diagram type by purpose: flowchart (process), sequence (interactions), state (lifecycle), class (structure), ER (data)
-- Use descriptive labels and consistent direction
-- Quote special characters in node names: `["Node with/slash"]`
-- Use colors that contrast with black/white text
-- Include accessibility titles and descriptions
-</visualization>
-
 
 <conditional>
 If small codebase: Single README with essential diagram
@@ -77,13 +81,10 @@ If unclear scope: Start with exploration diagram
 - Missing context: Request clarification or proceed with assumptions
 </error-handling>
 
-<rules>
-- Maximum 5 documentation files
-- Prioritize clarity over completeness
-- Include diagrams where they clarify, not complicate
-- Explain the "why" before the "how"
-- Use analogies and concrete examples
-- Write for future confused developers
-</rules>
+# Arguments: $ARGUMENTS accepts:
+# - Directory path: Analyze entire codebase
+# - Specific topic: Focus documentation on that area
+# - "--update": Refresh existing documentation
+# - Custom output path after "--output"
 
-*The best documentation teaches visually what words alone cannot convey.*
+The best documentation teaches visually what words alone cannot convey.

@@ -7,7 +7,7 @@ description: Check project edict compliance
 Check if $ARGUMENTS (or current directory) violates any project edicts (constraints).
 
 ## Context
-- Target: !`echo "${ARGUMENTS:-current directory}"`
+- Target: !`echo "${ARGUMENTS:-.}"`
 - Project config: !`test -f CLAUDE.md && echo "Found" || echo "Not found"`
 - Active edicts: !`grep -c "^### Edict\." CLAUDE.md 2>/dev/null || echo "0"`
 
@@ -22,8 +22,10 @@ Check if $ARGUMENTS (or current directory) violates any project edicts (constrai
 </requirements>
 
 <phases>
-1. **Parse** - Extract edicts | 2. **Check** - Verify compliance
-3. **Analyze** - Categorize findings | 4. **Report** - Generate output
+1. **Parse** - Extract edicts from CLAUDE.md
+2. **Check** - Verify compliance for each edict
+3. **Analyze** - Categorize findings by severity
+4. **Report** - Generate compliance output
 </phases>
 
 <output>
