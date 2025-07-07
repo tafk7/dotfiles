@@ -42,6 +42,12 @@ Content
 
 ### 5. **Phases vs Process**
 - **<phases>**: High-level overview (4-6 brief phases)
+  - Use pipe separators (`|`) for parallel/related phases that can happen together
+  - Use numbered list format for sequential phases that must complete in order
+  - Examples:
+    - Parallel: `1. **Scan** - Find issues | 2. **Analyze** - Assess impact`
+    - Sequential: `1. **Parse** - Extract data` → `2. **Generate** - Create output`
+  - Choose format based on workflow logic, not template appearance
 - **<process>**: Detailed step-by-step instructions
 - Both can coexist if needed
 
@@ -72,7 +78,7 @@ Document as comments after error-handling:
 - [ ] Context section with shell commands
 - [ ] <task> tag includes $ARGUMENTS
 - [ ] <requirements> are numbered and specific
-- [ ] <phases> use consistent format
+- [ ] <phases> use appropriate format (pipe for parallel, list for sequential)
 - [ ] <output> specifies exact file path
 - [ ] <conditional> groups related conditions
 - [ ] <error-handling> covers common cases
@@ -84,3 +90,36 @@ Document as comments after error-handling:
 - Commands: `[verb].md` or `[noun].md`
 - Outputs: `artifacts/[subdir]/YYMMDD_HHMM_[command]_[description].md`
 - Issues: `artifacts/issues/TODO-YYMM-NNN_[description].md`
+
+## Optional Sections
+
+Commands may include optional sections when they add clarity:
+
+### `<template>` Section
+Use for commands that generate structured output users need to fill in:
+- TODO creation commands
+- Log entry formats
+- Issue templates
+
+### `<rules>` Section  
+Use for commands with important constraints that don't fit requirements:
+- Maximum limits (e.g., "Maximum 5 files")
+- Quality guidelines
+- Behavioral constraints
+
+### `<visualization>` Section
+Use for commands that create diagrams or visual output:
+- Mermaid diagram guidance
+- Formatting best practices
+- Accessibility requirements
+
+## Acceptable Variations
+
+While consistency is important, these variations are acceptable:
+
+1. **Complex Commands**: May use additional sections if they significantly improve clarity
+2. **Specialized Tools**: Can adapt format to match their unique workflow
+3. **Phase Details**: Can include detailed sub-phases in output section when needed
+4. **Conditional Grouping**: Can use multi-line format for complex conditions
+
+The goal is clarity and functionality, not rigid conformity.
