@@ -8,11 +8,11 @@ Clean up: $ARGUMENTS
 
 ## Context
 - Current date: !`date +%Y-%m-%d`
-- Threshold: !`echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"` days
+- Threshold: !`echo "${ARGUMENTS:-30}" | grep -oE '^[0-9]+' || echo "30"` days
 - Mode: !`[[ "$ARGUMENTS" == *"--dry-run"* ]] && echo "DRY RUN" || echo "EXECUTE"`
 - Protected: issues/, reference/, current devlog
-- Candidates: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|reference/|devlog_)" | wc -l || echo "0"`
-- Total size: !`days=$(echo "${ARGUMENTS:-30}" | grep -o '[0-9]\+' | head -1 || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -v -E "(issues/|reference/|devlog_)" -exec du -ch {} + | tail -1 | cut -f1 || echo "0"`
+- Candidates: !`days=$(echo "${ARGUMENTS:-30}" | grep -oE '^[0-9]+' || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -vE "(issues/|reference/|devlog_)" | wc -l`
+- Total size: !`days=$(echo "${ARGUMENTS:-30}" | grep -oE '^[0-9]+' || echo "30"); find artifacts -type f -mtime +$days 2>/dev/null | grep -vE "(issues/|reference/|devlog_)" -exec du -ch {} + 2>/dev/null | tail -1 | cut -f1 || echo "0"`
 
 ## Task
 
@@ -31,6 +31,14 @@ Clean up: $ARGUMENTS
 **Warn:** READY_ files, >1MB files, referenced in issues
 **Remove:** Old files without special markers
 </rules>
+
+<phases>
+1. **Identify** - Find cleanup candidates
+2. **Check** - Verify references and dependencies
+3. **Warn** - Flag special cases
+4. **Execute** - Remove with confirmation
+5. **Log** - Record cleanup operation
+</phases>
 
 <output>
 ```
@@ -78,6 +86,13 @@ If file count > 50:
 - Show size totals
 - Batch confirmation
 </conditional>
+
+<error-handling>
+Missing artifacts directory: Create if needed or exit gracefully
+Permission denied: List what can be accessed
+Invalid threshold: Default to 30 days with warning
+Large file count: Paginate results, confirm in batches
+</error-handling>
 
 # Argument handling:
 # - No args: 30-day default

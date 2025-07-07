@@ -1,5 +1,5 @@
 ---
-description: Deep analysis to understand and explain code/systems in artifacts/analyses
+description: Create user-facing documentation explaining code/concepts
 ---
 
 # Explain
@@ -10,7 +10,7 @@ Deep analysis of $ARGUMENTS to build understanding and generate explanatory repo
 - Target: !`echo "${ARGUMENTS:-.}"`
 - Type: !`[[ -f "${ARGUMENTS:-.}" ]] && echo "File" || [[ -d "${ARGUMENTS:-.}" ]] && echo "Directory" || echo "Topic"`
 - Language: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" \) 2>/dev/null | sed -E 's/.*\.([^.]+)$/\1/' | sort | uniq -c | sort -rn | head -3 | tr '\n' ' ' || echo "Unknown"`
-- Size: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo "0"` lines
+- Size: !`find "${ARGUMENTS:-.}" -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.go" -o -name "*.rs" \) 2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo "0"` lines
 - Tests: !`find "${ARGUMENTS:-.}" -name "*test*" -o -name "*spec*" 2>/dev/null | wc -l || echo "0"`
 
 ## Task
@@ -35,61 +35,37 @@ Create `artifacts/analyses/YYMMDD_HHMM_explain_[target].md`:
 
 ```markdown
 # Understanding: [Target]
-Date: YYYY-MM-DD HH:MM | Type: [Library/App/Service] | Complexity: [Simple/Moderate/Complex]
+Date: YYYY-MM-DD HH:MM | Type: [Library/App/Service]
 
 ## What This Is
 [One paragraph explaining purpose and value]
 **In a nutshell**: [One-line summary]
-**Think of it as**: [Helpful metaphor or analogy]
 
 ## How It Works
 [Core mechanism explained simply]
 
-### Architecture
-[Mermaid diagram showing structure/flow]
+```mermaid
+[Architecture diagram]
+```
 
-### Key Components
-1. **[Component]**: [What it does] (location: file:line)
-2. **[Component]**: [Purpose and responsibility] (file:line)
-3. **[Component]**: [Role in system] (file:line)
-
-## Mental Model
-To understand this system:
-- [Key insight that unlocks understanding]
-- [How components relate to each other]
-- [Central pattern or philosophy]
+## Key Components
+1. **[Component]**: [Purpose] → file:line
+2. **[Component]**: [Purpose] → file:line
+3. **[Component]**: [Purpose] → file:line
 
 ## Navigation Guide
-**Start here**: file:line - [Why this is the best entry point]
-**Core logic**: file:line - [Where the main work happens]
-**Configuration**: file:line - [How behavior is controlled]
+- Start here: file:line - [Entry point]
+- Core logic: file:line - [Main work]
+- Key paths: [flow1] → [flow2] → [flow3]
 
-### Important Paths
-1. Main flow: entry.py → process() → output
-2. Data flow: input → transform → persist
-3. Error handling: detect() → handle() → recover()
+## Mental Model
+Think of this as [metaphor]. The key insight is [central concept].
 
-## Design Decisions
-**Pattern**: [What pattern] used because [rationale]
-**Trade-off**: Chose [X] over [Y] to enable [benefit]
-**Constraint**: Limited by [factor], worked around via [approach]
-
-## How Things Connect
-- External APIs: [How integrated]
-- Database: [Interaction pattern]
-- Dependencies: [Key libraries and why chosen]
-
-## Domain Concepts
-**[Term]**: In this codebase means [definition]
-**[Concept]**: Implemented as [explanation]
-
-## Surprising Discoveries
-! [Non-obvious behavior or clever trick]
-? [Design choice that's unclear]
-* [Area requiring careful attention]
-
-## Summary
-This system [core purpose] by [main mechanism]. The key to understanding it is [central insight]. When navigating, remember [crucial concept].
+[Additional sections as needed based on target type:]
+- Design decisions (for complex systems)
+- Domain concepts (for business logic)
+- External connections (for integrations)
+- Gotchas (if any surprises found)
 ```
 </output>
 
