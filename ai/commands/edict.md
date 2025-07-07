@@ -6,56 +6,34 @@ description: Check project edict compliance
 
 Check if $ARGUMENTS (or current directory) violates any project edicts (constraints).
 
-## Context
-- Target: !`echo "${ARGUMENTS:-.}"`
-- Project config: !`test -f CLAUDE.md && echo "Found" || echo "Not found"`
-- Active edicts: !`grep -c "^### Edict\." CLAUDE.md 2>/dev/null || echo "0"`
-
 ## Task
 
 <task>Verify edict compliance for $ARGUMENTS</task>
 
 <requirements>
 1. Parse edicts from CLAUDE.md (exit if missing)
-2. Check compliance: Compatibility, Performance, Security, Dependencies, Architecture  
-3. Categorize findings and generate actionable report
+2. Check compliance for all edict categories
+3. Generate actionable violation report
 </requirements>
 
 <phases>
 1. **Parse** - Extract edicts from CLAUDE.md
-2. **Check** - Verify compliance for each edict
-3. **Analyze** - Categorize findings by severity
-4. **Report** - Generate compliance output
+2. **Check** - Verify compliance
+3. **Report** - Document violations and fixes
 </phases>
 
 <output>
-Create `artifacts/analyses/YYMMDD_HHMM_edict_compliance.md`:
-
-```markdown
-# Edict Compliance Report  
-Target: [checked] | Date: YYYY-MM-DD HH:MM
-✅ Compliant: N | ❌ Violations: N | ⚠️ Warnings: N
-
-## ❌ VIOLATIONS
-### Edict.Category.N
-Violated: [constraint] | Found: [violation] | Location: file:line | Fix: [change]
-
-## Actions Required
-[Priority fixes and next steps]
-```
+artifacts/analyses/YYMMDD_HHMM_edict_compliance.md
 </output>
 
 <conditional>
-No violations: Highlight compliance, suggest removal candidates | Critical: Mark ❌ CRITICAL, immediate fixes, block ops
-Errors: Missing CLAUDE.md(exit), Malformed(skip), Access denied(note), Large codebase(sample)
-Modes: Quick(summary), Full(detailed), CI(parseable), Redemption(progress)
+If no violations: Note full compliance
+If critical violations: Mark as blocking
 </conditional>
 
 <error-handling>
-Missing CLAUDE.md: Exit with clear message about requirements
-Malformed edicts: Skip invalid sections, note in report
-Access denied: Document accessible files only
-Parse errors: Graceful degradation with partial results
+Missing CLAUDE.md: Exit with setup instructions
+Malformed edicts: Skip and note in report
 </error-handling>
 
 Every edict expires eventually - compliance today, freedom tomorrow.
