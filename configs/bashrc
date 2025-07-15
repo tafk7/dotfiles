@@ -1,8 +1,12 @@
-# Set DOTFILES_DIR for this installation
-export DOTFILES_DIR="/home/tafk/dotfiles"
-
 # Modern Bash Configuration - Power User Setup
 # Part of dotfiles - optimized for development workflow
+
+# Detect DOTFILES_DIR if not set
+if [[ -z "$DOTFILES_DIR" ]]; then
+    # Get the directory of this bashrc file, then go up one level
+    DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+    export DOTFILES_DIR
+fi
 
 # ==============================================================================
 # Core Shell Settings
@@ -70,7 +74,7 @@ fi
 # FZF bash-specific configuration
 if command -v fzf >/dev/null 2>&1; then
     [ -f ~/.fzf.bash ] && source ~/.fzf.bash
-    
+
     # Enhanced FZF key bindings
     bind '"\C-f": "fzf-file-widget"'
     bind '"\C-r": "fzf-history-widget"'
@@ -110,14 +114,14 @@ fi
 set_prompt() {
     local exit_code=$?
     local prompt_symbol
-    
+
     # Show exit code if non-zero
     if [[ $exit_code -ne 0 ]]; then
         prompt_symbol="${PROMPT_COLOR_ERROR}✗${PROMPT_COLOR_RESET}"
     else
         prompt_symbol="${PROMPT_COLOR_SUCCESS}✓${PROMPT_COLOR_RESET}"
     fi
-    
+
     # Build prompt
     PS1="${PROMPT_COLOR_USER}\u${PROMPT_COLOR_RESET}@${PROMPT_COLOR_HOST}\h${PROMPT_COLOR_RESET}:${PROMPT_COLOR_PATH}\w${PROMPT_COLOR_RESET}"
     PS1+="$(git_prompt)"
@@ -156,11 +160,11 @@ PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
 if [[ "$IS_WSL" == "true" ]]; then
     # WSL-specific aliases
     alias open='explorer.exe'
-    
+
     # Windows integration
     alias winget='/mnt/c/Windows/System32/winget.exe'
     alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
-    
+
     # Display is set in scripts/env/common.sh
 fi
 
@@ -174,10 +178,10 @@ if [[ -d "$DOTFILES_DIR" ]]; then
     for file in "$DOTFILES_DIR"/scripts/functions/*.sh; do
         [[ -r "$file" ]] && source "$file"
     done
-    
-    # Load aliases  
+
+    # Load aliases
     for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
-        [[ -r "$file" ]] && source "$file"
+        [[ -r "$file" ]] && source "$file"G
     done
 fi
 
@@ -198,3 +202,25 @@ if [[ $- == *i* ]]; then
         echo -e "${PROMPT_COLOR_HOST}Theme: $DOTFILES_THEME${PROMPT_COLOR_RESET}"
     fi
 fi
+
+# FINN/BrainSmith parameters
+export NUM_DEFAULT_WORKERS=14
+export XILINXD_LICENSE_FILE=4400@10.1.0.4
+#/opt/Xilinx/licenses/Xilinx_brainSmith_dev0.lic
+
+# FINN paths
+export FINN_ROOT=/home/tafk/finn/
+export FINN_HOST_BUILD_DIR=/home/tafk/builds/finn
+export FINN_XILINX_PATH="/tools/Xilinx"
+export FINN_XILINX_VERSION="2024.2"
+export FINN_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
+
+# BrainSmith paths
+export BSMITH_ROOT=/home/tafk/brainsmith/
+export BSMITH_BUILD_DIR=/home/tafk/builds/brainsmith
+export BSMITH_XILINX_PATH="/tools/Xilinx"
+export BSMITH_XILINX_VERSION="2024.2"
+export BSMITH_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
+
+# Source Xilinx tools
+source /tools/Xilinx/Vivado/2024.2/settings64.sh

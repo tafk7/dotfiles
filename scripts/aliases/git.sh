@@ -3,7 +3,7 @@
 # Essential git aliases for daily use
 
 # Status and staging
-alias gs='git status -sb'
+alias gs='git status'
 alias ga='git add'
 alias gaa='git add .'
 alias gd='git diff'

@@ -16,9 +16,8 @@ if [[ -f "$THEME_FILE" ]]; then
 fi
 
 # Path constants
-readonly PROJECTS_DIR="$HOME/projects"
+export PROJECTS_DIR="$HOME/projects"
 # DOTFILES_DIR is set by install.sh - don't hardcode it here
-export PROJECTS_DIR DOTFILES_DIR
 
 # FZF configuration (theme-aware)
 if command -v fzf >/dev/null 2>&1; then

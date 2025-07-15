@@ -135,6 +135,16 @@ create_backup_dir() {
     echo "$backup_dir"
 }
 
+# Backup a single file
+backup_file() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        local backup="${file}.backup-$(date +%Y%m%d-%H%M%S)"
+        cp "$file" "$backup"
+        log "Backed up: $file -> $backup"
+    fi
+}
+
 # Create symlink with backup
 safe_symlink() {
     local source="$1"

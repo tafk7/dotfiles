@@ -126,8 +126,21 @@ install_modern_cli_tools() {
         fi
     fi
     
-    # Skip glow installation - use bat for markdown viewing instead
-    log "Skipping glow - will use bat for markdown viewing"
+    # Install glow for markdown viewing
+    if ! command_exists glow; then
+        log "Installing glow for markdown viewing..."
+        # Try apt first (might be available in some repos)
+        if ! install_packages "glow"; then
+            # Fallback to snap
+            log "glow not in apt repos, trying snap..."
+            if command_exists snap; then
+                execute_with_feedback "sudo snap install glow" "Installing glow via snap"
+            else
+                log_error "Neither apt nor snap available for glow installation"
+                log "You can install glow manually later with: sudo snap install glow"
+            fi
+        fi
+    fi
 }
 
 # Install eza from GitHub releases
