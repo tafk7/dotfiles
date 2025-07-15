@@ -30,45 +30,28 @@ POWERLEVEL9K_PROMPT_ON_NEWLINE=true
 POWERLEVEL9K_MULTILINE_LAST_PROMPT_PREFIX="%F{014}❯%f "
 POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX=""
 
-# Oh My Zsh update settings
-zstyle ':omz:update' mode reminder
-zstyle ':omz:update' frequency 13
+# Oh My Zsh update settings - less intrusive
+zstyle ':omz:update' mode disabled  # No automatic update checks
 
-# Plugins - Essential power user collection
+# Plugins - Reduced set for less intrusive experience
 plugins=(
-    # Core functionality
+    # Core functionality only
     git
     docker
-    docker-compose
-    kubectl
     
-    # Node.js ecosystem
-    npm
-    node
-    nvm
-    
-    # Python development
-    python
-    pip
-    
-    # System tools
+    # Basic tools
     sudo
-    command-not-found
-    colored-man-pages
     
-    # Navigation and search
-    history-substring-search
-    
-    # Auto-completion and suggestions
-    zsh-autosuggestions
-    zsh-syntax-highlighting
+    # Minimal completion enhancement
     zsh-completions
     
-    # Additional utilities
-    extract
-    web-search
-    copypath
-    copyfile
+    # Optional: Uncomment for more features
+    # zsh-autosuggestions
+    # zsh-syntax-highlighting
+    # history-substring-search
+    # kubectl
+    # npm
+    # python
 )
 
 # ==============================================================================
@@ -125,39 +108,30 @@ setopt GLOB_DOTS               # Include dotfiles in globbing
 setopt NO_CASE_GLOB            # Case insensitive globbing
 setopt NUMERIC_GLOB_SORT       # Sort filenames numerically when possible
 
-# Completion options
+# Completion options - less aggressive
 setopt COMPLETE_IN_WORD        # Complete from both ends of a word
 setopt ALWAYS_TO_END          # Move cursor to the end of a completed word
 setopt PATH_DIRS              # Perform path search even on command names with slashes
-setopt AUTO_MENU              # Show completion menu on a successive tab press
-setopt AUTO_LIST              # Automatically list choices on ambiguous completion
+unsetopt AUTO_MENU            # Don't show completion menu automatically
+setopt AUTO_LIST              # List choices (but don't auto-select)
 setopt AUTO_PARAM_SLASH       # If completed parameter is a directory, add a trailing slash
-setopt FLOW_CONTROL           # Enable flow control in the shell
+setopt LIST_PACKED            # Make completion list more compact
 
-# Correction options
-setopt CORRECT                # Try to correct the spelling of commands
-setopt CORRECT_ALL           # Try to correct the spelling of all arguments in a line
+# Correction options - disabled for less intrusive experience
+# setopt CORRECT                # Try to correct the spelling of commands
+# setopt CORRECT_ALL           # Try to correct the spelling of all arguments in a line
 
 # ==============================================================================
 # Advanced Completion System
 # ==============================================================================
 
-# Completion styling
-zstyle ':completion:*' auto-description 'specify: %d'
-zstyle ':completion:*' completer _expand _complete _correct _approximate
-zstyle ':completion:*' format 'Completing %d'
-zstyle ':completion:*' group-name ''
-zstyle ':completion:*' menu select=2
-zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' list-colors ''
-zstyle ':completion:*' list-prompt %SAt %p: Hit TAB for more, or the character to insert%s
-zstyle ':completion:*' matcher-list '' 'm:{a-z}={A-Z}' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=* l:|=*'
-zstyle ':completion:*' menu select=long
-zstyle ':completion:*' select-prompt %SScrolling active: current selection at %p%s
+# Completion styling - simplified
+zstyle ':completion:*' completer _complete _ignored
+zstyle ':completion:*' menu select=0  # Don't auto-activate menu
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'  # Simple case-insensitive
 zstyle ':completion:*' use-compctl false
-zstyle ':completion:*' verbose true
-zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
-zstyle ':completion:*:kill:*' command 'ps -u $USER -o pid,%cpu,tty,cputime,cmd'
+zstyle ':completion:*' verbose false  # Less verbose descriptions
 
 # Completion for modern tools
 zstyle ':completion:*:*:docker:*' option-stacking yes
@@ -176,20 +150,24 @@ fi
 # Plugin Configuration - Advanced Settings
 # ==============================================================================
 
-# Autosuggestions configuration
-ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#928374,underline"
-ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
-ZSH_AUTOSUGGEST_USE_ASYNC=true
+# Autosuggestions configuration (if plugin is enabled)
+if [[ ${plugins[(r)zsh-autosuggestions]} == zsh-autosuggestions ]]; then
+    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#666666"  # Dimmer, no underline
+    ZSH_AUTOSUGGEST_STRATEGY=(history)  # Only history, not completion
+    ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+    ZSH_AUTOSUGGEST_USE_ASYNC=true
+    # Accept suggestion with right arrow or End key only
+    ZSH_AUTOSUGGEST_ACCEPT_WIDGETS=(end-of-line vi-end-of-line)
+fi
 
-# Syntax highlighting configuration
-ZSH_HIGHLIGHT_HIGHLIGHTERS=(main brackets pattern cursor)
-ZSH_HIGHLIGHT_STYLES[command]='fg=green,bold'
-ZSH_HIGHLIGHT_STYLES[alias]='fg=magenta,bold'
-ZSH_HIGHLIGHT_STYLES[builtin]='fg=cyan,bold'
-ZSH_HIGHLIGHT_STYLES[function]='fg=blue,bold'
-ZSH_HIGHLIGHT_STYLES[path]='fg=yellow'
-ZSH_HIGHLIGHT_STYLES[globbing]='fg=orange'
+# Syntax highlighting configuration (if plugin is enabled)
+if [[ ${plugins[(r)zsh-syntax-highlighting]} == zsh-syntax-highlighting ]]; then
+    ZSH_HIGHLIGHT_HIGHLIGHTERS=(main)  # Only basic highlighting
+    # Subtle colors, no bold
+    ZSH_HIGHLIGHT_STYLES[command]='fg=green'
+    ZSH_HIGHLIGHT_STYLES[alias]='fg=cyan'
+    ZSH_HIGHLIGHT_STYLES[path]='none'  # No special highlighting for paths
+fi
 
 # History substring search configuration
 HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND='bg=magenta,fg=white,bold'
@@ -283,6 +261,22 @@ fi
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # ==============================================================================
+# Quick Settings Toggle
+# ==============================================================================
+
+# Function to switch to minimal mode
+zsh-minimal() {
+    ln -sf "$DOTFILES_DIR/configs/zshrc.minimal" ~/.zshrc
+    echo "Switched to minimal zsh configuration. Run 'reload' to apply."
+}
+
+# Function to switch back to full mode
+zsh-full() {
+    ln -sf "$DOTFILES_DIR/configs/zshrc" ~/.zshrc
+    echo "Switched to full zsh configuration. Run 'reload' to apply."
+}
+
+# ==============================================================================
 # Local Configuration and Cleanup
 # ==============================================================================
 
@@ -292,16 +286,7 @@ fi
 # Completion system finalization
 autoload -U compinit && compinit
 
-# Welcome message for interactive shells
-if [[ -o interactive ]]; then
-    echo "🚀 Zsh ${ZSH_VERSION} with Oh My Zsh loaded"
-    if command -v git >/dev/null 2>&1; then
-        echo "📦 Git: $(git --version | cut -d' ' -f3)"
-    fi
-    if [[ -n "$WSL_DISTRO_NAME" ]]; then
-        echo "🐧 WSL: $WSL_DISTRO_NAME"
-    fi
-    if [[ -n "$DOTFILES_THEME" ]]; then
-        echo "🎨 Theme: $DOTFILES_THEME"
-    fi
+# Minimal welcome message for interactive shells
+if [[ -o interactive ]] && [[ "$ZSH_QUIET" != "true" ]]; then
+    echo "Zsh ${ZSH_VERSION%%.*} ready"
 fi

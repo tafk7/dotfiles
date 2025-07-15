@@ -127,6 +127,29 @@ create_config_symlinks() {
             if [[ "$source_name" == "gitconfig" ]]; then
                 # Special handling for git config template
                 process_git_config "$source" "$target" "$backup_dir"
+            elif [[ "$source_name" == "bashrc" ]]; then
+                # Special handling for bashrc - source instead of symlink
+                local bashrc_source="source \"$source\""
+                
+                # Create .bashrc if it doesn't exist
+                touch "$target"
+                
+                # Check if already sourcing our bashrc
+                if ! grep -Fq "$bashrc_source" "$target"; then
+                    # Backup existing bashrc
+                    if [[ -s "$target" ]]; then
+                        cp "$target" "$backup_dir/.bashrc"
+                        log "Backed up existing .bashrc"
+                    fi
+                    
+                    # Add source line
+                    echo "" >> "$target"
+                    echo "# Dotfiles bashrc integration" >> "$target"
+                    echo "$bashrc_source" >> "$target"
+                    success "Added dotfiles bashrc to ~/.bashrc"
+                else
+                    log "Dotfiles bashrc already sourced in ~/.bashrc"
+                fi
             else
                 safe_symlink "$source" "$target" "$backup_dir"
             fi
@@ -161,27 +184,27 @@ create_config_symlinks() {
     
     # Add DOTFILES_DIR to shell configs for runtime
     log "Setting DOTFILES_DIR in shell configurations..."
-    for shell_config in "$HOME/.bashrc" "$HOME/.zshrc"; do
-        if [[ -L "$shell_config" ]]; then
-            # Get the actual config file that the symlink points to
-            local actual_config="$(readlink -f "$shell_config")"
-            if [[ -f "$actual_config" ]]; then
-                # Check if DOTFILES_DIR is already set in the file
-                if ! grep -q "^export DOTFILES_DIR=" "$actual_config"; then
-                    # Add DOTFILES_DIR export at the beginning of the file
-                    local temp_file=$(mktemp)
-                    echo "# Set DOTFILES_DIR for this installation" > "$temp_file"
-                    echo "export DOTFILES_DIR=\"$DOTFILES_DIR\"" >> "$temp_file"
-                    echo "" >> "$temp_file"
-                    cat "$actual_config" >> "$temp_file"
-                    mv "$temp_file" "$actual_config"
-                    success "Added DOTFILES_DIR to $(basename "$shell_config")"
-                else
-                    log "DOTFILES_DIR already set in $(basename "$shell_config")"
-                fi
+    
+    # For bashrc, DOTFILES_DIR will be auto-detected from the sourced file
+    # For zshrc, we still need to add it if using symlink
+    if [[ -L "$HOME/.zshrc" ]]; then
+        local actual_config="$(readlink -f "$HOME/.zshrc")"
+        if [[ -f "$actual_config" ]]; then
+            # Check if DOTFILES_DIR is already set in the file
+            if ! grep -q "^export DOTFILES_DIR=" "$actual_config"; then
+                # Add DOTFILES_DIR export at the beginning of the file
+                local temp_file=$(mktemp)
+                echo "# Set DOTFILES_DIR for this installation" > "$temp_file"
+                echo "export DOTFILES_DIR=\"$DOTFILES_DIR\"" >> "$temp_file"
+                echo "" >> "$temp_file"
+                cat "$actual_config" >> "$temp_file"
+                mv "$temp_file" "$actual_config"
+                success "Added DOTFILES_DIR to .zshrc"
+            else
+                log "DOTFILES_DIR already set in .zshrc"
             fi
         fi
-    done
+    fi
     
     success "Configuration symlinks created"
 }
