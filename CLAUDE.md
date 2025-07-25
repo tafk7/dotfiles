@@ -2,135 +2,97 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository Overview
-
-This is a simplified, Ubuntu-focused dotfiles management system built around just 3 core files (~800 lines total). The architecture emphasizes simplicity, security, and maintainability while providing a comprehensive development environment setup.
-
-## Common Commands
+## Essential Commands
 
 ### Installation & Setup
 ```bash
-# Base installation (essential tools + Docker)
+# Base installation (essential tools only)
 ./install.sh
 
-# With professional development tools (Azure CLI, Node.js/Python tools)
-./install.sh --work
+# Full installation with work/personal tools
+./install.sh --work --personal
 
-# With personal media tools
-./install.sh --personal
-
-# Force replacement with automatic backups
-./install.sh --force
-
-# Full installation
-./install.sh --work --personal --force
+# Update configurations without reinstalling packages
+./scripts/update-configs.sh
 ```
 
 ### Validation & Testing
 ```bash
 # Validate installation
-./scripts/validate-install.sh
-
-# Validate with specific packages
-./scripts/validate-install.sh --work --personal
-
-# Verbose mode for debugging
 ./scripts/validate-install.sh --verbose
 
-# Auto-fix mode
+# Fix common issues automatically
 ./scripts/validate-install.sh --fix
 
-# Validate specific category
+# Check specific category
 ./scripts/validate-install.sh --category docker
 ```
 
-### Development Workflow
+### Development Commands
 ```bash
-# Reload shell configuration without restart
+# Reload shell configuration
 reload
 
-# Theme management
-./scripts/theme-switcher.sh          # Interactive theme selector
-./scripts/theme-switcher.sh nord     # Set specific theme
-themes                               # List available themes
+# Switch themes interactively
+./scripts/theme-switcher.sh
 
-# WSL-specific commands (when applicable)
-sync-ssh                            # Import SSH keys from Windows
-pbcopy / pbpaste                    # Cross-platform clipboard
+# List available themes
+themes
 ```
 
 ## High-Level Architecture
 
-### Core Structure
-```
-dotfiles/
-├── install.sh           # Main orchestrator (243 lines)
-├── lib/
-│   ├── core.sh         # Core utilities & system ops (313 lines)
-│   └── packages.sh     # Package management (288 lines)
-├── configs/            # Visible config files (no dots!)
-├── scripts/            # Runtime scripts & shell integration
-├── ai/                 # AI-assisted development tools
-└── docs/              # Documentation
-```
+This is a **Ubuntu-focused dotfiles repository** designed with the Arete philosophy: pursuing code in its highest form where every line serves its purpose with crystalline clarity.
 
-### Key Design Principles
-1. **3-file core** - Entire system in just install.sh + 2 library files
-2. **Ubuntu-only** - Removed cross-platform complexity for cleaner code
-3. **Visible configs** - All config files stored without dots for easy discovery
-4. **Non-destructive** - Automatic timestamped backups before any changes
-5. **Linear flow** - Simple, sequential installation process
-6. **WSL-aware** - Automatic detection and integration for Windows Subsystem for Linux
+### Core Design Principles
+- **Ubuntu-only**: No cross-platform complexity (70% code reduction from original)
+- **Human-readable**: Any developer can understand in 20 minutes
+- **Security-first**: HTTPS downloads, checksum verification, fail-safe operations
+- **Non-destructive**: Automatic backups before any changes
+- **Modular**: Clear separation between core utilities, packages, and validation
 
-### Configuration Mappings
-All configurations in `configs/` are symlinked to their hidden destinations:
-- `configs/bashrc` → `~/.bashrc`
-- `configs/zshrc` → `~/.zshrc`
-- `configs/init.vim` → `~/.config/nvim/init.vim`
-- `configs/tmux.conf` → `~/.tmux.conf`
-- `configs/gitconfig` → `~/.gitconfig` (template-processed)
-- `configs/profile` → `~/.profile`
-- `configs/ripgreprc` → `~/.ripgreprc`
-- `configs/config/bat/` → `~/.config/bat/`
-- `configs/config/fd/` → `~/.config/fd/`
+### Directory Structure
+- `install.sh` - Main entry point, orchestrates installation
+- `lib/` - Core functionality (core.sh, packages.sh, validation.sh)
+- `configs/` - Visible config files without leading dots for easy discovery
+- `scripts/` - Utilities for theme switching, config updates, validation
+- `artifacts/` - Temporary development work before promotion to production
 
-### Package Categories
-- **Base**: Always installed - git, neovim, tmux, eza, bat, fd, ripgrep, fzf, Docker
-- **Work** (`--work`): Azure CLI, yarn, ESLint, Prettier, black, ruff
-- **Personal** (`--personal`): ffmpeg, yt-dlp
-- **WSL**: Automatically installed if WSL detected - socat, wslu
+### Key Architectural Decisions
+1. **Symlink Management**: All configs are symlinked from `configs/` to home directory with automatic backup
+2. **Package Sets**: Base (essential), Work (dev tools), Personal (media) - clearly separated
+3. **Validation System**: Pre/post installation checks with repair capabilities
+4. **Theme System**: 5 pre-configured themes with hot-swappable configuration
+5. **WSL Integration**: Automatic detection and setup for Windows Subsystem for Linux
 
-### AI Integration
-The repository includes comprehensive AI-assisted development tools:
-- **Slash commands** in `ai/commands/` for structured AI interactions
-- **Global CLAUDE.md** at `ai/global-CLAUDE.md` with the Arete framework
-- **Artifact workflow** for managing AI-generated content
-- **Project templates** for repository-specific AI configuration
+### Development Workflow
+The repository follows the artifacts pattern (`ai/workflow.md`):
+- Experimental work in `artifacts/`
+- Production code in appropriate directories
+- Temporal naming: `YYMMDD_HHMM_description.ext`
+- Issue tracking: `artifacts/issues/TODO-YYMM-NNN_description.md`
 
-## Development Guidelines
+## Project Edicts
 
-### Adding New Packages
-1. For base packages: Edit `base_packages` array in `lib/packages.sh`
-2. For work packages: Add to `install_work_packages()` function
-3. For personal packages: Add to `personal_packages` array
+1. **Simplicity Over Features**: If a feature adds complexity without clear benefit, it doesn't belong
+2. **Ubuntu-Only**: No macOS, no Fedora, no Arch - just Ubuntu/Debian
+3. **Visible Configs**: Store configs without leading dots in `configs/` directory
+4. **Fail-Safe Operations**: Every destructive operation must have a backup
+5. **Human-Readable Code**: Avoid clever bash tricks that sacrifice clarity
 
-### Adding New Configurations
-1. Create config file in `configs/` directory (no leading dot)
-2. Add mapping to `config_mappings` array in `install.sh`
-3. System automatically creates symlink during installation
+## Quality Metrics
 
-### Modifying Shell Integration
-- Add aliases in `scripts/aliases/` (auto-loaded)
-- Add functions in `scripts/functions/` (auto-loaded)
-- Environment variables go in `scripts/env/common.sh`
+- Installation must complete in under 2 minutes (excluding package downloads)
+- Validation script must detect 100% of missing dependencies
+- All shell scripts must pass shellcheck
+- Zero external dependencies for core functionality (only apt/snap packages)
 
-### Theme System
-The repository includes 5 pre-configured themes (Nord, Tokyo Night, Kanagawa, Gruvbox Material, Catppuccin Mocha) with unified colors across neovim, tmux, shell, and FZF. Themes can be switched using the interactive theme-switcher.sh script.
+## Common Development Tasks
 
-## Important Notes
+When modifying this repository:
+1. Always run `./scripts/validate-install.sh` after changes
+2. Test installation in a fresh Ubuntu container: `docker run -it ubuntu:latest`
+3. Update `scripts/aliases/` or `scripts/functions/` for new shell utilities
+4. Follow the Arete philosophy - delete more than you add
 
-- This is an Ubuntu/WSL-only system - no macOS or other platform support
-- Docker is always installed as part of base packages
-- All operations are non-destructive with automatic backups
-- Template processing is supported (currently only gitconfig)
-- The system follows a security-first approach with HTTPS-only downloads and checksum verification
+Remember: This is a dotfiles repository that values clarity, simplicity, and reliability above all else.

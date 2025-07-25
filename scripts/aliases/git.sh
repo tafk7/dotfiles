@@ -29,7 +29,7 @@ alias gl='git log --oneline --decorate --graph'
 alias gla='git log --oneline --decorate --graph --all'
 
 # Stash
-alias gst='git stash'
+alias gstash='git stash'
 alias gstp='git stash pop'
 
 # Useful functions

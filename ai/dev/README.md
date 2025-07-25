@@ -19,9 +19,8 @@ The framework rests on three Prime Directives:
 ### Using the Framework
 
 1. Place `global-CLAUDE.md` in `~/.claude/CLAUDE.md` for system-wide philosophy
-2. Create project-specific `CLAUDE.md` files using `project-template.md`
-3. Use slash commands (`/arete`, `/ship`, `/refine`) to invoke different development modes
-4. Follow the `workflow.md` process for clean separation of experiments and production
+2. Use slash commands (`/arete`, `/ship`, `/refine`) to invoke different development modes
+3. Follow the `workflow.md` process for clean separation of experiments and production
 
 ### Key Commands
 
