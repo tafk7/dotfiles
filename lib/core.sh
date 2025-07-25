@@ -14,7 +14,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+RESET='\033[0m' # Reset (alias for NC)
 
 # Logging functions
 log() { echo -e "${BLUE}[INFO]${NC} $1"; }

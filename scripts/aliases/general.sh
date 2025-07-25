@@ -19,18 +19,14 @@ fi
 
 # OS-aware aliases for bat and fd (safe aliases that don't override system commands)
 if command -v batcat &> /dev/null; then
-    alias c='batcat'
+    alias bat='batcat'
     alias view='batcat'
 elif command -v bat &> /dev/null; then
-    alias c='bat'
     alias view='bat'
 fi
 
 if command -v fdfind &> /dev/null; then
-    alias f='fdfind'
     alias fd='fdfind'
-elif command -v fd &> /dev/null; then
-    alias f='fd'
 fi
 
 # Directory navigation
@@ -41,7 +37,6 @@ alias ~='cd ~'
 alias -- -='cd -'
 
 # File operations
-alias rm='rm -i'
 alias mkdir='mkdir -p'
 
 # Grep with color
@@ -53,7 +48,6 @@ alias egrep='egrep --color=auto'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-alias ps='ps auxf'
 # Process search function
 psg() {
     if [[ -z "$1" ]]; then
@@ -65,7 +59,6 @@ psg() {
 }
 
 # Network
-alias ping='ping -c 5'
 alias ports='netstat -tulanp'
 alias myip='curl ifconfig.me'
 alias localip='hostname -I'
@@ -89,7 +82,6 @@ alias more='less'
 # Archive operations (safe aliases that don't override tar)
 alias untar='tar -zxvf'
 alias tarc='tar -czf'  # tar create
-alias tarx='tar -xvf'  # tar extract
 
 # Process management
 alias psmem='ps auxf | sort -nr -k 4'
@@ -103,6 +95,10 @@ alias ducks='du -cks * | sort -rn | head'
 # History
 alias h='history'
 alias hgrep='history | grep'
+
+# Safer alternatives (explicit commands)
+alias rmf='rm -rf'    # force remove
+alias rmi='rm -i'     # interactive remove
 
 # Reload shell (works for both bash and zsh)
 if [[ -n "$ZSH_VERSION" ]]; then
@@ -134,3 +130,7 @@ fi
 # Dotfiles management
 alias update-configs='$DOTFILES_DIR/scripts/update-configs.sh'
 alias update-configs-force='$DOTFILES_DIR/scripts/update-configs.sh --force'
+
+# Cheatsheet for keybindings
+alias cheat='$DOTFILES_DIR/scripts/cheatsheet.sh'
+alias shortcuts='cheat'  # Alternative alias

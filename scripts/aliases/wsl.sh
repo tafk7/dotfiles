@@ -21,7 +21,6 @@ alias cddl='cd $WIN_DOWNLOADS'
 alias cddocs='cd $WIN_DOCUMENTS'
 
 # Windows program shortcuts
-alias open-explorer='explorer.exe'
 alias notepad='notepad.exe'
 alias clip='clip.exe'
 alias pwsh='powershell.exe'
@@ -29,7 +28,6 @@ alias cmd='cmd.exe'
 
 # File operations
 alias explorer='explorer.exe .'
-alias e='explorer.exe .'
 
 # Clipboard integration
 alias cwd='pwd | clip.exe'

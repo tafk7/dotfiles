@@ -67,10 +67,6 @@ config_mappings=(
     
     # Development tools
     "$CONFIGS_DIR/gitconfig:$HOME/.gitconfig"
-    "$CONFIGS_DIR/gitignore_global:$HOME/.gitignore_global"
-    
-    # Tool configurations
-    "$CONFIGS_DIR/starship.toml:$HOME/.config/starship.toml"
 )
 
 # Handle config subdirectories
@@ -126,19 +122,23 @@ create_config_symlink() {
 # ==============================================================================
 
 main() {
-    header "Updating Configuration Files"
+    echo
+    echo "========================================"
+    echo "Updating Configuration Files"
+    echo "========================================"
     
     detect_environment
     
     # Counter for success/failure tracking
-    local success_count=0
-    local failure_count=0
+    success_count=0
+    failure_count=0
     
     log "Updating configuration symlinks..."
     
     # Process main config files
     for mapping in "${config_mappings[@]}"; do
         IFS=':' read -r src dest <<< "$mapping"
+        # log "Processing: $src -> $dest"  # Uncomment for debugging
         
         # Special handling for gitconfig (template)
         if [[ "$dest" == "$HOME/.gitconfig" ]] && [[ ! -f "$dest" ]]; then
@@ -148,15 +148,19 @@ main() {
         
         if [[ -f "$src" ]]; then
             if create_config_symlink "$src" "$dest"; then
-                ((success_count++))
+                success_count=$((success_count + 1))
+                # log "Success count: $success_count"  # Uncomment for debugging
             else
-                ((failure_count++))
+                failure_count=$((failure_count + 1))
+                # log "Failure count: $failure_count"  # Uncomment for debugging
             fi
         else
             warn "Source file not found: $src"
-            ((failure_count++))
+            failure_count=$((failure_count + 1))
         fi
     done
+    
+    # log "Finished processing main config files"  # Uncomment for debugging
     
     # Process config subdirectories
     for mapping in "${config_subdirs[@]}"; do
@@ -166,19 +170,41 @@ main() {
         
         if [[ -d "$src" ]]; then
             if create_config_symlink "$src" "$dest"; then
-                ((success_count++))
+                success_count=$((success_count + 1))
             else
-                ((failure_count++))
+                failure_count=$((failure_count + 1))
             fi
         else
             warn "Source directory not found: $src"
-            ((failure_count++))
+            failure_count=$((failure_count + 1))
         fi
     done
     
+    # Create neovim theme.vim if it doesn't exist
+    local nvim_theme_file="$HOME/.config/nvim/theme.vim"
+    if [[ ! -f "$nvim_theme_file" ]]; then
+        log "Creating neovim theme.vim file..."
+        mkdir -p "$(dirname "$nvim_theme_file")"
+        cat > "$nvim_theme_file" << 'EOF'
+" Default theme configuration for neovim
+" This file is sourced by init.vim for theme settings
+try
+    let g:gruvbox_material_background = 'medium'
+    let g:gruvbox_material_better_performance = 1
+    colorscheme gruvbox-material
+catch
+    colorscheme desert
+endtry
+EOF
+        success "Created neovim theme.vim with default theme"
+        success_count=$((success_count + 1))
+    fi
+    
     # Summary
     echo
-    header "Update Summary"
+    echo "========================================"
+    echo "Update Summary"
+    echo "========================================"
     success "Updated: $success_count configurations"
     if [[ $failure_count -gt 0 ]]; then
         warn "Failed: $failure_count configurations"
@@ -193,14 +219,18 @@ main() {
         echo
         warn "Note: .gitconfig not found. Run the full installer to set up git configuration."
     fi
+    
+    # Return appropriate exit code
+    if [[ $failure_count -gt 0 ]]; then
+        return 1
+    else
+        return 0
+    fi
 }
 
-# Run main function
+# Run main function and capture exit status
 main
+MAIN_EXIT_CODE=$?
 
-# Exit with appropriate code
-if [[ ${failure_count:-0} -gt 0 ]]; then
-    exit 1
-else
-    exit 0
-fi
+# Exit with main's exit code
+exit $MAIN_EXIT_CODE
