@@ -130,7 +130,14 @@ validate_base_packages() {
     
     # Shell and modern CLI tools
     validate_command_with_version "zsh" "--version" "Zsh shell"
-    validate_command_with_version "nvim" "--version" "Neovim" "sudo apt install neovim"
+    
+    # Neovim validation
+    if command_exists nvim; then
+        local nvim_version=$(nvim --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+        test_pass "Neovim installed (v$nvim_version)"
+    else
+        test_fail "Neovim not installed" "./install.sh to install"
+    fi
     
     # Check for bat (Ubuntu package name variations)
     if command_exists bat; then
@@ -266,6 +273,14 @@ validate_configuration_files() {
     
     # Configuration directories
     validate_directory "$HOME/.config/nvim" "Neovim config directory"
+    
+    # Check for neovim theme.vim
+    if [[ ! -f "$HOME/.config/nvim/theme.vim" ]]; then
+        test_warn "Neovim theme.vim not found - may cause display issues" \
+            "./scripts/update-configs.sh to create default theme"
+    else
+        test_pass "Neovim theme.vim exists"
+    fi
     
     # Check DOTFILES_DIR is set in shell configs
     if [[ -f "$HOME/.bashrc" ]]; then

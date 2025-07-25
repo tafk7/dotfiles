@@ -181,7 +181,7 @@ if [[ -d "$DOTFILES_DIR" ]]; then
 
     # Load aliases
     for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
-        [[ -r "$file" ]] && source "$file"G
+        [[ -r "$file" ]] && source "$file"
     done
 fi
 

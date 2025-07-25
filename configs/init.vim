@@ -104,7 +104,8 @@ endif
 
 " Show line numbers
 set number
-set relativenumber
+" Relative numbers disabled - using absolute line numbers only
+" set relativenumber
 
 " Highlight current line
 set cursorline
@@ -327,14 +328,6 @@ vnoremap <leader>/ :Commentary<CR>
 " Auto Commands
 " ==============================================================================
 
-" Return to last edit position when opening files
-augroup remember_position
-    autocmd!
-    autocmd BufReadPost *
-        \ if line("'\"") > 0 && line("'\"") <= line("$") |
-        \   exe "normal! g`\"" |
-        \ endif
-augroup END
 
 " Automatically remove trailing whitespace on save
 augroup trim_whitespace
@@ -414,19 +407,18 @@ set ttyfast
 
 " Reduce timeout delays
 set timeoutlen=500
-set ttimeoutlen=0
+set ttimeoutlen=10
 
 " ==============================================================================
 " Convenience Functions
 " ==============================================================================
 
-" Toggle between number and relativenumber
+" Toggle line numbers on/off
 function! ToggleNumber()
-    if(&relativenumber == 1)
-        set norelativenumber
-        set number
+    if(&number == 1)
+        set nonumber
     else
-        set relativenumber
+        set number
     endif
 endfunction
 nnoremap <leader>n :call ToggleNumber()<CR>

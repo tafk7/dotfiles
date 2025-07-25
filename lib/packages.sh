@@ -81,7 +81,7 @@ install_base_packages() {
         
         # Shell and modern CLI tools
         "zsh"
-        "neovim"
+        # neovim installed separately with PPA for latest version
         "bat" 
         "fd-find"
         "ripgrep"
@@ -118,6 +118,9 @@ install_base_packages() {
 install_modern_cli_tools() {
     log "Installing modern CLI tools with fallbacks..."
     
+    # Install neovim from PPA for latest stable version
+    install_neovim_latest
+    
     # Try to install eza via package manager first, fallback to GitHub release
     if ! command_exists eza; then
         if ! install_packages "eza"; then
@@ -139,6 +142,72 @@ install_modern_cli_tools() {
                 log_error "Neither apt nor snap available for glow installation"
                 log "You can install glow manually later with: sudo snap install glow"
             fi
+        fi
+    fi
+}
+
+# Install latest stable neovim using AppImage
+install_neovim_latest() {
+    log "Installing latest stable Neovim..."
+    
+    # Check if neovim is already installed
+    if command_exists nvim; then
+        local current_version=$(nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+        log "Current Neovim version: $current_version"
+        
+        # Ask user if they want to update
+        if [[ -t 0 ]]; then
+            read -p "Neovim is already installed. Update to latest? [y/N] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                success "Keeping existing Neovim installation"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Install using AppImage for consistent latest version
+    log "Downloading latest Neovim AppImage..."
+    local nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
+    local temp_file="/tmp/nvim.appimage"
+    
+    if curl -fsSL "$nvim_url" -o "$temp_file"; then
+        # Make executable and move to /usr/local/bin
+        chmod +x "$temp_file"
+        
+        # Remove old nvim if it exists
+        if [[ -f /usr/local/bin/nvim ]]; then
+            safe_sudo rm -f /usr/local/bin/nvim
+        fi
+        
+        # Install the AppImage
+        safe_sudo mv "$temp_file" /usr/local/bin/nvim
+        
+        # Verify installation
+        if command_exists nvim; then
+            local new_version=$(nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+            success "Neovim $new_version installed successfully via AppImage"
+            
+            # Install python support for neovim
+            log "Installing Python support for Neovim..."
+            if command_exists pip3; then
+                pip3 install --user pynvim || warn "Failed to install pynvim"
+            fi
+        else
+            error "Failed to install Neovim AppImage"
+            return 1
+        fi
+    else
+        error "Failed to download Neovim AppImage"
+        warn "Falling back to package manager installation..."
+        
+        # Try PPA as fallback
+        if safe_sudo add-apt-repository -y ppa:neovim-ppa/unstable; then
+            safe_sudo apt-get update
+            install_packages "neovim"
+        else
+            # Final fallback to distribution package
+            install_packages "neovim"
         fi
     fi
 }

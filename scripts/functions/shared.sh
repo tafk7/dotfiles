@@ -2,8 +2,8 @@
 # Shared functions for both bash and zsh
 # Eliminates redundancy between shell configurations
 
-# Smart cd with auto-ls
-cd() {
+# cd and list - use cdl instead of overriding cd
+cdl() {
     builtin cd "$@" && ls
 }
 
