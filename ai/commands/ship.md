@@ -1,47 +1,21 @@
 ---
-description: Prioritize delivery over perfection - get it working and shipped
+description: Ship working code with fastest path
 ---
 
-# Ship It Mode
+# /ship
 
-Get $ARGUMENTS working now. Quality later. Document everything.
+<instructions>
+Get functionality working immediately with fastest path, prioritizing delivery over perfection.
+</instructions>
 
-## Context
-- Urgency: !`echo "$ARGUMENTS" | grep -oE -m1 "(CRITICAL|URGENT|ASAP)" || echo "HIGH"`
+<approach>
+Phase 1 - Triage: Identify minimum viable fix for core functionality
+Phase 2 - Execute: Implement fastest working solution
+Phase 3 - Document: Record all shortcuts and create cleanup TODO
+Priority: Working code now, quality improvements later
+Output: Create cleanup issue in artifacts/. Record fixes in devlog.
+</approach>
 
-## Task
-
-<task>Ship $ARGUMENTS immediately</task>
-
-<requirements>
-1. Get core functionality working with fastest path
-2. Document all shortcuts taken in devlog
-3. Create cleanup TODO issue for tech debt
-4. One test minimum to verify critical path
-</requirements>
-
-<phases>
-1. **Triage** - Identify minimum viable fix
-2. **Execute** - Implement fastest solution  
-3. **Document** - Record shortcuts and create cleanup TODO
-</phases>
-
-<output>
-artifacts/devlog_YYMM.md (append entry)
-artifacts/issues/TODO-YYMM-NNN_[description].md
-</output>
-
-<conditional>
-If CRITICAL: Skip checks, core functionality only
-</conditional>
-
-<error-handling>
-Build fails: Comment out problematic code
-Tests fail: Skip non-critical with TODO
-</error-handling>
-
-# Arguments: $ARGUMENTS accepts:
-# - Task description with optional urgency markers
-# - CRITICAL/URGENT/ASAP: Triggers maximum speed mode
-
-Ship mode is emergency medicine - it saves the patient but requires rehabilitation.
+<context>
+Target: $ARGUMENTS
+</context>

@@ -1,41 +1,21 @@
 ---
-description: Build AI's internal understanding for implementation work
+description: Build deep understanding of codebase
 ---
 
-# Build Context
+# /context
 
-Deep analysis of $ARGUMENTS to establish your comprehensive understanding before implementation.
+<instructions>
+Build deep understanding of the codebase to establish comprehensive mental model before implementation.
+</instructions>
 
-## Task
+<approach>
+Phase 1 - Survey: Map architecture, dependencies, and boundaries
+Phase 2 - Analyze: Identify core patterns, abstractions, and data flows
+Phase 3 - Internalize: Build working mental model of design decisions
+Priority: Core domains and critical paths over peripheral code
+Output: Enhanced understanding only - no files created
+</approach>
 
-<task>Build your mental model of $ARGUMENTS</task>
-
-<requirements>
-1. Map architecture and dependencies
-2. Identify core patterns and abstractions
-3. Trace critical paths and data flows
-4. Internalize design decisions for future work
-</requirements>
-
-<phases>
-1. **Survey** - Structure and boundaries
-2. **Analyze** - Patterns and flows
-3. **Internalize** - Build working mental model
-</phases>
-
-<output>
-Your enhanced understanding (no files created - pure mental model building)
-</output>
-
-<conditional>
-If large codebase: Focus on core domains
-If library: API surface and usage patterns
-If no code: Documentation and structure only
-</conditional>
-
-<error-handling>
-Access denied: Use available information
-Huge codebase: Sample representative paths
-</error-handling>
-
-Context is the lens through which chaos becomes clarity.
+<context>
+Target: $ARGUMENTS
+</context>

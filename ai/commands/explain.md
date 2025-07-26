@@ -1,41 +1,21 @@
 ---
-description: Create user-facing documentation explaining code/concepts
+description: Explain code with visuals and examples
 ---
 
-# Explain
+# /explain
 
-Deep analysis of $ARGUMENTS to build understanding and generate explanatory report.
+<instructions>
+Create user-facing documentation that explains code through diagrams, concepts, and key examples.
+</instructions>
 
-## Task
+<approach>
+Phase 1 - Analyze: Understand architecture, flow, and key abstractions
+Phase 2 - Visualize: Create diagrams using mermaid (see ~/.claude/mermaid_reference.md) or ASCII art as appropriate
+Phase 3 - Document: Explain the "why" and "how" with minimal code snippets, focusing on understanding
+Priority: Visual comprehension and conceptual clarity over code reproduction
+Output: Create explanation with diagrams in artifacts/analyses/
+</approach>
 
-<task>Understand and explain $ARGUMENTS comprehensively</task>
-
-<requirements>
-1. Build complete understanding of how it works
-2. Identify key patterns and design decisions
-3. Create clear, navigable documentation
-4. Focus on user comprehension
-</requirements>
-
-<phases>
-1. **Analyze** - Understand structure and flow
-2. **Synthesize** - Extract key insights
-3. **Document** - Create clear explanation
-</phases>
-
-<output>
-artifacts/analyses/YYMMDD_HHMM_explain_[target].md
-</output>
-
-<conditional>
-If single file: Function-level detail
-If large system: Focus on core concepts
-If no code: Explain available documentation
-</conditional>
-
-<error-handling>
-Target unclear: Ask for specific file or topic
-Too broad: Suggest narrower scope
-</error-handling>
-
-Understanding is seeing the system as its creators intended.
+<context>
+Target: $ARGUMENTS
+</context>
