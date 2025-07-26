@@ -30,8 +30,8 @@ Everything in `artifacts/` is experimentation. Production code lives in `src/`, 
 - **Both**: Code and architecture diagrams serve all audiences effectively
 
 ### Naming Convention
-`YYMMDD_HHMM_description.ext` (e.g., `241215_1430_auth_refactor.md`)
-Use `date +%y%m%d_%H%M` to get accurate timestamp.
+Use semantic names that describe the content (e.g., `auth_refactor.md`, `user_api_design.md`).
+Include timestamp at the top of the file content: `Created: YYYY-MM-DD HH:MM`
 
 ### Development Log
 Track daily progress in `artifacts/devlog_YYMM.md`:
@@ -43,6 +43,8 @@ Track daily progress in `artifacts/devlog_YYMM.md`:
 **Artifacts**: [Files created in artifacts/]
 **Promoted**: [Files moved to production]
 **Issues**: [Created: TODO-YYMM-NNN | Resolved: TODO-YYMM-NNN]
+
+# Include timestamp at top of artifact files: Created: YYYY-MM-DD HH:MM
 
 # Type additions: Bug(error,cause,fix), Feature(story,criteria), Refactor(metrics), Research(decisions)
 # Milestones: === MILESTONE: [Achievement] === (>30% improvement)

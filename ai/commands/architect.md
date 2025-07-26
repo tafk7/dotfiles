@@ -1,40 +1,21 @@
 ---
-description: Design component structure for new systems
+description: Design component structure and architecture
 ---
 
 # /architect
 
-Design component structure and key architectural decisions for new system $ARGUMENTS.
+<instructions>
+Design component structure and key architectural decisions for a new system.
+</instructions>
 
-## Task
+<approach>
+Phase 1 - Analyze: Understand requirements and constraints
+Phase 2 - Design: Define 3-5 core components with clear responsibilities and interfaces
+Phase 3 - Document: Create architecture with diagrams and technology recommendations
+Priority: Simplicity and clarity over completeness
+Output: Create architecture document in artifacts/designs/. Log design to devlog.
+</approach>
 
-<task>Design component architecture for new system $ARGUMENTS</task>
-
-<requirements>
-1. Define 3-5 core components with clear responsibilities
-2. Specify data flow and component interfaces
-3. Recommend key technology choices with rationale
-4. Provide concrete starting points for implementation
-</requirements>
-
-<phases>
-1. **Analyze** - Understand requirements and constraints
-2. **Design** - Define components and interfaces
-3. **Document** - Create architecture with diagrams (see ~/.claude/mermaid_reference.md)
-</phases>
-
-<output>
-artifacts/designs/YYMMDD_HHMM_architecture_[system].md
-</output>
-
-<error-handling>
-Vague requirements: Ask for specific use cases
-Overly complex: Suggest MVP scope
-</error-handling>
-
-# Arguments: $ARGUMENTS accepts:
-# - system-name: Name of new system to design
-# - feature-name: New feature requiring architectural design
-# - No args: Design for current directory context
-
-Good architecture enables change; great architecture makes change obvious.
+<context>
+Target: $ARGUMENTS
+</context>

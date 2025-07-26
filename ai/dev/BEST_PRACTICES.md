@@ -94,31 +94,53 @@ Review this code for security vulnerabilities, focusing on:
 
 1. **Task-Oriented Commands**
    ```markdown
-   ## /refactor-auth
-   Refactor the authentication system:
-   1. Identify all authentication-related files
-   2. Analyze the current implementation
-   3. Suggest a cleaner architecture
-   4. Implement changes incrementally
-   5. Update tests
+   # /refactor-auth
+   
+   <instructions>
+   Refactor the authentication system for improved architecture
+   </instructions>
+   
+   <approach>
+   Identify all authentication-related files, analyze current implementation, suggest cleaner architecture, implement changes incrementally, and update tests.
+   </approach>
+   
+   <context>
+   Target: $ARGUMENTS
+   </context>
    ```
 
 2. **Analysis Commands**
    ```markdown
-   ## /performance-audit
-   Analyze our API performance and present results in a markdown table:
-   | Endpoint | Avg Response Time | Suggestions |
-   Focus on database queries and N+1 problems
+   # /performance-audit
+   
+   <instructions>
+   Analyze API performance focusing on database queries and N+1 problems
+   </instructions>
+   
+   <approach>
+   Review all API endpoints, measure response times, identify bottlenecks especially in database queries. Present results in markdown table format with columns: Endpoint | Avg Response Time | Suggestions.
+   </approach>
+   
+   <context>
+   Target: $ARGUMENTS
+   </context>
    ```
 
 3. **Automation Commands**
    ```markdown
-   ## /fix-lint-errors
-   1. Run the lint command
-   2. Write all errors to a markdown checklist
-   3. Fix each error systematically
-   4. Re-run lint to verify fixes
-   5. Commit with message "fix: resolve lint errors"
+   # /fix-lint-errors
+   
+   <instructions>
+   Fix all lint errors in the project systematically
+   </instructions>
+   
+   <approach>
+   Run lint command, write errors to markdown checklist, fix each error systematically, re-run lint to verify fixes, then commit with message "fix: resolve lint errors".
+   </approach>
+   
+   <context>
+   Target: $ARGUMENTS
+   </context>
    ```
 
 ## Prompt Writing Best Practices
@@ -130,15 +152,19 @@ Be specific about desired behavior and frame your instructions with modifiers. C
 **Instead of:** "fix the tests"
 **Use:** "fix the failing authentication tests by updating the mock data to match the new API response format"
 
-**With XML tags for better structure:**
+**With XML tags for better structure (3-section maximum):**
 ```
-<task>Fix the failing authentication tests</task>
-<context>Tests are failing due to API response format change</context>
-<requirements>
-- Update mock data to match new format
-- Ensure all test assertions pass
-- Run lint and typecheck after changes
-</requirements>
+<instructions>
+Fix the failing authentication tests by updating mock data
+</instructions>
+
+<approach>
+Tests are failing due to API response format change. Update mock data to match new format, ensure all test assertions pass, then run lint and typecheck.
+</approach>
+
+<context>
+Target: src/tests/auth/
+</context>
 ```
 
 ### 2. Break Down Complex Tasks
