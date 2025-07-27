@@ -13,7 +13,7 @@ Phase 1 - Experiment: Try multiple approaches quickly without polish
 Phase 2 - Learn: Document what works, what fails, and why
 Phase 3 - Decide: Flag promising results for proper implementation
 Priority: Speed and learning over code quality
-Output: Create sketches in artifacts/sketches/
+Output: Create sketches in _artifacts/sketches/
 </approach>
 
 <context>

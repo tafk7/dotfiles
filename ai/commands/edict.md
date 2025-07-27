@@ -13,7 +13,7 @@ Phase 1 - Parse: Extract edicts from project CLAUDE.md file
 Phase 2 - Check: Verify compliance across all edict categories
 Phase 3 - Report: Document violations with suggested fixes
 Priority: Critical violations that block functionality
-Output: Create compliance report in artifacts/analyses/
+Output: Create compliance report in _artifacts/analyses/
 </approach>
 
 <context>
