@@ -1,20 +1,22 @@
-# COMMAND TEMPLATE
-# This file defines the standard format for all slash commands.
-# Copy this template when creating new commands and maintain consistency.
+---
+description: [Concise action-oriented description (3-7 words)]
+---
 
 # /[commandname]
 
 <instructions>
-[Single sentence describing what this command accomplishes]
+[Single sentence clearly stating what this command accomplishes.]
 </instructions>
 
 <approach>
-[How Clara should approach this - phases, priorities, constraints.
-Include output location like artifacts/[type]/ if applicable.
-Can be multiple lines describing the workflow.]
+[How to approach the task. For complex commands use phases:]
+Phase 1 - [Action]: [Brief description]
+Phase 2 - [Action]: [Brief description]
+Phase 3 - [Action]: [Brief description]
+Priority: [What to focus on]
+Output: Create [document type] in _artifacts/[subdirectory]/
 </approach>
 
 <context>
 Target: $ARGUMENTS
-[Add any additional dynamic context only if truly needed]
 </context>

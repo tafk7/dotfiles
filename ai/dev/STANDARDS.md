@@ -1,108 +1,168 @@
 # Slash Command Standards
 
-This document defines the standardized formats for slash commands based on analysis of existing patterns.
+This document defines the standardized format for slash commands in the Arete Framework.
 
 ## Core Principle: Trust the AI
 
-The AI is highly intelligent and knows how to code, gather context, and solve problems. Commands should:
-- Specify goals and constraints, not implementation details
-- Provide guidance and workflow structure, not step-by-step instructions
-- Focus on what makes this command unique, not what the AI already knows
+Commands should specify goals and constraints, not implementation details. The AI knows how to code, gather context, and solve problems.
 
-## Format Decisions
+## Command Format
 
-### 1. **Conditional Format**
-Use `If X: Y` format with pipe separators for related conditions:
-```
-If deep: Full analysis | If quick: Top issues only
-If CRITICAL: Skip checks, minimal fix only
-Errors: Missing file(exit), Invalid input(prompt)
-```
+Every command follows this exact structure:
 
-### 2. **Shell Commands**
-Place `2>/dev/null` immediately after potentially failing commands:
-```
-- Good: !`grep pattern file 2>/dev/null | wc -l || echo "0"`
-- Bad: !`grep pattern file | wc -l 2>/dev/null || echo "0"`
-```
-
-### 3. **Output Structure**
-Keep output specifications minimal:
 ```markdown
-<output>
-artifacts/[type]/YYMMDD_HHMM_[command]_[description].md
-</output>
+---
+description: [Concise action-oriented description (3-7 words)]
+---
+
+# /[commandname]
+
+<instructions>
+[Single sentence clearly stating what this command accomplishes.]
+</instructions>
+
+<approach>
+[How to approach the task. Can be simple or use phases for complex workflows.]
+</approach>
+
+<context>
+Target: $ARGUMENTS
+[Additional context only if needed]
+</context>
 ```
-Only include templates when consistent visual structure is critical.
 
-### 4. **Philosophy Statements**
-- Place as final line of command
-- Use regular text (no italics)
-- Create memorable, principle-based statement
+## Format Components
 
-### 5. **Phases**
-- **<phases>**: High-level workflow overview (3-5 brief phases)
-  - Use pipe separators (`|`) for parallel/related phases
-  - Use numbered list for sequential phases that must complete in order
-  - Keep phases conceptual, not prescriptive
-  - Avoid detailed step-by-step instructions
+### 1. YAML Frontmatter
+- **Required**: Always include `description` field
+- **Style**: Active verbs, 3-7 words maximum
+- **Examples**: "Design component structure and architecture", "Analyze code against Arete principles"
 
-### 6. **Error Handling**
-Always include `<error-handling>` section with common failures:
+### 2. Command Header
+- Format: `# /[commandname]`
+- Single word preferred (architect, arete, ship)
+- Compound for subcommands: `/git:commit`, `/_artifacts/status`
+
+### 3. Instructions Tag
+- **Purpose**: Single sentence goal statement
+- **Style**: Clear, actionable, ends with period
+- **Focus**: What to accomplish, not how
+
+### 4. Approach Tag
+- **Simple commands**: Single paragraph approach
+- **Complex commands**: Phase-based structure
+  ```
+  Phase 1 - [Action]: [Description]
+  Phase 2 - [Action]: [Description]
+  Phase 3 - [Action]: [Description]
+  Priority: [What matters most]
+  Output: [Where results go]
+  ```
+- **Alternative**: Some commands use numbered lists for sequential steps
+
+### 5. Context Tag
+- **Always include**: `Target: $ARGUMENTS`
+- **Optional additions**: Only when behavior changes based on context
+- **Keep minimal**: Trust the AI to gather needed context
+
+## Common Patterns
+
+### Output Specifications
 ```
+Output: Create [type] in _artifacts/[subdir]/
+```
+
+### Priority Statements
+- "High-impact simplifications and deletions first"
+- "Speed and learning over code quality"
+- "Working code now, quality improvements later"
+
+### Phase Names
+- Phase 1: Analyze, Survey, Scan, Parse, Discovery
+- Phase 2: Design, Check, Measure, Execute
+- Phase 3: Document, Report, Synthesize, Diagnose
+
+## File Organization
+
+### Directory Structure
+```
+ai/commands/
+├── architect.md         # Design commands
+├── arete.md            # Quality analysis  
+├── ship.md             # Fast delivery
+├── hone.md             # Dead code removal
+├── [...more commands]
+├── _artifacts/          # Artifact management (5 commands)
+│   ├── status.md
+│   ├── todo.md
+│   └── [...more]
+└── git/               # Git operations
+    ├── commit.md
+    └── diff.md
+```
+
+### Naming Conventions
+- Commands: `[verb].md` or `[noun].md`
+- Issues: `TODO-YYMM-NNN_[description].md`
+
+## Creating New Commands
+
+1. **Check existing commands first** - Reuse before creating
+2. **Start from TEMPLATE.md** - Maintain consistency
+3. **Focus on uniqueness** - What makes this command special?
+4. **Test locally** - Ensure it works as intended
+5. **Keep it simple** - Less specification, more trust
+
+## Examples
+
+### Good: Simple and Clear
+```markdown
+---
+description: Ship working code with fastest path
+---
+
+# /ship
+
+<instructions>
+Deliver working solution prioritizing speed over perfection.
+</instructions>
+
+<approach>
+Get it working with minimal changes. Log technical debt as TODO issues. Use existing patterns, skip non-critical features, focus on core functionality.
+Priority: Working code now, quality improvements later.
+Output: Log to devlog. Create TODO-YYMM-NNN issues for cleanup.
+</approach>
+
+<context>
+Target: $ARGUMENTS
+</context>
+```
+
+### Bad: Over-Specified
+```markdown
+# /ship
+
+<instructions>
+This command helps you ship code quickly by following these steps...
+</instructions>
+
+<approach>
+First, analyze the codebase using grep and find commands.
+Then, implement the solution using proper error handling.
+Make sure to validate input and handle edge cases.
+Run tests with pytest or jest depending on the language.
+Finally, create documentation...
+</approach>
+
 <error-handling>
-File not found: List alternatives
-Permission denied: Check ownership
-Invalid input: Use default value
+If file not found: Create it
+If permission denied: Use sudo
+If syntax error: Fix it
 </error-handling>
 ```
 
-### 7. **Argument Documentation**
-Document as comments after error-handling:
-```
-# Arguments: $ARGUMENTS accepts:
-# - No args: Current directory
-# - filename: Specific file to analyze
-# - --flag: Enable special mode
-```
+## Philosophy
 
-## Consistency Checklist
+Commands should enable, not constrain. They provide rails for common workflows while trusting the AI's intelligence to handle details. When in doubt, specify less and trust more.
 
-- [ ] YAML front matter with concise description
-- [ ] Title matches filename
-- [ ] Brief description uses $ARGUMENTS
-- [ ] Context section only if specific focus needed
-- [ ] <task> tag clearly states the goal
-- [ ] <requirements> focus on outcomes, not methods
-- [ ] <phases> provide high-level workflow if complex
-- [ ] <output> specifies artifact path
-- [ ] <conditional> covers major variations
-- [ ] <error-handling> addresses common failures simply
-- [ ] Arguments documented concisely
-- [ ] Philosophy statement captures essence
-
-## File Naming
-
-- Commands: `[verb].md` or `[noun].md`
-- Outputs: `artifacts/[subdir]/YYMMDD_HHMM_[command]_[description].md`
-- Issues: `artifacts/issues/TODO-YYMM-NNN_[description].md`
-
-## Optional Sections
-
-Commands may include optional sections when they add unique value:
-
-### `<template>` Section
-Use sparingly when consistent visual structure is critical for the AI's output:
-- Analysis reports that need specific formatting
-- Structured documentation that follows a precise pattern
-- Outputs where visual consistency matters for readability
-
-## Simplification Guidelines
-
-1. **Remove Redundancy**: If the AI already knows how to do something, don't explain it
-2. **Trust Intelligence**: Specify goals and constraints, let the AI determine implementation
-3. **Merge Similar Commands**: Combine commands with overlapping purposes
-4. **Minimal Context**: Only gather context that changes behavior
-5. **Concise Requirements**: Focus on unique aspects of this command
-
-The goal is clarity through simplicity, not exhaustive specification.
+Arete.

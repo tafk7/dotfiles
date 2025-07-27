@@ -2,7 +2,7 @@
 description: Analyze and remove obsolete artifacts
 ---
 
-# /artifacts/cleanup
+# /_artifacts/cleanup
 
 <instructions>
 Analyze artifact contents to identify and remove obsolete development work.

@@ -2,7 +2,7 @@
 description: Show artifacts and open issues
 ---
 
-# /artifacts/status
+# /_artifacts/status
 
 <instructions>
 Show current artifacts, open issues, and recent activity.
