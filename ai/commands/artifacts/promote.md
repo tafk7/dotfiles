@@ -2,7 +2,7 @@
 description: Promote artifacts to production code
 ---
 
-# /artifacts/promote
+# /_artifacts/promote
 
 <instructions>
 Promote artifacts to production with full integration and verification.

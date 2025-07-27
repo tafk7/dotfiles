@@ -13,7 +13,7 @@ Phase 1 - Analyze: Assess code quality and identify improvement opportunities
 Phase 2 - Prioritize: Rank by impact/risk ratio (quick wins first)
 Phase 3 - Document: Create actionable checklist with implementation steps
 Priority: 3-5 improvements balancing impact versus implementation risk
-Output: Create refinement checklist in artifacts/checklists/. Note improvements in devlog.
+Output: Create refinement checklist in _artifacts/checklists/. Note improvements in devlog.
 </approach>
 
 <context>
