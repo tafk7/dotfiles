@@ -14,7 +14,7 @@ Phase 2 - Measure: Analyze algorithmic complexity and resource usage
 Phase 3 - Diagnose: Find bottlenecks and inefficiencies
 Phase 4 - Recommend: Propose optimizations with impact estimates
 Priority: High-impact bottlenecks over micro-optimizations
-Output: Create analysis in artifacts/analyses/. Note analysis and key findings in devlog.
+Output: Create analysis in _artifacts/analyses/. Note analysis and key findings in devlog.
 </approach>
 
 <context>
