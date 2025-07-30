@@ -203,7 +203,7 @@ if [[ $- == *i* ]]; then
     fi
 fi
 
-# FINN/BrainSmith parameters
+# FINN/Brainsmith parameters
 export NUM_DEFAULT_WORKERS=14
 export XILINXD_LICENSE_FILE=4400@10.1.0.4
 #/opt/Xilinx/licenses/Xilinx_brainSmith_dev0.lic
@@ -215,7 +215,7 @@ export FINN_XILINX_PATH="/tools/Xilinx"
 export FINN_XILINX_VERSION="2024.2"
 export FINN_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
 
-# BrainSmith paths
+# Brainsmith paths
 export BSMITH_ROOT=/home/tafk/brainsmith/
 export BSMITH_BUILD_DIR=/home/tafk/builds/brainsmith
 export BSMITH_XILINX_PATH="/tools/Xilinx"

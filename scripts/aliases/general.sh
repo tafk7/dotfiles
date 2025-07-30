@@ -118,10 +118,8 @@ alias count='find . -type f | wc -l'
 alias cpv='cp -v'
 alias rmv='rm -v'
 
-# Markdown viewing - prefer glow if available, fallback to bat
-if command -v glow &> /dev/null; then
-    alias md='glow'  # View markdown files with glow
-elif command -v batcat &> /dev/null; then
+# Markdown viewing - use bat for syntax highlighting
+if command -v batcat &> /dev/null; then
     alias md='batcat --style=plain --language=markdown'  # View markdown files
 elif command -v bat &> /dev/null; then
     alias md='bat --style=plain --language=markdown'  # View markdown files
