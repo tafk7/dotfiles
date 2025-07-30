@@ -129,21 +129,6 @@ install_modern_cli_tools() {
         fi
     fi
     
-    # Install glow for markdown viewing
-    if ! command_exists glow; then
-        log "Installing glow for markdown viewing..."
-        # Try apt first (might be available in some repos)
-        if ! install_packages "glow"; then
-            # Fallback to snap
-            log "glow not in apt repos, trying snap..."
-            if command_exists snap; then
-                execute_with_feedback "sudo snap install glow" "Installing glow via snap"
-            else
-                log_error "Neither apt nor snap available for glow installation"
-                log "You can install glow manually later with: sudo snap install glow"
-            fi
-        fi
-    fi
 }
 
 # Install latest stable neovim using AppImage
@@ -169,9 +154,29 @@ install_neovim_latest() {
     # Install using AppImage for consistent latest version
     log "Downloading latest Neovim AppImage..."
     local nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim.appimage"
-    local temp_file="/tmp/nvim.appimage"
+    local nvim_checksum_url="https://github.com/neovim/neovim/releases/latest/download/nvim.appimage.sha256sum"
+    local temp_dir=$(mktemp -d)
+    local temp_file="$temp_dir/nvim.appimage"
     
     if curl -fsSL "$nvim_url" -o "$temp_file"; then
+        # Download and verify checksum
+        if curl -fsSL "$nvim_checksum_url" -o "$temp_dir/nvim.sha256sum" 2>/dev/null; then
+            log "Verifying Neovim AppImage checksum..."
+            cd "$temp_dir"
+            # The checksum file contains the hash and filename, verify it
+            if sha256sum -c nvim.sha256sum >/dev/null 2>&1; then
+                log "Checksum verified successfully"
+            else
+                error "Checksum verification failed for Neovim AppImage"
+                cd - >/dev/null
+                rm -rf "$temp_dir"
+                return 1
+            fi
+            cd - >/dev/null
+        else
+            warn "Could not download checksum file for Neovim, proceeding without verification"
+        fi
+        
         # Make executable and move to /usr/local/bin
         chmod +x "$temp_file"
         
@@ -182,6 +187,9 @@ install_neovim_latest() {
         
         # Install the AppImage
         safe_sudo mv "$temp_file" /usr/local/bin/nvim
+        
+        # Clean up temp directory
+        rm -rf "$temp_dir"
         
         # Verify installation
         if command_exists nvim; then
@@ -218,10 +226,36 @@ install_eza_from_github() {
     
     local eza_version="v0.18.2"  # Latest stable as of Ubuntu 24.04
     local eza_url="https://github.com/eza-community/eza/releases/download/${eza_version}/eza_x86_64-unknown-linux-gnu.tar.gz"
+    local eza_checksum_url="https://github.com/eza-community/eza/releases/download/${eza_version}/eza_checksums.txt"
     local temp_dir=$(mktemp -d)
     
+    # Download the binary
     if curl -fsSL "$eza_url" -o "$temp_dir/eza.tar.gz"; then
-        cd "$temp_dir"
+        # Download and verify checksum
+        if curl -fsSL "$eza_checksum_url" -o "$temp_dir/checksums.txt" 2>/dev/null; then
+            log "Verifying eza checksum..."
+            cd "$temp_dir"
+            # Extract relevant checksum line and verify
+            local expected_checksum=$(grep "eza_x86_64-unknown-linux-gnu.tar.gz" checksums.txt | awk '{print $1}')
+            if [[ -n "$expected_checksum" ]]; then
+                local actual_checksum=$(sha256sum eza.tar.gz | awk '{print $1}')
+                if [[ "$expected_checksum" != "$actual_checksum" ]]; then
+                    error "Checksum verification failed for eza"
+                    error "Expected: $expected_checksum"
+                    error "Actual: $actual_checksum"
+                    cd - >/dev/null
+                    rm -rf "$temp_dir"
+                    return 1
+                fi
+                log "Checksum verified successfully"
+            else
+                warn "Could not find checksum for eza in checksums file, proceeding with caution"
+            fi
+        else
+            warn "Could not download checksums file, proceeding without verification"
+        fi
+        
+        # Extract and install
         tar -xzf eza.tar.gz
         if [[ -f "eza" ]]; then
             safe_sudo mv eza /usr/local/bin/eza
@@ -243,8 +277,30 @@ install_docker() {
     log "Installing Docker..."
     
     # Add Docker's official GPG key and repository
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-        gpg --dearmor | safe_sudo tee /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null
+    log "Downloading and verifying Docker GPG key..."
+    local docker_gpg_url="https://download.docker.com/linux/ubuntu/gpg"
+    local temp_key=$(mktemp)
+    
+    if curl -fsSL "$docker_gpg_url" -o "$temp_key"; then
+        # Verify the key fingerprint (Docker's official key fingerprint)
+        local docker_fingerprint="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+        local key_fingerprint=$(gpg --dry-run --import --import-options show-only "$temp_key" 2>&1 | grep -E "^ " | tr -d ' ' | tail -1)
+        
+        if [[ "${key_fingerprint}" == "${docker_fingerprint}" ]]; then
+            log "Docker GPG key fingerprint verified"
+            cat "$temp_key" | gpg --dearmor | safe_sudo tee /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null
+        else
+            error "Docker GPG key fingerprint verification failed"
+            error "Expected: $docker_fingerprint"
+            error "Received: $key_fingerprint"
+            rm -f "$temp_key"
+            return 1
+        fi
+        rm -f "$temp_key"
+    else
+        error "Failed to download Docker GPG key"
+        return 1
+    fi
     
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
         https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
@@ -399,10 +455,25 @@ install_azure_cli_ubuntu() {
     local temp_key=$(mktemp)
     
     if curl -fsSL "$ms_key_url" -o "$temp_key"; then
-        # Import the key
-        cat "$temp_key" | gpg --dearmor | \
-            safe_sudo tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null
-        rm "$temp_key"
+        # Verify the key fingerprint (Microsoft's official package signing key)
+        # Microsoft publishes multiple keys, we check for the main package signing key
+        local ms_fingerprint="BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+        local key_info=$(gpg --dry-run --import --import-options show-only "$temp_key" 2>&1)
+        
+        if echo "$key_info" | grep -q "$ms_fingerprint"; then
+            log "Microsoft GPG key fingerprint verified"
+            # Import the key
+            cat "$temp_key" | gpg --dearmor | \
+                safe_sudo tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null
+        else
+            error "Microsoft GPG key fingerprint verification failed"
+            error "Expected fingerprint not found: $ms_fingerprint"
+            warn "Key info:"
+            echo "$key_info" | grep -E "fpr:|pub" | head -5
+            rm -f "$temp_key"
+            return 1
+        fi
+        rm -f "$temp_key"
         
         # Add repository
         echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] \

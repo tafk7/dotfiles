@@ -166,12 +166,6 @@ validate_base_packages() {
         test_warn "eza not found" "Installed via GitHub releases or not available"
     fi
     
-    # Check for glow (may be installed via snap or GitHub)
-    if command_exists glow; then
-        validate_command_with_version "glow" "--version" "glow markdown viewer"
-    else
-        test_warn "glow not found" "Install via snap or GitHub releases"
-    fi
     
     # Development essentials
     validate_command_with_version "python3" "--version" "Python 3"
