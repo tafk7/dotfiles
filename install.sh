@@ -292,6 +292,9 @@ run_installation() {
     # Phase 7: Validation
     validate_installation
     
+    # Phase 8: Cleanup old backups
+    cleanup_old_backups 5  # Keep only last 5 backups
+    
     # Success message
     echo
     success "🎉 Dotfiles installation completed successfully!"

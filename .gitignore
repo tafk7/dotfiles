@@ -1,6 +1,9 @@
 # Development artifacts
 docs/archive/
 
+# Backup directory
+.backups/
+
 # Local configuration overrides
 *.local
 

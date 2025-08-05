@@ -26,8 +26,8 @@ alias dcr='docker compose restart'
 alias dcb='docker compose build'
 
 # System cleanup
-alias dprune='docker system prune -f'
-alias dprunea='docker system prune -af'
+alias dprune='docker system prune'      # Will prompt for confirmation
+alias dprunea='docker system prune -a'  # Will prompt for confirmation
 
 # Useful functions
 

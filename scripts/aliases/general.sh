@@ -33,11 +33,9 @@ fi
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
-alias ~='cd ~'
 alias -- -='cd -'
 
 # File operations
-alias mkdir='mkdir -p'
 
 # Grep with color
 alias grep='grep --color=auto'
@@ -48,15 +46,7 @@ alias egrep='egrep --color=auto'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-# Process search function
-psg() {
-    if [[ -z "$1" ]]; then
-        echo "Usage: psg <process_name>"
-        echo "Search for running processes matching the given name"
-        return 1
-    fi
-    ps aux | grep -v grep | grep -i "$1"
-}
+# Process search is now in scripts/functions/process.sh
 
 # Network
 alias ports='netstat -tulanp'
@@ -70,14 +60,16 @@ alias tl='tmux list-sessions'
 alias tk='tmux kill-session -t'
 
 # File viewing and editing
-# Backward compatibility for vim users
+# Neovim as default editor with escape hatches to real vim/vi
 if command -v nvim >/dev/null 2>&1; then
     alias vim='nvim'
     alias vi='nvim'
+    # Escape hatches to use actual vim/vi if needed
+    command -v vim >/dev/null 2>&1 && alias vimvim='command vim'
+    command -v vi >/dev/null 2>&1 && alias vivim='command vi'
 fi
 alias nano='nano -w'
 alias less='less -R'
-alias more='less'
 
 # Archive operations (safe aliases that don't override tar)
 alias untar='tar -zxvf'
@@ -97,7 +89,7 @@ alias h='history'
 alias hgrep='history | grep'
 
 # Safer alternatives (explicit commands)
-alias rmf='rm -rf'    # force remove
+alias rmff='rm -rf'   # force remove (double 'f' for safety)
 alias rmi='rm -i'     # interactive remove
 
 # Reload shell (works for both bash and zsh)
@@ -128,6 +120,11 @@ fi
 # Dotfiles management
 alias update-configs='$DOTFILES_DIR/scripts/update-configs.sh'
 alias update-configs-force='$DOTFILES_DIR/scripts/update-configs.sh --force'
+alias update-claude-commands='$DOTFILES_DIR/scripts/update-claude-commands.sh'
+
+# Find and replace utility
+alias fr='$DOTFILES_DIR/scripts/fr.sh'
+alias find-replace='$DOTFILES_DIR/scripts/fr.sh'
 
 # Cheatsheet for keybindings
 alias cheat='$DOTFILES_DIR/scripts/cheatsheet.sh'

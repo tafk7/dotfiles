@@ -220,6 +220,9 @@ EOF
         warn "Note: .gitconfig not found. Run the full installer to set up git configuration."
     fi
     
+    # Cleanup old backups (keep last 10 individual file backups)
+    cleanup_old_backups 10
+    
     # Return appropriate exit code
     if [[ $failure_count -gt 0 ]]; then
         return 1

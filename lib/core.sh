@@ -125,14 +125,24 @@ detect_environment() {
     export IS_WSL=$(is_wsl && echo "true" || echo "false")
 }
 
-# Path constants  
+# Path constants
+# DOTFILES_DIR should be set by the calling script
+if [[ -z "${DOTFILES_DIR:-}" ]]; then
+    # Try to determine it from the script location
+    DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+fi
+
+# Backup directory within the repository
 if [[ -z "${DOTFILES_BACKUP_PREFIX:-}" ]]; then
-    readonly DOTFILES_BACKUP_PREFIX="$HOME/dotfiles-backup"
+    readonly DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
 fi
 
 # Create backup directory with timestamp
 create_backup_dir() {
-    local backup_dir="$DOTFILES_BACKUP_PREFIX-$(date +%Y%m%d-%H%M%S)"
+    # Ensure .backups directory exists
+    mkdir -p "$DOTFILES_BACKUP_PREFIX"
+    
+    local backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$backup_dir"
     echo "$backup_dir"
 }
@@ -141,7 +151,11 @@ create_backup_dir() {
 backup_file() {
     local file="$1"
     if [[ -f "$file" ]]; then
-        local backup="${file}.backup-$(date +%Y%m%d-%H%M%S)"
+        # Ensure .backups directory exists
+        mkdir -p "$DOTFILES_BACKUP_PREFIX"
+        
+        local filename=$(basename "$file")
+        local backup="$DOTFILES_BACKUP_PREFIX/${filename}.backup-$(date +%Y%m%d-%H%M%S)"
         cp "$file" "$backup"
         log "Backed up: $file -> $backup"
     fi
@@ -305,6 +319,27 @@ setup_npm_global() {
     fi
     
     success "NPM global directory configured: $npm_global_dir"
+}
+
+# Cleanup old backups (keep most recent N backups)
+cleanup_old_backups() {
+    local keep_count="${1:-10}"  # Default to keeping 10 backups
+    local backup_type="${2:-}"   # Optional backup type filter
+    
+    if [[ ! -d "$DOTFILES_BACKUP_PREFIX" ]]; then
+        return 0
+    fi
+    
+    log "Cleaning up old backups (keeping last $keep_count)..."
+    
+    # If backup type specified, filter by it
+    if [[ -n "$backup_type" ]]; then
+        # List directories matching the type pattern
+        ls -dt "$DOTFILES_BACKUP_PREFIX"/*"$backup_type"* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs rm -rf 2>/dev/null || true
+    else
+        # Clean all backup directories
+        ls -dt "$DOTFILES_BACKUP_PREFIX"/* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs rm -rf 2>/dev/null || true
+    fi
 }
 
 # Validation functions

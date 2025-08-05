@@ -52,18 +52,22 @@ fi
 export PYTHONDONTWRITEBYTECODE=1  # Prevent .pyc files
 
 # Go configuration
-export GOPATH="$HOME/go"
-export PATH="$GOPATH/bin:$PATH"
+if [[ -d "$HOME/go" ]]; then
+    export GOPATH="$HOME/go"
+    [[ -d "$GOPATH/bin" ]] && export PATH="$GOPATH/bin:$PATH"
+fi
 
 # Rust configuration
-export CARGO_HOME="$HOME/.cargo"
-export PATH="$CARGO_HOME/bin:$PATH"
+if [[ -d "$HOME/.cargo" ]]; then
+    export CARGO_HOME="$HOME/.cargo"
+    [[ -d "$CARGO_HOME/bin" ]] && export PATH="$CARGO_HOME/bin:$PATH"
+fi
 
 # Local binaries
-export PATH="$HOME/.local/bin:$PATH"
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
 # NPM global packages (if npm is installed)
-if command -v npm >/dev/null 2>&1; then
+if command -v npm >/dev/null 2>&1 && [[ -d "$HOME/.npm-global/bin" ]]; then
     export PATH="$HOME/.npm-global/bin:$PATH"
 fi
 
