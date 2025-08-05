@@ -8,6 +8,9 @@ readonly DOTFILES_CORE_LOADED=1
 
 set -e
 
+# Path setup
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,82 +19,17 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
-RESET='\033[0m' # Reset (alias for NC)
 
 # Logging functions
 log() { echo -e "${BLUE}[INFO]${NC} $1"; }
-info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 
-# Check if running on WSL
-is_wsl() {
-    [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || [[ -n "${WSL_DISTRO_NAME:-}" ]]
-}
-
-# Get Windows username for WSL operations
-get_windows_username() {
-    if is_wsl; then
-        # Try multiple methods to get Windows username
-        local win_user=""
-        
-        # Method 1: Use powershell.exe to get actual Windows username
-        if command -v powershell.exe >/dev/null 2>&1; then
-            win_user=$(powershell.exe -NoProfile -Command '$env:USERNAME' 2>/dev/null | tr -d '\r\n' | tr -d ' ')
-            # Validate it's not empty or a system account
-            if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
-                win_user=""
-            fi
-        fi
-        
-        # Method 2: Try to get the user who owns the WSL instance
-        if [[ -z "$win_user" ]] && command -v wslpath >/dev/null 2>&1; then
-            # Get the Windows profile directory and extract username from it
-            local win_profile=$(cmd.exe /c "echo %USERPROFILE%" 2>/dev/null | tr -d '\r\n')
-            if [[ -n "$win_profile" ]]; then
-                # Extract username from path like C:\Users\username
-                win_user=$(echo "$win_profile" | sed 's/.*\\Users\\\([^\\]*\).*/\1/')
-                # Validate it's not a system folder
-                if [[ "$win_user" == "Public" ]] || [[ "$win_user" == "Default" ]] || [[ "$win_user" == "All Users" ]]; then
-                    win_user=""
-                fi
-            fi
-        fi
-        
-        # Method 3: Use cmd.exe as fallback
-        if [[ -z "$win_user" ]] && command -v cmd.exe >/dev/null 2>&1; then
-            win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
-            # Validate it's not empty or a system account
-            if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
-                win_user=""
-            fi
-        fi
-        
-        # Method 4: Check for actual user directories in /mnt/c/Users
-        if [[ -z "$win_user" ]] && [[ -d "/mnt/c/Users" ]]; then
-            # Look for directories that have a Desktop folder (indicating real user accounts)
-            for dir in /mnt/c/Users/*/; do
-                local dirname=$(basename "$dir")
-                # Skip system folders
-                if [[ "$dirname" != "Public" && "$dirname" != "Default" && "$dirname" != "All Users" && "$dirname" != "Default User" ]]; then
-                    if [[ -d "$dir/Desktop" ]]; then
-                        win_user="$dirname"
-                        break
-                    fi
-                fi
-            done
-        fi
-        
-        # Method 5: From current user as final fallback
-        if [[ -z "$win_user" ]]; then
-            win_user="$USER"
-        fi
-        
-        echo "$win_user"
-    fi
-}
+# =============================================================================
+# Core Functions (original core.sh)
+# =============================================================================
 
 # Safe sudo wrapper - shows commands before execution
 safe_sudo() {
@@ -99,14 +37,10 @@ safe_sudo() {
     sudo "$@"
 }
 
-# Check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
 
 # Detect Ubuntu version and WSL
 detect_environment() {
-    if ! command_exists lsb_release; then
+    if ! command -v lsb_release >/dev/null 2>&1; then
         error "This script requires Ubuntu. lsb_release not found."
         exit 1
     fi
@@ -123,68 +57,6 @@ detect_environment() {
     fi
     
     export IS_WSL=$(is_wsl && echo "true" || echo "false")
-}
-
-# Path constants
-# DOTFILES_DIR should be set by the calling script
-if [[ -z "${DOTFILES_DIR:-}" ]]; then
-    # Try to determine it from the script location
-    DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-fi
-
-# Backup directory within the repository
-if [[ -z "${DOTFILES_BACKUP_PREFIX:-}" ]]; then
-    readonly DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
-fi
-
-# Create backup directory with timestamp
-create_backup_dir() {
-    # Ensure .backups directory exists
-    mkdir -p "$DOTFILES_BACKUP_PREFIX"
-    
-    local backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$backup_dir"
-    echo "$backup_dir"
-}
-
-# Backup a single file
-backup_file() {
-    local file="$1"
-    if [[ -f "$file" ]]; then
-        # Ensure .backups directory exists
-        mkdir -p "$DOTFILES_BACKUP_PREFIX"
-        
-        local filename=$(basename "$file")
-        local backup="$DOTFILES_BACKUP_PREFIX/${filename}.backup-$(date +%Y%m%d-%H%M%S)"
-        cp "$file" "$backup"
-        log "Backed up: $file -> $backup"
-    fi
-}
-
-# Create symlink with backup
-safe_symlink() {
-    local source="$1"
-    local target="$2"
-    local backup_dir="$3"
-    
-    # Check if source exists
-    if [[ ! -e "$source" ]]; then
-        error "Source file does not exist: $source"
-        return 1
-    fi
-    
-    # If target exists and is not a symlink, back it up
-    if [[ -e "$target" && ! -L "$target" ]]; then
-        log "Backing up existing $target"
-        mv "$target" "$backup_dir/"
-    elif [[ -L "$target" ]]; then
-        # Remove existing symlink
-        rm "$target"
-    fi
-    
-    # Create the symlink
-    ln -s "$source" "$target"
-    success "Linked $source -> $target"
 }
 
 # Process git config template with user input
@@ -217,6 +89,134 @@ process_git_config() {
     # Process template
     sed -e "s/{{GIT_NAME}}/$git_name/g" -e "s/{{GIT_EMAIL}}/$git_email/g" "$source" > "$target"
     success "Git config created: $target"
+}
+
+# Setup NPM global directory (consolidated function)
+setup_npm_global() {
+    if ! command -v npm >/dev/null 2>&1; then
+        return 0
+    fi
+    
+    log "Setting up NPM global directory..."
+    
+    local npm_global_dir="$HOME/.npm-global"
+    mkdir -p "$npm_global_dir"
+    
+    # Configure npm to use our global directory
+    npm config set prefix "$npm_global_dir"
+    
+    # Add to PATH if not already there
+    if [[ ":$PATH:" != *":$npm_global_dir/bin:"* ]]; then
+        export PATH="$npm_global_dir/bin:$PATH"
+    fi
+    
+    success "NPM global directory configured: $npm_global_dir"
+}
+
+# Validation functions
+validate_prerequisites() {
+    log "Validating prerequisites..."
+    
+    # Check for required commands
+    local required_commands=("curl" "wget" "git")
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            error "Required command not found: $cmd"
+            exit 1
+        fi
+    done
+    
+    # Check bash version
+    if [[ ${BASH_VERSION%%.*} -lt 4 ]]; then
+        error "Bash 4.0+ required (found: $BASH_VERSION)"
+        exit 1
+    fi
+    
+    # Check available disk space (need at least 100MB)
+    local available_kb=$(df "$HOME" | awk 'NR==2 {print $4}')
+    local required_kb=102400  # 100MB
+    
+    if [[ $available_kb -lt $required_kb ]]; then
+        error "Insufficient disk space. Need 100MB, have $(($available_kb/1024))MB"
+        exit 1
+    fi
+    
+    success "Prerequisites validated"
+}
+
+# Post-installation validation
+validate_installation() {
+    log "Validating installation..."
+    
+    local failed_validations=0
+    
+    # Check critical files (some are symlinks, .gitconfig is templated)
+    local critical_files=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.config/nvim/init.vim" "$HOME/.gitconfig")
+    for file in "${critical_files[@]}"; do
+        if [[ "$file" == "$HOME/.gitconfig" ]]; then
+            # .gitconfig is a templated file, not a symlink
+            if [[ ! -f "$file" ]]; then
+                error "Git config file missing: $file"
+                ((failed_validations++))
+            elif [[ ! -r "$file" ]]; then
+                error "Git config file not readable: $file"
+                ((failed_validations++))
+            fi
+        else
+            # All other files should be symlinks
+            if [[ ! -L "$file" ]]; then
+                error "Critical symlink missing: $file"
+                ((failed_validations++))
+            else
+                # Validate symlink target exists and is readable
+                if [[ ! -r "$file" ]]; then
+                    error "Symlink target not readable: $file -> $(readlink "$file")"
+                    ((failed_validations++))
+                fi
+            fi
+        fi
+    done
+    
+    # Check shell configuration loading
+    if [[ -f "$HOME/.bashrc" ]]; then
+        if ! grep -q "DOTFILES_DIR" "$HOME/.bashrc"; then
+            warn "Dotfiles integration may not be working in .bashrc - DOTFILES_DIR not found"
+        fi
+    fi
+    
+    
+    if [[ $failed_validations -eq 0 ]]; then
+        success "Installation validation passed"
+        return 0
+    else
+        error "Installation validation failed ($failed_validations issues)"
+        return 1
+    fi
+}
+
+# =============================================================================
+# WSL Functions (from wsl.sh)
+# =============================================================================
+
+# Check if running on WSL
+is_wsl() {
+    [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || [[ -n "${WSL_DISTRO_NAME:-}" ]]
+}
+
+# Get Windows username for WSL operations
+get_windows_username() {
+    if is_wsl; then
+        # Use cmd.exe to get Windows username - simple and reliable
+        local win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
+        
+        # Validate it's not empty or a system account
+        if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
+            # Fallback to current user
+            win_user="$USER"
+        fi
+        
+        echo "$win_user"
+    fi
 }
 
 # Setup WSL clipboard integration  
@@ -299,26 +299,63 @@ import_windows_ssh_keys() {
     success "SSH key import completed"
 }
 
-# Setup NPM global directory (consolidated function)
-setup_npm_global() {
-    if ! command_exists npm; then
-        return 0
+# =============================================================================
+# Backup Functions (from backup.sh)
+# =============================================================================
+
+# Backup directory within the repository
+if [[ -z "${DOTFILES_BACKUP_PREFIX:-}" ]]; then
+    readonly DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
+fi
+
+# Create backup directory with timestamp
+create_backup_dir() {
+    # Ensure .backups directory exists
+    mkdir -p "$DOTFILES_BACKUP_PREFIX"
+    
+    local backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$backup_dir"
+    echo "$backup_dir"
+}
+
+# Backup a single file
+backup_file() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        # Ensure .backups directory exists
+        mkdir -p "$DOTFILES_BACKUP_PREFIX"
+        
+        local filename=$(basename "$file")
+        local backup="$DOTFILES_BACKUP_PREFIX/${filename}.backup-$(date +%Y%m%d-%H%M%S)"
+        cp "$file" "$backup"
+        log "Backed up: $file -> $backup"
+    fi
+}
+
+# Create symlink with backup
+safe_symlink() {
+    local source="$1"
+    local target="$2"
+    local backup_dir="$3"
+    
+    # Check if source exists
+    if [[ ! -e "$source" ]]; then
+        error "Source file does not exist: $source"
+        return 1
     fi
     
-    log "Setting up NPM global directory..."
-    
-    local npm_global_dir="$HOME/.npm-global"
-    mkdir -p "$npm_global_dir"
-    
-    # Configure npm to use our global directory
-    npm config set prefix "$npm_global_dir"
-    
-    # Add to PATH if not already there
-    if [[ ":$PATH:" != *":$npm_global_dir/bin:"* ]]; then
-        export PATH="$npm_global_dir/bin:$PATH"
+    # If target exists and is not a symlink, back it up
+    if [[ -e "$target" && ! -L "$target" ]]; then
+        log "Backing up existing $target"
+        mv "$target" "$backup_dir/"
+    elif [[ -L "$target" ]]; then
+        # Remove existing symlink
+        rm "$target"
     fi
     
-    success "NPM global directory configured: $npm_global_dir"
+    # Create the symlink
+    ln -s "$source" "$target"
+    success "Linked $source -> $target"
 }
 
 # Cleanup old backups (keep most recent N backups)
@@ -342,83 +379,5 @@ cleanup_old_backups() {
     fi
 }
 
-# Validation functions
-validate_prerequisites() {
-    log "Validating prerequisites..."
-    
-    # Check for required commands
-    local required_commands=("curl" "wget" "git")
-    for cmd in "${required_commands[@]}"; do
-        if ! command_exists "$cmd"; then
-            error "Required command not found: $cmd"
-            exit 1
-        fi
-    done
-    
-    # Check bash version
-    if [[ ${BASH_VERSION%%.*} -lt 4 ]]; then
-        error "Bash 4.0+ required (found: $BASH_VERSION)"
-        exit 1
-    fi
-    
-    # Check available disk space (need at least 100MB)
-    local available_kb=$(df "$HOME" | awk 'NR==2 {print $4}')
-    local required_kb=102400  # 100MB
-    
-    if [[ $available_kb -lt $required_kb ]]; then
-        error "Insufficient disk space. Need 100MB, have $(($available_kb/1024))MB"
-        exit 1
-    fi
-    
-    success "Prerequisites validated"
-}
-
-# Post-installation validation
-validate_installation() {
-    log "Validating installation..."
-    
-    local failed_validations=0
-    
-    # Check critical files (some are symlinks, .gitconfig is templated)
-    local critical_files=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.config/nvim/init.vim" "$HOME/.gitconfig")
-    for file in "${critical_files[@]}"; do
-        if [[ "$file" == "$HOME/.gitconfig" ]]; then
-            # .gitconfig is a templated file, not a symlink
-            if [[ ! -f "$file" ]]; then
-                error "Git config file missing: $file"
-                ((failed_validations++))
-            elif [[ ! -r "$file" ]]; then
-                error "Git config file not readable: $file"
-                ((failed_validations++))
-            fi
-        else
-            # All other files should be symlinks
-            if [[ ! -L "$file" ]]; then
-                error "Critical symlink missing: $file"
-                ((failed_validations++))
-            else
-                # Validate symlink target exists and is readable
-                if [[ ! -r "$file" ]]; then
-                    error "Symlink target not readable: $file -> $(readlink "$file")"
-                    ((failed_validations++))
-                fi
-            fi
-        fi
-    done
-    
-    # Check shell configuration loading
-    if [[ -f "$HOME/.bashrc" ]]; then
-        if ! grep -q "DOTFILES_DIR" "$HOME/.bashrc"; then
-            warn "Dotfiles integration may not be working in .bashrc - DOTFILES_DIR not found"
-        fi
-    fi
-    
-    
-    if [[ $failed_validations -eq 0 ]]; then
-        success "Installation validation passed"
-        return 0
-    else
-        error "Installation validation failed ($failed_validations issues)"
-        return 1
-    fi
-}
+# Export commonly used functions
+export -f is_wsl get_windows_username

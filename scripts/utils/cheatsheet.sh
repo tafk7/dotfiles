@@ -6,7 +6,8 @@ set -e
 
 # Source core functions for colors
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
+# Navigate up two directories since we're now in scripts/utils/
+DOTFILES_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 source "$DOTFILES_DIR/lib/core.sh"
 
 # Terminal width detection
@@ -116,15 +117,28 @@ show_shell() {
     print_separator
     format_line "bat  Better cat     untar Extract      reload   Reload    h      History"
     format_line "fd   Find files     tarc  Create tar   themes   List      hgrep  Search hist"
-    format_line "rg   Ripgrep                           theme-switch       count  Count files"
+    format_line "rg   Ripgrep        fr    Find/replace theme-switch       count  Count files"
     format_line "vim  Neovim                            update-configs     "
     echo
     echo "    Tmux Shortcuts      Safer Commands     Quick Actions"
     print_separator
-    format_line "tm   New session    rmf  Force remove  psmem  Sort by RAM"
+    format_line "tm   New session    rmff Force remove  psmem  Sort by RAM"
     format_line "ta   Attach         rmi  Interactive   pscpu  Sort by CPU"
     format_line "tl   List sessions  cpv  Verbose copy  ducks  Large files"
     format_line "tk   Kill session   rmv  Verbose rm    md     View markdown"
+}
+
+# Show development tools
+show_dev() {
+    print_header "DEVELOPMENT SHORTCUTS"
+    echo "    Python              Node.js            Docker             General"
+    print_separator
+    format_line "py   Python3        ni   npm install   dps  List          vimvim Real vim"
+    format_line "venv Create venv    nr   npm run      di   Images        vivim  Real vi"
+    format_line "activate Activate   nrd  npm run dev  dc   Compose       fr     Find/replace"
+    format_line "pytest Run tests    nrb  npm run build dcu  Up           "
+    format_line "fmt  Black format   nrt  npm run test  dcd  Down         "
+    format_line "lint Ruff check     nclean Reinstall   dprune Clean       "
 }
 
 # Show all cheatsheets
@@ -133,6 +147,7 @@ show_all() {
     show_tmux
     show_git
     show_shell
+    show_dev
 }
 
 # Main function
@@ -150,11 +165,14 @@ main() {
         shell)
             show_shell
             ;;
+        dev)
+            show_dev
+            ;;
         all|"")
             show_all
             ;;
         *)
-            echo "Usage: cheat [vim|tmux|git|shell|all]"
+            echo "Usage: cheat [vim|tmux|git|shell|dev|all]"
             echo "Show keybindings and shortcuts for dotfiles tools"
             exit 1
             ;;
