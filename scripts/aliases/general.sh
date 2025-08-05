@@ -123,9 +123,9 @@ alias update-configs-force='$DOTFILES_DIR/scripts/update-configs.sh --force'
 alias update-claude-commands='$DOTFILES_DIR/scripts/update-claude-commands.sh'
 
 # Find and replace utility
-alias fr='$DOTFILES_DIR/scripts/fr.sh'
-alias find-replace='$DOTFILES_DIR/scripts/fr.sh'
+alias fr='$DOTFILES_DIR/scripts/utils/fr.sh'
+alias find-replace='$DOTFILES_DIR/scripts/utils/fr.sh'
 
 # Cheatsheet for keybindings
-alias cheat='$DOTFILES_DIR/scripts/cheatsheet.sh'
+alias cheat='$DOTFILES_DIR/scripts/utils/cheatsheet.sh'
 alias shortcuts='cheat'  # Alternative alias

@@ -50,7 +50,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Development Commands
 ```bash
 # Find and replace utility
-./scripts/fr.sh
+./scripts/utils/fr.sh
 
 # Reload shell configuration
 reload

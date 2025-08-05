@@ -1,11 +1,10 @@
 #!/bin/bash
 # Simplified Dotfiles Installation Script
-# Ubuntu-only support, human-readable, well-engineered
-# Usage: ./install.sh [--work] [--personal] [--force] [--help]
+# Clean, direct installation without complexity theater
 
-set -e
+set -euo pipefail
 
-# Get script directory
+# Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load simplified modules
@@ -15,13 +14,30 @@ source "$SCRIPT_DIR/lib/packages.sh"
 # Configuration
 CONFIGS_DIR="$SCRIPT_DIR/configs"
 DOTFILES_DIR="$SCRIPT_DIR"
-export DOTFILES_DIR
 
-# Command line flags
+# Installation options
 INSTALL_WORK=false
 INSTALL_PERSONAL=false
 FORCE_OVERWRITE=false
 SHOW_HELP=false
+
+# Configuration mappings using associative array
+declare -A CONFIG_MAP=(
+    # Simple symlinks
+    [bashrc]="$HOME/.bashrc:symlink"
+    [zshrc]="$HOME/.zshrc:symlink"
+    [zshrc.minimal]="$HOME/.zshrc.minimal:symlink"
+    [profile]="$HOME/.profile:symlink"
+    [tmux.conf]="$HOME/.tmux.conf:symlink"
+    [editorconfig]="$HOME/.editorconfig:symlink"
+    [ripgreprc]="$HOME/.ripgreprc:symlink"
+    [init.vim]="$HOME/.config/nvim/init.vim:symlink"
+    [config/bat]="$HOME/.config/bat:directory"
+    [config/fd]="$HOME/.config/fd:directory"
+    
+    # Special handling
+    [gitconfig]="$HOME/.gitconfig:template"
+)
 
 # Parse command line arguments
 parse_arguments() {
@@ -61,9 +77,9 @@ USAGE:
     ./install.sh [OPTIONS]
 
 OPTIONS:
-    --work          Install professional development tools (includes Azure CLI)
+    --work          Install professional development tools
     --personal      Install personal/media tools  
-    --force         (Legacy option - configs are always safely backed up)
+    --force         Force overwrite existing configs
     --help          Show this help message
 
 EXAMPLES:
@@ -72,249 +88,180 @@ EXAMPLES:
     ./install.sh --work --personal  # Install everything
 
 The script will:
-1. Install essential packages (always)
-2. Install Docker (always)
-3. Install work tools if --work specified (includes Azure CLI)
-4. Install personal tools if --personal specified
-5. Create symlinks for all configuration files
-6. Setup WSL integration if running on WSL
+1. Install essential packages (git, curl, zsh, neovim, etc.)
+2. Install work tools if --work specified (Docker, Node.js, Azure CLI)
+3. Install personal tools if --personal specified (ffmpeg, yt-dlp)
+4. Create symlinks for all configuration files
+5. Setup WSL integration if running on WSL
+
+For Zsh customization (Oh My Zsh, themes, plugins), run:
+    ./scripts/setup-zsh-environment.sh
 
 All configuration files are backed up before being replaced.
 EOF
 }
 
-# Create configuration symlinks
-create_config_symlinks() {
-    log "Creating configuration symlinks..."
-    
-    # Validate configs directory exists
-    if [[ ! -d "$CONFIGS_DIR" ]]; then
-        error "Configs directory not found: $CONFIGS_DIR"
-        error "Expected to find config files in this directory"
-        return 1
-    fi
-    
-    local backup_dir
-    if ! backup_dir=$(create_backup_dir); then
-        error "Failed to create backup directory"
-        return 1
-    fi
-    log "Using backup directory: $backup_dir"
-    
-    # Configuration files mapping: source_name:target_name
-    local config_mappings=(
-        "bashrc:.bashrc"
-        "zshrc:.zshrc"
-        "init.vim:.config/nvim/init.vim"
-        "tmux.conf:.tmux.conf"
-        "gitconfig:.gitconfig"
-        "editorconfig:.editorconfig"
-        "profile:.profile"
-        "ripgreprc:.ripgreprc"
-    )
-    
-    # Create neovim config directory if needed
-    mkdir -p "$HOME/.config/nvim"
-    
-    # Handle regular config files
-    for mapping in "${config_mappings[@]}"; do
-        local source_name="${mapping%:*}"
-        local target_name="${mapping#*:}"
-        local source="$CONFIGS_DIR/$source_name"
-        local target="$HOME/$target_name"
-        
-        if [[ -f "$source" ]]; then
-            if [[ "$source_name" == "gitconfig" ]]; then
-                # Special handling for git config template
-                process_git_config "$source" "$target" "$backup_dir"
-            elif [[ "$source_name" == "bashrc" ]]; then
-                # Special handling for bashrc - source instead of symlink
-                local bashrc_source="source \"$source\""
-                
-                # Create .bashrc if it doesn't exist
-                touch "$target"
-                
-                # Check if already sourcing our bashrc
-                if ! grep -Fq "$bashrc_source" "$target"; then
-                    # Backup existing bashrc
-                    if [[ -s "$target" ]]; then
-                        cp "$target" "$backup_dir/.bashrc"
-                        log "Backed up existing .bashrc"
-                    fi
-                    
-                    # Add source line
-                    echo "" >> "$target"
-                    echo "# Dotfiles bashrc integration" >> "$target"
-                    echo "$bashrc_source" >> "$target"
-                    success "Added dotfiles bashrc to ~/.bashrc"
-                else
-                    log "Dotfiles bashrc already sourced in ~/.bashrc"
-                fi
-            else
-                safe_symlink "$source" "$target" "$backup_dir"
-            fi
-        else
-            warn "Config file not found: $source"
-        fi
-    done
-    
-    # Handle config subdirectories (not the entire .config)
-    # Symlink specific subdirectories from configs/config/
-    local config_subdirs=(
-        "config/bat:.config/bat"
-        "config/fd:.config/fd"
-    )
-    
-    for mapping in "${config_subdirs[@]}"; do
-        local source_name="${mapping%:*}"
-        local target_name="${mapping#*:}"
-        local source="$CONFIGS_DIR/$source_name"
-        local target="$HOME/$target_name"
-        
-        # Create parent directory if needed
-        local target_parent=$(dirname "$target")
-        mkdir -p "$target_parent"
-        
-        if [[ -d "$source" ]]; then
-            safe_symlink "$source" "$target" "$backup_dir"
-        else
-            warn "Config subdirectory not found: $source"
-        fi
-    done
-    
-    # Add DOTFILES_DIR to shell configs for runtime
-    log "Setting DOTFILES_DIR in shell configurations..."
-    
-    # For bashrc, DOTFILES_DIR will be auto-detected from the sourced file
-    # For zshrc, we still need to add it if using symlink
-    if [[ -L "$HOME/.zshrc" ]]; then
-        local actual_config="$(readlink -f "$HOME/.zshrc")"
-        if [[ -f "$actual_config" ]]; then
-            # Check if DOTFILES_DIR is already set in the file
-            if ! grep -q "^export DOTFILES_DIR=" "$actual_config"; then
-                # Add DOTFILES_DIR export at the beginning of the file
-                local temp_file=$(mktemp)
-                echo "# Set DOTFILES_DIR for this installation" > "$temp_file"
-                echo "export DOTFILES_DIR=\"$DOTFILES_DIR\"" >> "$temp_file"
-                echo "" >> "$temp_file"
-                cat "$actual_config" >> "$temp_file"
-                mv "$temp_file" "$actual_config"
-                success "Added DOTFILES_DIR to .zshrc"
-            else
-                log "DOTFILES_DIR already set in .zshrc"
-            fi
-        fi
-    fi
-    
-    success "Configuration symlinks created"
-}
 
-# Setup shell integration
-setup_shell_integration() {
-    log "Setting up shell integration..."
+# Phase 0: Prerequisites
+phase_prerequisites() {
+    log "Checking prerequisites..."
     
-    # Ensure aliases and functions are sourced
-    local shell_dirs=("$DOTFILES_DIR/scripts/aliases" "$DOTFILES_DIR/scripts/functions")
-    
-    for dir in "${shell_dirs[@]}"; do
-        if [[ -d "$dir" ]]; then
-            for script in "$dir"/*.sh; do
-                # Skip if glob doesn't match any files
-                [[ -f "$script" ]] || continue
-                log "Shell script available: $(basename "$script")"
-            done
-        fi
-    done
-    
-    success "Shell integration configured (restart shell to activate)"
-}
-
-# Validate required functions are available
-validate_required_functions() {
-    local required_functions=(
-        "validate_prerequisites" "detect_environment" "install_base_packages"
-        "install_work_packages" "install_personal_packages" "setup_zsh_environment"
-        "create_backup_dir" "safe_symlink" "process_git_config"
-        "setup_wsl_clipboard" "import_windows_ssh_keys" "setup_npm_global"
-        "validate_installation"
-    )
-    
-    local missing_functions=()
-    for func in "${required_functions[@]}"; do
-        if ! declare -f "$func" >/dev/null 2>&1; then
-            missing_functions+=("$func")
-        fi
-    done
-    
-    if [[ ${#missing_functions[@]} -gt 0 ]]; then
-        error "Missing required functions: ${missing_functions[*]}"
-        error "Please check lib/core.sh and lib/packages.sh are complete"
+    # Check Ubuntu
+    if ! command -v lsb_release >/dev/null 2>&1; then
+        error "This script requires Ubuntu"
         exit 1
     fi
+    
+    # Check basic tools that should exist
+    for cmd in curl wget git; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            error "Required command not found: $cmd"
+            exit 1
+        fi
+    done
+    
+    detect_environment
+}
+
+# Phase 1: Package Installation
+phase_packages() {
+    log "Phase 1: Package Installation"
+    
+    install_base_packages
+    [[ "$INSTALL_WORK" == "true" ]] && install_work_packages
+    [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
+    
+    success "Package installation phase complete"
+}
+
+# Phase 2: Configuration
+phase_configuration() {
+    log "Phase 2: Configuration"
+    
+    # Create backup directory
+    local backup_dir
+    backup_dir=$(create_backup_dir)
+    log "Backup directory: $backup_dir"
+    
+    # Process each configuration
+    for config in "${!CONFIG_MAP[@]}"; do
+        local mapping="${CONFIG_MAP[$config]}"
+        local target="${mapping%%:*}"
+        local type="${mapping##*:}"
+        local source="$CONFIGS_DIR/$config"
+        
+        case "$type" in
+            symlink)
+                process_symlink "$source" "$target" "$backup_dir"
+                ;;
+            directory)
+                process_directory "$source" "$target" "$backup_dir"
+                ;;
+            template)
+                process_template "$source" "$target" "$backup_dir"
+                ;;
+            *)
+                error "Unknown config type: $type for $config"
+                ;;
+        esac
+    done
+    
+    success "Configuration phase complete"
+}
+
+# Process symlink configuration
+process_symlink() {
+    local source="$1" target="$2" backup_dir="$3"
+    
+    # Create parent directory if needed
+    local parent_dir="$(dirname "$target")"
+    if [[ ! -d "$parent_dir" ]]; then
+        mkdir -p "$parent_dir"
+    fi
+    
+    safe_symlink "$source" "$target" "$backup_dir"
+}
+
+# Process directory configuration
+process_directory() {
+    local source="$1" target="$2" backup_dir="$3"
+    process_symlink "$source" "$target" "$backup_dir"
+}
+
+# Process template configuration
+process_template() {
+    local source="$1" target="$2" backup_dir="$3"
+    
+    process_git_config "$source" "$target" "$backup_dir"
+}
+
+# Phase 3: Shell Integration
+phase_shell_integration() {
+    log "Phase 3: Shell Integration"
+    
+    # Setup FZF integration
+    if command -v fzf >/dev/null 2>&1; then
+        local fzf_base="/usr/share/doc/fzf/examples"
+        if [[ -d "$fzf_base" ]]; then
+            log "FZF integration files found at $fzf_base"
+        else
+            warn "FZF installed but integration files not found"
+        fi
+    fi
+    
+    success "Shell integration phase complete"
+}
+
+# Phase 4: WSL Setup
+phase_wsl_setup() {
+    if [[ "$IS_WSL" != "true" ]]; then
+        log "Phase 4: WSL Setup - Skipped (not running on WSL)"
+        return 0
+    fi
+    
+    log "Phase 4: WSL Setup"
+    
+    setup_wsl_clipboard
+    import_windows_ssh_keys
+    
+    success "WSL setup phase complete"
+}
+
+# Phase 5: Final Setup
+phase_final_setup() {
+    log "Phase 5: Final Setup"
+    
+    setup_npm_global
+    
+    # Run minimal validation checks
+    log "Running setup checks..."
+    "$SCRIPT_DIR/scripts/check-setup.sh"
+    
+    cleanup_old_backups 5
+    
+    success "Final setup phase complete"
 }
 
 # Main installation workflow
 run_installation() {
-    # Phase 0: Function Validation
-    validate_required_functions
-    
-    # Phase 1: Validation
-    validate_prerequisites
-    detect_environment
-    
-    # Phase 2: Package Installation
-    install_base_packages
-    
-    if [[ "$INSTALL_WORK" == "true" ]]; then
-        install_work_packages
-    fi
-    
-    if [[ "$INSTALL_PERSONAL" == "true" ]]; then
-        install_personal_packages
-    fi
-    
-    # Phase 3: Shell Environment Setup
-    setup_zsh_environment
-    
-    # Phase 4: Configuration
-    create_config_symlinks
-    setup_shell_integration
-    
-    # Phase 5: WSL Setup (if applicable)
-    if [[ "$IS_WSL" == "true" ]]; then
-        setup_wsl_clipboard
-        import_windows_ssh_keys
-    fi
-    
-    # Phase 6: Final Setup
-    setup_npm_global
-    
-    # Phase 7: Validation
-    validate_installation
-    
-    # Phase 8: Cleanup old backups
-    cleanup_old_backups 5  # Keep only last 5 backups
+    phase_prerequisites
+    phase_packages
+    phase_configuration
+    phase_shell_integration
+    phase_wsl_setup
+    phase_final_setup
     
     # Success message
     echo
-    success "🎉 Dotfiles installation completed successfully!"
+    success "🎉 Dotfiles installation complete!"
     echo
-    log "Next steps:"
-    log "  1. To use Zsh: chsh -s $(which zsh) && exec zsh"
-    log "  2. Configure Powerlevel10k: p10k configure"
-    log "  3. Or stay with Bash: source ~/.bashrc"
-    log "  4. Run 'reload' command to refresh your environment"
-    if [[ "$INSTALL_WORK" == "true" ]]; then
-        log "  5. Login to Azure: az login"
-    fi
-    if [[ "$IS_WSL" == "true" ]]; then
-        log "  6. SSH keys imported from Windows"
-        log "  7. Clipboard integration (pbcopy/pbpaste) ready"
-    fi
-    echo
+    echo "Next steps:"
+    echo "1. Restart your shell or run: source ~/.bashrc"
+    echo "2. For Zsh customization, run: ./scripts/setup-zsh-environment.sh"
+    [[ "$IS_WSL" == "true" ]] && echo "3. Log out and back in for Docker group changes"
 }
 
-# Main function
+# Main entry point
 main() {
     # Parse command line arguments
     parse_arguments "$@"

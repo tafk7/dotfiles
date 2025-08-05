@@ -38,6 +38,7 @@ Arete.
 - **Complexity Theater**: Over-engineering simple problems
 - **Progress Fakery**: Fake tests, wishful docs, vanity metrics
 - **Perfectionism Paralysis**: Endless polishing without shipping
+- **Defensive Programming**: Handling failures that aren't your responsibility
 
 ## The Arete Paradox
 
