@@ -2,97 +2,154 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Essential Commands
+## Commands
 
-### Installation & Setup
+### Installation and Setup
 ```bash
-# Base installation (essential tools only)
+# Base installation (essential tools + Docker)
 ./install.sh
 
-# Full installation with work/personal tools
-./install.sh --work --personal
+# Add work tools (Azure CLI, Node.js/Python dev tools)
+./install.sh --work
 
-# Update configurations without reinstalling packages
+# Add personal tools (media applications)
+./install.sh --personal
+
+# Force mode for existing installations (backup and replace)
+./install.sh --force
+
+# Update configuration files after changes
 ./scripts/update-configs.sh
 ```
 
-### Validation & Testing
+### Validation and Testing
 ```bash
-# Validate installation
-./scripts/validate-install.sh --verbose
+# Validate installation completeness
+./scripts/validate-install.sh
 
-# Fix common issues automatically
+# Validate with work/personal packages
+./scripts/validate-install.sh --work --personal
+
+# Fix mode - attempt to repair issues
 ./scripts/validate-install.sh --fix
 
-# Check specific category
+# Validate specific category
 ./scripts/validate-install.sh --category docker
+```
+
+### Theme Management
+```bash
+# Interactive theme switcher
+./scripts/theme-switcher.sh
+
+# Direct theme switch
+./scripts/theme-switcher.sh nord
+./scripts/theme-switcher.sh tokyo-night
 ```
 
 ### Development Commands
 ```bash
+# Find and replace utility
+./scripts/fr.sh
+
 # Reload shell configuration
 reload
 
-# Switch themes interactively
-./scripts/theme-switcher.sh
+# Search processes
+psg <name>
 
-# List available themes
-themes
+# View markdown with syntax highlighting
+md <file>
 ```
 
-## High-Level Architecture
+## Architecture
 
-This is a **Ubuntu-focused dotfiles repository** designed with the Arete philosophy: pursuing code in its highest form where every line serves its purpose with crystalline clarity.
+This is a simplified Ubuntu dotfiles system with a 3-file core architecture:
 
-### Core Design Principles
-- **Ubuntu-only**: No cross-platform complexity (70% code reduction from original)
-- **Human-readable**: Any developer can understand in 20 minutes
-- **Security-first**: HTTPS downloads, checksum verification, fail-safe operations
-- **Non-destructive**: Automatic backups before any changes
-- **Modular**: Clear separation between core utilities, packages, and validation
+### Core Libraries
+- **lib/core.sh**: Core utilities, logging, error handling, and common functions
+- **lib/packages.sh**: Package definitions and installation functions
+- **lib/validation.sh**: Validation framework for testing installations
+
+### Key Principles
+1. **Ubuntu-only**: No cross-platform complexity, focused on Ubuntu/WSL
+2. **Visible configs**: All configurations in `configs/` without leading dots
+3. **Non-destructive**: Automatic backups before any changes
+4. **Modular structure**: Clear separation between scripts, configs, and libraries
 
 ### Directory Structure
-- `install.sh` - Main entry point, orchestrates installation
-- `lib/` - Core functionality (core.sh, packages.sh, validation.sh)
-- `configs/` - Visible config files without leading dots for easy discovery
-- `scripts/` - Utilities for theme switching, config updates, validation
-- `artifacts/` - Temporary development work before promotion to production
+```
+dotfiles/
+├── configs/           # Visible configuration files (symlinked to hidden locations)
+│   ├── themes/       # 5 pre-configured color themes
+│   └── config/       # Additional config directories
+├── scripts/
+│   ├── aliases/      # Shell aliases by category (docker, git, general, wsl, claude)
+│   ├── functions/    # Shared shell functions
+│   └── env/         # Environment variables
+├── lib/              # Core libraries (3-file architecture)
+└── ai/              # AI integration with Arete framework
+```
 
-### Key Architectural Decisions
-1. **Symlink Management**: All configs are symlinked from `configs/` to home directory with automatic backup
-2. **Package Sets**: Base (essential), Work (dev tools), Personal (media) - clearly separated
-3. **Validation System**: Pre/post installation checks with repair capabilities
-4. **Theme System**: 5 pre-configured themes with hot-swappable configuration
-5. **WSL Integration**: Automatic detection and setup for Windows Subsystem for Linux
+### Configuration Mappings
+Configs are symlinked from visible to hidden locations:
+- `configs/bashrc` → `~/.bashrc`
+- `configs/zshrc` → `~/.zshrc`
+- `configs/init.vim` → `~/.config/nvim/init.vim`
+- `configs/gitconfig` → `~/.gitconfig` (templated with user details)
 
-### Development Workflow
-The repository follows the artifacts pattern (`ai/workflow.md`):
-- Experimental work in `artifacts/`
-- Production code in appropriate directories
-- Temporal naming: `YYMMDD_HHMM_description.ext`
-- Issue tracking: `artifacts/issues/TODO-YYMM-NNN_description.md`
+## AI Integration - The Arete Framework
 
-## Project Edicts
+This repository implements the Arete framework for AI-assisted development. Key concepts:
 
-1. **Simplicity Over Features**: If a feature adds complexity without clear benefit, it doesn't belong
-2. **Ubuntu-Only**: No macOS, no Fedora, no Arch - just Ubuntu/Debian
-3. **Visible Configs**: Store configs without leading dots in `configs/` directory
-4. **Fail-Safe Operations**: Every destructive operation must have a backup
-5. **Human-Readable Code**: Avoid clever bash tricks that sacrifice clarity
+### Philosophy
+- **Arete** (ἀρετή): Code in its highest form with crystalline clarity
+- **Clara**: The AI persona (Claude + Arete) pursuing code excellence
+- **Prime Directives**: Code quality is sacred, truth over comfort, simplicity is divine
 
-## Quality Metrics
+### Available Commands
+The framework provides 20 slash commands in `ai/commands/`:
+- `/arete`, `/context`, `/explain` - Analysis and understanding
+- `/architect`, `/refine`, `/checklist` - Design and architecture
+- `/implement`, `/ship`, `/explore` - Implementation modes
+- `/git:commit`, `/git:diff` - Git operations
+- `/_artifacts/*` - Project artifact management
 
-- Installation must complete in under 2 minutes (excluding package downloads)
-- Validation script must detect 100% of missing dependencies
-- All shell scripts must pass shellcheck
-- Zero external dependencies for core functionality (only apt/snap packages)
+### Artifact Workflow
+The `_artifacts/` directory is used for experimental work:
+- `devlog.md` - Progress tracking (append only, reverse chronological)
+- `issues/` - TODO tracking with `TODO-YYMM-NNN` format
+- Status prefixes: `READY_` (production-ready), `BLOCKED_` (dependencies)
 
-## Common Development Tasks
+## Development Patterns
 
-When modifying this repository:
-1. Always run `./scripts/validate-install.sh` after changes
-2. Test installation in a fresh Ubuntu container: `docker run -it ubuntu:latest`
-3. Update `scripts/aliases/` or `scripts/functions/` for new shell utilities
-4. Follow the Arete philosophy - delete more than you add
+### Adding Packages
+Edit arrays in `lib/packages.sh`:
+- `base_packages` - Essential tools
+- `personal_packages` - Media tools
+- `install_work_packages()` - Professional tools
 
-Remember: This is a dotfiles repository that values clarity, simplicity, and reliability above all else.
+### Adding Configurations
+1. Create file in `configs/` without leading dot
+2. Add to `config_mappings` array in `install.sh`
+3. System automatically creates symlinks
+
+### Shell Customization
+- Add `.sh` files to `scripts/aliases/` for new aliases
+- Add `.sh` files to `scripts/functions/` for new functions
+- Files are automatically sourced on shell startup
+
+### WSL Integration
+When running in WSL, additional features are enabled:
+- Clipboard integration (`pbcopy`/`pbpaste`)
+- SSH key import from Windows (`sync-ssh`)
+- Windows username detection
+- WSL-specific packages (socat, wslu)
+
+## Important Notes
+
+1. **Theme System**: Always run `./scripts/update-configs.sh` after theme changes to ensure proper configuration
+2. **Git Config**: The `.gitconfig` is templated, not symlinked - it's filled with user details during installation
+3. **Validation**: Use `./scripts/validate-install.sh` to verify installation completeness
+4. **Backups**: Original files are backed up to `~/.dotfiles_backup_YYYYMMDD_HHMMSS/`
+5. **Docker**: Included in base installation with proper group setup
