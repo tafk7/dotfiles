@@ -20,7 +20,10 @@ shopt -s histappend                # Append to history, don't overwrite
 shopt -s checkwinsize              # Check window size after each command
 shopt -s cdspell                   # Correct minor spelling errors in cd
 shopt -s dirspell                  # Correct spelling errors in directory names
-shopt -s autocd                    # Auto cd when typing directory name
+# autocd requires Bash 4.0+
+if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
+    shopt -s autocd                # Auto cd when typing directory name
+fi
 shopt -s globstar                  # Enable ** recursive globbing
 shopt -s nocaseglob               # Case-insensitive globbing
 shopt -s extglob                  # Extended globbing patterns
@@ -42,10 +45,11 @@ complete -cf man
 # History Configuration - Power User Setup
 # ==============================================================================
 
-# History settings
+# History settings (configurable for performance)
 HISTFILE=~/.bash_history
-HISTSIZE=50000
-HISTFILESIZE=100000
+# Allow users to reduce history for performance: export BASH_HIST_SIZE=10000
+HISTSIZE=${BASH_HIST_SIZE:-50000}
+HISTFILESIZE=$((HISTSIZE * 2))
 HISTCONTROL=ignoreboth:erasedups   # Ignore duplicates and lines starting with space
 HISTTIMEFORMAT="%F %T "            # Add timestamps to history
 HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"  # Ignore common commands
@@ -85,11 +89,15 @@ fi
 # Git Integration
 # ==============================================================================
 
-# Git-aware prompt function
+# Git-aware prompt function (disable with: export BASH_NO_GIT_PROMPT=1)
 git_prompt() {
+    # Skip if disabled or in large repos
+    [[ -n "$BASH_NO_GIT_PROMPT" ]] && return
+    
     local git_status git_branch
-    if git_branch=$(git symbolic-ref --short HEAD 2>/dev/null); then
-        git_status=$(git status --porcelain 2>/dev/null)
+    # Add timeout to prevent slowdowns in large repos
+    if git_branch=$(timeout 0.1s git symbolic-ref --short HEAD 2>/dev/null); then
+        git_status=$(timeout 0.2s git status --porcelain 2>/dev/null)
         if [[ -n $git_status ]]; then
             echo " ${PROMPT_COLOR_GIT_DIRTY}($git_branch*)${PROMPT_COLOR_RESET}"
         else
@@ -172,16 +180,16 @@ fi
 # Dotfiles Integration
 # ==============================================================================
 
-# Load dotfiles functions and aliases
+# Load dotfiles functions and aliases (with error handling)
 if [[ -d "$DOTFILES_DIR" ]]; then
     # Load functions
     for file in "$DOTFILES_DIR"/scripts/functions/*.sh; do
-        [[ -r "$file" ]] && source "$file"
+        [[ -r "$file" ]] && source "$file" 2>/dev/null || true
     done
 
     # Load aliases
     for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
-        [[ -r "$file" ]] && source "$file"
+        [[ -r "$file" ]] && source "$file" 2>/dev/null || true
     done
 fi
 
@@ -192,35 +200,24 @@ fi
 # Source local configuration if it exists (not tracked in git)
 [[ -f ~/.bashrc.local ]] && source ~/.bashrc.local
 
-# Welcome message (only for interactive shells)
-if [[ $- == *i* ]]; then
-    echo -e "${PROMPT_COLOR_SUCCESS}Bash ${BASH_VERSION%.*} loaded with power user configuration${PROMPT_COLOR_RESET}"
-    if command -v git >/dev/null 2>&1; then
-        echo -e "${PROMPT_COLOR_USER}Git: $(git --version | cut -d' ' -f3)${PROMPT_COLOR_RESET}"
-    fi
-    if [[ -n "$DOTFILES_THEME" ]]; then
-        echo -e "${PROMPT_COLOR_HOST}Theme: $DOTFILES_THEME${PROMPT_COLOR_RESET}"
-    fi
-fi
-
 # FINN/Brainsmith parameters
 export NUM_DEFAULT_WORKERS=14
 export XILINXD_LICENSE_FILE=4400@10.1.0.4
 #/opt/Xilinx/licenses/Xilinx_brainSmith_dev0.lic
 
 # FINN paths
-export FINN_ROOT=/home/tafk/finn/
-export FINN_HOST_BUILD_DIR=/home/tafk/builds/finn
-export FINN_XILINX_PATH="/tools/Xilinx"
-export FINN_XILINX_VERSION="2024.2"
-export FINN_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
+# export FINN_ROOT=/home/tafk/finn/
+# export FINN_HOST_BUILD_DIR=/home/tafk/builds/finn
+# export FINN_XILINX_PATH="/tools/Xilinx"
+# export FINN_XILINX_VERSION="2024.2"
+# export FINN_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
 
 # Brainsmith paths
-export BSMITH_ROOT=/home/tafk/brainsmith/
-export BSMITH_BUILD_DIR=/home/tafk/builds/brainsmith
-export BSMITH_XILINX_PATH="/tools/Xilinx"
-export BSMITH_XILINX_VERSION="2024.2"
-export BSMITH_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
+# export BSMITH_ROOT=/home/tafk/brainsmith/
+# export BSMITH_BUILD_DIR=/home/tafk/builds/brainsmith
+# export BSMITH_XILINX_PATH="/tools/Xilinx"
+# export BSMITH_XILINX_VERSION="2024.2"
+# export BSMITH_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
 
-# Source Xilinx tools
-source /tools/Xilinx/Vivado/2024.2/settings64.sh
+# Source Xilinx tools (if available)
+[[ -f /tools/Xilinx/Vivado/2024.2/settings64.sh ]] && source /tools/Xilinx/Vivado/2024.2/settings64.sh

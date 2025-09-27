@@ -117,7 +117,6 @@ The framework provides 20 slash commands in `ai/commands/`:
 
 ### Artifact Workflow
 The `_artifacts/` directory is used for experimental work:
-- `devlog.md` - Progress tracking (append only, reverse chronological)
 - `issues/` - TODO tracking with `TODO-YYMM-NNN` format
 - Status prefixes: `READY_` (production-ready), `BLOCKED_` (dependencies)
 

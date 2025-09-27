@@ -14,5 +14,5 @@ Examine artifact files for outdated designs, superseded implementations, conflic
 
 <context>
 Target: $ARGUMENTS
-Always preserve: issues/, reference/, current devlog, BLOCKED_*, READY_*
+Always preserve: issues/, reference/, BLOCKED_*, READY_*
 </context>

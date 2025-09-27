@@ -130,7 +130,7 @@ Deliver working solution prioritizing speed over perfection.
 <approach>
 Get it working with minimal changes. Log technical debt as TODO issues. Use existing patterns, skip non-critical features, focus on core functionality.
 Priority: Working code now, quality improvements later.
-Output: Log to devlog. Create TODO-YYMM-NNN issues for cleanup.
+Output: Create TODO-YYMM-NNN issues for cleanup.
 </approach>
 
 <context>
