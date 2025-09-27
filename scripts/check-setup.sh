@@ -9,8 +9,9 @@ issues_found=0
 
 # 1. Check critical symlinks
 echo "Checking configuration files..."
-critical_configs=(~/.bashrc ~/.zshrc ~/.gitconfig)
-for config in "${critical_configs[@]}"; do
+# Note: .gitconfig is a template, not a symlink
+symlink_configs=(~/.bashrc ~/.zshrc ~/.tmux.conf)
+for config in "${symlink_configs[@]}"; do
     if [[ ! -e "$config" ]]; then
         echo "❌ Missing: $config"
         issues_found=1
@@ -20,6 +21,14 @@ for config in "${critical_configs[@]}"; do
         echo "⚠️  Not a symlink: $config (may be overwritten on next install)"
     fi
 done
+
+# Check gitconfig separately (it's a processed template, not a symlink)
+if [[ -f ~/.gitconfig ]]; then
+    echo "✅ Present: ~/.gitconfig (processed template)"
+else
+    echo "❌ Missing: ~/.gitconfig"
+    issues_found=1
+fi
 echo
 
 # 2. Docker group membership (silent permission failures)
@@ -59,6 +68,11 @@ if command -v npm >/dev/null 2>&1; then
         echo "✅ NPM prefix correctly set to ~/.npm-global"
     elif [[ "$prefix" == "/usr"* ]]; then
         echo "✅ NPM using system prefix: $prefix"
+    elif [[ "$prefix" =~ \\\\wsl\.localhost\\ ]] || [[ "$prefix" =~ ^\\\\\\\\wsl ]]; then
+        echo "❌ NPM has Windows-style WSL path: $prefix"
+        echo "   Fix: npm config set prefix ~/.npm-global"
+        echo "        export PATH=~/.npm-global/bin:\$PATH"
+        issues_found=1
     else
         echo "⚠️  NPM prefix is $prefix"
         echo "   This may cause permission issues when installing global packages"

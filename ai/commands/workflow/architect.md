@@ -13,7 +13,7 @@ Phase 1 - Analyze: Understand requirements and constraints
 Phase 2 - Design: Define 3-5 core components with clear responsibilities and interfaces
 Phase 3 - Document: Create architecture with diagrams and technology recommendations
 Priority: Simplicity and clarity over completeness
-Output: Create architecture document in _artifacts/designs/. Log design to devlog.
+Output: Create architecture document in _artifacts/designs/.
 </approach>
 
 <context>

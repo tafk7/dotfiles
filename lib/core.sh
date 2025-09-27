@@ -99,11 +99,26 @@ setup_npm_global() {
     
     log "Setting up NPM global directory..."
     
+    # Force Unix-style path on WSL
     local npm_global_dir="$HOME/.npm-global"
+    if [[ "$IS_WSL" == "true" ]]; then
+        # Ensure we use Linux path, not Windows path
+        npm_global_dir="$(cd ~ && pwd)/.npm-global"
+    fi
+    
     mkdir -p "$npm_global_dir"
     
     # Configure npm to use our global directory
     npm config set prefix "$npm_global_dir"
+    
+    # Verify the prefix was set correctly
+    local actual_prefix=$(npm config get prefix)
+    if [[ "$actual_prefix" =~ \\\\ ]]; then
+        warn "NPM prefix contains Windows path: $actual_prefix"
+        warn "Forcing Unix-style path..."
+        # Force set with explicit Unix path
+        npm config set prefix "$(cd ~ && pwd)/.npm-global"
+    fi
     
     # Add to PATH if not already there
     if [[ ":$PATH:" != *":$npm_global_dir/bin:"* ]]; then
