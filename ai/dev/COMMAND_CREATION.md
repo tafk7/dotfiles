@@ -139,7 +139,7 @@ Target: $ARGUMENTS
 ### 2. Verify Output
 - Check output location matches specification
 - Ensure temporal naming is correct
-- Verify devlog integration works
+- Verify artifact creation works
 
 ### 3. Integration Testing
 - Test alongside related commands
@@ -162,7 +162,7 @@ Output: Create analysis in _artifacts/analyses/
 ### Implementation Commands
 ```markdown
 <approach>
-[Direct approach to building]. Log progress to devlog. Create any needed artifacts.
+[Direct approach to building]. Create any needed artifacts.
 Priority: [Speed vs quality tradeoff]
 </approach>
 ```
