@@ -1,0 +1,189 @@
+" Minimal Neovim Configuration - Fast startup for quick edits
+" Optimized for terminal editing alongside VS Code
+
+" ==============================================================================
+" Core Settings
+" ==============================================================================
+
+" Essential settings only
+set number                      " Line numbers
+set relativenumber             " Relative line numbers
+set hidden                     " Allow hidden buffers
+set ignorecase                 " Case insensitive search
+set smartcase                  " But case sensitive when uppercase present
+set incsearch                  " Incremental search
+set hlsearch                   " Highlight search results
+set expandtab                  " Spaces instead of tabs
+set tabstop=4                  " Tab width
+set shiftwidth=4               " Indent width
+set autoindent                 " Auto indent new lines
+set clipboard=unnamedplus      " System clipboard
+set mouse=a                    " Mouse support
+set updatetime=300             " Faster completion
+set signcolumn=yes             " Always show sign column
+set termguicolors              " True color support
+set scrolloff=8                " Keep 8 lines above/below cursor
+set cursorline                 " Highlight current line
+set splitbelow splitright      " More natural splits
+set undofile                   " Persistent undo
+set undodir=~/.vim/undodir     " Undo directory
+
+" Performance
+set lazyredraw                 " Don't redraw during macros
+set synmaxcol=200              " Syntax highlight only first 200 cols
+
+" ==============================================================================
+" Minimal Plugin Manager
+" ==============================================================================
+
+" Auto-install vim-plug if not present
+let data_dir = has('nvim') ? stdpath('data') . '/site' : '~/.vim'
+if empty(glob(data_dir . '/autoload/plug.vim'))
+  silent execute '!curl -fLo '.data_dir.'/autoload/plug.vim --create-dirs  https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
+  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
+endif
+
+" ==============================================================================
+" Essential Plugins Only
+" ==============================================================================
+
+call plug#begin('~/.vim/plugged')
+
+" Text manipulation essentials
+Plug 'tpope/vim-surround'       " Surround text objects
+Plug 'tpope/vim-commentary'      " Comment with gc
+Plug 'tpope/vim-repeat'          " Repeat plugin commands
+
+" Git integration (minimal)
+Plug 'tpope/vim-fugitive'        " Git commands
+
+" Single colorscheme
+Plug 'nordtheme/vim'             " Nord theme
+
+call plug#end()
+
+" ==============================================================================
+" Color Scheme
+" ==============================================================================
+
+try
+  colorscheme nord
+catch
+  colorscheme slate
+endtry
+
+" ==============================================================================
+" Key Mappings
+" ==============================================================================
+
+" Leader key
+let mapleader = ","
+
+" Quick save/quit
+nnoremap <leader>w :w<CR>
+nnoremap <leader>q :q<CR>
+nnoremap <leader>x :x<CR>
+
+" Clear search highlighting
+nnoremap <leader><space> :nohlsearch<CR>
+
+" ==============================================================================
+" ESDF Navigation (Preserved)
+" ==============================================================================
+
+" Window navigation with Ctrl+ESDF
+nnoremap <C-e> <C-w>k
+nnoremap <C-s> <C-w>h
+nnoremap <C-d> <C-w>j
+nnoremap <C-f> <C-w>l
+
+" Tab navigation with Alt+A/G
+nnoremap <M-a> :tabprevious<CR>
+nnoremap <M-g> :tabnext<CR>
+
+" Half-page scrolling with Shift+Arrows (preserved from original)
+nnoremap <S-Up> <C-u>
+nnoremap <S-Down> <C-d>
+nnoremap <S-Left> zH
+nnoremap <S-Right> zL
+
+" ==============================================================================
+" Quick Git Commands
+" ==============================================================================
+
+nnoremap <leader>gs :Git<CR>
+nnoremap <leader>gd :Gdiffsplit<CR>
+nnoremap <leader>gb :Git blame<CR>
+
+" ==============================================================================
+" Better Defaults
+" ==============================================================================
+
+" Y to yank to end of line (like D and C)
+nnoremap Y y$
+
+" Keep cursor centered when searching
+nnoremap n nzzzv
+nnoremap N Nzzzv
+
+" Better join lines
+nnoremap J mzJ`z
+
+" Quick macro replay
+nnoremap Q @q
+
+" ==============================================================================
+" Minimal Status Line
+" ==============================================================================
+
+set statusline=
+set statusline+=%#PmenuSel#
+set statusline+=\ %f                     " Filename
+set statusline+=\ %m                     " Modified flag
+set statusline+=%=                       " Right align
+set statusline+=\ %y                     " File type
+set statusline+=\ %l:%c                  " Line:Column
+set statusline+=\ 
+
+" ==============================================================================
+" Auto Commands
+" ==============================================================================
+
+" Create undo directory if it doesn't exist
+if !isdirectory(expand('~/.vim/undodir'))
+  call mkdir(expand('~/.vim/undodir'), 'p')
+endif
+
+" Remove trailing whitespace on save
+autocmd BufWritePre * :%s/\s\+$//e
+
+" Return to last edit position
+autocmd BufReadPost *
+  \ if line("'\"") > 0 && line("'\"") <= line("$") |
+  \   exe "normal! g`\"" |
+  \ endif
+
+" ==============================================================================
+" Neovim Specific
+" ==============================================================================
+
+if has('nvim')
+  " Better terminal escape
+  tnoremap <Esc> <C-\><C-n>
+  
+  " Terminal navigation
+  tnoremap <C-e> <C-\><C-n><C-w>k
+  tnoremap <C-s> <C-\><C-n><C-w>h
+  tnoremap <C-d> <C-\><C-n><C-w>j
+  tnoremap <C-f> <C-\><C-n><C-w>l
+endif
+
+" ==============================================================================
+" Quick Settings
+" ==============================================================================
+
+" Toggle relative numbers
+nnoremap <leader>n :set relativenumber!<CR>
+
+" Toggle wrap
+nnoremap <leader>z :set wrap!<CR>

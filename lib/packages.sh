@@ -8,9 +8,13 @@ source "$LIB_DIR/core.sh"
 
 # Package definitions using associative array
 declare -A PACKAGES=(
-    [base]="build-essential curl wget git unzip zip jq software-properties-common zsh neovim bat fd-find ripgrep fzf python3-pip pipx openssh-client tmux"
+    [core]="git curl wget build-essential software-properties-common"
+    [development]="neovim tmux zsh openssh-client"
+    [modern]="bat fd-find ripgrep fzf"
+    [terminal]="glow lazygit httpie htop tree"
+    [languages]="python3-pip pipx"
     [wsl]="socat wslu"
-    [work]="azure-cli nodejs npm docker.io docker-compose-v2"
+    [docker]="docker.io docker-compose-v2"
     [personal]="ffmpeg yt-dlp"
 )
 
@@ -45,7 +49,12 @@ update_packages() {
 # Install base packages
 install_base_packages() {
     update_packages
-    install_package_set "base"
+    
+    # Install in logical order
+    install_package_set "core"        # Absolute essentials
+    install_package_set "development" # Dev tools
+    install_package_set "modern"      # Modern CLI replacements
+    install_package_set "languages"   # Language support
     
     # Create command aliases for renamed packages
     if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
@@ -55,8 +64,7 @@ install_base_packages() {
         safe_sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
     fi
     
-    # Setup NPM global directory
-    setup_npm_global
+    # Note: npm setup moved to install_node_and_npm()
 }
 
 # Install WSL-specific packages
@@ -65,17 +73,35 @@ install_wsl_packages() {
     install_package_set "wsl"
 }
 
-# Install work packages with minimal setup
-install_work_packages() {
-    log "Installing work/development packages..."
+# Install Node.js and configure npm properly
+install_node_and_npm() {
+    log "Installing Node.js and npm..."
     
-    # For newer Ubuntu (22.04+), azure-cli is in universe
-    if ! apt-cache show azure-cli >/dev/null 2>&1; then
-        safe_sudo add-apt-repository -y universe
-        update_packages
+    # Install Node.js via NodeSource repository for latest version
+    if ! command -v node >/dev/null 2>&1; then
+        log "Setting up NodeSource repository for Node.js..."
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | safe_sudo -E bash -
+        safe_sudo apt-get install -y nodejs
     fi
     
-    install_package_set "work"
+    # NOW setup npm global directory after npm exists
+    if command -v npm >/dev/null 2>&1; then
+        setup_npm_global
+    fi
+}
+
+# Install work packages
+install_work_packages() {
+    log "Installing work packages..."
+    
+    # Install Azure CLI
+    if ! command -v az >/dev/null 2>&1; then
+        log "Installing Azure CLI..."
+        curl -sL https://aka.ms/InstallAzureCLIDeb | safe_sudo bash
+    fi
+    
+    # Install Docker
+    install_package_set "docker"
     
     # Add user to docker group if docker was installed
     if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
@@ -88,6 +114,14 @@ install_work_packages() {
 install_personal_packages() {
     install_package_set "personal"
 }
+
+# Install terminal enhancement tools
+install_terminal_packages() {
+    install_package_set "terminal"
+}
+
+# Note: Modern tools like eza, zoxide, starship are installed via separate scripts
+# This keeps package management simple and version management flexible
 
 # Install specific tool if missing
 ensure_tool() {
@@ -107,15 +141,17 @@ ensure_tool() {
     fi
 }
 
-# Main installation function
+# Main installation function (kept for compatibility)
 install_all_packages() {
     local include_work="${1:-false}"
     local include_personal="${2:-false}"
     
     install_base_packages
+    install_terminal_packages
     install_wsl_packages
     
     if [[ "$include_work" == "true" ]]; then
+        install_node_and_npm
         install_work_packages
     fi
     

@@ -1,0 +1,181 @@
+# Minimal Tmux Configuration - Optimized for VS Code + Visual Workflow
+# Supports ESDF/WASD navigation toggle via TMUX_NAV_STYLE environment variable
+
+# ==============================================================================
+# Core Settings
+# ==============================================================================
+
+# Better terminal support
+set -g default-terminal "screen-256color"
+set -ga terminal-overrides ",*256col*:Tc"    # True color support
+
+# Performance
+set -sg escape-time 0                        # No delay for escape key
+set -g history-limit 10000                   # Reasonable scrollback
+set -g display-time 2000                     # Status messages display
+set -g status-interval 5                     # Refresh status bar
+set -g focus-events on                       # Focus events for vim
+
+# Window and pane behavior
+set -g base-index 1                          # Start windows at 1
+setw -g pane-base-index 1                    # Start panes at 1
+set -g renumber-windows on                   # Renumber windows when closed
+setw -g automatic-rename on                  # Rename window to current program
+
+# ==============================================================================
+# Key Bindings - Core
+# ==============================================================================
+
+# Better prefix (Ctrl-a instead of Ctrl-b)
+unbind C-b
+set -g prefix C-a
+bind C-a send-prefix
+
+# Reload configuration
+bind r source-file ~/.tmux.conf \; display-message "Config reloaded!"
+
+# ==============================================================================
+# Pane Management
+# ==============================================================================
+
+# Split panes with | and - (and preserve current path)
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+
+# Also allow traditional " and % with path preservation
+bind '"' split-window -v -c "#{pane_current_path}"
+bind % split-window -h -c "#{pane_current_path}"
+
+# ==============================================================================
+# Navigation Toggle (ESDF vs WASD)
+# ==============================================================================
+
+# Default is ESDF, set TMUX_NAV_STYLE=wasd for WASD navigation
+
+# ESDF Navigation (default)
+%if "#{!=:#{TMUX_NAV_STYLE},wasd}"
+# Pane navigation with Alt+ESDF
+bind -n M-e select-pane -U
+bind -n M-s select-pane -L
+bind -n M-d select-pane -D
+bind -n M-f select-pane -R
+
+# Pane resizing with Alt+Shift+ESDF
+bind -n M-E resize-pane -U 5
+bind -n M-S resize-pane -L 5
+bind -n M-D resize-pane -D 5
+bind -n M-F resize-pane -R 5
+
+# Window navigation with Alt+A/G
+bind -n M-a previous-window
+bind -n M-g next-window
+%endif
+
+# WASD Navigation (optional)
+%if "#{==:#{TMUX_NAV_STYLE},wasd}"
+# Pane navigation with Alt+WASD
+bind -n M-w select-pane -U
+bind -n M-a select-pane -L
+bind -n M-s select-pane -D
+bind -n M-d select-pane -R
+
+# Pane resizing with Alt+Shift+WASD
+bind -n M-W resize-pane -U 5
+bind -n M-A resize-pane -L 5
+bind -n M-S resize-pane -D 5
+bind -n M-D resize-pane -R 5
+
+# Window navigation with Alt+Q/E
+bind -n M-q previous-window
+bind -n M-e next-window
+%endif
+
+# Standard vim navigation (always available)
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+
+# ==============================================================================
+# Mouse Support
+# ==============================================================================
+
+# Enable mouse support for visual workflow
+set -g mouse on
+
+# Don't exit copy mode when releasing mouse
+unbind -T copy-mode-vi MouseDragEnd1Pane
+
+# ==============================================================================
+# Copy Mode
+# ==============================================================================
+
+# Use vim keybindings in copy mode
+setw -g mode-keys vi
+
+# Better copy mode bindings
+bind-key -T copy-mode-vi v send-keys -X begin-selection
+bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection
+
+# System clipboard integration (Linux/WSL)
+if-shell "command -v xclip" \
+  "bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'xclip -in -selection clipboard'"
+
+if-shell "grep -q Microsoft /proc/version" \
+  "bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'clip.exe'"
+
+# ==============================================================================
+# Status Bar - Minimal
+# ==============================================================================
+
+# Status bar position and basics
+set -g status-position bottom
+set -g status-justify left
+set -g status-style 'bg=colour234 fg=colour137'
+
+# Left side - session name
+set -g status-left '#[fg=colour233,bg=colour245,bold] #S #[bg=colour234] '
+set -g status-left-length 20
+
+# Right side - time and host
+set -g status-right '#[fg=colour233,bg=colour245] %H:%M %d-%b '
+set -g status-right-length 50
+
+# Window status
+setw -g window-status-format ' #I:#W '
+setw -g window-status-current-format '#[fg=colour233,bg=colour245,bold] #I:#W '
+
+# Messages
+set -g message-style 'fg=colour232 bg=colour166 bold'
+
+# ==============================================================================
+# Quick Window Management
+# ==============================================================================
+
+# Create new window with current path
+bind c new-window -c "#{pane_current_path}"
+
+# Quick window switching with Alt+number
+bind -n M-1 select-window -t :=1
+bind -n M-2 select-window -t :=2
+bind -n M-3 select-window -t :=3
+bind -n M-4 select-window -t :=4
+bind -n M-5 select-window -t :=5
+
+# ==============================================================================
+# Session Management
+# ==============================================================================
+
+# Quick session switching
+bind S choose-session
+
+# Create new session
+bind N new-session
+
+# ==============================================================================
+# Helper Display
+# ==============================================================================
+
+# Show current navigation style
+bind ? display-message "Navigation: #{?#{==:#{TMUX_NAV_STYLE},wasd},WASD,ESDF} (TMUX_NAV_STYLE=#{TMUX_NAV_STYLE})"

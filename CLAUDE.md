@@ -20,21 +20,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Update configuration files after changes
 ./scripts/update-configs.sh
+
+# Install VS Code integration
+./scripts/install-vscode.sh
+
+# Install Starship prompt
+./scripts/install-starship.sh
+
+# Switch configurations
+./scripts/tmux-config-switcher.sh minimal  # Streamlined tmux
+vim-minimal     # Fast vim for quick edits
+vim-full        # Full-featured vim config
 ```
 
 ### Validation and Testing
 ```bash
-# Validate installation completeness
-./scripts/validate-install.sh
+# Check installation status (basic verification)
+./scripts/check-setup.sh
 
-# Validate with work/personal packages
-./scripts/validate-install.sh --work --personal
-
-# Fix mode - attempt to repair issues
-./scripts/validate-install.sh --fix
-
-# Validate specific category
-./scripts/validate-install.sh --category docker
+# Planned future feature: validate-install.sh
+# Will support: --work --personal --fix --category options
+# Currently use check-setup.sh for basic validation
 ```
 
 ### Theme Management
@@ -62,14 +68,19 @@ psg <name>
 md <file>
 ```
 
+## Environment Variables
+
+### Navigation Style
+- `TMUX_NAV_STYLE=wasd` - Use WASD navigation in tmux (default is ESDF)
+- Add to your `.zshrc.local` or `.bashrc.local` to persist
+
 ## Architecture
 
-This is a simplified Ubuntu dotfiles system with a 3-file core architecture:
+This is a simplified Ubuntu dotfiles system with a 2-file core architecture:
 
 ### Core Libraries
 - **lib/core.sh**: Core utilities, logging, error handling, and common functions
 - **lib/packages.sh**: Package definitions and installation functions
-- **lib/validation.sh**: Validation framework for testing installations
 
 ### Key Principles
 1. **Ubuntu-only**: No cross-platform complexity, focused on Ubuntu/WSL
