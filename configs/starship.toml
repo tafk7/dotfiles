@@ -1,0 +1,116 @@
+# Starship Configuration - Minimal, Fast, Visual
+# Optimized for VS Code integrated terminal
+
+# Wait 10ms for command timeout
+command_timeout = 100
+
+# Format the prompt
+format = """
+[╭─](#9A348E) $directory$git_branch$git_status$cmd_duration
+[╰─](#DA627D) $character"""
+
+# Right prompt shows context
+right_format = """$nodejs$python$docker_context$time"""
+
+# Prompt character changes based on success/failure
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vicmd_symbol = "[❮](bold yellow)"
+
+# Current directory
+[directory]
+format = "[$path]($style) "
+style = "cyan bold"
+truncation_length = 3
+truncate_to_repo = true
+truncation_symbol = "…/"
+
+# Git branch
+[git_branch]
+format = "on [$symbol$branch]($style) "
+style = "purple"
+symbol = " "
+truncation_length = 20
+
+# Git status with minimal indicators
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+style = "red"
+conflicted = "⚔️ "
+ahead = "↑${count}"
+behind = "↓${count}"
+diverged = "↕"
+untracked = "?"
+stashed = "$"
+modified = "*"
+staged = "+"
+renamed = "»"
+deleted = "✘"
+
+# Show command duration for slow commands
+[cmd_duration]
+min_time = 2_000  # Show if command took more than 2 seconds
+format = "took [$duration]($style) "
+style = "yellow"
+
+# Node.js version
+[nodejs]
+format = "[$symbol($version )]($style)"
+symbol = " "
+style = "green"
+detect_extensions = ["js", "mjs", "cjs", "ts"]
+detect_files = ["package.json", ".node-version"]
+detect_folders = ["node_modules"]
+
+# Python version
+[python]
+format = "[$symbol($version )]($style)"
+symbol = " "
+style = "yellow"
+detect_extensions = ["py"]
+detect_files = [".python-version", "requirements.txt", "setup.py", "pyproject.toml"]
+detect_folders = []
+
+# Docker context
+[docker_context]
+format = "[$symbol$context]($style) "
+symbol = " "
+style = "blue"
+only_with_files = true
+detect_files = ["Dockerfile", "docker-compose.yml", "docker-compose.yaml"]
+
+# Time (optional - shows on right)
+[time]
+disabled = false
+format = "[$time]($style)"
+style = "dimmed"
+time_format = "%R"  # 24-hour format
+
+# Disable modules we don't need
+[aws]
+disabled = true
+
+[gcloud]
+disabled = true
+
+[package]
+disabled = true
+
+[rust]
+disabled = true
+
+[golang]
+disabled = true
+
+[java]
+disabled = true
+
+[kotlin]
+disabled = true
+
+[scala]
+disabled = true
+
+[swift]
+disabled = true
