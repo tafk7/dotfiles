@@ -4,6 +4,11 @@ docs/archive/
 # Backup directory
 .backups/
 
+# Backup files
+*.backup
+*-backup
+*.bak
+
 # Local configuration overrides
 *.local
 

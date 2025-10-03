@@ -18,14 +18,7 @@ fi
 # Shell options for better UX
 shopt -s histappend                # Append to history, don't overwrite
 shopt -s checkwinsize              # Check window size after each command
-shopt -s cdspell                   # Correct minor spelling errors in cd
-shopt -s dirspell                  # Correct spelling errors in directory names
-# autocd requires Bash 4.0+
-if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
-    shopt -s autocd                # Auto cd when typing directory name
-fi
 shopt -s globstar                  # Enable ** recursive globbing
-shopt -s nocaseglob               # Case-insensitive globbing
 shopt -s extglob                  # Extended globbing patterns
 
 # Better completion
@@ -52,7 +45,7 @@ HISTSIZE=${BASH_HIST_SIZE:-50000}
 HISTFILESIZE=$((HISTSIZE * 2))
 HISTCONTROL=ignoreboth:erasedups   # Ignore duplicates and lines starting with space
 HISTTIMEFORMAT="%F %T "            # Add timestamps to history
-HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"  # Ignore common commands
+HISTIGNORE=""  # Don't ignore any commands
 
 # Real-time history sharing (efficient version)
 PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"

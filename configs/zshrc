@@ -1,64 +1,42 @@
 # Set DOTFILES_DIR for this installation
 export DOTFILES_DIR="/home/tafk/dotfiles"
 
-# Modern Zsh Configuration - Power User Setup
-# Part of dotfiles - optimized with Oh My Zsh and advanced features
+# Modern Zsh Configuration - Optimized for VS Code + Visual Workflow
+# Uses Starship prompt for fast startup with visual features
+# Single optimized configuration - no switching needed
 
 # ==============================================================================
-# Performance Optimization - Load Early
+# Essential Zsh Options
 # ==============================================================================
 
-# Enable Powerlevel10k instant prompt (must be at top)
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+# History configuration
+HISTFILE=~/.zsh_history
+HISTSIZE=50000
+SAVEHIST=100000
 
-# ==============================================================================
-# Oh My Zsh Configuration
-# ==============================================================================
+# History options (only the essential ones)
+setopt EXTENDED_HISTORY          # Write the history file in the ":start:elapsed;command" format
+setopt INC_APPEND_HISTORY        # Write to the history file immediately
+setopt SHARE_HISTORY             # Share history between all sessions
+setopt HIST_EXPIRE_DUPS_FIRST    # Expire duplicate entries first
+setopt HIST_IGNORE_DUPS          # Don't record duplicates
+setopt HIST_IGNORE_SPACE         # Don't record entries starting with a space
+setopt HIST_VERIFY               # Don't execute immediately upon history expansion
 
-# Path to oh-my-zsh installation
-export ZSH="$HOME/.oh-my-zsh"
+# Navigation options
+setopt AUTO_PUSHD               # Push the current directory visited on the stack
+setopt PUSHD_IGNORE_DUPS        # Do not store duplicates in the stack
+setopt PUSHD_SILENT             # Do not print the directory stack
 
-# Theme configuration
-ZSH_THEME="powerlevel10k/powerlevel10k"
+# Expansion and globbing
+setopt EXTENDED_GLOB            # Use extended globbing syntax
+setopt GLOB_DOTS               # Include dotfiles in globbing
 
-# Powerlevel10k configuration
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(dir vcs newline prompt_char)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status command_execution_time background_jobs time)
-POWERLEVEL9K_PROMPT_ON_NEWLINE=true
-POWERLEVEL9K_MULTILINE_LAST_PROMPT_PREFIX="%F{014}❯%f "
-POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX=""
-
-# Oh My Zsh update settings - less intrusive
-zstyle ':omz:update' mode disabled  # No automatic update checks
-
-# Plugins - Reduced set for less intrusive experience
-plugins=(
-    # Core functionality only
-    git
-    docker
-    
-    # Basic tools
-    sudo
-    
-    # Minimal completion enhancement
-    zsh-completions
-    
-    # Optional: Uncomment for more features
-    # zsh-autosuggestions
-    # zsh-syntax-highlighting
-    # history-substring-search
-    # kubectl
-    # npm
-    # python
-)
-
-# ==============================================================================
-# Load Oh My Zsh
-# ==============================================================================
-
-source $ZSH/oh-my-zsh.sh
+# Completion options
+setopt COMPLETE_IN_WORD        # Complete from both ends of a word
+setopt ALWAYS_TO_END          # Move cursor to the end of a completed word
+setopt AUTO_LIST              # List choices on ambiguous completion
+setopt AUTO_PARAM_SLASH       # Add trailing slash for directories
 
 # ==============================================================================
 # Load Shared Environment
@@ -75,218 +53,155 @@ if [[ -f "$HOME/.config/dotfiles/theme.sh" ]]; then
 fi
 
 # ==============================================================================
-# Zsh-Specific Options and Features
+# Starship Prompt
 # ==============================================================================
 
-# History configuration - power user settings
-HISTFILE=~/.zsh_history
-HISTSIZE=50000
-SAVEHIST=100000
-
-# History options
-setopt EXTENDED_HISTORY          # Write the history file in the ":start:elapsed;command" format
-setopt INC_APPEND_HISTORY        # Write to the history file immediately, not when the shell exits
-setopt SHARE_HISTORY             # Share history between all sessions
-setopt HIST_EXPIRE_DUPS_FIRST    # Expire duplicate entries first when trimming history
-setopt HIST_IGNORE_DUPS          # Don't record an entry that was just recorded again
-setopt HIST_IGNORE_ALL_DUPS      # Delete old recorded entry if new entry is a duplicate
-setopt HIST_FIND_NO_DUPS         # Do not display a line previously found
-setopt HIST_IGNORE_SPACE         # Don't record an entry starting with a space
-setopt HIST_SAVE_NO_DUPS         # Don't write duplicate entries in the history file
-setopt HIST_REDUCE_BLANKS        # Remove superfluous blanks before recording entry
-setopt HIST_VERIFY               # Don't execute immediately upon history expansion
-
-# Navigation options
-setopt AUTO_CD                   # Auto cd when typing directory name
-setopt AUTO_PUSHD               # Push the current directory visited on the stack
-setopt PUSHD_IGNORE_DUPS        # Do not store duplicates in the stack
-setopt PUSHD_SILENT             # Do not print the directory stack after pushd or popd
-
-# Expansion and globbing
-setopt EXTENDED_GLOB            # Use extended globbing syntax
-setopt GLOB_DOTS               # Include dotfiles in globbing
-setopt NO_CASE_GLOB            # Case insensitive globbing
-setopt NUMERIC_GLOB_SORT       # Sort filenames numerically when possible
-
-# Completion options - less aggressive
-setopt COMPLETE_IN_WORD        # Complete from both ends of a word
-setopt ALWAYS_TO_END          # Move cursor to the end of a completed word
-setopt PATH_DIRS              # Perform path search even on command names with slashes
-unsetopt AUTO_MENU            # Don't show completion menu automatically
-setopt AUTO_LIST              # List choices (but don't auto-select)
-setopt AUTO_PARAM_SLASH       # If completed parameter is a directory, add a trailing slash
-setopt LIST_PACKED            # Make completion list more compact
-
-# Correction options - disabled for less intrusive experience
-# setopt CORRECT                # Try to correct the spelling of commands
-# setopt CORRECT_ALL           # Try to correct the spelling of all arguments in a line
+# Initialize starship if available
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init zsh)"
+else
+    # Fallback to simple prompt if starship not installed
+    PS1='%F{cyan}%~%f %# '
+fi
 
 # ==============================================================================
-# Advanced Completion System
+# Completion System
 # ==============================================================================
 
-# Completion styling - simplified
+# Initialize completion system
+autoload -Uz compinit
+compinit
+
+# Basic completion styling
 zstyle ':completion:*' completer _complete _ignored
-zstyle ':completion:*' menu select=0  # Don't auto-activate menu
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'  # Simple case-insensitive
-zstyle ':completion:*' use-compctl false
-zstyle ':completion:*' verbose false  # Less verbose descriptions
+zstyle ':completion:*' menu select
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
 
-# Completion for modern tools
+# Docker completion
 zstyle ':completion:*:*:docker:*' option-stacking yes
 zstyle ':completion:*:*:docker-*:*' option-stacking yes
 
 # ==============================================================================
-# FZF Zsh-Specific Configuration
+# Key Bindings
 # ==============================================================================
 
-# FZF zsh integration
-if command -v fzf >/dev/null 2>&1; then
-    [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-fi
-
-# ==============================================================================
-# Plugin Configuration - Advanced Settings
-# ==============================================================================
-
-# Autosuggestions configuration (if plugin is enabled)
-if [[ ${plugins[(r)zsh-autosuggestions]} == zsh-autosuggestions ]]; then
-    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#666666"  # Dimmer, no underline
-    ZSH_AUTOSUGGEST_STRATEGY=(history)  # Only history, not completion
-    ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
-    ZSH_AUTOSUGGEST_USE_ASYNC=true
-    # Accept suggestion with right arrow or End key only
-    ZSH_AUTOSUGGEST_ACCEPT_WIDGETS=(end-of-line vi-end-of-line)
-fi
-
-# Syntax highlighting configuration (if plugin is enabled)
-if [[ ${plugins[(r)zsh-syntax-highlighting]} == zsh-syntax-highlighting ]]; then
-    ZSH_HIGHLIGHT_HIGHLIGHTERS=(main)  # Only basic highlighting
-    # Subtle colors, no bold
-    ZSH_HIGHLIGHT_STYLES[command]='fg=green'
-    ZSH_HIGHLIGHT_STYLES[alias]='fg=cyan'
-    ZSH_HIGHLIGHT_STYLES[path]='none'  # No special highlighting for paths
-fi
-
-# History substring search configuration
-HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_FOUND='bg=magenta,fg=white,bold'
-HISTORY_SUBSTRING_SEARCH_HIGHLIGHT_NOT_FOUND='bg=red,fg=white,bold'
-HISTORY_SUBSTRING_SEARCH_GLOBBING_FLAGS='i'
-
-# ==============================================================================
-# Aliases and Functions from Scripts
-# ==============================================================================
-
-# Aliases and functions are loaded from scripts/aliases/*.sh and scripts/functions/*.sh
-
-# Functions are loaded from scripts/functions/shared.sh
-
-# ==============================================================================
-# Key Bindings - Zsh Specific
-# ==============================================================================
-
-# Vi mode key bindings
-bindkey -v
-export KEYTIMEOUT=1
+# Emacs-style key bindings (default)
+bindkey -e
 
 # History search
 bindkey '^R' history-incremental-search-backward
 bindkey '^S' history-incremental-search-forward
 
-# Edit command line in vim
-autoload -U edit-command-line
-zle -N edit-command-line
-bindkey '^X^E' edit-command-line
-
 # Better word navigation
 bindkey '^[[1;5C' forward-word    # Ctrl+Right
 bindkey '^[[1;5D' backward-word   # Ctrl+Left
 
-# ==============================================================================
-# Node.js and Development Environment
-# ==============================================================================
-
-# Node Version Manager
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+# Edit command line in editor
+autoload -U edit-command-line
+zle -N edit-command-line
+bindkey '^X^E' edit-command-line
 
 # ==============================================================================
-# WSL Integration - Enhanced
+# FZF Integration
+# ==============================================================================
+
+# FZF configuration
+if command -v fzf >/dev/null 2>&1; then
+    # Source FZF key bindings and completion
+    [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+    
+    # Enhanced FZF options with preview
+    export FZF_DEFAULT_OPTS="
+        --height 40% 
+        --layout=reverse 
+        --border
+        --preview-window=right:60%
+        --bind 'ctrl-/:change-preview-window(down|hidden|)'"
+    
+    # Use fd for file search if available
+    if command -v fd >/dev/null 2>&1; then
+        export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+        export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    fi
+    
+    # Preview files with bat
+    if command -v bat >/dev/null 2>&1; then
+        export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}'"
+    elif command -v batcat >/dev/null 2>&1; then
+        export FZF_CTRL_T_OPTS="--preview 'batcat --style=numbers --color=always --line-range :500 {}'"
+    fi
+    
+    # Enhanced directory search
+    export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
+fi
+
+# ==============================================================================
+# Modern CLI Tools
+# ==============================================================================
+
+# Zoxide for smart directory jumping
+if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init zsh)"
+    alias cd='z'  # Optional: replace cd with zoxide
+fi
+
+# ==============================================================================
+# Node.js - Lazy Load NVM
+# ==============================================================================
+
+# Lazy load NVM for faster startup
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    alias nvm='unalias nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm'
+    alias node='unalias node; unalias nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; node'
+    alias npm='unalias npm; unalias nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; npm'
+fi
+
+# ==============================================================================
+# WSL Integration
 # ==============================================================================
 
 if [[ "$IS_WSL" == "true" ]]; then
-    # WSL-specific aliases and functions
+    # WSL-specific aliases
     alias open='explorer.exe'
     alias winget='/mnt/c/Windows/System32/winget.exe'
-    alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
     
-    # Enhanced Windows integration
+    # Windows path helper
     wcd() {
         local winpath=$(wslpath -w "$(pwd)")
         echo "$winpath" | clip.exe
         echo "Windows path copied to clipboard: $winpath"
     }
     
-    # Windows Explorer in current directory
+    # Explorer in current directory
     explorer() {
         explorer.exe "${1:-.}"
     }
-    
-    # Display and WSL environment is set in scripts/env/common.sh
 fi
 
 # ==============================================================================
-# Dotfiles Integration
+# Load Dotfiles Functions and Aliases
 # ==============================================================================
 
-# Load dotfiles functions and aliases
-if [[ -d "$DOTFILES_DIR" ]]; then
-    # Load functions
+# Load functions
+if [[ -d "$DOTFILES_DIR/scripts/functions" ]]; then
     for file in "$DOTFILES_DIR"/scripts/functions/*.sh; do
         [[ -r "$file" ]] && source "$file"
     done
-    
-    # Load aliases  
+fi
+
+# Load aliases  
+if [[ -d "$DOTFILES_DIR/scripts/aliases" ]]; then
     for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
         [[ -r "$file" ]] && source "$file"
     done
 fi
 
-# ==============================================================================
-# Powerlevel10k Configuration
-# ==============================================================================
-
-# Load Powerlevel10k configuration
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # ==============================================================================
-# Quick Settings Toggle
-# ==============================================================================
-
-# Function to switch to minimal mode
-zsh-minimal() {
-    ln -sf "$DOTFILES_DIR/configs/zshrc.minimal" ~/.zshrc
-    echo "Switched to minimal zsh configuration. Run 'reload' to apply."
-}
-
-# Function to switch back to full mode
-zsh-full() {
-    ln -sf "$DOTFILES_DIR/configs/zshrc" ~/.zshrc
-    echo "Switched to full zsh configuration. Run 'reload' to apply."
-}
-
-# ==============================================================================
-# Local Configuration and Cleanup
+# Local Configuration
 # ==============================================================================
 
 # Source local configuration if it exists (not tracked in git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
-
-# Completion system finalization
-autoload -U compinit && compinit
-
-# Minimal welcome message for interactive shells
-if [[ -o interactive ]] && [[ "$ZSH_QUIET" != "true" ]]; then
-    echo "Zsh ${ZSH_VERSION%%.*} ready"
-fi

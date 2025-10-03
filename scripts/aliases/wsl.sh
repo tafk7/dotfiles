@@ -36,8 +36,8 @@ alias win-ssh='ls -la $WIN_SSH'
 
 # Functions are now in scripts/functions/wsl.sh
 
-# Note: Core WSL functions (SSH management, clipboard, etc.) are handled in wsl/core.sh
-# This file only contains simple aliases and basic functions
+# Note: Core WSL functions (SSH management, clipboard, etc.) are handled in lib/core.sh
+# This file contains WSL-specific aliases
 
 # SSH import functionality (main alias)
 alias sync-ssh='import_windows_ssh_keys'

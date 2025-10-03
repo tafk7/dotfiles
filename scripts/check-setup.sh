@@ -130,3 +130,6 @@ else
 fi
 echo
 echo "To reload your configuration: source ~/.bashrc"
+
+# Exit with the number of issues found
+exit $issues_found
