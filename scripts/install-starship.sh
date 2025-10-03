@@ -51,6 +51,6 @@ else
     exit 1
 fi
 
-log_success "Starship configuration complete!"
-log_info "The dotfiles zsh configuration already uses Starship by default"
-log_info "Just reload your shell to see the new prompt: exec zsh"
+success "Starship configuration complete!"
+log "The dotfiles zsh configuration already uses Starship by default"
+log "Just reload your shell to see the new prompt: exec zsh"
