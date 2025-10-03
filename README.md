@@ -37,7 +37,7 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 
 **Essential Tools:**
 - Build tools: build-essential, curl, wget, git, zip/unzip, jq
-- Modern shell: zsh with Oh My Zsh, Powerlevel10k theme, and enhanced plugins
+- Modern shell: zsh with Starship prompt for fast, visual experience
 - Modern CLI replacements: eza (includes tree functionality), bat, fd-find, ripgrep, fzf
 - Development basics: Python 3, pip, pipx, Node.js, npm
 - **Docker**: Container platform with user group setup
@@ -48,6 +48,7 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 - Development: `init.vim` (vim-plug + 18 plugins), `.tmux.conf` (TPM + plugins), `.gitconfig`, `.editorconfig`
 - Tool configs: `.ripgreprc`, bat, fd configurations
 - Theme configs: Unified color schemes for neovim, tmux, shell, and FZF
+- **VS Code Integration**: Optimized settings for hybrid vim/visual workflow
 
 ### Work Tools (`--work`)
 
@@ -141,6 +142,29 @@ sync-ssh
 
 # WSL: Cross-platform clipboard
 pbcopy / pbpaste
+
+# VS Code shortcuts (after running install-vscode.sh)
+c          # Open current directory in VS Code
+cf         # Find file with fzf and open in VS Code
+cgrep      # Search content and open at line in VS Code
+
+# Modern terminal tools
+z          # Smart directory jumping with zoxide
+zi         # Interactive directory search with fzf
+lg         # Visual git interface with lazygit
+glow       # Markdown preview in terminal
+
+# Enhanced FZF functions
+gb         # Interactive git branch switcher
+gl         # Interactive git log browser
+rg         # Content search with ripgrep + fzf
+fp         # Project finder
+
+# Configuration switchers
+tmux-config-switcher.sh minimal  # Use streamlined tmux
+vim-minimal     # Fast vim config for quick edits
+vim-full        # Full-featured vim config
+vim-status      # Show current vim configuration
 ```
 
 ## 🎨 Theme System
@@ -167,6 +191,53 @@ pbcopy / pbpaste
 - **Catppuccin Mocha**: Soothing pastel colors
 
 Themes apply consistently across neovim, tmux, shell prompts, and FZF. See [Theme Documentation](docs/theme-system.md) for details.
+
+## 💻 VS Code Integration
+
+### Setup
+
+```bash
+# Install VS Code settings and extensions
+./scripts/install-vscode.sh
+```
+
+This installs:
+- **Hybrid Vim mode**: VS Code shortcuts preserved, vim motions for text editing
+- **Optimized settings**: Font ligatures, smooth scrolling, visual enhancements
+- **Essential extensions**: Vim, GitLens, themes matching your dotfiles
+- **Custom keybindings**: Vim-style window navigation, quick file access
+
+### Key Features
+
+- **Best of both worlds**: Use mouse/GUI when visual, vim motions for efficiency
+- **Preserved VS Code shortcuts**: Ctrl+P, Ctrl+Shift+P, Ctrl+S all work normally
+- **Quick terminal access**: Integrated terminal with your zsh configuration
+- **Theme consistency**: VS Code themes match your terminal theme
+
+See `configs/vscode/` for settings and customization options.
+
+## ⚡ Streamlined Configurations
+
+### Performance-Optimized Options
+
+This dotfiles system now includes streamlined alternatives optimized for VS Code workflows:
+
+**Shell**: 
+- **Starship** prompt (200ms faster startup than Oh My Zsh)
+- Modern zsh config without framework overhead
+- No configuration switching needed - optimized by default
+
+**Terminal Multiplexer**:
+- Minimal tmux without plugins
+- ESDF/WASD navigation toggle via `TMUX_NAV_STYLE`
+- Switch with: `tmux-config-switcher.sh minimal`
+
+**Editor**:
+- Minimal vim with 5 essential plugins (<50ms startup)
+- Full vim with 18+ plugins for extended sessions
+- Switch with: `vim-minimal` or `vim-full`
+
+These configurations follow the principle: **Use VS Code for development, terminal tools for quick edits**.
 
 ## 🎨 Customization
 
@@ -201,7 +272,7 @@ Themes apply consistently across neovim, tmux, shell prompts, and FZF. See [Them
 - **Theme System:** See `docs/theme-system.md` for detailed theme documentation
 - **Quick Start:** See `docs/THEME_QUICK_START.md` for theme quick reference
 - **AI Integration:** See `ai/` directory for Claude Code prompts and tools
-- **Architecture:** Simple 3-file design, human-readable codebase
+- **Architecture:** Simple 2-file library design, human-readable codebase
 - **Aliases:** See `scripts/aliases/` for available shortcuts
 
 ## 🎯 Design Principles

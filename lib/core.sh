@@ -27,14 +27,22 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 
-# =============================================================================
-# Core Functions (original core.sh)
-# =============================================================================
+# Source other library files
+source "$DOTFILES_DIR/lib/backup.sh"
+source "$DOTFILES_DIR/lib/wsl.sh"
 
 # Safe sudo wrapper - shows commands before execution
 safe_sudo() {
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log "[DRY RUN] Would execute: sudo $*"
+        return 0
+    fi
+    
     log "Executing: sudo $*"
-    sudo "$@"
+    if ! sudo "$@"; then
+        error "Command failed: sudo $*"
+        return 1
+    fi
 }
 
 
@@ -55,8 +63,6 @@ detect_environment() {
         local win_user=$(get_windows_username)
         wsl_log "Windows username: $win_user"
     fi
-    
-    export IS_WSL=$(is_wsl && echo "true" || echo "false")
 }
 
 # Process git config template with user input
@@ -77,8 +83,28 @@ process_git_config() {
     local git_name git_email
     
     if [[ -t 0 ]]; then  # Interactive terminal
-        read -p "Enter your git name: " git_name
-        read -p "Enter your git email: " git_email
+        # Check if already configured
+        local existing_name=$(git config --global user.name 2>/dev/null || true)
+        local existing_email=$(git config --global user.email 2>/dev/null || true)
+        
+        if [[ -n "$existing_name" ]]; then
+            read -p "Enter your git name [$existing_name]: " git_name
+            git_name="${git_name:-$existing_name}"
+        else
+            read -p "Enter your git name: " git_name
+        fi
+        
+        if [[ -n "$existing_email" ]]; then
+            read -p "Enter your git email [$existing_email]: " git_email
+            git_email="${git_email:-$existing_email}"
+        else
+            read -p "Enter your git email: " git_email
+        fi
+        
+        # Basic email validation
+        if [[ ! "$git_email" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
+            warn "Email format looks incorrect: $git_email"
+        fi
     else
         # Non-interactive fallback
         git_name="${USER}"
@@ -86,8 +112,14 @@ process_git_config() {
         warn "Non-interactive mode: using default git config ($git_name, $git_email)"
     fi
     
-    # Process template
-    sed -e "s/{{GIT_NAME}}/$git_name/g" -e "s/{{GIT_EMAIL}}/$git_email/g" "$source" > "$target"
+    # Process template with sed (escape special characters)
+    git_name_escaped=$(printf '%s\n' "$git_name" | sed 's/[[\.*^$()+?{|]/\\&/g')
+    git_email_escaped=$(printf '%s\n' "$git_email" | sed 's/[[\.*^$()+?{|]/\\&/g')
+    
+    sed -e "s/{{GIT_NAME}}/$git_name_escaped/g" \
+        -e "s/{{GIT_EMAIL}}/$git_email_escaped/g" \
+        "$source" > "$target"
+    
     success "Git config created: $target"
 }
 
@@ -101,7 +133,7 @@ setup_npm_global() {
     
     # Force Unix-style path on WSL
     local npm_global_dir="$HOME/.npm-global"
-    if [[ "$IS_WSL" == "true" ]]; then
+    if is_wsl; then
         # Ensure we use Linux path, not Windows path
         npm_global_dir="$(cd ~ && pwd)/.npm-global"
     fi
@@ -209,190 +241,3 @@ validate_installation() {
     fi
 }
 
-# =============================================================================
-# WSL Functions (from wsl.sh)
-# =============================================================================
-
-# Check if running on WSL
-is_wsl() {
-    [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || [[ -n "${WSL_DISTRO_NAME:-}" ]]
-}
-
-# Get Windows username for WSL operations
-get_windows_username() {
-    if is_wsl; then
-        # Use cmd.exe to get Windows username - simple and reliable
-        local win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
-        
-        # Validate it's not empty or a system account
-        if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
-            # Fallback to current user
-            win_user="$USER"
-        fi
-        
-        echo "$win_user"
-    fi
-}
-
-# Setup WSL clipboard integration  
-setup_wsl_clipboard() {
-    if ! is_wsl; then
-        return 0
-    fi
-    
-    wsl_log "Setting up WSL clipboard integration..."
-    
-    local bin_dir="$HOME/.local/bin"
-    mkdir -p "$bin_dir"
-    
-    # Create pbcopy script
-    cat > "$bin_dir/pbcopy" << 'EOF'
-#!/bin/bash
-clip.exe
-EOF
-    
-    # Create pbpaste script  
-    cat > "$bin_dir/pbpaste" << 'EOF'
-#!/bin/bash
-powershell.exe -command "Get-Clipboard" | sed 's/\r$//'
-EOF
-    
-    chmod +x "$bin_dir/pbcopy" "$bin_dir/pbpaste"
-    
-    # Ensure ~/.local/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-        export PATH="$HOME/.local/bin:$PATH"
-    fi
-    
-    success "WSL clipboard integration setup complete"
-}
-
-# Import SSH keys from Windows (WSL only)
-import_windows_ssh_keys() {
-    if ! is_wsl; then
-        return 0
-    fi
-    
-    local win_user=$(get_windows_username)
-    if [[ -z "$win_user" ]]; then
-        warn "Could not determine Windows username for SSH key import"
-        return 1
-    fi
-    
-    local windows_ssh_dir="/mnt/c/Users/$win_user/.ssh"
-    
-    if [[ ! -d "$windows_ssh_dir" ]]; then
-        wsl_log "No Windows SSH directory found at $windows_ssh_dir"
-        return 0
-    fi
-    
-    wsl_log "Importing SSH keys from Windows..."
-    
-    local ssh_dir="$HOME/.ssh"
-    mkdir -p "$ssh_dir"
-    chmod 700 "$ssh_dir"
-    
-    # Copy SSH keys with proper permissions
-    for key_file in "$windows_ssh_dir"/*; do
-        if [[ -f "$key_file" ]]; then
-            local filename=$(basename "$key_file")
-            local target="$ssh_dir/$filename"
-            
-            cp "$key_file" "$target"
-            
-            # Set appropriate permissions
-            if [[ "$filename" == *.pub ]]; then
-                chmod 644 "$target"
-            else
-                chmod 600 "$target"
-            fi
-            
-            wsl_log "Imported SSH key: $filename"
-        fi
-    done
-    
-    success "SSH key import completed"
-}
-
-# =============================================================================
-# Backup Functions (from backup.sh)
-# =============================================================================
-
-# Backup directory within the repository
-if [[ -z "${DOTFILES_BACKUP_PREFIX:-}" ]]; then
-    readonly DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
-fi
-
-# Create backup directory with timestamp
-create_backup_dir() {
-    # Ensure .backups directory exists
-    mkdir -p "$DOTFILES_BACKUP_PREFIX"
-    
-    local backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$backup_dir"
-    echo "$backup_dir"
-}
-
-# Backup a single file
-backup_file() {
-    local file="$1"
-    if [[ -f "$file" ]]; then
-        # Ensure .backups directory exists
-        mkdir -p "$DOTFILES_BACKUP_PREFIX"
-        
-        local filename=$(basename "$file")
-        local backup="$DOTFILES_BACKUP_PREFIX/${filename}.backup-$(date +%Y%m%d-%H%M%S)"
-        cp "$file" "$backup"
-        log "Backed up: $file -> $backup"
-    fi
-}
-
-# Create symlink with backup
-safe_symlink() {
-    local source="$1"
-    local target="$2"
-    local backup_dir="$3"
-    
-    # Check if source exists
-    if [[ ! -e "$source" ]]; then
-        error "Source file does not exist: $source"
-        return 1
-    fi
-    
-    # If target exists and is not a symlink, back it up
-    if [[ -e "$target" && ! -L "$target" ]]; then
-        log "Backing up existing $target"
-        mv "$target" "$backup_dir/"
-    elif [[ -L "$target" ]]; then
-        # Remove existing symlink
-        rm "$target"
-    fi
-    
-    # Create the symlink
-    ln -s "$source" "$target"
-    success "Linked $source -> $target"
-}
-
-# Cleanup old backups (keep most recent N backups)
-cleanup_old_backups() {
-    local keep_count="${1:-10}"  # Default to keeping 10 backups
-    local backup_type="${2:-}"   # Optional backup type filter
-    
-    if [[ ! -d "$DOTFILES_BACKUP_PREFIX" ]]; then
-        return 0
-    fi
-    
-    log "Cleaning up old backups (keeping last $keep_count)..."
-    
-    # If backup type specified, filter by it
-    if [[ -n "$backup_type" ]]; then
-        # List directories matching the type pattern
-        ls -dt "$DOTFILES_BACKUP_PREFIX"/*"$backup_type"* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs rm -rf 2>/dev/null || true
-    else
-        # Clean all backup directories
-        ls -dt "$DOTFILES_BACKUP_PREFIX"/* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs rm -rf 2>/dev/null || true
-    fi
-}
-
-# Export commonly used functions
-export -f is_wsl get_windows_username

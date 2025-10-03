@@ -20,13 +20,13 @@ INSTALL_WORK=false
 INSTALL_PERSONAL=false
 FORCE_OVERWRITE=false
 SHOW_HELP=false
+DRY_RUN=false
 
 # Configuration mappings using associative array
 declare -A CONFIG_MAP=(
     # Simple symlinks
     [bashrc]="$HOME/.bashrc:symlink"
     [zshrc]="$HOME/.zshrc:symlink"
-    [zshrc.minimal]="$HOME/.zshrc.minimal:symlink"
     [profile]="$HOME/.profile:symlink"
     [tmux.conf]="$HOME/.tmux.conf:symlink"
     [editorconfig]="$HOME/.editorconfig:symlink"
@@ -55,6 +55,10 @@ parse_arguments() {
                 FORCE_OVERWRITE=true
                 shift
                 ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
             --help)
                 SHOW_HELP=true
                 shift
@@ -80,6 +84,7 @@ OPTIONS:
     --work          Install professional development tools
     --personal      Install personal/media tools  
     --force         Force overwrite existing configs
+    --dry-run       Preview actions without making changes
     --help          Show this help message
 
 EXAMPLES:
@@ -102,9 +107,9 @@ EOF
 }
 
 
-# Phase 0: Prerequisites
-phase_prerequisites() {
-    log "Checking prerequisites..."
+# Phase 1: System Verification
+phase_verify_system() {
+    log "Phase 1: System Verification"
     
     # Check Ubuntu
     if ! command -v lsb_release >/dev/null 2>&1; then
@@ -121,57 +126,140 @@ phase_prerequisites() {
     done
     
     detect_environment
+    
+    
+    success "System verification complete"
 }
 
-# Phase 1: Package Installation
-phase_packages() {
-    log "Phase 1: Package Installation"
+# Phase 2: Package Installation
+phase_install_packages() {
+    log "Phase 2: Package Installation"
     
-    install_base_packages
-    [[ "$INSTALL_WORK" == "true" ]] && install_work_packages
-    [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would install packages:"
+        log "  - Core packages: git, curl, wget, build-essential"
+        log "  - Development: neovim, tmux, zsh, openssh-client"
+        log "  - Modern CLI: bat, fd-find, ripgrep, fzf"
+        log "  - Terminal tools: glow, lazygit, httpie, htop, tree"
+        log "  - Languages: python3-pip, pipx"
+        is_wsl && log "  - WSL tools: socat, wslu"
+        [[ "$INSTALL_WORK" == "true" ]] && log "  - Work tools: Node.js, Docker, Azure CLI"
+        [[ "$INSTALL_PERSONAL" == "true" ]] && log "  - Personal tools: ffmpeg, yt-dlp"
+        log "  - Additional tools via scripts: starship, eza, zoxide"
+    else
+        install_base_packages
+        install_terminal_packages
+        
+        # WSL packages if needed
+        if is_wsl; then
+            install_wsl_packages
+        fi
+        
+        # Work packages (includes proper npm setup)
+        if [[ "$INSTALL_WORK" == "true" ]]; then
+            install_node_and_npm
+            install_work_packages
+        fi
+        
+        # Personal packages
+        [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
+        
+        # Modern tools via dedicated installers
+        "$DOTFILES_DIR/scripts/install-starship.sh" || { error "Starship installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/install-eza.sh" || { error "Eza installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
+    fi
     
-    success "Package installation phase complete"
+    success "Package installation complete"
 }
 
-# Phase 2: Configuration
-phase_configuration() {
-    log "Phase 2: Configuration"
+# Phase 3: Configuration and Validation
+phase_setup_configs() {
+    log "Phase 3: Configuration and Validation"
     
-    # Create backup directory
+    # Single backup directory for this installation
     local backup_dir
     backup_dir=$(create_backup_dir)
     log "Backup directory: $backup_dir"
     
-    # Process each configuration
-    for config in "${!CONFIG_MAP[@]}"; do
-        local mapping="${CONFIG_MAP[$config]}"
-        local target="${mapping%%:*}"
-        local type="${mapping##*:}"
-        local source="$CONFIGS_DIR/$config"
-        
-        case "$type" in
-            symlink)
-                process_symlink "$source" "$target" "$backup_dir"
-                ;;
-            directory)
-                process_directory "$source" "$target" "$backup_dir"
-                ;;
-            template)
-                process_template "$source" "$target" "$backup_dir"
-                ;;
-            *)
-                error "Unknown config type: $type for $config"
-                ;;
-        esac
-    done
+    # Process configurations
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would process configurations:"
+        readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
+        for config in "${sorted_configs[@]}"; do
+            local mapping="${CONFIG_MAP[$config]}"
+            local target="${mapping%%:*}"
+            local type="${mapping##*:}"
+            if [[ -e "$target" ]]; then
+                if [[ -L "$target" ]]; then
+                    log "  ↻ $target (symlink exists - would update)"
+                else
+                    log "  ⚠️  $target (file exists - would backup)"
+                fi
+            else
+                log "  ✓ $target (would create $type)"
+            fi
+        done
+        is_wsl && log "[DRY RUN] Would setup WSL clipboard integration and SSH keys"
+    else
+        readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
+        for config in "${sorted_configs[@]}"; do
+            local mapping="${CONFIG_MAP[$config]}"
+            local target="${mapping%%:*}"
+            local type="${mapping##*:}"
+            local source="$CONFIGS_DIR/$config"
+            
+            case "$type" in
+                symlink)
+                    process_symlink "$source" "$target" "$backup_dir"
+                    ;;
+                directory)
+                    process_directory "$source" "$target" "$backup_dir"
+                    ;;
+                template)
+                    process_template "$source" "$target" "$backup_dir"
+                    ;;
+                *)
+                    error "Unknown config type: $type for $config"
+                    ;;
+            esac
+        done
+    fi
     
-    success "Configuration phase complete"
+    # WSL-specific setup
+    if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
+        setup_wsl_clipboard
+        import_windows_ssh_keys
+    fi
+    
+    # NPM setup if Node.js is installed but wasn't in work packages
+    if command -v npm >/dev/null 2>&1 && [[ "$INSTALL_WORK" != "true" ]]; then
+        setup_npm_global
+    fi
+    
+    # Validation
+    log "Running setup validation..."
+    if [[ "$DRY_RUN" != "true" ]]; then
+        if ! "$SCRIPT_DIR/scripts/check-setup.sh"; then
+            error "Setup validation failed"
+            exit 1
+        fi
+    fi
+    
+    # Cleanup
+    cleanup_old_backups 10
+    
+    success "Configuration and validation complete"
 }
 
 # Process symlink configuration
 process_symlink() {
     local source="$1" target="$2" backup_dir="$3"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would link $source -> $target"
+        return 0
+    fi
     
     # Create parent directory if needed
     local parent_dir="$(dirname "$target")"
@@ -192,64 +280,20 @@ process_directory() {
 process_template() {
     local source="$1" target="$2" backup_dir="$3"
     
-    process_git_config "$source" "$target" "$backup_dir"
-}
-
-# Phase 3: Shell Integration
-phase_shell_integration() {
-    log "Phase 3: Shell Integration"
-    
-    # Setup FZF integration
-    if command -v fzf >/dev/null 2>&1; then
-        local fzf_base="/usr/share/doc/fzf/examples"
-        if [[ -d "$fzf_base" ]]; then
-            log "FZF integration files found at $fzf_base"
-        else
-            warn "FZF installed but integration files not found"
-        fi
-    fi
-    
-    success "Shell integration phase complete"
-}
-
-# Phase 4: WSL Setup
-phase_wsl_setup() {
-    if [[ "$IS_WSL" != "true" ]]; then
-        log "Phase 4: WSL Setup - Skipped (not running on WSL)"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would process git config template"
         return 0
     fi
     
-    log "Phase 4: WSL Setup"
-    
-    setup_wsl_clipboard
-    import_windows_ssh_keys
-    
-    success "WSL setup phase complete"
+    process_git_config "$source" "$target" "$backup_dir"
 }
 
-# Phase 5: Final Setup
-phase_final_setup() {
-    log "Phase 5: Final Setup"
-    
-    setup_npm_global
-    
-    # Run minimal validation checks
-    log "Running setup checks..."
-    "$SCRIPT_DIR/scripts/check-setup.sh"
-    
-    cleanup_old_backups 5
-    
-    success "Final setup phase complete"
-}
 
 # Main installation workflow
 run_installation() {
-    phase_prerequisites
-    phase_packages
-    phase_configuration
-    phase_shell_integration
-    phase_wsl_setup
-    phase_final_setup
+    phase_verify_system
+    phase_install_packages
+    phase_setup_configs
     
     # Success message
     echo
@@ -257,8 +301,9 @@ run_installation() {
     echo
     echo "Next steps:"
     echo "1. Restart your shell or run: source ~/.bashrc"
-    echo "2. For Zsh customization, run: ./scripts/setup-zsh-environment.sh"
-    [[ "$IS_WSL" == "true" ]] && echo "3. Log out and back in for Docker group changes"
+    if [[ "$INSTALL_WORK" == "true" ]] && command -v docker >/dev/null 2>&1; then
+        echo "2. Log out and back in for Docker group changes"
+    fi
 }
 
 # Main entry point
@@ -277,6 +322,7 @@ main() {
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
     echo "Packages: Base$([ "$INSTALL_WORK" = "true" ] && echo " + Work")$([ "$INSTALL_PERSONAL" = "true" ] && echo " + Personal")"
+    [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     
     # Run installation
