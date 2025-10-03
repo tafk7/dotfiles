@@ -8,8 +8,8 @@ source "$LIB_DIR/core.sh"
 
 # Package definitions using associative array
 declare -A PACKAGES=(
-    [core]="git curl wget build-essential software-properties-common"
-    [development]="neovim tmux zsh openssh-client"
+    [core]="git curl build-essential"
+    [development]="neovim zsh openssh-client"
     [modern]="bat fd-find ripgrep fzf"
     [terminal]="glow lazygit httpie htop tree"
     [languages]="python3-pip pipx"
