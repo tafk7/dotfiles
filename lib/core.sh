@@ -123,42 +123,6 @@ process_git_config() {
     success "Git config created: $target"
 }
 
-# Setup NPM global directory (consolidated function)
-setup_npm_global() {
-    if ! command -v npm >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    log "Setting up NPM global directory..."
-    
-    # Force Unix-style path on WSL
-    local npm_global_dir="$HOME/.npm-global"
-    if is_wsl; then
-        # Ensure we use Linux path, not Windows path
-        npm_global_dir="$(cd ~ && pwd)/.npm-global"
-    fi
-    
-    mkdir -p "$npm_global_dir"
-    
-    # Configure npm to use our global directory
-    npm config set prefix "$npm_global_dir"
-    
-    # Verify the prefix was set correctly
-    local actual_prefix=$(npm config get prefix)
-    if [[ "$actual_prefix" =~ \\\\ ]]; then
-        warn "NPM prefix contains Windows path: $actual_prefix"
-        warn "Forcing Unix-style path..."
-        # Force set with explicit Unix path
-        npm config set prefix "$(cd ~ && pwd)/.npm-global"
-    fi
-    
-    # Add to PATH if not already there
-    if [[ ":$PATH:" != *":$npm_global_dir/bin:"* ]]; then
-        export PATH="$npm_global_dir/bin:$PATH"
-    fi
-    
-    success "NPM global directory configured: $npm_global_dir"
-}
 
 # Validation functions
 validate_prerequisites() {

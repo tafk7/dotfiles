@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Base installation (essential tools + Docker)
 ./install.sh
 
-# Add work tools (Azure CLI, Node.js/Python dev tools)
+# Add work tools (Azure CLI, Node.js via NVM, Python dev tools)
 ./install.sh --work
 
 # Add personal tools (media applications)
@@ -24,8 +24,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install VS Code integration
 ./scripts/install-vscode.sh
 
-# Install Starship prompt
-./scripts/install-starship.sh
+# Install modern CLI tools (installed automatically by install.sh)
+./scripts/install-starship.sh  # Cross-shell prompt (to /usr/local/bin)
+./scripts/install-eza.sh        # Modern ls replacement (via APT repository)
+./scripts/install-lazygit.sh    # Terminal UI for git (to /usr/local/bin)
+./scripts/install-zoxide.sh     # Smart directory jumper (to /usr/local/bin)
+./scripts/install-nvm.sh        # Node Version Manager with Node.js LTS
 
 # Switch configurations
 ./scripts/tmux-config-switcher.sh minimal  # Streamlined tmux
@@ -163,3 +167,7 @@ When running in WSL, additional features are enabled:
 3. **Validation**: Use `./scripts/validate-install.sh` to verify installation completeness
 4. **Backups**: Original files are backed up to `~/.dotfiles_backup_YYYYMMDD_HHMMSS/`
 5. **Docker**: Included in base installation with proper group setup
+6. **Tool Installation Paths**:
+   - **eza**: Installed via APT repository (deb.gierens.de) for automatic updates
+   - **starship, lazygit, zoxide**: Installed to `/usr/local/bin` for system-wide access
+   - **VS Code extensions**: Managed through `code` CLI
