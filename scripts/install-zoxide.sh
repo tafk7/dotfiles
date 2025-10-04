@@ -32,10 +32,11 @@ if [[ ! -s install.sh ]] || ! grep -q "zoxide" install.sh; then
     exit 1
 fi
 
-# Run installer
-log "Running zoxide installer..."
+# Run installer with explicit /usr/local/bin directory
+log "Running zoxide installer (installing to /usr/local/bin)..."
 chmod +x install.sh
-./install.sh
+# Install to /usr/local/bin for system-wide access
+./install.sh --bin-dir=/usr/local/bin
 
 # Cleanup
 cd -
