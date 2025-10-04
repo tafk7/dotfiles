@@ -39,7 +39,7 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 - Build tools: build-essential, curl, wget, git, zip/unzip, jq
 - Modern shell: zsh with Starship prompt for fast, visual experience
 - Modern CLI replacements: eza (includes tree functionality), bat, fd-find, ripgrep, fzf
-- Development basics: Python 3, pip, pipx, Node.js, npm
+- Development basics: Python 3, pip, pipx
 - **Docker**: Container platform with user group setup
 - **Theme System**: 5 pre-configured color schemes (Nord, Tokyo Night, Kanagawa, Gruvbox Material, Catppuccin)
 
@@ -54,7 +54,7 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 
 **Professional Development:**
 - **Azure CLI**: Ubuntu-specific installation for cloud development
-- **Node.js ecosystem**: yarn, ESLint, Prettier
+- **Node.js via NVM**: Node Version Manager for flexible Node.js/npm management
 - **Python tools**: black, ruff (via pipx for isolation)
 
 ### Personal Tools (`--personal`)
