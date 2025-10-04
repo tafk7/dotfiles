@@ -145,15 +145,9 @@ phase_install_packages() {
         is_wsl && log "  - WSL tools: socat, wslu"
         [[ "$INSTALL_WORK" == "true" ]] && log "  - Work tools: Node.js, Docker, Azure CLI"
         [[ "$INSTALL_PERSONAL" == "true" ]] && log "  - Personal tools: ffmpeg, yt-dlp"
-        log "  - Additional tools via scripts: starship, eza, zoxide"
+        log "  - Additional tools via scripts: starship, eza, lazygit, zoxide"
     else
-        install_base_packages
-        install_terminal_packages
-        
-        # WSL packages if needed
-        if is_wsl; then
-            install_wsl_packages
-        fi
+        install_base_packages  # Now includes terminal and WSL packages
         
         # Work packages (includes proper npm setup)
         if [[ "$INSTALL_WORK" == "true" ]]; then
@@ -167,6 +161,7 @@ phase_install_packages() {
         # Modern tools via dedicated installers
         "$DOTFILES_DIR/scripts/install-starship.sh" || { error "Starship installation failed"; exit 1; }
         "$DOTFILES_DIR/scripts/install-eza.sh" || { error "Eza installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
         "$DOTFILES_DIR/scripts/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
     fi
     
