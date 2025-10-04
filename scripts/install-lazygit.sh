@@ -9,16 +9,27 @@ source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/core.sh"
 
 log "Installing lazygit (Terminal UI for git)..."
 
-# Check if lazygit is already installed
+# Check if lazygit is already installed and compare versions
 if command -v lazygit >/dev/null 2>&1; then
-    log "lazygit is already installed"
-    lazygit --version
-    exit 0
+    CURRENT_VERSION=$(lazygit --version | grep -oP 'version=\K[^,]+' || echo "0.0.0")
+    LATEST_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    
+    if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
+        log "lazygit is already installed and up to date (v$CURRENT_VERSION)"
+        exit 0
+    else
+        log "lazygit v$CURRENT_VERSION is installed, but v$LATEST_VERSION is available"
+        log "Updating to latest version..."
+    fi
 fi
 
-# Get latest version from GitHub API
-log "Fetching latest lazygit release..."
-LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+# Get latest version if not already fetched
+if [[ -z "$LATEST_VERSION" ]]; then
+    log "Fetching latest lazygit release..."
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+else
+    LAZYGIT_VERSION="$LATEST_VERSION"
+fi
 
 if [[ -z "$LAZYGIT_VERSION" ]]; then
     error "Could not determine latest lazygit version"
