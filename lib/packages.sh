@@ -8,11 +8,11 @@ source "$LIB_DIR/core.sh"
 
 # Package definitions using associative array
 declare -A PACKAGES=(
-    [core]="git curl build-essential"
-    [development]="neovim zsh openssh-client"
+    [core]="git build-essential"  # git is checked by installer, build-essential for compiling
+    [development]="neovim zsh"  # removed curl, openssh-client (pre-installed)
     [modern]="bat fd-find ripgrep fzf"
     [terminal]="httpie htop tree"
-    [languages]="python3-pip pipx"
+    [languages]="python3-pip pipx"  # pip for direct use, pipx for isolated installs
     [wsl]="socat wslu"
     [docker]="docker.io docker-compose-v2"
     [personal]="ffmpeg yt-dlp"
