@@ -27,9 +27,9 @@ cd "$TEMP_DIR"
 curl -sS https://starship.rs/install.sh > install.sh
 chmod +x install.sh
 
-# Run installer with automatic yes (requires sudo)
-log "Installing Starship (requires sudo)..."
-sudo sh install.sh --yes
+# Run installer with automatic yes and explicit bin directory (requires sudo)
+log "Installing Starship to /usr/local/bin (requires sudo)..."
+sudo sh install.sh --yes --bin-dir /usr/local/bin
 
 # Cleanup
 cd -
