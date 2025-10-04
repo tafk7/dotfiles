@@ -61,23 +61,27 @@ if [[ -f ~/.gitconfig ]]; then
     fi
 fi
 
-# 4. NPM prefix (prevents future EACCES permission errors)
-if command -v npm >/dev/null 2>&1; then
-    prefix=$(npm config get prefix 2>/dev/null)
-    if [[ "$prefix" == "$HOME/.npm-global" ]]; then
-        echo "✅ NPM prefix correctly set to ~/.npm-global"
-    elif [[ "$prefix" == "/usr"* ]]; then
-        echo "✅ NPM using system prefix: $prefix"
-    elif [[ "$prefix" =~ \\\\wsl\.localhost\\ ]] || [[ "$prefix" =~ ^\\\\\\\\wsl ]]; then
-        echo "❌ NPM has Windows-style WSL path: $prefix"
-        echo "   Fix: npm config set prefix ~/.npm-global"
-        echo "        export PATH=~/.npm-global/bin:\$PATH"
-        issues_found=1
+# 4. NVM and Node.js setup
+if [[ -d "$HOME/.nvm" ]] && [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+    # Source NVM to check if it works
+    export NVM_DIR="$HOME/.nvm"
+    if . "$NVM_DIR/nvm.sh" 2>/dev/null && command -v nvm >/dev/null 2>&1; then
+        echo "✅ NVM is installed and functional"
+        if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+            echo "✅ Node.js $(node --version) and npm $(npm --version) available via NVM"
+        else
+            echo "⚠️  NVM is installed but Node.js is not"
+            echo "   Fix: nvm install --lts"
+        fi
     else
-        echo "⚠️  NPM prefix is $prefix"
-        echo "   This may cause permission issues when installing global packages"
-        echo "   Fix: npm config set prefix ~/.npm-global"
+        echo "⚠️  NVM directory exists but NVM is not functional"
+        echo "   Fix: Reinstall with ./scripts/install-nvm.sh"
     fi
+elif command -v node >/dev/null 2>&1; then
+    # Node installed but not via NVM
+    echo "⚠️  Node.js is installed but not via NVM"
+    echo "   This may cause permission issues with global packages"
+    echo "   Fix: Install NVM with ./scripts/install-nvm.sh"
 fi
 
 # 5. WSL-specific checks

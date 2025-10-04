@@ -78,22 +78,6 @@ install_base_packages() {
 }
 
 
-# Install Node.js and configure npm properly
-install_node_and_npm() {
-    log "Installing Node.js and npm..."
-    
-    # Install Node.js via NodeSource repository for latest version
-    if ! command -v node >/dev/null 2>&1; then
-        log "Setting up NodeSource repository for Node.js..."
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | safe_sudo -E bash -
-        safe_sudo apt-get install -y nodejs
-    fi
-    
-    # NOW setup npm global directory after npm exists
-    if command -v npm >/dev/null 2>&1; then
-        setup_npm_global
-    fi
-}
 
 # Install work packages
 install_work_packages() {
@@ -150,7 +134,6 @@ install_all_packages() {
     install_base_packages
     
     if [[ "$include_work" == "true" ]]; then
-        install_node_and_npm
         install_work_packages
     fi
     

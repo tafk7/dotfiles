@@ -149,10 +149,11 @@ phase_install_packages() {
     else
         install_base_packages  # Now includes terminal and WSL packages
         
-        # Work packages (includes proper npm setup)
+        # Work packages
         if [[ "$INSTALL_WORK" == "true" ]]; then
-            install_node_and_npm
             install_work_packages
+            # Install NVM and Node.js
+            "$DOTFILES_DIR/scripts/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
         fi
         
         # Personal packages
@@ -227,10 +228,6 @@ phase_setup_configs() {
         import_windows_ssh_keys
     fi
     
-    # NPM setup if Node.js is installed but wasn't in work packages
-    if command -v npm >/dev/null 2>&1 && [[ "$INSTALL_WORK" != "true" ]]; then
-        setup_npm_global
-    fi
     
     # Validation
     log "Running setup validation..."
