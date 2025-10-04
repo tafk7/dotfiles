@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install eza (modern ls replacement)
-# Fetches latest version from GitHub
+# Uses official APT repository for reliable updates
 
 set -euo pipefail
 
@@ -16,37 +16,26 @@ if command -v eza >/dev/null 2>&1; then
     exit 0
 fi
 
-# Get latest release URL from GitHub API
-log "Fetching latest eza release..."
-LATEST_URL=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest \
-    | grep "browser_download_url.*_amd64.deb" \
-    | cut -d '"' -f 4)
+# Method 1: Use official APT repository (recommended)
+log "Setting up eza repository..."
 
-if [[ -z "$LATEST_URL" ]]; then
-    error "Could not find latest eza release"
-    exit 1
+# Ensure gpg is installed
+if ! command -v gpg >/dev/null 2>&1; then
+    log "Installing gpg..."
+    safe_sudo apt-get update
+    safe_sudo apt-get install -y gpg
 fi
 
-# Download to temp directory
-TEMP_DIR=$(mktemp -d)
-cd "$TEMP_DIR"
+# Add eza repository
+safe_sudo mkdir -p /etc/apt/keyrings
+wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | safe_sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | safe_sudo tee /etc/apt/sources.list.d/gierens.list
+safe_sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
 
-log "Downloading eza from: $LATEST_URL"
-wget -q "$LATEST_URL" -O eza.deb
-
-# Install the package
-log "Installing eza (requires sudo)..."
-if safe_sudo dpkg -i eza.deb; then
-    success "eza installed successfully!"
-else
-    # Try to fix dependencies if dpkg failed
-    warn "Fixing dependencies..."
-    safe_sudo apt-get install -f -y
-fi
-
-# Cleanup
-cd -
-rm -rf "$TEMP_DIR"
+# Update and install
+log "Installing eza from repository..."
+safe_sudo apt-get update
+safe_sudo apt-get install -y eza
 
 # Verify installation
 if command -v eza >/dev/null 2>&1; then
