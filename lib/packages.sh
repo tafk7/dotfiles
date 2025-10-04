@@ -46,15 +46,25 @@ update_packages() {
     safe_sudo apt-get update
 }
 
-# Install base packages
+# Install base packages - single apt transaction for efficiency
 install_base_packages() {
     update_packages
     
-    # Install in logical order
-    install_package_set "core"        # Absolute essentials
-    install_package_set "development" # Dev tools
-    install_package_set "modern"      # Modern CLI replacements
-    install_package_set "languages"   # Language support
+    # Combine all base packages for single dependency resolution
+    local all_base_packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
+    
+    # Add WSL packages if on WSL
+    if is_wsl; then
+        all_base_packages="$all_base_packages ${PACKAGES[wsl]}"
+    fi
+    
+    log "Installing all base packages in single transaction..."
+    # shellcheck disable=SC2086
+    if safe_sudo apt-get install -y $all_base_packages; then
+        success "Base packages installed successfully"
+    else
+        warn "Some packages failed to install (this is normal for some optional packages)"
+    fi
     
     # Create command aliases for renamed packages
     if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
@@ -67,11 +77,6 @@ install_base_packages() {
     # Note: npm setup moved to install_node_and_npm()
 }
 
-# Install WSL-specific packages
-install_wsl_packages() {
-    is_wsl || return 0
-    install_package_set "wsl"
-}
 
 # Install Node.js and configure npm properly
 install_node_and_npm() {
@@ -115,10 +120,6 @@ install_personal_packages() {
     install_package_set "personal"
 }
 
-# Install terminal enhancement tools
-install_terminal_packages() {
-    install_package_set "terminal"
-}
 
 # Note: Modern tools like eza, zoxide, starship are installed via separate scripts
 # This keeps package management simple and version management flexible
@@ -147,8 +148,6 @@ install_all_packages() {
     local include_personal="${2:-false}"
     
     install_base_packages
-    install_terminal_packages
-    install_wsl_packages
     
     if [[ "$include_work" == "true" ]]; then
         install_node_and_npm
