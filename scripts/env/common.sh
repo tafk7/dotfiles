@@ -66,10 +66,6 @@ fi
 # Local binaries
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
-# NPM global packages (if npm is installed)
-if command -v npm >/dev/null 2>&1 && [[ -d "$HOME/.npm-global/bin" ]]; then
-    export PATH="$HOME/.npm-global/bin:$PATH"
-fi
 
 # WSL-specific environment
 if [[ "$IS_WSL" == "true" ]]; then
