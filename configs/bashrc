@@ -75,12 +75,15 @@ fi
 
 # FZF bash-specific configuration
 if command -v fzf >/dev/null 2>&1; then
-    [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+    # Load fzf key bindings (Ctrl-R for history, Ctrl-T for files, Alt-C for cd)
+    if [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]]; then
+        source /usr/share/doc/fzf/examples/key-bindings.bash
+    fi
 
-    # Enhanced FZF key bindings
-    bind '"\C-f": "fzf-file-widget"'
-    bind '"\C-r": "fzf-history-widget"'
-    bind '"\ec": "fzf-cd-widget"'
+    # Load fzf completion
+    if [[ -f /usr/share/doc/fzf/examples/completion.bash ]]; then
+        source /usr/share/doc/fzf/examples/completion.bash
+    fi
 fi
 
 # ==============================================================================
