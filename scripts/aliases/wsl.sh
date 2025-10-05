@@ -22,7 +22,13 @@ alias pwsh='powershell.exe'
 alias cmd='cmd.exe'
 
 # File operations
-alias explorer='explorer.exe .'
+# Explorer in current directory (also provides 'open' functionality)
+explorer() {
+    explorer.exe "${1:-.}"
+}
+
+# Alias for explorer
+alias open='explorer'
 
 # Clipboard integration
 alias cwd='pwd | clip.exe'
