@@ -181,13 +181,6 @@ if [[ "$IS_WSL" == "true" ]]; then
     # WSL-specific aliases
     alias winget='/mnt/c/Windows/System32/winget.exe'
 
-    # Windows path helper
-    wcd() {
-        local winpath=$(wslpath -w "$(pwd)")
-        echo "$winpath" | clip.exe
-        echo "Windows path copied to clipboard: $winpath"
-    }
-
     # Explorer in current directory (also provides 'open' functionality)
     explorer() {
         explorer.exe "${1:-.}"
