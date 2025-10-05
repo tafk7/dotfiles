@@ -178,16 +178,8 @@ fi
 # ==============================================================================
 
 if [[ "$IS_WSL" == "true" ]]; then
-    # WSL-specific aliases
+    # WSL-specific aliases (most are in scripts/aliases/wsl.sh)
     alias winget='/mnt/c/Windows/System32/winget.exe'
-
-    # Explorer in current directory (also provides 'open' functionality)
-    explorer() {
-        explorer.exe "${1:-.}"
-    }
-
-    # Alias for explorer
-    alias open='explorer'
 fi
 
 # ==============================================================================
