@@ -2,7 +2,7 @@
 # Install NVM (Node Version Manager) and Node.js
 # Best practice for Node.js on WSL/Ubuntu - avoids permission and path issues
 
-set -euo pipefail
+set -eo pipefail  # Remove -u flag to avoid NVM's unbound variable issues
 
 # Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/core.sh"
@@ -12,13 +12,21 @@ log "Installing NVM (Node Version Manager)..."
 # NVM installation directory
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 
+# Remove any Windows npm from PATH to avoid conflicts
+if [[ -n "${PATH:-}" ]]; then
+    # Filter out Windows paths that might contain npm
+    export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/mnt/c/' | tr '\n' ':' | sed 's/:$//')
+fi
+
 # Check if already installed
 if [[ -d "$NVM_DIR" ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
     log "NVM is already installed at $NVM_DIR"
-    # Source NVM to check version
+    # Source NVM to check version (disable strict mode temporarily)
+    set +u
     . "$NVM_DIR/nvm.sh"
+    set -u
     nvm --version
-    
+
     # Check if Node.js is installed via NVM
     if command -v node >/dev/null 2>&1; then
         log "Node.js $(node --version) is already installed via NVM"
@@ -30,30 +38,36 @@ if [[ -d "$NVM_DIR" ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
 else
     # Create NVM directory
     mkdir -p "$NVM_DIR"
-    
-    # Download and install NVM
+
+    # Download and install NVM (disable strict mode for installer)
     log "Downloading NVM installer..."
+    set +u
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    
+    set -u
+
     # Verify installation
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
         error "NVM installation failed"
         exit 1
     fi
-    
+
     success "NVM installed successfully!"
 fi
 
-# Source NVM
+# Source NVM (disable strict mode)
 log "Loading NVM..."
 export NVM_DIR="$HOME/.nvm"
+set +u
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+set -u
 
-# Install latest LTS Node.js
+# Install latest LTS Node.js (disable strict mode for NVM commands)
 log "Installing latest LTS Node.js..."
+set +u
 nvm install --lts
 nvm use --lts
 nvm alias default lts/*
+set -u
 
 # Verify installation
 if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
