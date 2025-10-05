@@ -140,6 +140,16 @@ if command -v fzf >/dev/null 2>&1; then
     
     # Enhanced directory search
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
+
+    # Load fzf key bindings (Ctrl-R for history, Ctrl-T for files, Alt-C for cd)
+    if [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+        source /usr/share/doc/fzf/examples/key-bindings.zsh
+    fi
+
+    # Load fzf completion
+    if [[ -f /usr/share/doc/fzf/examples/completion.zsh ]]; then
+        source /usr/share/doc/fzf/examples/completion.zsh
+    fi
 fi
 
 # ==============================================================================
