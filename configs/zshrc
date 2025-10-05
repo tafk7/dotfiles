@@ -5,6 +5,11 @@ export DOTFILES_DIR="/home/tafk/dotfiles"
 # Uses Starship prompt for fast startup with visual features
 # Single optimized configuration - no switching needed
 
+# Fix locale settings to prevent warnings
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+
 # ==============================================================================
 # Essential Zsh Options
 # ==============================================================================
@@ -164,20 +169,22 @@ fi
 
 if [[ "$IS_WSL" == "true" ]]; then
     # WSL-specific aliases
-    alias open='explorer.exe'
     alias winget='/mnt/c/Windows/System32/winget.exe'
-    
+
     # Windows path helper
     wcd() {
         local winpath=$(wslpath -w "$(pwd)")
         echo "$winpath" | clip.exe
         echo "Windows path copied to clipboard: $winpath"
     }
-    
-    # Explorer in current directory
+
+    # Explorer in current directory (also provides 'open' functionality)
     explorer() {
         explorer.exe "${1:-.}"
     }
+
+    # Alias for explorer
+    alias open='explorer'
 fi
 
 # ==============================================================================
