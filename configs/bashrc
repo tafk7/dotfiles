@@ -1,6 +1,11 @@
 # Modern Bash Configuration - Power User Setup
 # Part of dotfiles - optimized for development workflow
 
+# Fix locale settings to prevent warnings
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+
 # Detect DOTFILES_DIR if not set
 if [[ -z "$DOTFILES_DIR" ]]; then
     # Get the directory of this bashrc file, then go up one level
