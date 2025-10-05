@@ -93,9 +93,12 @@ install_work_packages() {
     install_package_set "docker"
     
     # Add user to docker group if docker was installed
-    if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
-        safe_sudo usermod -aG docker "$USER"
-        warn "Added to docker group. Log out and back in for changes to take effect."
+    if command -v docker >/dev/null 2>&1; then
+        # Check /etc/group directly (groups only shows current session)
+        if ! grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
+            safe_sudo usermod -aG docker "$USER"
+            success "Added $USER to docker group"
+        fi
     fi
 }
 
