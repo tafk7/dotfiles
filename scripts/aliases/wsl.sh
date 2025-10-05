@@ -27,6 +27,13 @@ alias explorer='explorer.exe .'
 # Clipboard integration
 alias cwd='pwd | clip.exe'
 
+# Windows path helper function
+wcd() {
+    local winpath=$(wslpath -w "$(pwd)")
+    echo "$winpath" | clip.exe
+    echo "Windows path copied to clipboard: $winpath"
+}
+
 # Path conversion
 alias wpath='wslpath -w'
 alias lpath='wslpath -u'
