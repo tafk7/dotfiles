@@ -110,13 +110,13 @@ EOF
 # Phase 1: System Verification
 phase_verify_system() {
     log "Phase 1: System Verification"
-    
+
     # Check Ubuntu
     if ! command -v lsb_release >/dev/null 2>&1; then
         error "This script requires Ubuntu"
         exit 1
     fi
-    
+
     # Check basic tools that should exist
     for cmd in curl wget git; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -124,10 +124,19 @@ phase_verify_system() {
             exit 1
         fi
     done
-    
+
     detect_environment
-    
-    
+
+    # Generate locale if not present
+    if [[ "$DRY_RUN" != "true" ]]; then
+        if ! locale -a | grep -qi "en_US.utf8"; then
+            log "Generating en_US.UTF-8 locale..."
+            safe_sudo locale-gen en_US.UTF-8
+            safe_sudo update-locale LANG=en_US.UTF-8
+            success "Locale generated"
+        fi
+    fi
+
     success "System verification complete"
 }
 
