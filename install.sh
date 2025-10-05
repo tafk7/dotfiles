@@ -229,19 +229,10 @@ phase_setup_configs() {
     fi
     
     
-    # Validation
-    log "Running setup validation..."
-    if [[ "$DRY_RUN" != "true" ]]; then
-        if ! "$SCRIPT_DIR/scripts/check-setup.sh"; then
-            error "Setup validation failed"
-            exit 1
-        fi
-    fi
-    
     # Cleanup
     cleanup_old_backups 10
-    
-    success "Configuration and validation complete"
+
+    success "Configuration complete"
 }
 
 # Process symlink configuration
@@ -286,16 +277,68 @@ run_installation() {
     phase_verify_system
     phase_install_packages
     phase_setup_configs
-    
+
     # Success message
     echo
     success "🎉 Dotfiles installation complete!"
     echo
-    echo "Next steps:"
-    echo "1. Restart your shell or run: source ~/.bashrc"
+
+    # Post-installation instructions
+    local needs_relogin=false
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📋 Next Steps:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo
+
+    # Check if Docker group was added
     if [[ "$INSTALL_WORK" == "true" ]] && command -v docker >/dev/null 2>&1; then
-        echo "2. Log out and back in for Docker group changes"
+        if grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
+            if ! groups | grep -q docker; then
+                echo "⚠️  Docker group membership requires re-login"
+                needs_relogin=true
+            fi
+        fi
     fi
+
+    # Check if NVM was installed
+    local nvm_installed=false
+    if [[ "$INSTALL_WORK" == "true" ]] && [[ -d "$HOME/.nvm" ]]; then
+        nvm_installed=true
+    fi
+
+    if [[ "$needs_relogin" == "true" ]]; then
+        echo "1. 🔄 Exit and reconnect to your terminal/WSL session"
+        echo "   (Required for Docker group membership to take effect)"
+        echo
+        echo "2. ✅ Verify installation:"
+        echo "   ./scripts/check-setup.sh"
+        echo
+        if [[ "$nvm_installed" == "true" ]]; then
+            echo "3. 🧪 Test Node.js/npm:"
+            echo "   node --version && npm --version"
+            echo
+        fi
+        echo "4. 🎨 Optionally switch theme:"
+        echo "   ./scripts/theme-switcher.sh"
+    else
+        echo "1. 🔄 Reload your shell configuration:"
+        echo "   source ~/.bashrc  # or source ~/.zshrc"
+        echo
+        echo "2. ✅ Verify installation:"
+        echo "   ./scripts/check-setup.sh"
+        echo
+        if [[ "$nvm_installed" == "true" ]]; then
+            echo "3. 🧪 Test Node.js/npm:"
+            echo "   node --version && npm --version"
+            echo
+        fi
+        echo "4. 🎨 Optionally switch theme:"
+        echo "   ./scripts/theme-switcher.sh"
+    fi
+
+    echo
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
 # Main entry point

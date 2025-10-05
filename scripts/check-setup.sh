@@ -33,12 +33,18 @@ echo
 
 # 2. Docker group membership (silent permission failures)
 if command -v docker >/dev/null 2>&1; then
-    if ! groups | grep -q docker; then
-        echo "⚠️  Docker installed but you're not in docker group"
-        echo "   Fix: sudo usermod -aG docker $USER && newgrp docker"
-        issues_found=1
+    # Check /etc/group for membership
+    if grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
+        # In group file, check if active in current session
+        if groups | grep -q docker; then
+            echo "✅ Docker group membership active"
+        else
+            echo "ℹ️  Docker group added (log out and back in to activate)"
+        fi
     else
-        echo "✅ Docker group membership OK"
+        echo "❌ Not in docker group"
+        echo "   Fix: sudo usermod -aG docker $USER"
+        issues_found=1
     fi
 fi
 
