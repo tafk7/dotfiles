@@ -28,6 +28,9 @@ alias gpu='git push -u origin HEAD'
 alias gl='git log --oneline --decorate --graph'
 alias gla='git log --oneline --decorate --graph --all'
 
+# Lazygit TUI
+alias lg='lazygit'
+
 # Stash
 alias gstash='git stash'
 alias gstp='git stash pop'
