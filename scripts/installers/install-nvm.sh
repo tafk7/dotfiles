@@ -7,6 +7,16 @@ set -eo pipefail  # Remove -u flag to avoid NVM's unbound variable issues
 # Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/core.sh"
 
+# Helper function to run NVM commands safely
+# NVM uses unbound variables internally, so we need to temporarily disable -u checking
+run_nvm_command() {
+    set +u
+    "$@"
+    local exit_code=$?
+    set -u
+    return $exit_code
+}
+
 log "Installing NVM (Node Version Manager)..."
 
 # NVM installation directory
@@ -21,10 +31,8 @@ fi
 # Check if already installed
 if [[ -d "$NVM_DIR" ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
     log "NVM is already installed at $NVM_DIR"
-    # Source NVM to check version (disable strict mode temporarily)
-    set +u
-    . "$NVM_DIR/nvm.sh"
-    set -u
+    # Source NVM to check version
+    run_nvm_command . "$NVM_DIR/nvm.sh"
     nvm --version
 
     # Check if Node.js is installed via NVM
@@ -39,11 +47,9 @@ else
     # Create NVM directory
     mkdir -p "$NVM_DIR"
 
-    # Download and install NVM (disable strict mode for installer)
+    # Download and install NVM
     log "Downloading NVM installer..."
-    set +u
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    set -u
+    run_nvm_command bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
 
     # Verify installation
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
@@ -54,20 +60,16 @@ else
     success "NVM installed successfully!"
 fi
 
-# Source NVM (disable strict mode)
+# Source NVM
 log "Loading NVM..."
 export NVM_DIR="$HOME/.nvm"
-set +u
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-set -u
+run_nvm_command . "$NVM_DIR/nvm.sh"
 
-# Install latest LTS Node.js (disable strict mode for NVM commands)
+# Install latest LTS Node.js
 log "Installing latest LTS Node.js..."
-set +u
-nvm install --lts
-nvm use --lts
-nvm alias default lts/*
-set -u
+run_nvm_command nvm install --lts
+run_nvm_command nvm use --lts
+run_nvm_command nvm alias default lts/*
 
 # Verify installation
 if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then

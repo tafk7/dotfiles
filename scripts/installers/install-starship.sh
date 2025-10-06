@@ -9,11 +9,21 @@ source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/core.sh"
 
 log "Installing Starship prompt..."
 
-# Check if starship is already installed
+# Check if starship is already installed and get version
 if command -v starship >/dev/null 2>&1; then
-    log "Starship is already installed"
-    starship --version
-    exit 0
+    CURRENT_VERSION=$(starship --version | head -n1 | awk '{print $2}')
+    log "Starship $CURRENT_VERSION is already installed"
+
+    # Check for latest version
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/starship/starship/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+
+    if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
+        success "Already up to date!"
+        exit 0
+    else
+        log "Latest version available: $LATEST_VERSION"
+        log "Updating Starship..."
+    fi
 fi
 
 # Install starship using the official installer
@@ -29,7 +39,7 @@ chmod +x install.sh
 
 # Run installer with automatic yes and explicit bin directory (requires sudo)
 log "Installing Starship to /usr/local/bin (requires sudo)..."
-sudo sh install.sh --yes --bin-dir /usr/local/bin
+safe_sudo sh install.sh --yes --bin-dir /usr/local/bin
 
 # Cleanup
 cd -

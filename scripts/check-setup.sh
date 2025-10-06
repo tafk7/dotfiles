@@ -81,13 +81,13 @@ if [[ -d "$HOME/.nvm" ]] && [[ -s "$HOME/.nvm/nvm.sh" ]]; then
         fi
     else
         echo "⚠️  NVM directory exists but NVM is not functional"
-        echo "   Fix: Reinstall with ./scripts/install-nvm.sh"
+        echo "   Fix: Reinstall with ./scripts/installers/install-nvm.sh"
     fi
 elif command -v node >/dev/null 2>&1; then
     # Node installed but not via NVM
     echo "⚠️  Node.js is installed but not via NVM"
     echo "   This may cause permission issues with global packages"
-    echo "   Fix: Install NVM with ./scripts/install-nvm.sh"
+    echo "   Fix: Install NVM with ./scripts/installers/install-nvm.sh"
 fi
 
 # 5. WSL-specific checks
@@ -127,6 +127,51 @@ for tool in "${essential_tools[@]}"; do
         echo "✅ $tool available"
     else
         echo "❌ $tool missing - install with: sudo apt-get install $tool"
+        issues_found=1
+    fi
+done
+
+# 8. Check for configuration conflicts (Phase 2 fixes)
+echo
+echo "Checking for configuration conflicts..."
+
+# Check EDITOR variable conflicts (exclude comments and strings)
+editor_sources=()
+if grep -v "^[[:space:]]*#" "$DOTFILES_DIR/scripts/aliases/vscode.sh" 2>/dev/null | grep -q "^[[:space:]]*export EDITOR"; then
+    editor_sources+=("aliases/vscode.sh")
+fi
+if grep -v "^[[:space:]]*#" "$DOTFILES_DIR/scripts/install-vscode.sh" 2>/dev/null | grep -q "^[[:space:]]*export EDITOR"; then
+    editor_sources+=("install-vscode.sh")
+fi
+
+if [[ ${#editor_sources[@]} -gt 0 ]]; then
+    echo "⚠️  EDITOR variable conflict detected in: ${editor_sources[*]}"
+    echo "   Should only be set in scripts/env/common.sh"
+    issues_found=1
+else
+    echo "✅ No EDITOR conflicts (single source of truth: env/common.sh)"
+fi
+
+# Check for deprecated FZF aliases
+if [[ -f "$DOTFILES_DIR/scripts/env/fzf.sh" ]]; then
+    if grep -q "alias rg=" "$DOTFILES_DIR/scripts/env/fzf.sh" 2>/dev/null; then
+        echo "❌ FZF aliases conflict with core tools (rg should not be aliased)"
+        echo "   Fix: Use fgb, fgl, frg instead of gb, gl, rg"
+        issues_found=1
+    else
+        echo "✅ FZF aliases properly prefixed (no conflicts)"
+    fi
+fi
+
+# Check for deprecated scripts (should not exist after cleanup)
+deprecated_files=(
+    "$DOTFILES_DIR/scripts/setup-zsh-environment.sh"
+    "$DOTFILES_DIR/scripts/setup-zsh-environment.sh.deprecated"
+)
+for file in "${deprecated_files[@]}"; do
+    if [[ -f "$file" ]]; then
+        echo "⚠️  Found deprecated script: $(basename "$file")"
+        echo "   This should be removed (conflicts with current setup)"
         issues_found=1
     fi
 done
