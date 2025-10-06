@@ -19,7 +19,7 @@ Actual:   a1b2c3d4e5f6789...
    ```bash
    # Clear cache and retry
    rm -rf /tmp/dotfiles-* ~/.cache/dotfiles/
-   ./install.sh --force
+   ./setup.sh --force
    ```
 
 2. **Outdated Hash (New Version Released)**
@@ -38,7 +38,7 @@ Actual:   a1b2c3d4e5f6789...
    export http_proxy=http://proxy.company.com:8080
    
    # Try installation
-   ./install.sh
+   ./setup.sh
    ```
 
 ### Problem: "Cannot reach URL"
@@ -68,7 +68,7 @@ Actual:   a1b2c3d4e5f6789...
 3. **Firewall/Corporate Restrictions**
    ```bash
    # Skip problematic downloads temporarily
-   ./install.sh --skip-existing
+   ./setup.sh --skip-existing
    
    # Manual installation later:
    # Download manually and place in correct location
@@ -181,7 +181,7 @@ Actual:   a1b2c3d4e5f6789...
 3. **Skip Missing Packages**
    ```bash
    # Continue installation without problematic packages
-   ./install.sh --skip-existing
+   ./setup.sh --skip-existing
    
    # Install missing tools manually later
    ```
@@ -278,7 +278,7 @@ Enter your full name: [hangs]
 1. **Non-Interactive Mode**
    ```bash
    # Skip interactive setup
-   ./install.sh --force
+   ./setup.sh --force
    
    # Configure manually later
    git config --global user.name "Your Name"
@@ -292,7 +292,7 @@ Enter your full name: [hangs]
    git config --global user.email "your.email@example.com"
    
    # Then run installation
-   ./install.sh
+   ./setup.sh
    ```
 
 ### Problem: "Tmux config syntax invalid"
@@ -417,7 +417,7 @@ rm -rf /tmp/dotfiles-* ~/.cache/dotfiles/
 
 # Start fresh
 git clone <dotfiles-repo> && cd dotfiles
-./install.sh
+./setup.sh
 ```
 
 ### Debug Mode
@@ -429,7 +429,7 @@ For detailed troubleshooting:
 set -x  # Before running commands
 
 # Run with maximum verbosity
-bash -x ./install.sh
+bash -x ./setup.sh
 
 # Check specific functions
 source lib.sh
