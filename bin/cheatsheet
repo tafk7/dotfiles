@@ -257,10 +257,22 @@ RESET="$PREVIEW_RESET"
 # Extract from formatted line
 line="\$1"
 category=\$(echo "\$line" | awk '{print \$1}')
-shortcut=\$(echo "\$line" | awk '{print \$2}')
+# Extract shortcut - need to capture everything between first and third field
+shortcut=\$(echo "\$line" | awk '{
+    # Find where the third field (description) starts by looking for multiple spaces
+    match(\$0, /^[^ ]+ +[^ ]+ +/)
+    if (RSTART > 0) {
+        # Extract just the shortcut (field 2)
+        line_start = substr(\$0, 1, RLENGTH)
+        match(line_start, /^[^ ]+ +/)
+        print substr(line_start, RLENGTH + 1)
+    } else {
+        print \$2
+    }
+}' | sed 's/[[:space:]]*\$//')
 
-# Find the full entry from the index file
-index_line=\$(grep "^\${category}│\${shortcut}│" "$index_file" | head -1)
+# Find the full entry from the index file using literal string matching (-F)
+index_line=\$(grep -F "\${category}│\${shortcut}│" "$index_file" | head -1)
 
 if [[ -n "\$index_line" ]]; then
     full_desc=\$(echo "\$index_line" | cut -d'│' -f3)
@@ -303,11 +315,18 @@ PREVIEW_EOF
     chmod +x "$preview_script"
 
     # Build searchable index, format for display, and let user select
-    local selected=$(cat "$index_file" | \
-        awk -F'│' '{printf "%-10s %-15s %-40s %s\n", $1, $2, $3, $4}' | \
+    local selected=$({
+        # Add column headers
+        printf "${BOLD}%-10s %-15s %-40s %s${RESET}\n" "CATEGORY" "SHORTCUT" "DESCRIPTION" "COMMAND"
+        # Add separator line
+        printf "${DIM}%-10s %-15s %-40s %s${RESET}\n" "────────" "────────" "────────────────────────────────────" "────────"
+        # Add all shortcuts
+        cat "$index_file" | awk -F'│' '{printf "%-10s %-15s %-40s %s\n", $1, $2, $3, $4}'
+    } | \
         fzf --ansi \
             --prompt='🔍 Search shortcuts > ' \
             --header='Type: shortcut name, description, or category | Enter: Copy command | Esc: Cancel' \
+            --header-lines=2 \
             --preview="$preview_script {}" \
             --preview-window='top:10:wrap:rounded:border-rounded' \
             --height=100% \
