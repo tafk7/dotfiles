@@ -158,7 +158,266 @@ show_all() {
     show_dev
 }
 
-# Interactive FZF selector with preview
+# Build comprehensive searchable index of all shortcuts
+# Format: category│shortcut│description│full_command
+build_shortcut_index() {
+    cat <<'INDEX'
+git│gs│git status│git status
+git│gl│log graph oneline│git log --oneline --decorate --graph
+git│gla│log graph all branches│git log --oneline --decorate --graph --all
+git│ga│add files│git add
+git│gaa│add all changes│git add .
+git│gau│add updated files│git add -u
+git│gd│diff unstaged│git diff
+git│gds│diff staged│git diff --staged
+git│grs│restore working changes│git restore
+git│grss│unstage files│git restore --staged
+git│gc│commit│git commit
+git│gcm│commit with message│git commit -m
+git│gca│amend commit│git commit --amend
+git│gsw│switch branch│git switch
+git│gswc│switch create branch│git switch -c
+git│gb│list branches│git branch
+git│gf│fetch│git fetch
+git│gfo│fetch origin│git fetch origin
+git│gfu│fetch upstream│git fetch upstream
+git│gfa│fetch all remotes│git fetch --all
+git│gfp│fetch and prune│git fetch --prune
+git│gp│push│git push
+git│gpl│pull│git pull
+git│gpu│push set upstream│git push -u origin HEAD
+git│gst│stash changes│git stash
+git│gstp│stash pop│git stash pop
+git│gsta│stash apply│git stash apply
+git│gstl│stash list│git stash list
+git│gcl│clone repository│git clone
+git│lg│lazygit TUI│lazygit
+git│gundo│undo last commit keep changes│git reset HEAD~1 --soft
+git│gquick│add commit push in one command│git add . && git commit -m "..." && git push
+tmux│Ctrl+a |│split window horizontal│prefix + |
+tmux│Ctrl+a -│split window vertical│prefix + -
+tmux│Ctrl+a x│kill pane│prefix + x
+tmux│Ctrl+a X│kill window│prefix + X
+tmux│Ctrl+a c│new window│prefix + c
+tmux│Ctrl+a 1-9│switch to window number│prefix + number
+tmux│Ctrl+a n│next window│prefix + n
+tmux│Ctrl+a p│previous window│prefix + p
+tmux│Ctrl+a d│detach session│prefix + d
+tmux│Ctrl+a s│list sessions│prefix + s
+tmux│Ctrl+a $│rename session│prefix + $
+tmux│Ctrl+a (│previous session│prefix + (
+tmux│Ctrl+a )│next session│prefix + )
+tmux│Ctrl+a r│reload config│prefix + r
+tmux│Ctrl+a ?│show keybindings│prefix + ?
+tmux│Alt+E│pane up no prefix│Alt+E (no prefix needed)
+tmux│Alt+S│pane left no prefix│Alt+S (no prefix needed)
+tmux│Alt+D│pane down no prefix│Alt+D (no prefix needed)
+tmux│Alt+F│pane right no prefix│Alt+F (no prefix needed)
+tmux│Alt+1-9│window number no prefix│Alt+number (no prefix needed)
+tmux│Ctrl+a E│resize pane up│prefix + E (5 lines)
+tmux│Ctrl+a S│resize pane left│prefix + S (5 lines)
+tmux│Ctrl+a D│resize pane down│prefix + D (5 lines)
+tmux│Ctrl+a F│resize pane right│prefix + F (5 lines)
+vim│Ctrl+P│fuzzy file search│Ctrl+P
+vim│,f│file browser│leader + f
+vim│,b│buffer list│leader + b
+vim│,g│grep search│leader + g
+vim│Space│clear highlight│Space
+vim│,gs│git status│leader + gs
+vim│,gd│git diff│leader + gd
+vim│,gb│git blame│leader + gb
+vim│,hn│next git hunk│leader + hn
+vim│,hs│stage git hunk│leader + hs
+vim│,hu│undo git hunk│leader + hu
+vim│,af│autofix linting│leader + af
+vim│,an│next error│leader + an
+vim│,ap│previous error│leader + ap
+vim│,/│toggle comment│leader + /
+vim│,n│toggle line numbers│leader + n
+vim│,ss│strip whitespace│leader + ss
+vim│Ctrl+E│window up│Ctrl+E
+vim│Ctrl+S│window left│Ctrl+S
+vim│Ctrl+D│window down│Ctrl+D
+vim│Ctrl+F│window right│Ctrl+F
+vim│cs"'│change surrounding quotes│cs"' (change " to ')
+vim│ds"│delete surrounding quotes│ds"
+vim│ysiw"│surround word with quotes│ysiw"
+vim│gc│comment motion│gc + motion
+vim│,w│save force│leader + w
+vim│,Q│quit all│leader + Q
+vim│:w│save│:w
+vim│:q│quit│:q
+vim│,q│quit│leader + q
+vim│u│undo│u
+vim│.│repeat last change│.
+shell│..│parent directory│cd ..
+shell│...│up two directories│cd ../..
+shell│....│up three directories│cd ../../..
+shell│-│previous directory│cd -
+shell│ls│list files eza│eza --color=always --group-directories-first
+shell│ll│long list│eza -l --time-style=long-iso
+shell│la│list all including hidden│eza -la
+shell│l│compact list│eza -CF
+shell│tree│tree view│eza --tree
+shell│bat│syntax highlighted cat│batcat
+shell│view│view file with bat│batcat
+shell│fd│modern find│fdfind
+shell│df│disk free human readable│df -h
+shell│du│disk usage human readable│du -h
+shell│free│memory human readable│free -h
+shell│psmem│processes by memory│ps auxf | sort -nr -k 4
+shell│pscpu│processes by cpu│ps auxf | sort -nr -k 3
+shell│ports│list open ports│netstat -tulanp
+shell│myip│show public IP│curl ifconfig.me
+shell│localip│show local IP│hostname -I
+shell│tm│new tmux session│tmux new -s
+shell│ta│attach tmux session│tmux attach -t
+shell│tl│list tmux sessions│tmux list-sessions
+shell│tk│kill tmux session│tmux kill-session -t
+shell│untar│extract tar.gz│tar -zxvf
+shell│tarc│create tar.gz│tar -czf
+shell│h│history│history
+shell│hgrep│search history│history | grep
+shell│rmff│force recursive remove│rm -rf
+shell│rmi│interactive remove│rm -i
+shell│cpv│verbose copy│cp -v
+shell│rmv│verbose remove│rm -v
+shell│count│count files│find . -type f | wc -l
+shell│reload│reload shell config│source ~/.zshrc or ~/.bashrc
+shell│themes│list available themes│ls configs/themes/
+shell│theme-switch│interactive theme switcher│$DOTFILES_DIR/bin/theme-switcher
+shell│update-configs│update dotfiles configs│$DOTFILES_DIR/bin/update-configs
+shell│fr│find and replace│$DOTFILES_DIR/bin/fr
+shell│cheat│this cheatsheet│$DOTFILES_DIR/bin/cheatsheet
+shell│cl│new claude session│claude
+shell│clc│continue claude session│claude --continue
+shell│clp│claude one-off command│claude --print
+shell│fgb│fzf git branch switcher│FZF git branch selector
+shell│fgl│fzf git log browser│FZF git log browser
+shell│frg│fzf ripgrep search│FZF + ripgrep content search
+shell│fp│fzf project finder│FZF project directory finder
+shell│md│view markdown│bat --style=plain --language=markdown
+docker│dps│list running containers│docker ps
+docker│dpsa│list all containers│docker ps -a
+docker│dexec│exec into container│docker exec -it
+docker│dlogs│follow container logs│docker logs -f
+docker│dstop│stop container│docker stop
+docker│drm│remove container│docker rm
+docker│drmf│force remove container│docker rm -f
+docker│di│list images│docker images
+docker│dpull│pull image│docker pull
+docker│dbuild│build image with tag│docker build -t
+docker│drmi│remove image│docker rmi
+docker│dc│docker compose command│docker compose
+docker│dcu│compose up detached│docker compose up -d
+docker│dcd│compose down│docker compose down
+docker│dcl│compose logs follow│docker compose logs -f
+docker│dcr│compose restart│docker compose restart
+docker│dcb│compose build│docker compose build
+docker│dprune│prune unused resources│docker system prune
+docker│dprunea│prune all unused│docker system prune -a
+docker│denter│enter container bash│docker exec -it <container> /bin/bash
+docker│dclean│clean everything│docker system prune -af --volumes
+docker│drun│quick run remove│docker run -it --rm
+docker│dstopall│stop all containers│docker stop $(docker ps -q)
+python│venv│create virtual env│python3 -m venv venv
+python│activate│activate venv│source venv/bin/activate
+python│pipreqs│install requirements│pip install -r requirements.txt
+python│py│python3 shortcut│python3
+python│ipy│ipython shell│ipython
+python│pytest│run pytest│python -m pytest
+python│pyt│pytest verbose│python -m pytest -v
+python│fmt│format with black│black .
+python│lint│lint with ruff│ruff check .
+python│lintf│lint and fix│ruff check . --fix
+python│pyserver│quick http server│python -m http.server
+node│ni│npm install│npm install
+node│nr│npm run│npm run
+node│nrm│remove node_modules│rm -rf node_modules package-lock.json
+node│nrd│npm run dev│npm run dev
+node│nrb│npm run build│npm run build
+node│nrt│npm run test│npm run test
+node│nrs│npm run start│npm run start
+node│nclean│clean reinstall│rm -rf node_modules && npm install
+vscode│c│open vscode here│code .
+vscode│cz│edit zshrc│code ~/.zshrc
+vscode│cb│edit bashrc│code ~/.bashrc
+vscode│cdot│open dotfiles│code $DOTFILES_DIR
+vscode│ctodo│open todos│code $DOTFILES_DIR/_artifacts/issues/
+vscode│cw│open with work profile│code . --profile "Work"
+vscode│cp│open with personal profile│code . --profile "Personal"
+vscode│gdvc│view staged in vscode│git diff --cached | code -
+vscode│gdiff│view diff in vscode│git diff | code -
+vscode│csettings│edit vscode settings│code ~/.config/Code/User/settings.json
+vscode│ckeys│edit vscode keys│code ~/.config/Code/User/keybindings.json
+vscode│cws│open workspace file│code *.code-workspace
+vscode│cproj│fzf project opener│FZF project finder + open in VSCode
+vscode│cf│fzf file opener│FZF file finder + open in VSCode
+vscode│cgrep│fzf ripgrep opener│Ripgrep search + open at line in VSCode
+vscode│cdiff│diff two files│code --diff file1 file2
+wsl│cdwin│cd windows home│cd $WIN_HOME
+wsl│cddesk│cd windows desktop│cd $WIN_DESKTOP
+wsl│cddl│cd windows downloads│cd $WIN_DOWNLOADS
+wsl│cddocs│cd windows documents│cd $WIN_DOCUMENTS
+wsl│notepad│windows notepad│notepad.exe
+wsl│clip│windows clipboard│clip.exe
+wsl│pwsh│powershell│powershell.exe
+wsl│cmd│windows cmd│cmd.exe
+wsl│explorer│open windows explorer│explorer.exe
+wsl│open│open windows explorer│explorer.exe
+wsl│cwd│copy pwd to clipboard│pwd | clip.exe
+wsl│wcd│copy windows path│wslpath -w $(pwd) | clip.exe
+wsl│wpath│convert to windows path│wslpath -w
+wsl│lpath│convert to linux path│wslpath -u
+wsl│win-ssh│list windows ssh keys│ls -la $WIN_SSH
+wsl│sync-ssh│import windows ssh keys│import_windows_ssh_keys
+INDEX
+}
+
+# Show detailed information about a specific shortcut
+show_shortcut_detail() {
+    local category="$1"
+    local shortcut="$2"
+
+    # Get the full line from the index
+    local detail=$(build_shortcut_index | grep "^${category}│${shortcut}│")
+
+    if [[ -n "$detail" ]]; then
+        local desc=$(echo "$detail" | cut -d'│' -f3)
+        local cmd=$(echo "$detail" | cut -d'│' -f4)
+
+        echo ""
+        echo "${BOLD}${YELLOW}${shortcut}${RESET}"
+        echo "${DIM}────────────────────────────────────────${RESET}"
+        echo "${CYAN}Category:${RESET}    ${category}"
+        echo "${CYAN}Usage:${RESET}       ${desc}"
+        echo "${CYAN}Command:${RESET}     ${cmd}"
+        echo ""
+
+        # Add context-specific tips
+        case "$category" in
+            git)
+                echo "${DIM}💡 Tip: Type 'cheat git' for all git shortcuts${RESET}"
+                ;;
+            tmux)
+                echo "${DIM}💡 Tip: Prefix is Ctrl+a (change with TMUX_PREFIX)${RESET}"
+                ;;
+            vim)
+                echo "${DIM}💡 Tip: Leader key is comma (,)${RESET}"
+                ;;
+        esac
+    else
+        echo ""
+        echo "${DIM}No details available${RESET}"
+        echo ""
+    fi
+}
+
+# Export function for FZF preview
+export -f show_shortcut_detail
+export -f build_shortcut_index
+
+# Interactive FZF selector with searchable shortcuts
 show_interactive() {
     # Fallback to traditional view if FZF not available
     if ! command -v fzf >/dev/null 2>&1; then
@@ -166,25 +425,48 @@ show_interactive() {
         return
     fi
 
-    local categories="vim
-tmux
-git
-shell
-dev
-all"
+    # Create temporary file for preview script
+    local preview_script=$(mktemp)
+    cat > "$preview_script" <<'PREVIEW_EOF'
+#!/bin/bash
+# Extract category and shortcut from formatted line
+category=$(echo "$1" | awk '{print $1}')
+shortcut=$(echo "$1" | awk '{print $2}')
 
-    local selected=$(echo "$categories" | fzf \
-        --prompt="📚 Select Cheatsheet > " \
-        --header="↑↓: Navigate | Enter: Open | Esc: Cancel" \
-        --preview="$0 {}" \
-        --preview-window=right:65%:wrap:rounded \
-        --height=100% \
-        --border=rounded \
-        --color="header:italic:cyan,prompt:bold:yellow")
+# Source the cheatsheet to get functions
+source "$CHEATSHEET_PATH"
 
-    # If user selected a category, show it in less
+# Show the detail
+show_shortcut_detail "$category" "$shortcut"
+PREVIEW_EOF
+    chmod +x "$preview_script"
+
+    # Export path to this script for preview
+    export CHEATSHEET_PATH="$0"
+
+    # Build searchable index, format for display, and let user select
+    local selected=$(build_shortcut_index | \
+        awk -F'│' '{printf "%-10s %-15s %-40s %s\n", $1, $2, $3, $4}' | \
+        fzf --ansi \
+            --prompt='🔍 Search shortcuts > ' \
+            --header='Type: shortcut name, description, or category | Enter: Copy command | Esc: Cancel' \
+            --preview="$preview_script {}" \
+            --preview-window='top:10:wrap:rounded:border-rounded' \
+            --height=100% \
+            --border=rounded \
+            --color='header:italic:cyan,prompt:bold:yellow')
+
+    # Clean up preview script
+    rm -f "$preview_script"
+
+    # If user selected something, extract and display the actual command
     if [[ -n "$selected" ]]; then
-        "$0" "$selected" | less -R
+        local command=$(echo "$selected" | awk '{for(i=4;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/[[:space:]]*$//')
+        echo ""
+        echo "${BOLD}${CYAN}Command:${RESET} ${YELLOW}${command}${RESET}"
+        echo ""
+        echo "${DIM}💡 Tip: Use Ctrl+Shift+C to copy from terminal${RESET}"
+        echo ""
     fi
 }
 
