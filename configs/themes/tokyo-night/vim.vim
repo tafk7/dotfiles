@@ -1,10 +1,7 @@
 " Tokyo Night theme configuration for Vim
 " https://github.com/folke/tokyonight.nvim
 
-" Set colorscheme
-colorscheme tokyonight
-
-" Tokyo Night specific settings
+" Tokyo Night specific settings (set before loading colorscheme)
 let g:tokyonight_style = 'night'
 let g:tokyonight_italic_functions = 1
 let g:tokyonight_italic_comments = 1
@@ -20,5 +17,12 @@ let g:tokyonight_dark_float = 1
 let g:tokyonight_colors = {}
 let g:tokyonight_lualine_bold = 1
 
-" Airline theme
-let g:airline_theme='tokyonight'
+" Set colorscheme with error handling
+try
+    colorscheme tokyonight
+    let g:airline_theme='tokyonight'
+catch
+    " Fallback if tokyonight not available
+    colorscheme desert
+    let g:airline_theme='dark'
+endtry
