@@ -276,6 +276,7 @@ process_git_config() {
     local source="$1"
     local target="$2"
     local backup_dir="$3"
+    local force="${4:-false}"
 
     # Backup existing config if it exists
     if [[ -f "$target" && ! -L "$target" ]]; then
@@ -293,23 +294,31 @@ process_git_config() {
         local existing_name=$(git config --global user.name 2>/dev/null || true)
         local existing_email=$(git config --global user.email 2>/dev/null || true)
 
-        if [[ -n "$existing_name" ]]; then
-            read -p "Enter your git name [$existing_name]: " git_name
-            git_name="${git_name:-$existing_name}"
+        # Skip prompts if already configured (unless forced)
+        if [[ -n "$existing_name" && -n "$existing_email" && "$force" != "true" ]]; then
+            git_name="$existing_name"
+            git_email="$existing_email"
+            success "Using existing git config (user.name: $git_name, user.email: $git_email)"
         else
-            read -p "Enter your git name: " git_name
-        fi
+            # Prompt for configuration
+            if [[ -n "$existing_name" ]]; then
+                read -p "Enter your git name [$existing_name]: " git_name
+                git_name="${git_name:-$existing_name}"
+            else
+                read -p "Enter your git name: " git_name
+            fi
 
-        if [[ -n "$existing_email" ]]; then
-            read -p "Enter your git email [$existing_email]: " git_email
-            git_email="${git_email:-$existing_email}"
-        else
-            read -p "Enter your git email: " git_email
-        fi
+            if [[ -n "$existing_email" ]]; then
+                read -p "Enter your git email [$existing_email]: " git_email
+                git_email="${git_email:-$existing_email}"
+            else
+                read -p "Enter your git email: " git_email
+            fi
 
-        # Basic email validation
-        if [[ ! "$git_email" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
-            warn "Email format looks incorrect: $git_email"
+            # Basic email validation
+            if [[ ! "$git_email" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
+                warn "Email format looks incorrect: $git_email"
+            fi
         fi
     else
         # Non-interactive fallback

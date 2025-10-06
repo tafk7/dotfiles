@@ -63,7 +63,7 @@ set nocompatible
 
 " Enable modern Vim features
 set encoding=utf-8
-set fileencoding=utf-8
+setglobal fileencoding=utf-8
 
 " Enable file type detection and plugins
 filetype plugin indent on

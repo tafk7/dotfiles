@@ -142,7 +142,7 @@ source-file $tmux_theme_file
 EOF
     
     # Reload tmux if running
-    if command -v tmux >/dev/null 2>&1 && tmux info &>/dev/null; then
+    if command -v tmux >/dev/null 2>&1 && tmux list-sessions &>/dev/null; then
         tmux source-file "$HOME/.tmux.conf" 2>/dev/null || true
         success "Tmux theme applied and reloaded: $theme"
     else
