@@ -168,6 +168,7 @@ phase_install_packages() {
         [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
 
         # Modern tools via dedicated installers
+        "$DOTFILES_DIR/install/install-neovim.sh" || { error "Neovim installation failed"; exit 1; }
         "$DOTFILES_DIR/install/install-starship.sh" || { error "Starship installation failed"; exit 1; }
         "$DOTFILES_DIR/install/install-eza.sh" || { error "Eza installation failed"; exit 1; }
         "$DOTFILES_DIR/install/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
