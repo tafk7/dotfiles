@@ -25,12 +25,12 @@ declare -A THEMES=(
     ["nord"]="Nord - Arctic, clean, bluish palette"
     ["kanagawa"]="Kanagawa - Japanese-inspired, warm and balanced"
     ["tokyo-night"]="Tokyo Night - Vibrant cyberpunk aesthetic"
-    ["gruvbox-material"]="Gruvbox Material - Softer variant of gruvbox"
-    ["catppuccin-mocha"]="Catppuccin Mocha - Modern pastel, dark variant"
+    ["gruvbox"]="Gruvbox Material - Softer variant of gruvbox"
+    ["catppuccin"]="Catppuccin Mocha - Modern pastel, dark variant"
 )
 
 # Default theme
-DEFAULT_THEME="gruvbox-material"
+DEFAULT_THEME="gruvbox"
 
 # ==============================================================================
 # Helper Functions
@@ -314,8 +314,8 @@ THEMES:
     nord                Nord - Arctic, clean palette
     kanagawa           Kanagawa - Japanese-inspired
     tokyo-night        Tokyo Night - Cyberpunk aesthetic
-    gruvbox-material   Gruvbox Material - Softer gruvbox
-    catppuccin-*       Catppuccin variants (mocha, macchiato, frappe, latte)
+    gruvbox            Gruvbox Material - Softer gruvbox
+    catppuccin         Catppuccin Mocha - Modern pastel
 
 EXAMPLES:
     ./bin/theme-switcher                    # Interactive selection with FZF
