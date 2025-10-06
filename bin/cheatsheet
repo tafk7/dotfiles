@@ -265,9 +265,9 @@ if [[ -n "\$shortcut" ]]; then
     echo ""
     echo "\${BOLD}\${YELLOW}\${shortcut}\${RESET}"
     echo "\${DIM}────────────────────────────────────────\${RESET}"
-    echo "\${CYAN}Category:\${RESET}    \${category}"
-    echo "\${CYAN}Usage:\${RESET}       \${full_desc}"
-    echo "\${CYAN}Command:\${RESET}     \${full_cmd}"
+    echo "\${CYAN}Category:\${RESET}     \${category}"
+    echo "\${CYAN}Command:\${RESET}      \${full_cmd}"
+    echo "\${CYAN}Description:\${RESET} \${full_desc}"
     echo ""
 
     case "\$category" in
@@ -300,14 +300,14 @@ PREVIEW_EOF
 
     # Build searchable index with visible delimiters for display
     local selected=$({
-        # Add column headers with visible delimiters (swapped: command before description)
-        printf "${BOLD}%-10s │ %-15s │ %-40s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "COMMAND" "DESCRIPTION"
+        # Add column headers with visible delimiters (3 columns: category, shortcut, command)
+        printf "${BOLD}%-10s │ %-15s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "COMMAND"
         # Add separator line
-        printf "${DIM}%-10s─┼─%-15s─┼─%-40s─┼─%s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..40})" "$(printf '─%.0s' {1..20})"
-        # Format all shortcuts with visible delimiters (swap columns 3 and 4)
+        printf "${DIM}%-10s─┼─%-15s─┼─%s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..50})"
+        # Format all shortcuts with visible delimiters (show only category, shortcut, command)
         cat "$index_file" | awk -F'│' '{
-            # Format for display with visible separators (command before description)
-            display = sprintf("%-10s │ %-15s │ %-40s │ %s", $1, $2, $4, $3)
+            # Format for display with visible separators (3 columns, no description in search)
+            display = sprintf("%-10s │ %-15s │ %s", $1, $2, $4)
             # Append original line after a tab separator (invisible, clean split)
             print display "\t" $0
         }'
