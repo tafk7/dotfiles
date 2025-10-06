@@ -47,14 +47,9 @@ setopt AUTO_PARAM_SLASH       # Add trailing slash for directories
 # Load Shared Environment
 # ==============================================================================
 
-# Source shared environment variables
-if [[ -f "$DOTFILES_DIR/scripts/env/common.sh" ]]; then
-    source "$DOTFILES_DIR/scripts/env/common.sh"
-fi
-
-# Source WSL environment variables if on WSL
-if [[ -f "$DOTFILES_DIR/scripts/env/wsl.sh" ]]; then
-    source "$DOTFILES_DIR/scripts/env/wsl.sh"
+# Source environment variables (merged from env/common.sh, env/fzf.sh, env/wsl.sh)
+if [[ -f "$DOTFILES_DIR/shell/env.sh" ]]; then
+    source "$DOTFILES_DIR/shell/env.sh"
 fi
 
 # Load theme configuration if available
@@ -183,7 +178,7 @@ fi
 # ==============================================================================
 
 if [[ "$IS_WSL" == "true" ]]; then
-    # WSL-specific aliases (most are in scripts/aliases/wsl.sh)
+    # WSL-specific aliases (most are in shell/aliases/wsl.sh)
     alias winget='/mnt/c/Windows/System32/winget.exe'
 fi
 
@@ -191,19 +186,15 @@ fi
 # Load Dotfiles Functions and Aliases
 # ==============================================================================
 
-# Load functions
-if [[ -d "$DOTFILES_DIR/scripts/functions" ]]; then
-    for file in "$DOTFILES_DIR"/scripts/functions/*.sh; do
-        [[ -r "$file" ]] && source "$file"
-    done
-fi
+# Load functions (merged core and fzf-extras)
+[[ -f "$DOTFILES_DIR/shell/functions.sh" ]] && source "$DOTFILES_DIR/shell/functions.sh"
+# Load WSL functions if on WSL
+[[ "$IS_WSL" == "true" ]] && [[ -f "$DOTFILES_DIR/shell/wsl-functions.sh" ]] && source "$DOTFILES_DIR/shell/wsl-functions.sh"
 
-# Load aliases  
-if [[ -d "$DOTFILES_DIR/scripts/aliases" ]]; then
-    for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
-        [[ -r "$file" ]] && source "$file"
-    done
-fi
+# Load aliases
+for file in "$DOTFILES_DIR"/shell/aliases/*.sh; do
+    [[ -r "$file" ]] && source "$file"
+done
 
 
 # ==============================================================================
