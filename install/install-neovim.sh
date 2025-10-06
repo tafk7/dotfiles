@@ -41,27 +41,32 @@ log "Latest stable version: $LATEST_VERSION"
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Download the latest AppImage
-DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${LATEST_VERSION}/nvim.appimage"
+# Download the latest prebuilt tarball (official method from GitHub releases)
+DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${LATEST_VERSION}/nvim-linux-x86_64.tar.gz"
 log "Downloading Neovim v${LATEST_VERSION}..."
-curl -L -o nvim.appimage "$DOWNLOAD_URL"
+curl -LO "$DOWNLOAD_URL"
 
-# Make it executable
-chmod +x nvim.appimage
-
-# Extract the AppImage (some systems need this for compatibility)
-# Try to run directly first, if that fails, extract
-if ./nvim.appimage --version >/dev/null 2>&1; then
-    log "AppImage works directly, installing..."
-    safe_sudo mv nvim.appimage /usr/local/bin/nvim
-else
-    log "Extracting AppImage for compatibility..."
-    ./nvim.appimage --appimage-extract >/dev/null 2>&1
-
-    # Move extracted files to /usr/local
-    safe_sudo mv squashfs-root /usr/local/nvim
-    safe_sudo ln -sf /usr/local/nvim/AppRun /usr/local/bin/nvim
+# Verify download succeeded
+if [[ ! -f "nvim-linux-x86_64.tar.gz" ]]; then
+    error "Download failed"
+    cd -
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
+
+# Remove old installation if it exists
+if [[ -d "/opt/nvim-linux-x86_64" ]]; then
+    log "Removing old Neovim installation..."
+    safe_sudo rm -rf /opt/nvim-linux-x86_64
+fi
+
+# Extract to /opt
+log "Extracting Neovim to /opt..."
+safe_sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+
+# Create symlink to /usr/local/bin
+log "Creating symlink in /usr/local/bin..."
+safe_sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
 
 # Cleanup
 cd -
