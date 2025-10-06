@@ -300,25 +300,25 @@ PREVIEW_EOF
 
     # Build searchable index with visible delimiters for display
     local selected=$({
-        # Add column headers with visible delimiters
-        printf "${BOLD}%-10s │ %-15s │ %-40s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "DESCRIPTION" "COMMAND"
+        # Add column headers with visible delimiters (swapped: command before description)
+        printf "${BOLD}%-10s │ %-15s │ %-40s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "COMMAND" "DESCRIPTION"
         # Add separator line
         printf "${DIM}%-10s─┼─%-15s─┼─%-40s─┼─%s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..40})" "$(printf '─%.0s' {1..20})"
-        # Format all shortcuts with visible delimiters (but keep original data after display separator)
+        # Format all shortcuts with visible delimiters (swap columns 3 and 4)
         cat "$index_file" | awk -F'│' '{
-            # Format for display with visible separators
-            display = sprintf("%-10s │ %-15s │ %-40s │ %s", $1, $2, $3, $4)
-            # Append original line after a special marker for easy extraction
-            print display "║" $0
+            # Format for display with visible separators (command before description)
+            display = sprintf("%-10s │ %-15s │ %-40s │ %s", $1, $2, $4, $3)
+            # Append original line after a tab separator (invisible, clean split)
+            print display "\t" $0
         }'
     } | \
         fzf --ansi \
             --prompt='🔍 Search shortcuts > ' \
             --header='Type: shortcut name, description, or category | Enter: Copy command | Esc: Cancel' \
             --header-lines=2 \
-            --delimiter='║' \
+            --delimiter='\t' \
             --with-nth=1 \
-            --preview="echo {2} | $preview_script /dev/stdin" \
+            --preview="$preview_script '{2}'" \
             --preview-window='top:10:wrap:rounded:border-rounded' \
             --height=100% \
             --border=rounded \
@@ -327,9 +327,9 @@ PREVIEW_EOF
     # Clean up temporary files
     rm -f "$preview_script" "$index_file"
 
-    # If user selected something, extract the original TSV data (after ║) and get command
+    # If user selected something, extract the original TSV data (after tab) and get command
     if [[ -n "$selected" ]]; then
-        local original=$(echo "$selected" | cut -d'║' -f2)
+        local original=$(echo "$selected" | cut -f2)
         local command=$(echo "$original" | awk -F'│' '{print $4}')
         echo ""
         echo "${BOLD}${CYAN}Command:${RESET} ${YELLOW}${command}${RESET}"
