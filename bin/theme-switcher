@@ -266,7 +266,9 @@ interactive_select() {
             else
                 echo "  $theme - ${THEMES[$theme]}"
             fi
-        done | sort | fzf --ansi --preview "bash $0 --preview {2}" --preview-window=right:50%:wrap | awk '{print $2}'
+        done | sort | fzf --ansi \
+            --preview 'bash '"$0"' --preview $(echo {} | sed "s/^[* ]*//" | cut -d" " -f1)' \
+            --preview-window=right:50%:wrap | sed 's/^[* ]*//' | cut -d' ' -f1
     )
     
     if [[ -n "$selected_theme" ]]; then
