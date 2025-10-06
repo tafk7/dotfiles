@@ -55,7 +55,7 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 **Professional Development:**
 - **Azure CLI**: Ubuntu-specific installation for cloud development
 - **Node.js via NVM**: Node Version Manager for flexible Node.js/npm management
-- **Python tools**: black, ruff (via pipx for isolation)
+- **Python dev tools**: python3-dev, python3-venv for virtual environment support
 
 ### Personal Tools (`--personal`)
 
