@@ -125,11 +125,9 @@ alias update-claude-commands='$DOTFILES_DIR/bin/update-claude'
 
 # Find and replace utility
 alias fr='$DOTFILES_DIR/bin/fr'
-alias find-replace='$DOTFILES_DIR/bin/fr'
 
 # Cheatsheet for keybindings
 alias cheat='$DOTFILES_DIR/bin/cheatsheet'
-alias shortcuts='cheat'  # Alternative alias
 
 # Claude CLI shortcuts
 alias cl='claude'                # New session

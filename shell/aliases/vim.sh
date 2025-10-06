@@ -9,7 +9,6 @@ alias vim-mode='$DOTFILES_DIR/bin/vim-config-switcher'
 
 # Quick edit common files
 alias vimrc='nvim ~/.config/nvim/init.vim'
-alias vimconfig='nvim ~/.config/nvim/init.vim'
 
 # Show current vim mode
 vim-status() {
@@ -40,38 +39,6 @@ vim-with() {
             ;;
         *)
             echo "Usage: vim-with [minimal|full|none] [files...]"
-            return 1
-            ;;
-    esac
-}
-
-# Benchmark vim startup time
-vim-bench() {
-    # Check if hyperfine is installed
-    if ! command -v hyperfine >/dev/null 2>&1; then
-        echo "Error: vim-bench requires hyperfine"
-        echo "Install with: cargo install hyperfine"
-        echo "Or use: apt install hyperfine (on Ubuntu 23.04+)"
-        return 1
-    fi
-
-    local config="${1:-current}"
-    local count="${2:-10}"
-
-    echo "Benchmarking vim startup time ($count runs)..."
-
-    case "$config" in
-        current)
-            hyperfine --warmup 3 --runs "$count" 'nvim --headless +quit'
-            ;;
-        minimal)
-            hyperfine --warmup 3 --runs "$count" "nvim --headless -u $DOTFILES_DIR/configs/init.vim.minimal +quit"
-            ;;
-        full)
-            hyperfine --warmup 3 --runs "$count" "nvim --headless -u $DOTFILES_DIR/configs/init.vim.full +quit"
-            ;;
-        *)
-            echo "Usage: vim-bench [current|minimal|full] [run_count]"
             return 1
             ;;
     esac
