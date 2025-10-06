@@ -59,7 +59,7 @@ cp ~/.your-config configs/.your-config
 
 ### 2. Update Configuration Mappings
 
-Edit `install.sh` and add to the `config_mappings` array (line ~125):
+Edit `setup.sh` and add to the `config_mappings` array (line ~125):
 ```bash
 config_mappings=(
     # ... existing mappings ...
@@ -195,10 +195,10 @@ install_your_software || warn "Your Software installation failed"
 1. Test on a clean system or container
 2. Test each installation mode:
    ```bash
-   ./install.sh                    # Base only
-   ./install.sh --work            # Base + work
-   ./install.sh --personal        # Base + personal
-   ./install.sh --work --personal # Everything
+   ./setup.sh                    # Base only
+   ./setup.sh --work            # Base + work
+   ./setup.sh --personal        # Base + personal
+   ./setup.sh --work --personal # Everything
    ```
 
 3. Test on different distributions if possible
@@ -216,7 +216,7 @@ install_your_software || warn "Your Software installation failed"
 
 1. Run the installer with your preferred options:
    ```bash
-   ./install.sh --work --personal
+   ./setup.sh --work --personal
    ```
 
 2. Or reload your shell configuration:

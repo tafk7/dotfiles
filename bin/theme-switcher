@@ -63,6 +63,7 @@ backup_current_config() {
     # Simple backup - just save the current theme name
     local current_theme=$(get_current_theme)
     if [[ -n "$current_theme" ]]; then
+        mkdir -p "$CONFIG_DIR"
         echo "$current_theme" > "$BACKUP_FILE"
     fi
 }

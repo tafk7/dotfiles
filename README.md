@@ -16,19 +16,19 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 
 ```bash
 # Base installation (essential tools + Docker)
-./install.sh
+./setup.sh
 
 # Add work tools (Azure CLI, Node.js/Python dev tools)
-./install.sh --work
+./setup.sh --work
 
 # Add personal tools (media applications)
-./install.sh --personal
+./setup.sh --personal
 
 # Everything
-./install.sh --work --personal
+./setup.sh --work --personal
 
 # Force mode for existing installations
-./install.sh --force          # Backup and replace existing files
+./setup.sh --force          # Backup and replace existing files
 ```
 
 ## 📦 What You Get
@@ -76,7 +76,7 @@ The system is organized into modular components:
 
 ```
 dotfiles/
-├── install.sh                    # Main installer
+├── setup.sh                      # Main installer
 ├── lib/
 │   ├── core.sh                   # Core utilities and functions
 │   └── packages.sh               # Package management
@@ -252,7 +252,7 @@ These configurations follow the principle: **Use VS Code for development, termin
 ### Adding New Configurations
 
 1. Create config file in `configs/` (no leading dot)
-2. Add mapping to `config_mappings` array in `install.sh`
+2. Add mapping to `config_mappings` array in `setup.sh`
 3. System automatically symlinks to hidden destination
 
 ### Adding Aliases/Functions

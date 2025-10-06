@@ -22,7 +22,7 @@ fi
 
 # Path constants
 export PROJECTS_DIR="$HOME/projects"
-# DOTFILES_DIR is set by install.sh and should be available
+# DOTFILES_DIR is set by setup.sh and should be available
 # Validate it's set to catch configuration issues early
 if [[ -z "$DOTFILES_DIR" ]]; then
     echo "Warning: DOTFILES_DIR not set. Some functionality may not work." >&2

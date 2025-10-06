@@ -77,7 +77,7 @@ show_help() {
 Simplified Dotfiles Installation Script
 
 USAGE:
-    ./install.sh [OPTIONS]
+    ./setup.sh [OPTIONS]
 
 OPTIONS:
     --work          Install professional development tools
@@ -87,9 +87,9 @@ OPTIONS:
     --help          Show this help message
 
 EXAMPLES:
-    ./install.sh                    # Install base packages only
-    ./install.sh --work             # Install base + work tools
-    ./install.sh --work --personal  # Install everything
+    ./setup.sh                    # Install base packages only
+    ./setup.sh --work             # Install base + work tools
+    ./setup.sh --work --personal  # Install everything
 
 The script will:
 1. Install essential packages (git, curl, zsh, neovim, etc.)

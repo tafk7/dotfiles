@@ -17,7 +17,7 @@ This dotfiles system is designed as a streamlined, Ubuntu-focused configuration 
 
 ```
 ┌─────────────────┐
-│   install.sh    │  ← Entry point
+│   setup.sh      │  ← Entry point
 └────────┬────────┘
          │
          ├─── Core Modules ──────────────┐
@@ -39,7 +39,7 @@ This dotfiles system is designed as a streamlined, Ubuntu-focused configuration 
 
 ## Core Components
 
-### 1. install.sh (238 lines)
+### 1. setup.sh (238 lines)
 **Main orchestrator and entry point**
 
 ```bash
@@ -311,7 +311,7 @@ pbcopy / pbpaste    # Cross-platform clipboard
 
 ### Adding New Configurations
 1. Create config file in `configs/` (no leading dot)
-2. Add mapping to `config_mappings` array in `install.sh`
+2. Add mapping to `config_mappings` array in `setup.sh`
 3. System automatically creates symlink to hidden destination
 
 ### Adding Runtime Features
