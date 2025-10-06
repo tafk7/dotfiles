@@ -189,7 +189,7 @@ apply_theme() {
         return 1
     fi
     
-    info "Applying theme: $theme"
+    log "Applying theme: $theme"
     
     # Backup current configuration
     backup_current_config
@@ -204,10 +204,10 @@ apply_theme() {
     
     success "Theme '$theme' has been applied successfully!"
     echo
-    info "To see all changes:"
-    info "  - Restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
-    info "  - Restart neovim or run: :source ~/.config/nvim/init.vim"
-    info "  - Tmux has been reloaded automatically (if running)"
+    log "To see all changes:"
+    log "  - Restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
+    log "  - Restart neovim or run: :source ~/.config/nvim/init.vim"
+    log "  - Tmux has been reloaded automatically (if running)"
 }
 
 # ==============================================================================
