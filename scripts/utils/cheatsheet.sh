@@ -108,24 +108,24 @@ show_shell() {
     print_header "SHELL ALIASES & SHORTCUTS"
     echo "    Navigation          File Operations    System Info        Network"
     print_separator
-    format_line "..   Parent dir     ls   List (eza)    df   Disk free     myip   Public IP"
+    format_line "..   Parent dir     ls   List (eza)    df   Disk free     myip    Public IP"
     format_line "...  Up 2 dirs      ll   Long list     du   Disk usage    localip Local IP"
-    format_line "~    Home dir       la   All files     free Memory        ports  Open ports"
-    format_line "-    Previous dir   tree Tree view     psg  Find process  "
+    format_line "~    Home dir       la   All files     free Memory        ports   Open ports"
+    format_line "-    Previous dir   tree Tree view     psg  Find process  note    Quick notes"
     echo
-    echo "    Modern Tools        Archive            Dotfiles           Misc"
+    echo "    Modern Tools        Archive            Dotfiles           FZF Extras"
     print_separator
-    format_line "bat  Better cat     untar Extract      reload   Reload    h      History"
-    format_line "fd   Find files     tarc  Create tar   themes   List      hgrep  Search hist"
-    format_line "rg   Ripgrep        fr    Find/replace theme-switch       count  Count files"
-    format_line "vim  Neovim                            update-configs     "
+    format_line "bat  Better cat     untar Extract      reload   Reload    fgb    Git branch"
+    format_line "fd   Find files     tarc  Create tar   themes   List      fgl    Git log"
+    format_line "rg   Ripgrep        fr    Find/replace theme-switch       frg    Ripgrep+fzf"
+    format_line "vim  Neovim         extract Archive     update-configs    fp     Projects"
     echo
-    echo "    Tmux Shortcuts      Safer Commands     Quick Actions"
+    echo "    Tmux Shortcuts      Safer Commands     Quick Actions      Claude"
     print_separator
-    format_line "tm   New session    rmff Force remove  psmem  Sort by RAM"
-    format_line "ta   Attach         rmi  Interactive   pscpu  Sort by CPU"
-    format_line "tl   List sessions  cpv  Verbose copy  ducks  Large files"
-    format_line "tk   Kill session   rmv  Verbose rm    md     View markdown"
+    format_line "tm   New session    rmff Force remove  psmem  Sort by RAM   cl     New"
+    format_line "ta   Attach         rmi  Interactive   pscpu  Sort by CPU   clc    Continue"
+    format_line "tl   List sessions  cpv  Verbose copy  ducks  Large files   clp    Print"
+    format_line "tk   Kill session   rmv  Verbose rm    md     View markdown cheat  Help"
 }
 
 # Show development tools

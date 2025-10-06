@@ -33,19 +33,19 @@ mkdir -p ~/.config/nvim
 
 case "$CONFIG" in
     minimal)
-        log_info "Switching to minimal vim configuration..."
+        log "Switching to minimal vim configuration..."
         ln -sf "$DOTFILES_DIR/configs/init.vim.minimal" ~/.config/nvim/init.vim
-        log_success "Switched to minimal configuration (fast startup)"
-        log_info "Run :PlugInstall in vim to install the 5 essential plugins"
+        success "Switched to minimal configuration (fast startup)"
+        log "Run :PlugInstall in vim to install the 5 essential plugins"
         ;;
     full)
-        log_info "Switching to full vim configuration..."
+        log "Switching to full vim configuration..."
         ln -sf "$DOTFILES_DIR/configs/init.vim.full" ~/.config/nvim/init.vim
-        log_success "Switched to full configuration (all features)"
-        log_info "Run :PlugInstall in vim to install all plugins"
+        success "Switched to full configuration (all features)"
+        log "Run :PlugInstall in vim to install all plugins"
         ;;
     *)
-        log_error "Unknown configuration: $CONFIG"
+        error "Unknown configuration: $CONFIG"
         show_usage
         exit 1
         ;;
@@ -56,7 +56,7 @@ echo "$CONFIG" > ~/.config/nvim/.vim-mode
 
 # Show what changed
 echo ""
-log_info "Key differences:"
+log "Key differences:"
 if [[ "$CONFIG" == "minimal" ]]; then
     echo "  ✓ Fast startup (<50ms)"
     echo "  ✓ Essential plugins only (surround, commentary, fugitive)"

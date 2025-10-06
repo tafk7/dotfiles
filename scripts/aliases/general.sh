@@ -46,7 +46,7 @@ alias egrep='egrep --color=auto'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-# Process search is now in scripts/functions/process.sh
+# Process search utilities (psg, pscpu, psmem) are available below
 
 # Network
 alias ports='netstat -tulanp'
@@ -103,7 +103,8 @@ fi
 
 # Theme management
 alias theme-switch='$DOTFILES_DIR/scripts/theme-switcher.sh'
-alias themes='echo "Available themes: nord, kanagawa, tokyo-night, gruvbox-material, catppuccin-mocha"'
+# Dynamic theme listing from configs/themes directory
+alias themes='ls -1 "$DOTFILES_DIR/configs/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
 
 # Quick file operations
 alias count='find . -type f | wc -l'
@@ -129,3 +130,8 @@ alias find-replace='$DOTFILES_DIR/scripts/utils/fr.sh'
 # Cheatsheet for keybindings
 alias cheat='$DOTFILES_DIR/scripts/utils/cheatsheet.sh'
 alias shortcuts='cheat'  # Alternative alias
+
+# Claude CLI shortcuts
+alias cl='claude'                # New session
+alias clc='claude --continue'    # Continue last session
+alias clp='claude --print'       # One-off command (non-interactive)

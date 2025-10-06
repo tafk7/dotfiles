@@ -1,5 +1,6 @@
 # Development artifacts
 docs/archive/
+_archive/
 CLAUDE.md
 
 # Backup directory
@@ -9,6 +10,8 @@ CLAUDE.md
 *.backup
 *-backup
 *.bak
+*.deprecated
+*.old
 
 # Local configuration overrides
 *.local

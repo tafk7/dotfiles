@@ -52,6 +52,11 @@ if [[ -f "$DOTFILES_DIR/scripts/env/common.sh" ]]; then
     source "$DOTFILES_DIR/scripts/env/common.sh"
 fi
 
+# Source WSL environment variables if on WSL
+if [[ -f "$DOTFILES_DIR/scripts/env/wsl.sh" ]]; then
+    source "$DOTFILES_DIR/scripts/env/wsl.sh"
+fi
+
 # Load theme configuration if available
 if [[ -f "$HOME/.config/dotfiles/theme.sh" ]]; then
     source "$HOME/.config/dotfiles/theme.sh"
