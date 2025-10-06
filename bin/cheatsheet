@@ -247,27 +247,21 @@ show_interactive() {
     local preview_script=$(mktemp)
     cat > "$preview_script" <<PREVIEW_EOF
 #!/bin/bash
-# Self-contained preview script
+# Self-contained preview script - receives original TSV line
 BOLD="$PREVIEW_BOLD"
 CYAN="$PREVIEW_CYAN"
 YELLOW="$PREVIEW_YELLOW"
 DIM="$PREVIEW_DIM"
 RESET="$PREVIEW_RESET"
 
-# Extract from formatted line using fixed column positions
-# Category: chars 0-10, Shortcut: chars 11-26, Description: chars 27-67, Command: 68+
+# Parse the TSV line directly using awk
 line="\$1"
-category=\$(echo "\$line" | cut -c1-10 | sed 's/[[:space:]]*\$//')
-shortcut=\$(echo "\$line" | cut -c11-26 | sed 's/[[:space:]]*\$//')
+category=\$(echo "\$line" | awk -F'│' '{print \$1}')
+shortcut=\$(echo "\$line" | awk -F'│' '{print \$2}')
+full_desc=\$(echo "\$line" | awk -F'│' '{print \$3}')
+full_cmd=\$(echo "\$line" | awk -F'│' '{print \$4}')
 
-# Find the full entry from the index file using literal string matching (-F)
-index_line=\$(grep -F "\${category}│\${shortcut}│" "$index_file" | head -1)
-
-if [[ -n "\$index_line" ]]; then
-    # Use awk to split on │ instead of cut for better Unicode handling
-    full_desc=\$(echo "\$index_line" | awk -F'│' '{print \$3}')
-    full_cmd=\$(echo "\$index_line" | awk -F'│' '{print \$4}')
-
+if [[ -n "\$shortcut" ]]; then
     echo ""
     echo "\${BOLD}\${YELLOW}\${shortcut}\${RESET}"
     echo "\${DIM}────────────────────────────────────────\${RESET}"
@@ -298,26 +292,33 @@ if [[ -n "\$index_line" ]]; then
     esac
 else
     echo ""
-    echo "\${DIM}No details available for: \${category}│\${shortcut}\${RESET}"
+    echo "\${DIM}No details available\${RESET}"
     echo ""
 fi
 PREVIEW_EOF
     chmod +x "$preview_script"
 
-    # Build searchable index, format for display, and let user select
+    # Build searchable index with visible delimiters for display
     local selected=$({
-        # Add column headers
-        printf "${BOLD}%-10s %-15s %-40s %s${RESET}\n" "CATEGORY" "SHORTCUT" "DESCRIPTION" "COMMAND"
-        # Add separator line using printf to repeat characters
-        printf "${DIM}%-10s %-15s %-40s %s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..40})" "$(printf '─%.0s' {1..20})"
-        # Add all shortcuts
-        cat "$index_file" | awk -F'│' '{printf "%-10s %-15s %-40s %s\n", $1, $2, $3, $4}'
+        # Add column headers with visible delimiters
+        printf "${BOLD}%-10s │ %-15s │ %-40s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "DESCRIPTION" "COMMAND"
+        # Add separator line
+        printf "${DIM}%-10s─┼─%-15s─┼─%-40s─┼─%s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..40})" "$(printf '─%.0s' {1..20})"
+        # Format all shortcuts with visible delimiters (but keep original data after display separator)
+        cat "$index_file" | awk -F'│' '{
+            # Format for display with visible separators
+            display = sprintf("%-10s │ %-15s │ %-40s │ %s", $1, $2, $3, $4)
+            # Append original line after a special marker for easy extraction
+            print display "║" $0
+        }'
     } | \
         fzf --ansi \
             --prompt='🔍 Search shortcuts > ' \
             --header='Type: shortcut name, description, or category | Enter: Copy command | Esc: Cancel' \
             --header-lines=2 \
-            --preview="$preview_script {}" \
+            --delimiter='║' \
+            --with-nth=1 \
+            --preview="echo {2} | $preview_script /dev/stdin" \
             --preview-window='top:10:wrap:rounded:border-rounded' \
             --height=100% \
             --border=rounded \
@@ -326,9 +327,10 @@ PREVIEW_EOF
     # Clean up temporary files
     rm -f "$preview_script" "$index_file"
 
-    # If user selected something, extract and display the actual command
+    # If user selected something, extract the original TSV data (after ║) and get command
     if [[ -n "$selected" ]]; then
-        local command=$(echo "$selected" | awk '{print $NF}')
+        local original=$(echo "$selected" | cut -d'║' -f2)
+        local command=$(echo "$original" | awk -F'│' '{print $4}')
         echo ""
         echo "${BOLD}${CYAN}Command:${RESET} ${YELLOW}${command}${RESET}"
         echo ""
