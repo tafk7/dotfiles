@@ -21,7 +21,7 @@ if [ -d "/usr/local/bin" ] ; then
     PATH="/usr/local/bin:$PATH"
 fi
 
-# Editor is set in scripts/env/common.sh with neovim preference
+# Editor is set in shell/env.sh with neovim preference
 
 # Set default pager
 export PAGER=less

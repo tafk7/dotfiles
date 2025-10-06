@@ -160,7 +160,7 @@ Brackets auto-close as you type:
 ### Quick Theme Switching
 Exit vim and run:
 ```bash
-./scripts/theme-switcher.sh
+./bin/theme-switcher
 ```
 
 Available themes:

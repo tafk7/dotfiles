@@ -17,25 +17,24 @@ This dotfiles system is designed as a streamlined, Ubuntu-focused configuration 
 
 ```
 ┌─────────────────┐
-│   install.sh    │  ← Entry point (243 lines)
+│   install.sh    │  ← Entry point
 └────────┬────────┘
          │
-         ├─── Simplified Modules ────────┐
+         ├─── Core Modules ──────────────┐
          │                               │
     ┌────▼─────┐          ┌─────────────▼┐
-    │lib/      │          │configs/      │
-    │core.sh   │          │(visible      │
-    │(313      │          │ files)       │
+    │lib.sh    │          │configs/      │
+    │          │          │(visible      │
+    │(530      │          │ files)       │
     │ lines)   │          │              │
     └──────────┘          └──────────────┘
          │
     ┌────▼─────┐          ┌──────────────┐
-    │lib/      │          │scripts/      │
-    │packages  │          │aliases &     │
-    │.sh       │          │functions     │
-    │(288      │          │              │
-    │ lines)   │          └──────────────┘
-    └──────────┘
+    │bin/      │          │shell/        │
+    │commands  │          │aliases &     │
+    │          │          │functions     │
+    │          │          │              │
+    └──────────┘          └──────────────┘
 ```
 
 ## Core Components
@@ -57,15 +56,16 @@ This dotfiles system is designed as a streamlined, Ubuntu-focused configuration 
 - `create_config_symlinks()` - Link visible configs to hidden destinations
 - `run_installation()` - Coordinate entire installation process
 
-### 2. lib/core.sh (313 lines)
-**Core utilities and system operations**
+### 2. lib.sh (530 lines)
+**Consolidated library with all utilities**
 
 ```bash
 ├── Logging system (colored output)
 ├── WSL detection and integration
-├── Environment validation  
+├── Environment validation
 ├── File operations (symlinks, backups)
 ├── SSH key management
+├── Package management
 └── Security functions
 ```
 
@@ -80,22 +80,6 @@ This dotfiles system is designed as a streamlined, Ubuntu-focused configuration 
 - `import_windows_ssh_keys()` - SSH key synchronization
 - `validate_prerequisites()` - Pre-installation checks
 - `validate_installation()` - Post-installation verification
-
-### 3. lib/packages.sh
-**Package management and installation**
-
-```bash
-├── Ubuntu package installation
-├── Docker setup (always installed)  
-├── Azure CLI installation (work flag)
-├── Node.js development tools
-├── Python development tools
-└── WSL-specific packages
-```
-
-**Key Functions:**
-- `install_single_package()` - Individual package installation
-- `install_packages()` - Bulk package installation
 - `install_base_packages()` - Essential tools for everyone
 - `install_docker()` - Container platform setup
 - `install_work_packages()` - Professional development tools
@@ -104,28 +88,32 @@ This dotfiles system is designed as a streamlined, Ubuntu-focused configuration 
 - `install_python_tools()` - Python development environment
 - `install_personal_packages()` - Media and entertainment tools
 
-### 4. scripts/
+### 3. bin/
+**User commands and utilities**
+
+### 4. shell/
 **Runtime scripts and shell configuration**
 
-The scripts directory contains modular components loaded at shell startup:
+The shell directory contains modular components loaded at shell startup:
 
 ```
-scripts/
-├── env/
-│   └── common.sh          # Environment variables and settings
-├── aliases/               # Shell aliases organized by category
-│   ├── general.sh        # Common command aliases (ls, cd, etc.)
-│   ├── docker.sh         # Docker shortcuts
-│   ├── git.sh           # Git workflow aliases
-│   └── wsl.sh           # WSL-specific integrations
-├── functions/            # Reusable shell functions
-│   ├── shared.sh        # Common utilities (mkcd, extract, etc.)
-│   └── help-tmux.sh     # Tmux helper functions
-└── theme-switcher.sh    # Interactive theme management
+shell/
+├── env.sh                 # Merged environment configuration
+├── functions.sh           # Merged core functions
+├── wsl-functions.sh       # WSL-specific functions
+└── aliases/               # Shell aliases organized by category
+    ├── general.sh        # Common command aliases (ls, cd, etc.)
+    ├── docker.sh         # Docker shortcuts
+    ├── git.sh            # Git workflow aliases
+    ├── vim.sh            # Vim mode switching
+    ├── vscode.sh         # VS Code integration
+    ├── node.sh           # Node.js aliases
+    ├── python.sh         # Python aliases
+    └── wsl.sh            # WSL-specific integrations
 ```
 
 **Key Features:**
-- **Environment Setup**: Centralized environment variables in `env/common.sh`
+- **Environment Setup**: Centralized environment variables in `shell/env.sh`
 - **WSL Detection**: Automatic detection and configuration for WSL environments
 - **Modular Loading**: Shell configs source these files dynamically
 - **SSH Key Import**: `sync-ssh` command for WSL users to import Windows SSH keys
@@ -262,17 +250,20 @@ socat, wslu
 The system integrates with shell environments through:
 
 ```
-scripts/
-├── aliases/            # Command shortcuts
-│   ├── docker.sh      # Docker command aliases
-│   ├── general.sh     # Modern CLI replacements  
-│   ├── git.sh         # Git workflow shortcuts
-│   └── wsl.sh         # WSL-specific commands
-└── functions/          # Utility functions
-    └── help-tmux.sh   # tmux helper functions
+shell/
+├── env.sh              # Environment variables
+├── functions.sh        # Core utility functions
+├── wsl-functions.sh    # WSL-specific functions
+└── aliases/            # Command shortcuts
+    ├── docker.sh      # Docker command aliases
+    ├── general.sh     # Modern CLI replacements
+    ├── git.sh         # Git workflow shortcuts
+    ├── vim.sh         # Vim mode switching
+    ├── vscode.sh      # VS Code integration
+    └── wsl.sh         # WSL-specific commands
 ```
 
-**Auto-loading**: All `.sh` files are automatically sourced on shell startup
+**Auto-loading**: All files are automatically sourced on shell startup
 
 ### Available Commands
 
@@ -324,8 +315,8 @@ pbcopy / pbpaste    # Cross-platform clipboard
 3. System automatically creates symlink to hidden destination
 
 ### Adding Runtime Features
-1. **Aliases**: Create `.sh` file in `scripts/aliases/`
-2. **Functions**: Create `.sh` file in `scripts/functions/`  
+1. **Aliases**: Create `.sh` file in `shell/aliases/`
+2. **Functions**: Add to `shell/functions.sh`
 3. Files are automatically sourced on shell startup
 
 ## Error Handling

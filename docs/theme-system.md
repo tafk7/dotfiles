@@ -63,7 +63,7 @@ A soothing pastel theme with a dark background.
 
 3. **Switch directly to a theme:**
    ```bash
-   ~/dotfiles/scripts/theme-switcher.sh nord
+   ~/dotfiles/bin/theme-switcher nord
    ```
 
 ### How It Works
@@ -197,8 +197,8 @@ configs/themes/
 │   └── ...
 └── .../
 
-scripts/
-└── theme-switcher.sh  # Main theme switching script
+bin/
+└── theme-switcher  # Main theme switching script
 ```
 
 ### Configuration Paths
