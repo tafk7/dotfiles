@@ -275,8 +275,8 @@ process_template() {
         log "[DRY RUN] Would process git config template"
         return 0
     fi
-    
-    process_git_config "$source" "$target" "$backup_dir"
+
+    process_git_config "$source" "$target" "$backup_dir" "$FORCE_OVERWRITE"
 }
 
 
