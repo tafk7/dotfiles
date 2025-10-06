@@ -9,8 +9,9 @@ set -e
 # ==============================================================================
 
 # Path constants
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# DOTFILES_DIR set by lib.sh (uses environment or calculates from BASH_SOURCE)
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 readonly THEMES_DIR="$DOTFILES_DIR/configs/themes"
 readonly CONFIG_DIR="$HOME/.config/dotfiles"
 readonly THEME_FILE="$CONFIG_DIR/current-theme"
