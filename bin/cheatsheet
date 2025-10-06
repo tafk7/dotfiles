@@ -89,13 +89,21 @@ show_tmux() {
 # Show git aliases
 show_git() {
     print_header "GIT ALIASES"
-    echo "    Status              Commits            Branches           History"
+    echo "    Status              Staging            Commits            Branches"
     print_separator
-    format_line "gs   status         gc   commit        gb   branch        gl   log graph"
-    format_line "ga   add            gcm  commit -m     gco  checkout      gla  log all"
-    format_line "gaa  add all        gca  amend         gcb  new branch    "
-    format_line "gd   diff           gp   push          gpl  pull          "
-    format_line "gdc  diff cached    gpu  push upstream gstash stash       "
+    format_line "gs   status         ga   add           gc   commit        gsw  switch"
+    format_line "gl   log graph      gaa  add all       gcm  commit -m     gswc switch -c"
+    format_line "gla  log all        gau  add -u        gca  amend         gb   branch"
+    format_line "gd   diff           grs  restore       "
+    format_line "gds  diff staged    grss restore --staged"
+    echo
+    echo "    Fetch               Push/Pull          Stash              Other"
+    print_separator
+    format_line "gf   fetch          gp   push          gst  stash         gcl  clone"
+    format_line "gfo  fetch origin   gpl  pull          gstp stash pop     lg   lazygit"
+    format_line "gfu  fetch upstream gpu  push -u       gsta stash apply   "
+    format_line "gfa  fetch --all    "
+    format_line "gfp  fetch --prune  "
     echo
     echo "    Functions                            Usage"
     print_separator
@@ -150,9 +158,39 @@ show_all() {
     show_dev
 }
 
+# Interactive FZF selector with preview
+show_interactive() {
+    # Fallback to traditional view if FZF not available
+    if ! command -v fzf >/dev/null 2>&1; then
+        show_all | less -R
+        return
+    fi
+
+    local categories="vim
+tmux
+git
+shell
+dev
+all"
+
+    local selected=$(echo "$categories" | fzf \
+        --prompt="📚 Select Cheatsheet > " \
+        --header="↑↓: Navigate | Enter: Open | Esc: Cancel" \
+        --preview="$0 {}" \
+        --preview-window=right:65%:wrap:rounded \
+        --height=100% \
+        --border=rounded \
+        --color="header:italic:cyan,prompt:bold:yellow")
+
+    # If user selected a category, show it in less
+    if [[ -n "$selected" ]]; then
+        "$0" "$selected" | less -R
+    fi
+}
+
 # Main function
 main() {
-    case "${1:-all}" in
+    case "${1}" in
         vim)
             show_vim
             ;;
@@ -168,22 +206,34 @@ main() {
         dev)
             show_dev
             ;;
-        all|"")
+        all)
             show_all
+            ;;
+        "")
+            # No args - show interactive selector
+            show_interactive
             ;;
         *)
             echo "Usage: cheat [vim|tmux|git|shell|dev|all]"
             echo "Show keybindings and shortcuts for dotfiles tools"
+            echo ""
+            echo "Run 'cheat' with no arguments for interactive mode"
             exit 1
             ;;
     esac
 }
 
-# Handle piping to less for long output
-if [[ -t 1 ]] && [[ "${1:-all}" == "all" ]]; then
-    # Output is to terminal and showing all sections
+# Handle piping to less for long output when showing specific sections
+if [[ -t 1 ]] && [[ -n "$1" ]] && [[ "$1" != "all" ]]; then
+    # Direct access to specific section - show in less
     main "$@" | less -R
+elif [[ -t 1 ]] && [[ "$1" == "all" ]]; then
+    # Direct access to all sections - show in less
+    main "$@" | less -R
+elif [[ -t 1 ]] && [[ -z "$1" ]]; then
+    # No args - interactive mode handles its own display
+    main "$@"
 else
-    # Output is piped or showing single section
+    # Output is piped
     main "$@"
 fi
