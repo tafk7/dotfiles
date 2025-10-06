@@ -425,24 +425,72 @@ show_interactive() {
         return
     fi
 
+    # Color definitions for preview
+    if command -v tput >/dev/null 2>&1; then
+        local PREVIEW_BOLD=$(tput bold)
+        local PREVIEW_CYAN=$(tput setaf 6)
+        local PREVIEW_YELLOW=$(tput setaf 3)
+        local PREVIEW_DIM=$(tput dim)
+        local PREVIEW_RESET=$(tput sgr0)
+    else
+        local PREVIEW_BOLD=""
+        local PREVIEW_CYAN=""
+        local PREVIEW_YELLOW=""
+        local PREVIEW_DIM=""
+        local PREVIEW_RESET=""
+    fi
+
     # Create temporary file for preview script
     local preview_script=$(mktemp)
-    cat > "$preview_script" <<'PREVIEW_EOF'
+    cat > "$preview_script" <<PREVIEW_EOF
 #!/bin/bash
-# Extract category and shortcut from formatted line
-category=$(echo "$1" | awk '{print $1}')
-shortcut=$(echo "$1" | awk '{print $2}')
+# Self-contained preview script
+BOLD="$PREVIEW_BOLD"
+CYAN="$PREVIEW_CYAN"
+YELLOW="$PREVIEW_YELLOW"
+DIM="$PREVIEW_DIM"
+RESET="$PREVIEW_RESET"
 
-# Source the cheatsheet to get functions
-source "$CHEATSHEET_PATH"
+# Extract from formatted line
+line="\$1"
+category=\$(echo "\$line" | awk '{print \$1}')
+shortcut=\$(echo "\$line" | awk '{print \$2}')
+desc=\$(echo "\$line" | awk '{for(i=3;i<=NF-1;i++) if (\$i != "") {for(j=i;j<=NF-1;j++) printf "%s ", \$j; break}}' | sed 's/[[:space:]]*\$//')
+cmd=\$(echo "\$line" | awk '{print \$NF}')
 
-# Show the detail
-show_shortcut_detail "$category" "$shortcut"
+# Build the index inline and find the full entry
+index_line=\$(cat "$0" | sed -n '/^build_shortcut_index()/,/^}/p' | grep "^\${category}│\${shortcut}│")
+
+if [[ -n "\$index_line" ]]; then
+    full_desc=\$(echo "\$index_line" | cut -d'│' -f3)
+    full_cmd=\$(echo "\$index_line" | cut -d'│' -f4)
+
+    echo ""
+    echo "\${BOLD}\${YELLOW}\${shortcut}\${RESET}"
+    echo "\${DIM}────────────────────────────────────────\${RESET}"
+    echo "\${CYAN}Category:\${RESET}    \${category}"
+    echo "\${CYAN}Usage:\${RESET}       \${full_desc}"
+    echo "\${CYAN}Command:\${RESET}     \${full_cmd}"
+    echo ""
+
+    case "\$category" in
+        git)
+            echo "\${DIM}💡 Tip: Type 'cheat git' for all git shortcuts\${RESET}"
+            ;;
+        tmux)
+            echo "\${DIM}💡 Tip: Prefix is Ctrl+a\${RESET}"
+            ;;
+        vim)
+            echo "\${DIM}💡 Tip: Leader key is comma (,)\${RESET}"
+            ;;
+    esac
+else
+    echo ""
+    echo "\${DIM}No details available\${RESET}"
+    echo ""
+fi
 PREVIEW_EOF
     chmod +x "$preview_script"
-
-    # Export path to this script for preview
-    export CHEATSHEET_PATH="$0"
 
     # Build searchable index, format for display, and let user select
     local selected=$(build_shortcut_index | \
@@ -461,7 +509,7 @@ PREVIEW_EOF
 
     # If user selected something, extract and display the actual command
     if [[ -n "$selected" ]]; then
-        local command=$(echo "$selected" | awk '{for(i=4;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/[[:space:]]*$//')
+        local command=$(echo "$selected" | awk '{print $NF}')
         echo ""
         echo "${BOLD}${CYAN}Command:${RESET} ${YELLOW}${command}${RESET}"
         echo ""
