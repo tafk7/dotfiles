@@ -4,8 +4,6 @@
 
 # Quick open VS Code
 alias c='code .'
-alias cc='code .'
-alias vsc='code .'
 
 # Open specific files/folders in VS Code
 alias cz='code ~/.zshrc'
@@ -18,8 +16,8 @@ alias cw='code . --profile "Work"'
 alias cp='code . --profile "Personal"'
 
 # Git + VS Code workflow
-alias gdc='git diff --cached | code -'  # View staged changes in VS Code
-alias gdiff='git diff | code -'         # View changes in VS Code
+alias gdvc='git diff --cached | code -'  # View staged changes in VS Code
+alias gdiff='git diff | code -'          # View changes in VS Code
 
 # Quick project navigation + open
 cproj() {
