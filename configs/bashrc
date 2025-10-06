@@ -59,14 +59,9 @@ PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 # Load Shared Environment
 # ==============================================================================
 
-# Source shared environment variables
-if [[ -f "$DOTFILES_DIR/scripts/env/common.sh" ]]; then
-    source "$DOTFILES_DIR/scripts/env/common.sh"
-fi
-
-# Source WSL environment variables if on WSL
-if [[ -f "$DOTFILES_DIR/scripts/env/wsl.sh" ]]; then
-    source "$DOTFILES_DIR/scripts/env/wsl.sh"
+# Source environment variables (merged from env/common.sh, env/fzf.sh, env/wsl.sh)
+if [[ -f "$DOTFILES_DIR/shell/env.sh" ]]; then
+    source "$DOTFILES_DIR/shell/env.sh"
 fi
 
 # Load theme configuration if available
@@ -148,13 +143,13 @@ PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
 # Smart Aliases - Modern CLI Tools
 # ==============================================================================
 
-# Aliases are loaded from scripts/aliases/*.sh files
+# Aliases are loaded from shell/aliases/*.sh files
 
 # ==============================================================================
 # Load Shared Functions
 # ==============================================================================
 
-# Functions are loaded from scripts/functions/*.sh files
+# Functions are loaded from shell/functions.sh
 
 # ==============================================================================
 # Node.js and Development Tools
@@ -164,8 +159,8 @@ PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 
-# Python and Docker aliases are loaded from scripts/aliases/
-# Theme aliases are loaded from scripts/aliases/general.sh
+# Python and Docker aliases are loaded from shell/aliases/
+# Theme aliases are loaded from shell/aliases/general.sh
 
 # ==============================================================================
 # WSL Integration
@@ -179,7 +174,7 @@ if [[ "$IS_WSL" == "true" ]]; then
     alias winget='/mnt/c/Windows/System32/winget.exe'
     alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
 
-    # Display is set in scripts/env/common.sh
+    # Display is set in shell/env.sh
 fi
 
 # ==============================================================================
@@ -188,13 +183,13 @@ fi
 
 # Load dotfiles functions and aliases (with error handling)
 if [[ -d "$DOTFILES_DIR" ]]; then
-    # Load functions
-    for file in "$DOTFILES_DIR"/scripts/functions/*.sh; do
-        [[ -r "$file" ]] && source "$file" 2>/dev/null || true
-    done
+    # Load functions (merged core and fzf-extras)
+    [[ -f "$DOTFILES_DIR/shell/functions.sh" ]] && source "$DOTFILES_DIR/shell/functions.sh"
+    # Load WSL functions if on WSL
+    [[ "$IS_WSL" == "true" ]] && [[ -f "$DOTFILES_DIR/shell/wsl-functions.sh" ]] && source "$DOTFILES_DIR/shell/wsl-functions.sh"
 
     # Load aliases
-    for file in "$DOTFILES_DIR"/scripts/aliases/*.sh; do
+    for file in "$DOTFILES_DIR"/shell/aliases/*.sh; do
         [[ -r "$file" ]] && source "$file" 2>/dev/null || true
     done
 fi

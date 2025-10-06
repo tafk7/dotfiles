@@ -7,10 +7,8 @@ set -euo pipefail
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Load simplified modules
-source "$SCRIPT_DIR/lib/core.sh"
-source "$SCRIPT_DIR/lib/packages.sh"
-source "$SCRIPT_DIR/lib/wsl.sh"
+# Load core library (contains all functions)
+source "$SCRIPT_DIR/lib.sh"
 
 # Configuration
 CONFIGS_DIR="$SCRIPT_DIR/configs"
@@ -101,7 +99,7 @@ The script will:
 5. Setup WSL integration if running on WSL
 
 For Zsh customization (Oh My Zsh, themes, plugins), run:
-    ./scripts/setup-zsh-environment.sh
+    # Legacy setup script removed - shell environment now configured via configs/zshrc
 
 All configuration files are backed up before being replaced.
 EOF
@@ -163,17 +161,17 @@ phase_install_packages() {
         if [[ "$INSTALL_WORK" == "true" ]]; then
             install_work_packages
             # Install NVM and Node.js
-            "$DOTFILES_DIR/scripts/installers/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
+            "$DOTFILES_DIR/install/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
         fi
 
         # Personal packages
         [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
 
         # Modern tools via dedicated installers
-        "$DOTFILES_DIR/scripts/installers/install-starship.sh" || { error "Starship installation failed"; exit 1; }
-        "$DOTFILES_DIR/scripts/installers/install-eza.sh" || { error "Eza installation failed"; exit 1; }
-        "$DOTFILES_DIR/scripts/installers/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
-        "$DOTFILES_DIR/scripts/installers/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
+        "$DOTFILES_DIR/install/install-starship.sh" || { error "Starship installation failed"; exit 1; }
+        "$DOTFILES_DIR/install/install-eza.sh" || { error "Eza installation failed"; exit 1; }
+        "$DOTFILES_DIR/install/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
+        "$DOTFILES_DIR/install/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
     fi
     
     success "Package installation complete"
@@ -332,7 +330,7 @@ run_installation() {
     fi
     echo
     echo "2. ✅ Verify installation:"
-    echo "   ./scripts/check-setup.sh"
+    echo "   ./bin/check-setup"
     echo
     if [[ "$nvm_installed" == "true" ]]; then
         echo "3. 🧪 Test Node.js/npm:"
@@ -340,7 +338,7 @@ run_installation() {
         echo
     fi
     echo "$(if [[ "$nvm_installed" == "true" ]]; then echo "4"; else echo "3"; fi). 🎨 Optionally switch theme:"
-    echo "   ./scripts/theme-switcher.sh"
+    echo "   ./bin/theme-switcher"
 
     echo
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
