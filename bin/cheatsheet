@@ -254,29 +254,19 @@ YELLOW="$PREVIEW_YELLOW"
 DIM="$PREVIEW_DIM"
 RESET="$PREVIEW_RESET"
 
-# Extract from formatted line
+# Extract from formatted line using fixed column positions
+# Category: chars 0-10, Shortcut: chars 11-26, Description: chars 27-67, Command: 68+
 line="\$1"
-category=\$(echo "\$line" | awk '{print \$1}')
-# Extract shortcut - need to capture everything between first and third field
-shortcut=\$(echo "\$line" | awk '{
-    # Find where the third field (description) starts by looking for multiple spaces
-    match(\$0, /^[^ ]+ +[^ ]+ +/)
-    if (RSTART > 0) {
-        # Extract just the shortcut (field 2)
-        line_start = substr(\$0, 1, RLENGTH)
-        match(line_start, /^[^ ]+ +/)
-        print substr(line_start, RLENGTH + 1)
-    } else {
-        print \$2
-    }
-}' | sed 's/[[:space:]]*\$//')
+category=\$(echo "\$line" | cut -c1-10 | sed 's/[[:space:]]*\$//')
+shortcut=\$(echo "\$line" | cut -c11-26 | sed 's/[[:space:]]*\$//')
 
 # Find the full entry from the index file using literal string matching (-F)
 index_line=\$(grep -F "\${category}│\${shortcut}│" "$index_file" | head -1)
 
 if [[ -n "\$index_line" ]]; then
-    full_desc=\$(echo "\$index_line" | cut -d'│' -f3)
-    full_cmd=\$(echo "\$index_line" | cut -d'│' -f4)
+    # Use awk to split on │ instead of cut for better Unicode handling
+    full_desc=\$(echo "\$index_line" | awk -F'│' '{print \$3}')
+    full_cmd=\$(echo "\$index_line" | awk -F'│' '{print \$4}')
 
     echo ""
     echo "\${BOLD}\${YELLOW}\${shortcut}\${RESET}"
@@ -318,8 +308,8 @@ PREVIEW_EOF
     local selected=$({
         # Add column headers
         printf "${BOLD}%-10s %-15s %-40s %s${RESET}\n" "CATEGORY" "SHORTCUT" "DESCRIPTION" "COMMAND"
-        # Add separator line
-        printf "${DIM}%-10s %-15s %-40s %s${RESET}\n" "────────" "────────" "────────────────────────────────────" "────────"
+        # Add separator line using printf to repeat characters
+        printf "${DIM}%-10s %-15s %-40s %s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..40})" "$(printf '─%.0s' {1..20})"
         # Add all shortcuts
         cat "$index_file" | awk -F'│' '{printf "%-10s %-15s %-40s %s\n", $1, $2, $3, $4}'
     } | \
