@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Load simplified modules
 source "$SCRIPT_DIR/lib/core.sh"
 source "$SCRIPT_DIR/lib/packages.sh"
+source "$SCRIPT_DIR/lib/wsl.sh"
 
 # Configuration
 CONFIGS_DIR="$SCRIPT_DIR/configs"
@@ -162,17 +163,17 @@ phase_install_packages() {
         if [[ "$INSTALL_WORK" == "true" ]]; then
             install_work_packages
             # Install NVM and Node.js
-            "$DOTFILES_DIR/scripts/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
+            "$DOTFILES_DIR/scripts/installers/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
         fi
-        
+
         # Personal packages
         [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
-        
+
         # Modern tools via dedicated installers
-        "$DOTFILES_DIR/scripts/install-starship.sh" || { error "Starship installation failed"; exit 1; }
-        "$DOTFILES_DIR/scripts/install-eza.sh" || { error "Eza installation failed"; exit 1; }
-        "$DOTFILES_DIR/scripts/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
-        "$DOTFILES_DIR/scripts/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/installers/install-starship.sh" || { error "Starship installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/installers/install-eza.sh" || { error "Eza installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/installers/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
+        "$DOTFILES_DIR/scripts/installers/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
     fi
     
     success "Package installation complete"
@@ -293,7 +294,7 @@ run_installation() {
     echo
 
     # Post-installation instructions
-    local needs_relogin=false
+    local needs_restart=false
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "📋 Next Steps:"
@@ -304,8 +305,8 @@ run_installation() {
     if [[ "$INSTALL_WORK" == "true" ]] && command -v docker >/dev/null 2>&1; then
         if grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
             if ! groups | grep -q docker; then
-                echo "⚠️  Docker group membership requires re-login"
-                needs_relogin=true
+                echo "⚠️  Docker group membership requires restart"
+                needs_restart=true
             fi
         fi
     fi
@@ -316,35 +317,30 @@ run_installation() {
         nvm_installed=true
     fi
 
-    if [[ "$needs_relogin" == "true" ]]; then
-        echo "1. 🔄 Exit and reconnect to your terminal/WSL session"
-        echo "   (Required for Docker group membership to take effect)"
-        echo
-        echo "2. ✅ Verify installation:"
-        echo "   ./scripts/check-setup.sh"
-        echo
-        if [[ "$nvm_installed" == "true" ]]; then
-            echo "3. 🧪 Test Node.js/npm:"
-            echo "   node --version && npm --version"
-            echo
-        fi
-        echo "4. 🎨 Optionally switch theme:"
-        echo "   ./scripts/theme-switcher.sh"
+    # Always recommend restart for locale changes to take effect
+    echo "1. 🔄 Restart your WSL session:"
+    if is_wsl; then
+        echo "   • Type 'exit' then reopen WSL, OR"
+        echo "   • From PowerShell/CMD: wsl --terminate Ubuntu"
     else
-        echo "1. 🔄 Reload your shell configuration:"
-        echo "   source ~/.bashrc  # or source ~/.zshrc"
-        echo
-        echo "2. ✅ Verify installation:"
-        echo "   ./scripts/check-setup.sh"
-        echo
-        if [[ "$nvm_installed" == "true" ]]; then
-            echo "3. 🧪 Test Node.js/npm:"
-            echo "   node --version && npm --version"
-            echo
-        fi
-        echo "4. 🎨 Optionally switch theme:"
-        echo "   ./scripts/theme-switcher.sh"
+        echo "   • Type 'exit' then reconnect to your terminal"
     fi
+    if [[ "$needs_restart" == "true" ]]; then
+        echo "   (Required for Docker group and locale changes)"
+    else
+        echo "   (Required for locale changes to take effect)"
+    fi
+    echo
+    echo "2. ✅ Verify installation:"
+    echo "   ./scripts/check-setup.sh"
+    echo
+    if [[ "$nvm_installed" == "true" ]]; then
+        echo "3. 🧪 Test Node.js/npm:"
+        echo "   node --version && npm --version"
+        echo
+    fi
+    echo "$(if [[ "$nvm_installed" == "true" ]]; then echo "4"; else echo "3"; fi). 🎨 Optionally switch theme:"
+    echo "   ./scripts/theme-switcher.sh"
 
     echo
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

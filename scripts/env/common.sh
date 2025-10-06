@@ -17,22 +17,14 @@ fi
 
 # Path constants
 export PROJECTS_DIR="$HOME/projects"
-# DOTFILES_DIR is set by install.sh - don't hardcode it here
-
-# FZF configuration (theme-aware)
-if command -v fzf >/dev/null 2>&1; then
-    # Default FZF options (can be overridden by themes)
-    export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"
-    
-    # Use fd/fdfind if available for better performance
-    if command -v fdfind >/dev/null 2>&1; then
-        export FZF_DEFAULT_COMMAND='fdfind --type f --hidden --follow --exclude .git'
-    elif command -v fd >/dev/null 2>&1; then
-        export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
-    fi
-    
-    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+# DOTFILES_DIR is set by install.sh and should be available
+# Validate it's set to catch configuration issues early
+if [[ -z "$DOTFILES_DIR" ]]; then
+    echo "Warning: DOTFILES_DIR not set. Some functionality may not work." >&2
 fi
+
+# FZF configuration is handled by scripts/env/fzf.sh (sourced separately)
+# This separation keeps FZF settings in one place with all preview configs
 
 # Bat configuration (theme-aware)
 if command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1; then

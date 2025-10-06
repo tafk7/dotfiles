@@ -7,7 +7,7 @@ set -euo pipefail
 # Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/core.sh"
 
-log_info "Setting up VS Code configuration..."
+log "Setting up VS Code configuration..."
 
 # VS Code config directories (support both Code and Code - OSS)
 CODE_DIRS=(
@@ -26,35 +26,35 @@ for dir in "${CODE_DIRS[@]}"; do
 done
 
 if [[ -z "$VSCODE_CONFIG_DIR" ]]; then
-    log_error "VS Code configuration directory not found"
-    log_info "Please install VS Code first: https://code.visualstudio.com/"
+    error "VS Code configuration directory not found"
+    log "Please install VS Code first: https://code.visualstudio.com/"
     exit 1
 fi
 
-log_info "Using VS Code config directory: $VSCODE_CONFIG_DIR"
+log "Using VS Code config directory: $VSCODE_CONFIG_DIR"
 
 # Backup existing settings if they exist
 if [[ -f "$VSCODE_CONFIG_DIR/settings.json" ]]; then
     backup_file="$VSCODE_CONFIG_DIR/settings.json.backup.$(date +%Y%m%d_%H%M%S)"
-    log_info "Backing up existing settings to $backup_file"
+    log "Backing up existing settings to $backup_file"
     cp "$VSCODE_CONFIG_DIR/settings.json" "$backup_file"
 fi
 
 if [[ -f "$VSCODE_CONFIG_DIR/keybindings.json" ]]; then
     backup_file="$VSCODE_CONFIG_DIR/keybindings.json.backup.$(date +%Y%m%d_%H%M%S)"
-    log_info "Backing up existing keybindings to $backup_file"
+    log "Backing up existing keybindings to $backup_file"
     cp "$VSCODE_CONFIG_DIR/keybindings.json" "$backup_file"
 fi
 
 # Copy VS Code settings
-log_info "Installing VS Code settings..."
+log "Installing VS Code settings..."
 cp "$DOTFILES_DIR/configs/vscode/settings.json" "$VSCODE_CONFIG_DIR/settings.json"
 cp "$DOTFILES_DIR/configs/vscode/keybindings.json" "$VSCODE_CONFIG_DIR/keybindings.json"
 
 # Install extensions if VS Code command is available
 if command -v code >/dev/null 2>&1; then
-    log_info "Installing recommended VS Code extensions..."
-    
+    log "Installing recommended VS Code extensions..."
+
     # Essential extensions for hybrid vim workflow
     extensions=(
         "vscodevim.vim"
@@ -66,10 +66,10 @@ if command -v code >/dev/null 2>&1; then
         "esbenp.prettier-vscode"
         "christian-kohler.path-intellisense"
     )
-    
+
     for ext in "${extensions[@]}"; do
-        log_info "Installing extension: $ext"
-        code --install-extension "$ext" || log_warning "Failed to install $ext"
+        log "Installing extension: $ext"
+        code --install-extension "$ext" || warn "Failed to install $ext"
     done
     
     # Install theme based on current dotfiles theme
@@ -91,19 +91,18 @@ if command -v code >/dev/null 2>&1; then
         esac
     fi
 else
-    log_warning "VS Code command not found. Please install extensions manually."
-    log_info "See $DOTFILES_DIR/configs/vscode/extensions.md for the list"
+    warn "VS Code command not found. Please install extensions manually."
+    log "See $DOTFILES_DIR/configs/vscode/extensions.md for the list"
 fi
 
-log_success "VS Code configuration completed!"
-log_info "Reload VS Code to apply settings"
+success "VS Code configuration completed!"
+log "Reload VS Code to apply settings"
 
-# Set VS Code as default editor if not already set
-if [[ -z "${EDITOR:-}" ]] || [[ "$EDITOR" != *"code"* ]]; then
-    log_info "Setting VS Code as default editor..."
-    echo "" >> "$HOME/.zshrc.local"
-    echo "# VS Code as default editor" >> "$HOME/.zshrc.local"
-    echo "export EDITOR='code --wait'" >> "$HOME/.zshrc.local"
-    echo "export VISUAL='code --wait'" >> "$HOME/.zshrc.local"
-    log_info "Added to ~/.zshrc.local - reload shell to apply"
-fi
+# Offer to set VS Code as default editor
+echo ""
+log "To use VS Code as your default editor, add to ~/.zshrc.local:"
+log "  export EDITOR='code --wait'"
+log "  export VISUAL='code --wait'"
+log "  export GIT_EDITOR='code --wait'"
+echo ""
+log "(Default editor is currently nvim, set in env/common.sh)"

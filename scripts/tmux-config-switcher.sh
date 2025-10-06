@@ -28,22 +28,22 @@ CONFIG="${1:-minimal}"
 
 case "$CONFIG" in
     minimal)
-        log_info "Switching to minimal tmux configuration..."
+        log "Switching to minimal tmux configuration..."
         ln -sf "$DOTFILES_DIR/configs/tmux.conf.minimal" ~/.tmux.conf
-        log_success "Switched to minimal configuration"
+        success "Switched to minimal configuration"
         ;;
     full)
-        log_info "Switching to full tmux configuration..."
+        log "Switching to full tmux configuration..."
         ln -sf "$DOTFILES_DIR/configs/tmux.conf.backup" ~/.tmux.conf
-        log_success "Switched to full configuration"
+        success "Switched to full configuration"
         ;;
     plugin)
-        log_info "Switching to original plugin-based configuration..."
+        log "Switching to original plugin-based configuration..."
         ln -sf "$DOTFILES_DIR/configs/tmux.conf" ~/.tmux.conf
-        log_success "Switched to plugin configuration"
+        success "Switched to plugin configuration"
         ;;
     *)
-        log_error "Unknown configuration: $CONFIG"
+        error "Unknown configuration: $CONFIG"
         show_usage
         exit 1
         ;;
@@ -51,10 +51,10 @@ esac
 
 # Show navigation tip
 echo ""
-log_info "Navigation style: ${TMUX_NAV_STYLE:-ESDF}"
-log_info "To change navigation style, add to your shell config:"
-log_info "  export TMUX_NAV_STYLE=wasd  # For WASD navigation"
-log_info "  export TMUX_NAV_STYLE=esdf  # For ESDF navigation (default)"
+log "Navigation style: ${TMUX_NAV_STYLE:-ESDF}"
+log "To change navigation style, add to your shell config:"
+log "  export TMUX_NAV_STYLE=wasd  # For WASD navigation"
+log "  export TMUX_NAV_STYLE=esdf  # For ESDF navigation (default)"
 echo ""
-log_info "Reload tmux config with: tmux source-file ~/.tmux.conf"
-log_info "Or press Ctrl+A, r inside tmux"
+log "Reload tmux config with: tmux source-file ~/.tmux.conf"
+log "Or press Ctrl+A, r inside tmux"
