@@ -49,7 +49,10 @@ wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 
 # Check if running on WSL
 is_wsl() {
-    [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || [[ -n "${WSL_DISTRO_NAME:-}" ]]
+    [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || \
+    [[ -n "${WSL_DISTRO_NAME:-}" ]] || \
+    grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null || \
+    grep -qiE "(microsoft|wsl)" /proc/sys/kernel/osrelease 2>/dev/null
 }
 
 # Get Windows username for WSL operations
@@ -257,10 +260,14 @@ detect_environment() {
 
     log "Detected Ubuntu $ubuntu_version ($ubuntu_codename)"
 
+    # Set and export WSL status
     if is_wsl; then
+        export IS_WSL="true"
         wsl_log "Running on Windows Subsystem for Linux"
         local win_user=$(get_windows_username)
         wsl_log "Windows username: $win_user"
+    else
+        export IS_WSL="false"
     fi
 }
 
