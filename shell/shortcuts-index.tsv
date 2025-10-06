@@ -73,6 +73,7 @@ vim│,f│Open file browser sidebar│leader + f
 vim│,b│Show list of open buffers│leader + b
 vim│,g│Search text across project│leader + g
 vim│Space│Clear search highlighting│Space
+vim│jk│Exit insert mode and return to normal mode│jk
 vim│,gs│Show git status in split│leader + gs
 vim│,gd│Show git diff in split│leader + gd
 vim│,gb│Show git blame for current line│leader + gb
@@ -135,6 +136,8 @@ shell│rmi│Remove files with confirmation prompt│rm -i
 shell│cpv│Copy files with verbose output│cp -v
 shell│rmv│Remove files with verbose output│rm -v
 shell│count│Count all files recursively│find . -type f | wc -l
+shell│ducks│Show largest directories and files in current dir│du -cks * | sort -rn | head
+shell│note│Quick notes to ~/.notes file│note [text]
 shell│reload│Reload shell configuration│source ~/.zshrc or ~/.bashrc
 shell│themes│List available color themes│ls configs/themes/
 shell│theme-switch│Launch interactive theme selector│$DOTFILES_DIR/bin/theme-switcher
