@@ -278,19 +278,11 @@ process_git_config() {
     local backup_dir="$3"
     local force="${4:-false}"
 
-    # Backup existing config if it exists
-    if [[ -f "$target" && ! -L "$target" ]]; then
-        log "Backing up existing git config"
-        mv "$target" "$backup_dir/"
-    elif [[ -L "$target" ]]; then
-        rm "$target"
-    fi
-
     # Get user information
     local git_name git_email
 
     if [[ -t 0 ]]; then  # Interactive terminal
-        # Check if already configured
+        # Check if already configured (BEFORE backing up the file!)
         local existing_name=$(git config --global user.name 2>/dev/null || true)
         local existing_email=$(git config --global user.email 2>/dev/null || true)
 
@@ -325,6 +317,14 @@ process_git_config() {
         git_name="${USER}"
         git_email="${USER}@localhost"
         warn "Non-interactive mode: using default git config ($git_name, $git_email)"
+    fi
+
+    # Backup existing config AFTER we've read the git user info
+    if [[ -f "$target" && ! -L "$target" ]]; then
+        log "Backing up existing git config"
+        mv "$target" "$backup_dir/"
+    elif [[ -L "$target" ]]; then
+        rm "$target"
     fi
 
     # Process template with sed (escape special characters)
