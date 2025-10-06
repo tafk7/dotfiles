@@ -47,11 +47,19 @@ vim-with() {
 
 # Benchmark vim startup time
 vim-bench() {
+    # Check if hyperfine is installed
+    if ! command -v hyperfine >/dev/null 2>&1; then
+        echo "Error: vim-bench requires hyperfine"
+        echo "Install with: cargo install hyperfine"
+        echo "Or use: apt install hyperfine (on Ubuntu 23.04+)"
+        return 1
+    fi
+
     local config="${1:-current}"
     local count="${2:-10}"
-    
+
     echo "Benchmarking vim startup time ($count runs)..."
-    
+
     case "$config" in
         current)
             hyperfine --warmup 3 --runs "$count" 'nvim --headless +quit'
