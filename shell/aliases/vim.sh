@@ -8,8 +8,8 @@ alias vim-full='$DOTFILES_DIR/bin/vim-config-switcher full'
 alias vim-mode='$DOTFILES_DIR/bin/vim-config-switcher'
 
 # Quick edit common files
-alias vimrc='vim ~/.config/nvim/init.vim'
-alias vimconfig='vim ~/.config/nvim/init.vim'
+alias vimrc='nvim ~/.config/nvim/init.vim'
+alias vimconfig='nvim ~/.config/nvim/init.vim'
 
 # Show current vim mode
 vim-status() {

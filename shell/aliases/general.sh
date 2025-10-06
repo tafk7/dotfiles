@@ -95,10 +95,10 @@ alias rmi='rm -i'     # interactive remove
 # Reload shell (works for both bash and zsh)
 if [[ -n "$ZSH_VERSION" ]]; then
     alias reload='source ~/.zshrc'
-    alias zshrc='vim ~/.zshrc'
+    alias zshrc='nvim ~/.zshrc'
 elif [[ -n "$BASH_VERSION" ]]; then
     alias reload='source ~/.bashrc'
-    alias bashrc='vim ~/.bashrc'
+    alias bashrc='nvim ~/.bashrc'
 fi
 
 # Theme management
