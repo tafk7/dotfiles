@@ -44,8 +44,9 @@ print_separator() {
 
 # Format keybinding line with colors
 format_line() {
-    echo "$1" | sed -E "s/([^ ]+)( +)([^│]+)/\\1\\2${DIM}\\3${RESET}/g" | \
-                sed -E "s/^([^ ]+)/    ${YELLOW}\\1${RESET}/"
+    local line="    $1"
+    # Highlight shortcuts (words followed by exactly 2 spaces) in yellow
+    echo "$line" | sed -E "s/([^ ]+)(  )/${YELLOW}\\1${RESET}\\2/g"
 }
 
 # Show vim keybindings
@@ -76,7 +77,7 @@ show_tmux() {
     format_line "|    Split horiz    c    New           d    Detach       r    Reload"
     format_line "-    Split vert     1-9  Switch        s    List         ?    Show keys"
     format_line "x    Kill pane      n    Next          $    Rename       "
-    format_line "X    Kill window    p    Previous      (    Previous     "
+    format_line "X    Kill window    p    Previous      (    Previous     )    Next"
     echo
     echo "    Navigation (No Prefix)              Resizing (With Prefix)"
     print_separator
@@ -267,7 +268,7 @@ if [[ -n "\$shortcut" ]]; then
     echo "\${DIM}────────────────────────────────────────\${RESET}"
     echo "\${CYAN}Category:\${RESET}     \${category}"
     echo "\${CYAN}Command:\${RESET}      \${full_cmd}"
-    echo "\${CYAN}Description:\${RESET} \${full_desc}"
+    echo "\${CYAN}Description:\${RESET}  \${full_desc}"
     echo ""
 
     case "\$category" in
