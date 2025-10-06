@@ -429,7 +429,7 @@ validate_installation() {
 # Package definitions using associative array
 declare -A PACKAGES=(
     [core]="git build-essential"
-    [development]="neovim zsh"
+    [development]="zsh"
     [modern]="bat fd-find ripgrep fzf"
     [terminal]="httpie htop tree"
     [languages]="python3-pip pipx"
