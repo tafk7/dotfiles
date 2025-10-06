@@ -432,7 +432,7 @@ set -x  # Before running commands
 bash -x ./install.sh
 
 # Check specific functions
-source scripts/security/core.sh
+source lib.sh
 verify_download "https://example.com/file" "expected-hash" "/tmp/test"
 ```
 

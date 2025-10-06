@@ -88,7 +88,9 @@ dotfiles/
 │       ├── nord/                 # Nord theme files
 │       ├── tokyo-night/          # Tokyo Night theme files
 │       └── ...                   # Other themes
-├── scripts/
+├── bin/              # User commands
+├── install/          # Installation scripts
+├── shell/            # Shell integration
 │   ├── env/                      # Environment variables
 │   │   └── common.sh            # Shared environment setup
 │   ├── aliases/                  # Shell aliases by category
@@ -132,7 +134,7 @@ psg <name>
 md <file>
 
 # Switch terminal theme interactively
-./scripts/theme-switcher.sh
+./bin/theme-switcher
 
 # List available themes
 themes
@@ -173,14 +175,14 @@ vim-status      # Show current vim configuration
 
 ```bash
 # Interactive theme switcher with preview
-./scripts/theme-switcher.sh
+./bin/theme-switcher
 
 # Direct theme switch
-./scripts/theme-switcher.sh nord
-./scripts/theme-switcher.sh tokyo-night
-./scripts/theme-switcher.sh kanagawa
-./scripts/theme-switcher.sh gruvbox-material
-./scripts/theme-switcher.sh catppuccin-mocha
+./bin/theme-switcher nord
+./bin/theme-switcher tokyo-night
+./bin/theme-switcher kanagawa
+./bin/theme-switcher gruvbox-material
+./bin/theme-switcher catppuccin-mocha
 ```
 
 **Available Themes:**
@@ -198,7 +200,7 @@ Themes apply consistently across neovim, tmux, shell prompts, and FZF. See [Them
 
 ```bash
 # Install VS Code settings and extensions
-./scripts/install-vscode.sh
+./install/install-vscode.sh
 ```
 
 This installs:
@@ -255,8 +257,8 @@ These configurations follow the principle: **Use VS Code for development, termin
 
 ### Adding Aliases/Functions
 
-- **Aliases:** Add `.sh` file to `scripts/aliases/`
-- **Functions:** Add `.sh` file to `scripts/functions/`
+- **Aliases:** Add `.sh` file to `shell/aliases/`
+- **Functions:** Add functions to `shell/functions.sh`
 - Files are automatically sourced on shell startup
 
 ## 🔒 Security Features
@@ -273,7 +275,7 @@ These configurations follow the principle: **Use VS Code for development, termin
 - **Quick Start:** See `docs/THEME_QUICK_START.md` for theme quick reference
 - **AI Integration:** See `ai/` directory for Claude Code prompts and tools
 - **Architecture:** Simple 2-file library design, human-readable codebase
-- **Aliases:** See `scripts/aliases/` for available shortcuts
+- **Aliases:** See `shell/aliases/` for available shortcuts
 
 ## 🎯 Design Principles
 

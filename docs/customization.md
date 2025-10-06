@@ -71,9 +71,9 @@ config_mappings=(
 
 ### 1. Create New Alias File
 
-Create a new file in `scripts/aliases/`:
+Create a new file in `shell/aliases/`:
 ```bash
-touch scripts/aliases/mytools.sh
+touch shell/aliases/mytools.sh
 ```
 
 ### 2. Add Your Aliases
@@ -92,11 +92,12 @@ The file will be automatically sourced on shell startup - no additional configur
 
 ## Creating Custom Functions
 
-### 1. Add to Functions Directory
+### 1. Add to Functions File
 
-Create a new file in `scripts/functions/`:
+Add your functions to `shell/functions.sh`:
 ```bash
-touch scripts/functions/myutils.sh
+# Open the functions file
+nano shell/functions.sh
 ```
 
 ### 2. Define Your Functions
@@ -117,7 +118,7 @@ new-project() {
 
 ## WSL-Specific Customizations
 
-For WSL-specific aliases or functions, add them to `scripts/aliases/wsl.sh`. They'll only be loaded when running in WSL.
+For WSL-specific aliases, add them to `shell/aliases/wsl.sh`. For WSL-specific functions, add them to `shell/wsl-functions.sh`. They'll only be loaded when running in WSL.
 
 ## Framework Functions Available
 
@@ -253,6 +254,6 @@ If you create useful customizations that others might benefit from:
 
 If you're unsure about something:
 1. Look at existing implementations in the setup files
-2. Check the security functions in `lib/core.sh`
+2. Check the security functions in `lib.sh`
 3. Test in a safe environment first
 4. Follow the patterns used by existing code
