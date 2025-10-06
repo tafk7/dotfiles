@@ -225,7 +225,7 @@ azure-cli (Ubuntu-specific installation)
 yarn, eslint, prettier
 
 # Python development
-black, ruff (via pipx for isolation)
+python3-dev, python3-venv (system libraries for venv support)
 ```
 
 ### Personal Packages (--personal flag)

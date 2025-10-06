@@ -491,9 +491,9 @@ install_work_packages() {
         log "Azure CLI already installed"
     fi
 
-    # Python development tools
+    # Python development tools (system-level only)
     log "Installing Python development tools..."
-    safe_sudo apt-get install -y python3-dev python3-venv black ruff
+    safe_sudo apt-get install -y python3-dev python3-venv
 
     success "Work tools installed"
 }
