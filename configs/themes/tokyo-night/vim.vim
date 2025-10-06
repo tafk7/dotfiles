@@ -20,7 +20,8 @@ let g:tokyonight_lualine_bold = 1
 " Set colorscheme with error handling
 try
     colorscheme tokyonight
-    let g:airline_theme='tokyonight'
+    " Use a compatible airline theme (tokyonight doesn't have native airline support)
+    let g:airline_theme='deus'
 catch
     " Fallback if tokyonight not available
     colorscheme desert
