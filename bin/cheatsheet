@@ -247,15 +247,15 @@ show_interactive() {
     local preview_script=$(mktemp)
     cat > "$preview_script" <<PREVIEW_EOF
 #!/bin/bash
-# Self-contained preview script - receives original TSV line
+# Self-contained preview script - receives original TSV line via stdin
 BOLD="$PREVIEW_BOLD"
 CYAN="$PREVIEW_CYAN"
 YELLOW="$PREVIEW_YELLOW"
 DIM="$PREVIEW_DIM"
 RESET="$PREVIEW_RESET"
 
-# Parse the TSV line directly using awk
-line="\$1"
+# Read the TSV line from stdin
+line=\$(cat)
 category=\$(echo "\$line" | awk -F'│' '{print \$1}')
 shortcut=\$(echo "\$line" | awk -F'│' '{print \$2}')
 full_desc=\$(echo "\$line" | awk -F'│' '{print \$3}')
@@ -318,7 +318,7 @@ PREVIEW_EOF
             --header-lines=2 \
             --delimiter='\t' \
             --with-nth=1 \
-            --preview="$preview_script '{2}'" \
+            --preview="echo {2} | $preview_script" \
             --preview-window='top:10:wrap:rounded:border-rounded' \
             --height=100% \
             --border=rounded \
