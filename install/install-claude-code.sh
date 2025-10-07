@@ -71,15 +71,6 @@ fi
 if command -v claude >/dev/null 2>&1; then
     INSTALLED_VERSION=$(claude --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -n1 || echo "installed")
     success "Claude Code $INSTALLED_VERSION is ready!"
-
-    # Run claude doctor to verify setup
-    log "Running diagnostics..."
-    if claude doctor >/dev/null 2>&1; then
-        success "Claude Code passed all diagnostic checks"
-    else
-        warn "Claude Code installed but diagnostics reported issues"
-        warn "Run 'claude doctor' for details"
-    fi
 else
     error "Claude Code installation verification failed"
     exit 1
@@ -87,11 +78,14 @@ fi
 
 # Show helpful information
 echo ""
-log "Claude Code is installed and ready to use!"
+success "Claude Code is installed and ready to use!"
+echo ""
 log "Available shortcuts:"
 log "  cl    - Start new Claude session"
 log "  clc   - Continue last Claude session"
 log "  clp   - One-off command (non-interactive)"
 echo ""
-log "To authenticate, run: claude"
-log "To verify installation: claude doctor"
+log "Next steps:"
+log "  1. Run 'claude' to authenticate (OAuth flow)"
+log "  2. Run 'claude doctor' to verify setup"
+log "  3. Run 'update-claude-commands' to sync slash commands"

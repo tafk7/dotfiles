@@ -74,6 +74,15 @@ run_nvm_command nvm alias default lts/*
 # Verify installation
 if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     success "Node.js $(node --version) and npm $(npm --version) installed via NVM!"
+
+    # Update npm to latest version
+    log "Updating npm to latest version..."
+    if run_nvm_command npm install -g npm@latest >/dev/null 2>&1; then
+        success "npm updated to $(npm --version)"
+    else
+        warn "npm update failed, using version $(npm --version)"
+    fi
+
     log "NVM will be automatically loaded in new shell sessions"
     log "To use in current session: source ~/.bashrc (or ~/.zshrc)"
 else
