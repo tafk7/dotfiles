@@ -9,10 +9,18 @@ source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
 
 log "Installing Claude Code CLI..."
 
+# Load NVM if it exists but isn't loaded yet
+if [[ -z "${NVM_DIR:-}" ]] && [[ -d "$HOME/.nvm" ]]; then
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    log "Loaded NVM from $NVM_DIR"
+fi
+
 # Check if Node.js is available
 if ! command -v node >/dev/null 2>&1; then
     error "Node.js is required but not found"
     error "Please install Node.js first (NVM is installed with --work flag)"
+    error "If NVM was just installed, try: source ~/.bashrc (or ~/.zshrc)"
     exit 1
 fi
 
