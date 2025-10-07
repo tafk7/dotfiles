@@ -17,8 +17,8 @@ theme-switch
 theme-switch nord
 theme-switch tokyo-night
 theme-switch kanagawa
-theme-switch gruvbox-material
-theme-switch catppuccin-mocha
+theme-switch gruvbox
+theme-switch catppuccin
 ```
 
 ### List Themes
