@@ -93,7 +93,7 @@ EXAMPLES:
 
 The script will:
 1. Install essential packages (git, curl, zsh, neovim, etc.)
-2. Install work tools if --work specified (Docker, Node.js, Azure CLI)
+2. Install work tools if --work specified (Docker, Node.js, Azure CLI, Claude Code)
 3. Install personal tools if --personal specified (ffmpeg, yt-dlp)
 4. Create symlinks for all configuration files
 5. Setup WSL integration if running on WSL
@@ -151,7 +151,7 @@ phase_install_packages() {
         log "  - Terminal tools: glow, lazygit, httpie, htop, tree"
         log "  - Languages: python3-pip, pipx"
         is_wsl && log "  - WSL tools: socat, wslu"
-        [[ "$INSTALL_WORK" == "true" ]] && log "  - Work tools: Node.js, Docker, Azure CLI"
+        [[ "$INSTALL_WORK" == "true" ]] && log "  - Work tools: Node.js, Docker, Azure CLI, Claude Code CLI"
         [[ "$INSTALL_PERSONAL" == "true" ]] && log "  - Personal tools: ffmpeg, yt-dlp"
         log "  - Additional tools via scripts: starship, eza, lazygit, zoxide"
     else
@@ -162,6 +162,8 @@ phase_install_packages() {
             install_work_packages
             # Install NVM and Node.js
             "$DOTFILES_DIR/install/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
+            # Install Claude Code CLI (requires Node.js)
+            "$DOTFILES_DIR/install/install-claude-code.sh" || { error "Claude Code installation failed"; exit 1; }
         fi
 
         # Personal packages
