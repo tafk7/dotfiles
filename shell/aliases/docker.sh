@@ -9,21 +9,17 @@ alias dexec='docker exec -it'
 alias dlogs='docker logs -f'
 alias dstop='docker stop'
 alias drm='docker rm'
-alias drmf='docker rm -f'
 
 # Images
 alias di='docker images'
 alias dpull='docker pull'
 alias dbuild='docker build -t'
-alias drmi='docker rmi'
 
 # Docker compose (using v2 syntax)
 alias dc='docker compose'
 alias dcu='docker compose up -d'
 alias dcd='docker compose down'
 alias dcl='docker compose logs -f'
-alias dcr='docker compose restart'
-alias dcb='docker compose build'
 
 # System cleanup
 alias dprune='docker system prune'      # Will prompt for confirmation
@@ -43,18 +39,6 @@ denter() {
         return 1
     fi
     docker exec -it "$1" /bin/bash || docker exec -it "$1" /bin/sh
-}
-
-# Clean up everything (containers, images, volumes)
-dclean() {
-    echo "Cleaning up Docker..."
-    docker system prune -af --volumes
-    echo "Cleanup complete!"
-}
-
-# Quick run with interactive terminal
-drun() {
-    docker run -it --rm "$@"
 }
 
 # Stop all running containers

@@ -55,7 +55,7 @@ A streamlined, human-readable dotfiles management system for Ubuntu environments
 **Professional Development:**
 - **Azure CLI**: Ubuntu-specific installation for cloud development
 - **Node.js via NVM**: Node Version Manager for flexible Node.js/npm management
-- **Python dev tools**: python3-dev, python3-venv for virtual environment support
+- **Python via pyenv**: Python Version Manager for flexible Python version management, works with Poetry and pip projects
 
 ### Personal Tools (`--personal`)
 
@@ -167,7 +167,61 @@ tmux-config-switcher.sh minimal  # Use streamlined tmux
 vim-minimal     # Fast vim config for quick edits
 vim-full        # Full-featured vim config
 vim-status      # Show current vim configuration
+
+# Python development (pyenv + Poetry/pip)
+pyset 3.11.9    # Set Python version for project (Poetry or pip)
+vactivate       # Activate virtual environment (smart detection)
+pyinfo          # Show Python environment info
+pylist          # List installed and available Python versions
 ```
+
+## 🐍 Python Development Workflow
+
+The dotfiles include a streamlined Python workflow using **pyenv** (version management) that works seamlessly with both **Poetry** and **pip** projects:
+
+### Quick Start
+
+```bash
+# 1. Install Python versions
+pyenv install 3.11.9
+pyenv install 3.12.4
+
+# 2. Set a default Python version (enables python/python3 commands globally)
+pyset --default 3.11.9
+
+# Now python/python3 work everywhere using the default version
+python --version
+# Python 3.11.9
+
+# Poetry project
+cd my-poetry-project
+pyset 3.11.9        # Set Python version + configure Poetry
+poetry install      # Install dependencies
+vactivate           # Activate venv
+
+# pip project
+cd my-pip-project
+pyset 3.10.14       # Set Python version + create venv
+vactivate           # Activate venv
+pip install -r requirements.txt
+
+# setuptools project (setup.py)
+cd my-package
+pyset 3.11.9        # Set Python version + create venv
+vactivate           # Activate venv
+pip install -e .    # Install in editable mode
+```
+
+### Benefits
+
+- ✅ **Default version blocking** - `python`/`python3` blocked until you set a default (prevents accidental system Python usage)
+- ✅ **Per-project Python versions** - Each project can use different Python versions via `.python-version`
+- ✅ **Automatic detection** - `pyset` detects Poetry vs pip projects automatically
+- ✅ **Smart precedence** - Project `.python-version` overrides global default automatically
+- ✅ **Team consistency** - `.python-version` file ensures everyone uses same version
+- ✅ **Works everywhere** - Integrates with Poetry, pip, setuptools, and VS Code
+
+See `cheat` command for full list of Python helpers.
 
 ## 🎨 Theme System
 
