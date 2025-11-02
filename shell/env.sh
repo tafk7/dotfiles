@@ -13,6 +13,24 @@
 # Node Version Manager
 export NVM_DIR="$HOME/.nvm"
 
+# Python Version Manager (pyenv)
+export PYENV_ROOT="$HOME/.pyenv"
+# Initialize pyenv if installed
+if [[ -d "$PYENV_ROOT" ]]; then
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path 2>/dev/null || true)"
+    eval "$(pyenv init - 2>/dev/null || true)"
+
+    # Set global default Python version if configured
+    DEFAULT_PYTHON_VERSION_FILE="$HOME/.config/dotfiles/default-python-version"
+    if [[ -f "$DEFAULT_PYTHON_VERSION_FILE" ]]; then
+        DEFAULT_PYTHON_VERSION=$(cat "$DEFAULT_PYTHON_VERSION_FILE" 2>/dev/null | tr -d '[:space:]')
+        if [[ -n "$DEFAULT_PYTHON_VERSION" ]]; then
+            pyenv global "$DEFAULT_PYTHON_VERSION" 2>/dev/null || true
+        fi
+    fi
+fi
+
 # Theme configuration
 # Read theme from persistent storage if it exists
 THEME_FILE="$HOME/.config/dotfiles/current-theme"

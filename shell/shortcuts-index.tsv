@@ -10,17 +10,13 @@
 # Git shortcuts
 git│gs│Show working tree status and staged changes│git status
 git│gl│Show commit history as decorated graph│git log --oneline --decorate --graph
-git│gla│Show all branches in commit graph│git log --oneline --decorate --graph --all
 git│ga│Stage specific files for commit│git add
 git│gaa│Stage all changes in working directory│git add .
 git│gau│Stage all tracked files that have changes│git add -u
 git│gd│Show unstaged changes in working directory│git diff
 git│gds│Show staged changes ready to commit│git diff --staged
-git│grs│Discard changes in working directory│git restore
-git│grss│Unstage files (remove from staging area)│git restore --staged
 git│gc│Create commit with editor for message│git commit
 git│gcm│Create commit with inline message│git commit -m
-git│gca│Modify the most recent commit│git commit --amend
 git│gsw│Switch to existing branch│git switch
 git│gswc│Create and switch to new branch│git switch -c
 git│gb│List all local branches│git branch
@@ -28,18 +24,12 @@ git│gf│Download objects and refs from remote│git fetch
 git│gfo│Download latest changes from origin remote│git fetch origin
 git│gfu│Download latest changes from upstream remote│git fetch upstream
 git│gfa│Download changes from all configured remotes│git fetch --all
-git│gfp│Fetch and remove deleted remote branches│git fetch --prune
 git│gp│Upload local commits to remote│git push
 git│gpl│Download and merge remote changes│git pull
-git│gpu│Push and set upstream tracking branch│git push -u origin HEAD
 git│gst│Save working changes to temporary area│git stash
 git│gstp│Apply and remove most recent stash│git stash pop
-git│gsta│Apply most recent stash without removing it│git stash apply
-git│gstl│Show all saved stashes│git stash list
-git│gcl│Create local copy of remote repository│git clone
 git│lg│Launch interactive terminal UI for git│lazygit
 git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
-git│gquick│Stage all, commit, and push in one step│git add . && git commit -m "..." && git push
 
 # Tmux shortcuts
 tmux│Ctrl+a |│Split current pane horizontally (top/bottom)│prefix + |
@@ -105,21 +95,17 @@ vim│.│Repeat last edit command│.
 # Shell shortcuts
 shell│..│Change to parent directory│cd ..
 shell│...│Go up two directory levels│cd ../..
-shell│....│Go up three directory levels│cd ../../..
 shell│-│Return to previous directory│cd -
-shell│ls│List directory with colors and icons│eza --color=always --group-directories-first
-shell│ll│List directory in long format with details│eza -l --time-style=long-iso
-shell│la│List all files including hidden ones│eza -la
-shell│l│List directory in compact columns│eza -CF
-shell│tree│Display directory tree structure│eza --tree
+shell│ls│List directory with colors (standard)│ls --color=auto
+shell│ll│Long listing with eza enhancements│eza -l --color=auto --group-directories-first
+shell│la│List all files including hidden (eza)│eza -la --color=auto --group-directories-first
+shell│l│Compact column listing (eza)│eza -CF --color=auto --group-directories-first
+shell│tree│Display directory tree structure│eza --tree --color=auto
 shell│bat│View file with syntax highlighting│batcat
 shell│view│View file with syntax highlighting│batcat
-shell│fd│Modern file finder (faster than find)│fdfind
 shell│df│Show disk space usage (human readable)│df -h
 shell│du│Show directory size (human readable)│du -h
 shell│free│Show memory usage (human readable)│free -h
-shell│psmem│List processes sorted by memory (highest first)│ps auxf | sort -nr -k 4
-shell│pscpu│List processes sorted by CPU (highest first)│ps auxf | sort -nr -k 3
 shell│ports│List all open network ports│netstat -tulanp
 shell│myip│Show your public IP address│curl ifconfig.me
 shell│localip│Show your local network IP│hostname -I
@@ -127,17 +113,9 @@ shell│tm│Create new named tmux session│tmux new -s
 shell│ta│Attach to existing tmux session│tmux attach -t
 shell│tl│List all tmux sessions│tmux list-sessions
 shell│tk│Kill specific tmux session│tmux kill-session -t
-shell│untar│Extract tar.gz archive│tar -zxvf
-shell│tarc│Create compressed tar.gz archive│tar -czf
 shell│h│Show command history│history
 shell│hgrep│Search command history│history | grep
-shell│rmff│Force remove directory and contents│rm -rf
-shell│rmi│Remove files with confirmation prompt│rm -i
-shell│cpv│Copy files with verbose output│cp -v
-shell│rmv│Remove files with verbose output│rm -v
-shell│count│Count all files recursively│find . -type f | wc -l
 shell│ducks│Show largest directories and files in current dir│du -cks * | sort -rn | head
-shell│note│Quick notes to ~/.notes file│note [text]
 shell│reload│Reload shell configuration│source ~/.zshrc or ~/.bashrc
 shell│themes│List available color themes│ls configs/themes/
 shell│theme-switch│Launch interactive theme selector│$DOTFILES_DIR/bin/theme-switcher
@@ -151,7 +129,6 @@ shell│fgb│Fuzzy search and switch git branches│FZF git branch selector
 shell│fgl│Fuzzy search git commit history│FZF git log browser
 shell│frg│Fuzzy search file contents with ripgrep│FZF + ripgrep content search
 shell│fp│Fuzzy search and open project directories│FZF project directory finder
-shell│md│View markdown file with syntax highlighting│bat --style=plain --language=markdown
 
 # Docker shortcuts
 docker│dps│List currently running containers│docker ps
@@ -160,63 +137,49 @@ docker│dexec│Execute command in running container│docker exec -it
 docker│dlogs│Stream container logs in real-time│docker logs -f
 docker│dstop│Stop running container│docker stop
 docker│drm│Remove stopped container│docker rm
-docker│drmf│Force remove container (even if running)│docker rm -f
 docker│di│List all Docker images│docker images
 docker│dpull│Download image from registry│docker pull
 docker│dbuild│Build image from Dockerfile with tag│docker build -t
-docker│drmi│Remove Docker image│docker rmi
 docker│dc│Run Docker Compose command│docker compose
 docker│dcu│Start all services in background│docker compose up -d
 docker│dcd│Stop and remove all containers│docker compose down
 docker│dcl│Stream logs from all services│docker compose logs -f
-docker│dcr│Restart all services│docker compose restart
-docker│dcb│Build/rebuild all service images│docker compose build
 docker│dprune│Remove unused containers and images│docker system prune
 docker│dprunea│Remove all unused Docker resources│docker system prune -a
 docker│denter│Open interactive bash shell in container│docker exec -it <container> /bin/bash
-docker│dclean│Remove all containers, images, and volumes│docker system prune -af --volumes
-docker│drun│Run container and remove after exit│docker run -it --rm
 docker│dstopall│Stop all running containers at once│docker stop $(docker ps -q)
 
-# Python shortcuts
-python│venv│Create isolated Python environment│python3 -m venv venv
-python│activate│Activate virtual environment│source venv/bin/activate
-python│pipreqs│Install packages from requirements.txt│pip install -r requirements.txt
+# Python shortcuts (pyenv + Poetry/pip workflow)
+python│pyset│Set Python version for project (Poetry or pip)│pyset <version> (e.g., pyset 3.11.9)
+python│vactivate│Activate virtual environment (smart detection)│vactivate
+python│pyinfo│Show current Python environment information│pyinfo
+python│pylist│List installed and available Python versions│pylist
+python│pactivate│Activate Poetry project venv│pactivate (Poetry-only alternative to vactivate)
+python│pyenv install│Install new Python version│pyenv install <version>
+python│pyenv versions│List installed Python versions│pyenv versions
+python│pyenv local│Set Python version for current directory│pyenv local <version>
+python│pyenv global│Set default Python version system-wide│pyenv global <version>
+python│poetry install│Install Poetry project dependencies│poetry install
+python│poetry add│Add package to Poetry project│poetry add <package>
+python│poetry env info│Show Poetry environment details│poetry env info
+python│pip install -e│Install package in editable mode (setuptools)│pip install -e .
 python│py│Run Python 3 interpreter│python3
-python│ipy│Run interactive IPython shell│ipython
 python│pytest│Run test suite with pytest│python -m pytest
 python│pyt│Run pytest with verbose output│python -m pytest -v
-python│fmt│Auto-format code with Black│black .
-python│lint│Check code with Ruff linter│ruff check .
-python│lintf│Auto-fix linting issues with Ruff│ruff check . --fix
-python│pyserver│Start simple HTTP server in current dir│python -m http.server
 
 # Node.js shortcuts
 node│ni│Install dependencies from package.json│npm install
 node│nr│Run npm script from package.json│npm run
-node│nrm│Remove node_modules and lock file│rm -rf node_modules package-lock.json
 node│nrd│Run development script│npm run dev
 node│nrb│Run build script│npm run build
 node│nrt│Run test script│npm run test
 node│nrs│Run start script│npm run start
-node│nclean│Delete and reinstall all dependencies│rm -rf node_modules && npm install
 
 # VS Code shortcuts
 vscode│c│Open VS Code in current directory│code .
-vscode│cz│Edit .zshrc in VS Code│code ~/.zshrc
-vscode│cb│Edit .bashrc in VS Code│code ~/.bashrc
 vscode│cdot│Open dotfiles directory in VS Code│code $DOTFILES_DIR
-vscode│ctodo│Open TODO artifacts in VS Code│code $DOTFILES_DIR/_artifacts/issues/
-vscode│cw│Open with Work profile settings│code . --profile "Work"
-vscode│cp│Open with Personal profile settings│code . --profile "Personal"
-vscode│gdvc│View staged git diff in VS Code│git diff --cached | code -
-vscode│gdiff│View git diff in VS Code│git diff | code -
-vscode│csettings│Edit VS Code settings.json│code ~/.config/Code/User/settings.json
-vscode│ckeys│Edit VS Code keybindings.json│code ~/.config/Code/User/keybindings.json
-vscode│cws│Open workspace file in VS Code│code *.code-workspace
 vscode│cproj│Fuzzy search and open project in VS Code│FZF project finder + open in VSCode
 vscode│cf│Fuzzy search and open file in VS Code│FZF file finder + open in VSCode
-vscode│cgrep│Search text and open at line in VS Code│Ripgrep search + open at line in VSCode
 vscode│cdiff│Compare two files side-by-side│code --diff file1 file2
 
 # WSL shortcuts
@@ -234,5 +197,4 @@ wsl│cwd│Copy current directory path to clipboard│pwd | clip.exe
 wsl│wcd│Copy Windows path to clipboard│wslpath -w $(pwd) | clip.exe
 wsl│wpath│Convert Linux path to Windows format│wslpath -w
 wsl│lpath│Convert Windows path to Linux format│wslpath -u
-wsl│win-ssh│List Windows SSH keys directory│ls -la $WIN_SSH
 wsl│sync-ssh│Import SSH keys from Windows│import_windows_ssh_keys

@@ -113,26 +113,6 @@ extract() {
 }
 
 # ==============================================================================
-# Utility Functions
-# ==============================================================================
-
-# Quick notes function
-note() {
-    local note_file="$HOME/.notes"
-    if [[ $# -eq 0 ]]; then
-        if [[ -f "$note_file" ]]; then
-            if command -v bat >/dev/null 2>&1; then
-                bat "$note_file"
-            else
-                cat "$note_file"
-            fi
-        fi
-    else
-        echo "$(date): $*" >> "$note_file"
-    fi
-}
-
-# ==============================================================================
 # Help & Documentation Functions
 # ==============================================================================
 
@@ -258,3 +238,257 @@ alias fgb='fzf-git-branch'   # FZF git branch switcher
 alias fgl='fzf-git-log'      # FZF git log browser
 alias frg='fzf-rg'           # FZF ripgrep search (rg is ripgrep itself)
 alias fp='fzf-project'       # FZF project finder
+
+# ==============================================================================
+# Python & Poetry Management Functions
+# ==============================================================================
+
+# Python command wrapper - enforces version management via pyenv
+python() {
+    if [[ ! -f "$HOME/.config/dotfiles/default-python-version" ]]; then
+        echo "Error: No default Python version set"
+        echo ""
+        echo "Set a default Python version to enable the python command:"
+        echo "  pyset --default <version>"
+        echo ""
+        echo "Example:"
+        echo "  pyenv install 3.11.9"
+        echo "  pyset --default 3.11.9"
+        return 1
+    fi
+    command python "$@"
+}
+
+# Python3 command wrapper - enforces version management via pyenv
+python3() {
+    if [[ ! -f "$HOME/.config/dotfiles/default-python-version" ]]; then
+        echo "Error: No default Python version set"
+        echo ""
+        echo "Set a default Python version to enable the python3 command:"
+        echo "  pyset --default <version>"
+        echo ""
+        echo "Example:"
+        echo "  pyenv install 3.11.9"
+        echo "  pyset --default 3.11.9"
+        return 1
+    fi
+    command python3 "$@"
+}
+
+# Set Python version for current project (works for both Poetry and pip projects)
+pyset() {
+    if ! command -v pyenv >/dev/null 2>&1; then
+        echo "Error: pyenv is not installed"
+        return 1
+    fi
+
+    # Handle --default flag
+    if [[ "$1" == "--default" ]]; then
+        if [[ -z "$2" ]]; then
+            echo "Usage: pyset --default <python-version>"
+            echo "Example: pyset --default 3.11.9"
+            echo ""
+            echo "Available Python versions:"
+            pyenv versions --bare
+            return 1
+        fi
+
+        local version="$2"
+
+        # Check if version is installed
+        if ! pyenv versions --bare | grep -q "^${version}$"; then
+            echo "Python ${version} is not installed."
+            echo "Install it with: pyenv install ${version}"
+            return 1
+        fi
+
+        # Create config directory if it doesn't exist
+        mkdir -p "$HOME/.config/dotfiles"
+
+        # Write default version to cache file
+        echo "$version" > "$HOME/.config/dotfiles/default-python-version"
+
+        # Set global Python version
+        pyenv global "$version"
+
+        echo ""
+        echo "✓ Default Python version set to ${version}"
+        echo "✓ python and python3 commands now available globally"
+        echo ""
+        echo "This version will be used everywhere unless overridden by a project's .python-version file."
+        return 0
+    fi
+
+    if [[ -z "$1" ]]; then
+        echo "Usage: pyset <python-version>"
+        echo "       pyset --default <python-version>"
+        echo ""
+        echo "Examples:"
+        echo "  pyset 3.11.9              # Set Python version for current project"
+        echo "  pyset --default 3.11.9    # Set global default Python version"
+        echo ""
+        echo "Available Python versions:"
+        pyenv versions --bare
+        return 1
+    fi
+
+    local version="$1"
+
+    # Check if version is installed
+    if ! pyenv versions --bare | grep -q "^${version}$"; then
+        echo "Python ${version} is not installed."
+        echo "Install it with: pyenv install ${version}"
+        return 1
+    fi
+
+    # Set local Python version
+    echo "Setting Python version to ${version}..."
+    pyenv local "$version"
+
+    # Detect project type and configure accordingly
+    if [[ -f pyproject.toml ]] && command -v poetry >/dev/null 2>&1; then
+        # Poetry project
+        echo "Configuring Poetry to use Python ${version}..."
+        poetry env use python
+
+        echo ""
+        echo "✓ Python version set to ${version}"
+        echo "✓ Poetry configured to use this version"
+        echo ""
+        echo "Next: Run 'poetry install' to create/update the virtual environment"
+    else
+        # pip project or no package manager
+        # Remove old venv if it exists
+        if [[ -d .venv ]]; then
+            echo "Removing existing .venv..."
+            rm -rf .venv
+        fi
+
+        # Create new venv
+        echo "Creating virtual environment..."
+        python -m venv .venv
+
+        echo ""
+        echo "✓ Python version set to ${version}"
+        echo "✓ Virtual environment created at .venv/"
+        echo ""
+        echo "Next steps:"
+        echo "  1. Activate: vactivate (or: source .venv/bin/activate)"
+        if [[ -f requirements.txt ]]; then
+            echo "  2. Install: pip install -r requirements.txt"
+        else
+            echo "  2. Install packages: pip install <package-name>"
+        fi
+    fi
+}
+
+# Show current Python and Poetry environment info
+pyinfo() {
+    echo "=== Python Environment Info ==="
+    echo ""
+
+    # pyenv info
+    if command -v pyenv >/dev/null 2>&1; then
+        echo "pyenv version:"
+        pyenv version
+        echo ""
+
+        if [[ -f .python-version ]]; then
+            echo "Project Python version (from .python-version):"
+            cat .python-version
+            echo ""
+        fi
+    else
+        echo "pyenv: not installed"
+        echo ""
+    fi
+
+    # System Python
+    echo "Active Python:"
+    which python || echo "  python: not found (enforcing venv usage ✓)"
+    python --version 2>/dev/null || echo "  No python in PATH (use venv)"
+    echo ""
+
+    # Poetry info
+    if command -v poetry >/dev/null 2>&1; then
+        echo "Poetry environment:"
+        poetry env info 2>/dev/null || echo "  No Poetry environment (run 'poetry install')"
+    else
+        echo "poetry: not installed"
+    fi
+
+    # Virtual environment status
+    echo ""
+    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+        echo "✓ Virtual environment active: $VIRTUAL_ENV"
+    else
+        echo "✗ No virtual environment active"
+        if [[ -d .venv ]]; then
+            echo "  (Found .venv/ - activate with: source .venv/bin/activate)"
+        fi
+    fi
+}
+
+# List all pyenv Python versions with helpful info
+pylist() {
+    if ! command -v pyenv >/dev/null 2>&1; then
+        echo "Error: pyenv is not installed"
+        return 1
+    fi
+
+    echo "=== Installed Python Versions ==="
+    pyenv versions
+    echo ""
+    echo "=== Available Versions (showing latest patches only) ==="
+    pyenv install --list | grep -E '^\s*3\.(8|9|10|11|12|13)\.[0-9]+$' | tail -20
+    echo ""
+    echo "Install a version: pyenv install <version>"
+    echo "Example: pyenv install 3.11.9"
+}
+
+# Quick Poetry venv activation
+pactivate() {
+    if [[ -d .venv ]]; then
+        source .venv/bin/activate
+        echo "✓ Virtual environment activated"
+    elif [[ -f pyproject.toml ]]; then
+        echo "No .venv found. Run 'poetry install' first."
+        return 1
+    else
+        echo "Not in a Poetry project (no pyproject.toml found)"
+        return 1
+    fi
+}
+
+# Alias for backward compatibility (use pyset instead)
+pysetup() {
+    echo "Note: 'pysetup' is deprecated. Use 'pyset' instead (works for both Poetry and pip projects)"
+    echo ""
+    pyset "$@"
+}
+
+# Universal venv activation (works for both Poetry and pip projects)
+vactivate() {
+    if [[ -d .venv ]]; then
+        source .venv/bin/activate
+        echo "✓ Virtual environment activated"
+
+        # Show what type of project this is
+        if [[ -f pyproject.toml ]]; then
+            echo "  (Poetry project)"
+        elif [[ -f requirements.txt ]]; then
+            echo "  (pip project)"
+        fi
+    else
+        echo "No .venv found in current directory"
+
+        if [[ -f pyproject.toml ]]; then
+            echo "This is a Poetry project. Run: poetry install"
+        elif [[ -f requirements.txt ]]; then
+            echo "This is a pip project. Run: pysetup <version>"
+        else
+            echo "Run 'pysetup <version>' or 'pyset <version>' to create one"
+        fi
+        return 1
+    fi
+}
