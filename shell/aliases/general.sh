@@ -2,20 +2,23 @@
 
 # General aliases for modern CLI tools and productivity
 
-# Modern replacements for classic commands (standardized)
+# Modern CLI tool aliases
+# Note: 'ls' kept as system default for compatibility (muscle memory for -ltr, etc.)
+# Use eza variants (ll, la, l, tree) for enhanced features
 if command -v eza >/dev/null 2>&1; then
-    alias ls='eza --color=always --group-directories-first'
-    alias ll='eza -l --color=always --group-directories-first --time-style=long-iso'
-    alias la='eza -la --color=always --group-directories-first --time-style=long-iso'
-    alias l='eza -CF --color=always --group-directories-first'
-    alias tree='eza --tree --color=always --group-directories-first'
+    alias ll='eza -l --color=auto --group-directories-first --time-style=long-iso'
+    alias la='eza -la --color=auto --group-directories-first --time-style=long-iso'
+    alias l='eza -CF --color=auto --group-directories-first'
+    alias tree='eza --tree --color=auto --group-directories-first'
 else
-    alias ls='ls --color=auto'
-    alias ll='ls -alF'
-    alias la='ls -A'
-    alias l='ls -CF'
-    alias tree='tree -C'
+    alias ll='ls -alF --color=auto'
+    alias la='ls -A --color=auto'
+    alias l='ls -CF --color=auto'
+    command -v tree >/dev/null 2>&1 && alias tree='tree -C'
 fi
+
+# Keep ls as system default
+alias ls='ls --color=auto'
 
 # OS-aware aliases for bat and fd (safe aliases that don't override system commands)
 if command -v batcat &> /dev/null; then
@@ -25,14 +28,9 @@ elif command -v bat &> /dev/null; then
     alias view='bat'
 fi
 
-if command -v fdfind &> /dev/null; then
-    alias fd='fdfind'
-fi
-
 # Directory navigation
 alias ..='cd ..'
 alias ...='cd ../..'
-alias ....='cd ../../..'
 alias -- -='cd -'
 
 # File operations
@@ -46,7 +44,6 @@ alias egrep='egrep --color=auto'
 alias df='df -h'
 alias du='du -h'
 alias free='free -h'
-# Process search utilities (psg, pscpu, psmem) are available below
 
 # Network
 alias ports='netstat -tulanp'
@@ -71,13 +68,7 @@ fi
 alias nano='nano -w'
 alias less='less -R'
 
-# Archive operations (safe aliases that don't override tar)
-alias untar='tar -zxvf'
-alias tarc='tar -czf'  # tar create
-
 # Process management
-alias psmem='ps auxf | sort -nr -k 4'
-alias pscpu='ps auxf | sort -nr -k 3'
 alias killall='killall -v'
 
 # Disk usage
@@ -87,10 +78,6 @@ alias ducks='du -cks * | sort -rn | head'
 # History
 alias h='history'
 alias hgrep='history | grep'
-
-# Safer alternatives (explicit commands)
-alias rmff='rm -rf'   # force remove (double 'f' for safety)
-alias rmi='rm -i'     # interactive remove
 
 # Reload shell (works for both bash and zsh)
 if [[ -n "$ZSH_VERSION" ]]; then
@@ -105,18 +92,6 @@ fi
 alias theme-switch='$DOTFILES_DIR/bin/theme-switcher'
 # Dynamic theme listing from configs/themes directory
 alias themes='ls -1 "$DOTFILES_DIR/configs/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
-
-# Quick file operations
-alias count='find . -type f | wc -l'
-alias cpv='cp -v'
-alias rmv='rm -v'
-
-# Markdown viewing - use bat for syntax highlighting
-if command -v batcat &> /dev/null; then
-    alias md='batcat --style=plain --language=markdown'  # View markdown files
-elif command -v bat &> /dev/null; then
-    alias md='bat --style=plain --language=markdown'  # View markdown files
-fi
 
 # Dotfiles management
 alias update-configs='$DOTFILES_DIR/bin/update-configs'

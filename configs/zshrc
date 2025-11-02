@@ -1,5 +1,10 @@
 # Set DOTFILES_DIR for this installation
-export DOTFILES_DIR="/home/tafk/dotfiles"
+# Auto-detect to handle symlinks and directory moves
+if [[ -z "$DOTFILES_DIR" ]]; then
+    export DOTFILES_DIR="${0:A:h:h}"  # Zsh idiom: resolve symlinks, get parent dir
+fi
+# Fallback if auto-detection fails
+: ${DOTFILES_DIR:="$HOME/dotfiles"}
 
 # Modern Zsh Configuration - Optimized for VS Code + Visual Workflow
 # Uses Starship prompt for fast startup with visual features
@@ -157,9 +162,10 @@ fi
 # ==============================================================================
 
 # Zoxide for smart directory jumping
+# Note: Keep cd as standard builtin for Claude Code snapshot compatibility
+# Use 'z' command directly for smart directory jumping
 if command -v zoxide >/dev/null 2>&1; then
     eval "$(zoxide init zsh)"
-    alias cd='z'  # Optional: replace cd with zoxide
 fi
 
 # ==============================================================================
@@ -168,9 +174,17 @@ fi
 
 # Lazy load NVM for faster startup
 if [ -s "$NVM_DIR/nvm.sh" ]; then
-    alias nvm='unalias nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm'
-    alias node='unalias node; unalias nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; node'
-    alias npm='unalias npm; unalias nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; npm'
+    # Helper function to load NVM once
+    _load_nvm() {
+        unset -f _load_nvm nvm node npm claude
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    }
+
+    # Create wrapper functions that load NVM on first use
+    nvm() { _load_nvm; nvm "$@"; }
+    node() { _load_nvm; node "$@"; }
+    npm() { _load_nvm; npm "$@"; }
+    claude() { _load_nvm; claude "$@"; }
 fi
 
 # ==============================================================================
@@ -201,5 +215,8 @@ done
 # Local Configuration
 # ==============================================================================
 
-# Source local configuration if it exists (not tracked in git)
+# Source shared local configuration (bash + zsh)
+[[ -f ~/.shell.local ]] && source ~/.shell.local
+
+# Source zsh-specific local configuration (not tracked in git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

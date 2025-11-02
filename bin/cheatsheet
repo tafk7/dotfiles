@@ -330,17 +330,5 @@ main() {
     esac
 }
 
-# Handle piping to less for long output when showing specific sections
-if [[ -t 1 ]] && [[ -n "$1" ]] && [[ "$1" != "all" ]]; then
-    # Direct access to specific section - show in less
-    main "$@" | less -R
-elif [[ -t 1 ]] && [[ "$1" == "all" ]]; then
-    # Direct access to all sections - show in less
-    main "$@" | less -R
-elif [[ -t 1 ]] && [[ -z "$1" ]]; then
-    # No args - interactive mode handles its own display
-    main "$@"
-else
-    # Output is piped
-    main "$@"
-fi
+# Direct output - let users pipe to less if needed
+main "$@"
