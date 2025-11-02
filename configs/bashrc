@@ -12,6 +12,8 @@ if [[ -z "$DOTFILES_DIR" ]]; then
     DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
     export DOTFILES_DIR
 fi
+# Fallback if auto-detection fails
+: ${DOTFILES_DIR:="$HOME/dotfiles"}
 
 # ==============================================================================
 # Core Shell Settings
@@ -94,7 +96,7 @@ fi
 git_prompt() {
     # Skip if disabled or in large repos
     [[ -n "$BASH_NO_GIT_PROMPT" ]] && return
-    
+
     local git_status git_branch
     # Add timeout to prevent slowdowns in large repos
     if git_branch=$(timeout 0.1s git symbolic-ref --short HEAD 2>/dev/null); then
@@ -198,27 +200,8 @@ fi
 # Local Configuration
 # ==============================================================================
 
-# Source local configuration if it exists (not tracked in git)
+# Source shared local configuration (not tracked in git)
+[[ -f ~/.shell.local ]] && source ~/.shell.local
+
+# Source shell-specific local configuration if it exists (not tracked in git)
 [[ -f ~/.bashrc.local ]] && source ~/.bashrc.local
-
-# FINN/Brainsmith parameters
-export NUM_DEFAULT_WORKERS=14
-export XILINXD_LICENSE_FILE=4400@10.1.0.4
-#/opt/Xilinx/licenses/Xilinx_brainSmith_dev0.lic
-
-# FINN paths
-# export FINN_ROOT=/home/tafk/finn/
-# export FINN_HOST_BUILD_DIR=/home/tafk/builds/finn
-# export FINN_XILINX_PATH="/tools/Xilinx"
-# export FINN_XILINX_VERSION="2024.2"
-# export FINN_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
-
-# Brainsmith paths
-# export BSMITH_ROOT=/home/tafk/brainsmith/
-# export BSMITH_BUILD_DIR=/home/tafk/builds/brainsmith
-# export BSMITH_XILINX_PATH="/tools/Xilinx"
-# export BSMITH_XILINX_VERSION="2024.2"
-# export BSMITH_DOCKER_EXTRA=" -v /opt/Xilinx/licenses:/opt/Xilinx/licenses -e XILINXD_LICENSE_FILE=$XILINXD_LICENSE_FILE"
-
-# Source Xilinx tools (if available)
-[[ -f /tools/Xilinx/Vivado/2024.2/settings64.sh ]] && source /tools/Xilinx/Vivado/2024.2/settings64.sh

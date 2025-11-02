@@ -18,7 +18,12 @@ CLAUDE.md
 
 # Theme system runtime files
 .config/dotfiles/current-theme
+.config/dotfiles/previous-theme
+.config/dotfiles/theme.sh
 .config/dotfiles/theme-backups/
+
+# Python version management
+.config/dotfiles/default-python-version
 
 # Vim runtime files
 plugged/

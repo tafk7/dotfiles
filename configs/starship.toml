@@ -1,8 +1,8 @@
 # Starship Configuration - Minimal, Fast, Visual
 # Optimized for VS Code integrated terminal
 
-# Wait 10ms for command timeout
-command_timeout = 100
+# Command timeout - increased for pyenv shims
+command_timeout = 1000
 
 # Format the prompt
 format = """
@@ -42,7 +42,7 @@ ahead = "↑${count}"
 behind = "↓${count}"
 diverged = "↕"
 untracked = "?"
-stashed = "$"
+stashed = "≡"
 modified = "*"
 staged = "+"
 renamed = "»"
@@ -71,6 +71,8 @@ style = "yellow"
 detect_extensions = ["py"]
 detect_files = [".python-version", "requirements.txt", "setup.py", "pyproject.toml"]
 detect_folders = []
+# Use python_binary to avoid slow pyenv shims on every prompt
+python_binary = ["python3", "python"]
 
 # Docker context
 [docker_context]
