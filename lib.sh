@@ -495,6 +495,92 @@ install_base_packages() {
     fi
 }
 
+# ==============================================================================
+# Tiered Installation Functions
+# ==============================================================================
+
+# Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide)
+install_shell_tier_packages() {
+    log "Installing shell tier packages..."
+
+    update_packages
+
+    # APT packages for shell tier
+    local shell_packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
+
+    # Add WSL packages if on WSL
+    if is_wsl; then
+        shell_packages="$shell_packages ${PACKAGES[wsl]}"
+    fi
+
+    log "Installing shell tier APT packages..."
+    # shellcheck disable=SC2086
+    if safe_sudo apt-get install -y $shell_packages; then
+        success "Shell tier APT packages installed"
+    else
+        warn "Some shell tier packages failed to install"
+    fi
+
+    # Create command aliases for renamed packages
+    if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
+        safe_sudo ln -sf "$(which batcat)" /usr/local/bin/bat
+    fi
+    if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
+        safe_sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
+    fi
+
+    # Install modern tools via dedicated installers (graceful failures)
+    log "Installing shell tier tools via scripts..."
+    "$DOTFILES_DIR/install/install-starship.sh" || warn "Starship installation failed"
+    "$DOTFILES_DIR/install/install-eza.sh" || warn "Eza installation failed"
+    "$DOTFILES_DIR/install/install-zoxide.sh" || warn "Zoxide installation failed"
+
+    success "Shell tier installation complete"
+}
+
+# Dev tier: development tools (neovim, lazygit, tmux)
+install_dev_tier_packages() {
+    log "Installing dev tier packages..."
+
+    # Install tmux via APT if not present
+    if ! command -v tmux >/dev/null 2>&1; then
+        log "Installing tmux..."
+        safe_sudo apt-get install -y tmux || warn "tmux installation failed"
+    fi
+
+    # Install neovim and lazygit via scripts (graceful failures)
+    log "Installing dev tier tools via scripts..."
+    "$DOTFILES_DIR/install/install-neovim.sh" || warn "Neovim installation failed"
+    "$DOTFILES_DIR/install/install-lazygit.sh" || warn "Lazygit installation failed"
+
+    success "Dev tier installation complete"
+}
+
+# Full tier: complete environment (NVM, pyenv, Docker, Azure CLI, Claude Code)
+install_full_tier_packages() {
+    log "Installing full tier packages..."
+
+    # Azure CLI and Python dev tools
+    install_work_packages
+
+    # Docker
+    install_docker
+
+    # Install NVM and Node.js
+    log "Installing NVM..."
+    "$DOTFILES_DIR/install/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
+
+    # Install pyenv for Python version management
+    log "Installing pyenv..."
+    "$DOTFILES_DIR/install/install-pyenv.sh" || { error "pyenv installation failed"; exit 1; }
+
+    # Install Claude Code CLI (requires Node.js)
+    log "Installing Claude Code..."
+    "$DOTFILES_DIR/install/install-claude-code.sh" || { error "Claude Code installation failed"; exit 1; }
+
+    success "Full tier installation complete"
+}
+
 # Install work packages (Azure CLI, Python tools, etc.)
 install_work_packages() {
     log "Installing work tools..."
