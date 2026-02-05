@@ -15,7 +15,7 @@ CONFIGS_DIR="$SCRIPT_DIR/configs"
 DOTFILES_DIR="$SCRIPT_DIR"
 
 # Installation options
-INSTALL_WORK=false
+INSTALL_TIER="config"  # Default tier: config, shell, dev, full
 INSTALL_PERSONAL=false
 FORCE_OVERWRITE=false
 SHOW_HELP=false
@@ -42,8 +42,20 @@ declare -A CONFIG_MAP=(
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --work)
-                INSTALL_WORK=true
+            --config|--sync)
+                INSTALL_TIER="config"
+                shift
+                ;;
+            --shell)
+                INSTALL_TIER="shell"
+                shift
+                ;;
+            --dev)
+                INSTALL_TIER="dev"
+                shift
+                ;;
+            --full|--work)
+                INSTALL_TIER="full"
                 shift
                 ;;
             --personal)
@@ -71,35 +83,71 @@ parse_arguments() {
     done
 }
 
+# Check if current tier includes the required tier level
+tier_includes() {
+    local required="$1"
+    case "$INSTALL_TIER" in
+        full) return 0 ;;
+        dev) [[ "$required" != "full" ]] ;;
+        shell) [[ "$required" == "config" || "$required" == "shell" ]] ;;
+        config) [[ "$required" == "config" ]] ;;
+    esac
+}
+
 # Show help information
 show_help() {
     cat << EOF
-Simplified Dotfiles Installation Script
+Dotfiles Installation Script - Tiered Installation System
 
 USAGE:
-    ./setup.sh [OPTIONS]
+    ./setup.sh [TIER] [OPTIONS]
+
+TIERS (cumulative - each tier includes all previous tiers):
+    --config, --sync    Symlinks only. Zero installs. No sudo required.
+                        Creates symlinks for all configuration files.
+
+    --shell             Config + modern CLI tools. Requires sudo.
+                        Adds: starship, eza, bat, fd, ripgrep, fzf, zoxide
+
+    --dev               Shell + development tools. Requires sudo.
+                        Adds: neovim, lazygit, tmux
+
+    --full, --work      Dev + full environment. Requires sudo.
+                        Adds: NVM, pyenv, Docker, Azure CLI, Claude Code
+
+MODIFIERS:
+    --personal          Add media tools (ffmpeg, yt-dlp) to any tier
 
 OPTIONS:
-    --work          Install professional development tools
-    --personal      Install personal/media tools  
-    --force         Force overwrite existing configs
-    --dry-run       Preview actions without making changes
-    --help          Show this help message
+    --force             Force overwrite existing configs
+    --dry-run           Preview actions without making changes
+    --help              Show this help message
 
 EXAMPLES:
-    ./setup.sh                    # Install base packages only
-    ./setup.sh --work             # Install base + work tools
-    ./setup.sh --work --personal  # Install everything
+    ./setup.sh                       # Default: config tier (symlinks only)
+    ./setup.sh --config              # Explicit config tier
+    ./setup.sh --shell               # Modern shell experience
+    ./setup.sh --dev                 # Full development setup
+    ./setup.sh --full                # Complete work environment
+    ./setup.sh --full --personal     # Everything including media tools
+    ./setup.sh --work                # Alias for --full (backwards compatible)
+    ./setup.sh --shell --dry-run     # Preview shell tier installation
+
+TIER SUMMARY:
+    ┌──────────┬─────────────────────────────────────────────────┬───────────┐
+    │ Tier     │ What It Installs                                │ Sudo?     │
+    ├──────────┼─────────────────────────────────────────────────┼───────────┤
+    │ config   │ Symlinks only (zero installs)                   │ No        │
+    │ shell    │ + starship, eza, bat, fd, ripgrep, fzf, zoxide  │ Yes       │
+    │ dev      │ + neovim, lazygit, tmux                         │ Yes       │
+    │ full     │ + NVM, pyenv, Docker, Azure CLI, Claude Code    │ Yes       │
+    └──────────┴─────────────────────────────────────────────────┴───────────┘
 
 The script will:
-1. Install essential packages (git, curl, zsh, neovim, etc.)
-2. Install work tools if --work specified (Docker, Node.js, Azure CLI, Claude Code)
-3. Install personal tools if --personal specified (ffmpeg, yt-dlp)
-4. Create symlinks for all configuration files
-5. Setup WSL integration if running on WSL
-
-For Zsh customization (Oh My Zsh, themes, plugins), run:
-    # Legacy setup script removed - shell environment now configured via configs/zshrc
+1. Verify system requirements
+2. Install packages based on selected tier
+3. Create symlinks for all configuration files
+4. Setup WSL integration if running on WSL
 
 All configuration files are backed up before being replaced.
 EOF
@@ -110,24 +158,32 @@ EOF
 phase_verify_system() {
     log "Phase 1: System Verification"
 
-    # Check Ubuntu
+    # Check Ubuntu - soft requirement for config tier, hard for others
     if ! command -v lsb_release >/dev/null 2>&1; then
-        error "This script requires Ubuntu"
-        exit 1
+        if tier_includes "shell"; then
+            error "This script requires Ubuntu for package installation"
+            exit 1
+        else
+            warn "Not running on Ubuntu - proceeding with config-only mode"
+        fi
     fi
 
     # Check basic tools that should exist
     for cmd in curl wget git; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            error "Required command not found: $cmd"
-            exit 1
+            if tier_includes "shell"; then
+                error "Required command not found: $cmd"
+                exit 1
+            else
+                warn "Command not found: $cmd (not required for config tier)"
+            fi
         fi
     done
 
     detect_environment
 
-    # Generate locale if not present
-    if [[ "$DRY_RUN" != "true" ]]; then
+    # Generate locale if not present (skip for config tier - requires sudo)
+    if tier_includes "shell" && [[ "$DRY_RUN" != "true" ]]; then
         if ! locale -a | grep -qi "en_US.utf8"; then
             log "Generating en_US.UTF-8 locale..."
             safe_sudo locale-gen en_US.UTF-8
@@ -142,43 +198,58 @@ phase_verify_system() {
 # Phase 2: Package Installation
 phase_install_packages() {
     log "Phase 2: Package Installation"
-    
+
+    # Skip entirely for config tier
+    if ! tier_includes "shell"; then
+        log "Config tier: skipping package installation"
+        success "Package installation skipped (config tier)"
+        return 0
+    fi
+
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would install packages:"
-        log "  - Core packages: git, curl, wget, build-essential"
-        log "  - Development: neovim, tmux, zsh, openssh-client"
-        log "  - Modern CLI: bat, fd-find, ripgrep, fzf"
-        log "  - Terminal tools: glow, lazygit, httpie, htop, tree"
-        log "  - Languages: python3-pip, pipx"
-        is_wsl && log "  - WSL tools: socat, wslu"
-        [[ "$INSTALL_WORK" == "true" ]] && log "  - Work tools: Node.js (NVM), Python (pyenv), Docker, Azure CLI, Claude Code CLI"
-        [[ "$INSTALL_PERSONAL" == "true" ]] && log "  - Personal tools: ffmpeg, yt-dlp"
-        log "  - Additional tools via scripts: starship, eza, lazygit, zoxide"
-    else
-        install_base_packages  # Now includes terminal and WSL packages
-        
-        # Work packages
-        if [[ "$INSTALL_WORK" == "true" ]]; then
-            install_work_packages
-            # Install NVM and Node.js
-            "$DOTFILES_DIR/install/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
-            # Install pyenv for Python version management
-            "$DOTFILES_DIR/install/install-pyenv.sh" || { error "pyenv installation failed"; exit 1; }
-            # Install Claude Code CLI (requires Node.js)
-            "$DOTFILES_DIR/install/install-claude-code.sh" || { error "Claude Code installation failed"; exit 1; }
+        log "[DRY RUN] Would install packages for tier: $INSTALL_TIER"
+
+        # Shell tier packages
+        log "  Shell tier packages:"
+        log "    - APT: git, build-essential, zsh, bat, fd-find, ripgrep, fzf, httpie, htop, tree, python3-pip, pipx"
+        is_wsl && log "    - WSL: socat, wslu"
+        log "    - Scripts: starship, eza, zoxide"
+
+        # Dev tier packages
+        if tier_includes "dev"; then
+            log "  Dev tier packages:"
+            log "    - Scripts: neovim, lazygit"
+            log "    - APT: tmux"
+        fi
+
+        # Full tier packages
+        if tier_includes "full"; then
+            log "  Full tier packages:"
+            log "    - Scripts: NVM, pyenv, Claude Code"
+            log "    - APT: Azure CLI, python3-dev, python3-venv"
+            log "    - Docker"
         fi
 
         # Personal packages
-        [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
+        [[ "$INSTALL_PERSONAL" == "true" ]] && log "  Personal: ffmpeg, yt-dlp"
+    else
+        # Shell tier: modern CLI tools
+        install_shell_tier_packages
 
-        # Modern tools via dedicated installers
-        "$DOTFILES_DIR/install/install-neovim.sh" || { error "Neovim installation failed"; exit 1; }
-        "$DOTFILES_DIR/install/install-starship.sh" || { error "Starship installation failed"; exit 1; }
-        "$DOTFILES_DIR/install/install-eza.sh" || { error "Eza installation failed"; exit 1; }
-        "$DOTFILES_DIR/install/install-lazygit.sh" || { error "Lazygit installation failed"; exit 1; }
-        "$DOTFILES_DIR/install/install-zoxide.sh" || { error "Zoxide installation failed"; exit 1; }
+        # Dev tier: development tools
+        if tier_includes "dev"; then
+            install_dev_tier_packages
+        fi
+
+        # Full tier: complete environment
+        if tier_includes "full"; then
+            install_full_tier_packages
+        fi
+
+        # Personal packages (any tier)
+        [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
     fi
-    
+
     success "Package installation complete"
 }
 
@@ -293,56 +364,65 @@ run_installation() {
 
     # Success message
     echo
-    success "🎉 Dotfiles installation complete!"
+    success "Dotfiles installation complete! (tier: $INSTALL_TIER)"
     echo
 
     # Post-installation instructions
     local needs_restart=false
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📋 Next Steps:"
+    echo "Next Steps:"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
 
-    # Check if Docker group was added
-    if [[ "$INSTALL_WORK" == "true" ]] && command -v docker >/dev/null 2>&1; then
+    # Check if Docker group was added (full tier only)
+    if tier_includes "full" && command -v docker >/dev/null 2>&1; then
         if grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
             if ! groups | grep -q docker; then
-                echo "⚠️  Docker group membership requires restart"
+                echo "* Docker group membership requires restart"
                 needs_restart=true
             fi
         fi
     fi
 
-    # Check if NVM was installed
+    # Check if NVM was installed (full tier only)
     local nvm_installed=false
-    if [[ "$INSTALL_WORK" == "true" ]] && [[ -d "$HOME/.nvm" ]]; then
+    if tier_includes "full" && [[ -d "$HOME/.nvm" ]]; then
         nvm_installed=true
     fi
 
-    # Always recommend restart for locale changes to take effect
-    echo "1. 🔄 Restart your WSL session:"
-    if is_wsl; then
-        echo "   • Type 'exit' then reopen WSL, OR"
-        echo "   • From PowerShell/CMD: wsl --terminate Ubuntu"
-    else
-        echo "   • Type 'exit' then reconnect to your terminal"
+    # Restart recommendation based on tier
+    local step=1
+    if tier_includes "shell"; then
+        echo "$step. Restart your shell session:"
+        if is_wsl; then
+            echo "   - Type 'exit' then reopen WSL, OR"
+            echo "   - From PowerShell/CMD: wsl --terminate Ubuntu"
+        else
+            echo "   - Type 'exit' then reconnect to your terminal"
+        fi
+        if [[ "$needs_restart" == "true" ]]; then
+            echo "   (Required for Docker group and locale changes)"
+        else
+            echo "   (Recommended for locale and shell changes)"
+        fi
+        echo
+        ((step++))
     fi
-    if [[ "$needs_restart" == "true" ]]; then
-        echo "   (Required for Docker group and locale changes)"
-    else
-        echo "   (Required for locale changes to take effect)"
-    fi
-    echo
-    echo "2. ✅ Verify installation:"
+
+    echo "$step. Verify installation:"
     echo "   ./bin/check-setup"
     echo
+    ((step++))
+
     if [[ "$nvm_installed" == "true" ]]; then
-        echo "3. 🧪 Test Node.js/npm:"
+        echo "$step. Test Node.js/npm:"
         echo "   node --version && npm --version"
         echo
+        ((step++))
     fi
-    echo "$(if [[ "$nvm_installed" == "true" ]]; then echo "4"; else echo "3"; fi). 🎨 Optionally switch theme:"
+
+    echo "$step. Optionally switch theme:"
     echo "   ./bin/theme-switcher"
 
     echo
@@ -361,10 +441,10 @@ main() {
     fi
     
     # Show banner
-    echo "🚀 Simplified Dotfiles Installation"
+    echo "Dotfiles Installation"
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
-    echo "Packages: Base$([ "$INSTALL_WORK" = "true" ] && echo " + Work")$([ "$INSTALL_PERSONAL" = "true" ] && echo " + Personal")"
+    echo "Tier: $INSTALL_TIER$([ "$INSTALL_PERSONAL" = "true" ] && echo " + personal")"
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     
