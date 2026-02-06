@@ -40,7 +40,7 @@ case "$CONFIG" in
         ;;
     full)
         log "Switching to full vim configuration..."
-        ln -sf "$DOTFILES_DIR/configs/init.vim.full" ~/.config/nvim/init.vim
+        ln -sf "$DOTFILES_DIR/configs/init.vim" ~/.config/nvim/init.vim
         success "Switched to full configuration (all features)"
         log "Run :PlugInstall in vim to install all plugins"
         ;;

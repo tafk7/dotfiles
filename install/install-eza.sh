@@ -35,9 +35,10 @@ fi
 log "Downloading eza v${EZA_VERSION}..."
 curl -Lo eza.tar.gz "https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_x86_64-unknown-linux-gnu.tar.gz"
 
-# Extract and install
+# Extract and install to user-local bin directory
 tar xf eza.tar.gz
-safe_sudo install -D ./eza -t /usr/local/bin/
+mkdir -p "$HOME/.local/bin"
+install -D ./eza -t "$HOME/.local/bin/"
 
 # Cleanup
 cd -

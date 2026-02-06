@@ -7,7 +7,7 @@
 [core]
     editor = nvim
     whitespace = fix,-indent-with-non-tab,trailing-space,cr-at-eol
-    pager = less -F -X
+    pager = delta
     autocrlf = input
 
 [color]
@@ -115,7 +115,7 @@
 
 [merge]
     tool = nvimdiff
-    conflictstyle = diff3
+    conflictstyle = zdiff3
 
 [diff]
     tool = nvimdiff
@@ -133,3 +133,11 @@
 
 [init]
     defaultBranch = main
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    line-numbers = true
+    hyperlinks = true

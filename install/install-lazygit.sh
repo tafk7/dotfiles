@@ -49,9 +49,10 @@ curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/downl
 # Extract
 tar xf lazygit.tar.gz lazygit
 
-# Install to /usr/local/bin
-log "Installing lazygit (requires sudo)..."
-safe_sudo install lazygit -D -t /usr/local/bin/
+# Install to ~/.local/bin
+log "Installing lazygit to ~/.local/bin..."
+mkdir -p "$HOME/.local/bin"
+install lazygit -D -t "$HOME/.local/bin/"
 
 # Cleanup
 cd -

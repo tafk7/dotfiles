@@ -15,17 +15,17 @@ BACKUP_DIR="$DOTFILES_BACKUP_PREFIX/claude_commands_$(date +%Y%m%d_%H%M%S)"
 
 # Check if source directory exists
 if [[ ! -d "$DOTFILES_COMMANDS" ]]; then
-    log_error "Source directory not found: $DOTFILES_COMMANDS"
+    error "Source directory not found: $DOTFILES_COMMANDS"
     exit 1
 fi
 
 # Main update function
 update_claude_commands() {
-    log_info "Updating Claude slash commands..."
+    log "Updating Claude slash commands..."
     
     # Create ~/.claude directory if it doesn't exist
     if [[ ! -d "$HOME/.claude" ]]; then
-        log_info "Creating ~/.claude directory..."
+        log "Creating ~/.claude directory..."
         mkdir -p "$HOME/.claude"
     fi
     
@@ -34,33 +34,33 @@ update_claude_commands() {
         # Ensure backup directory exists
         mkdir -p "$DOTFILES_BACKUP_PREFIX"
         
-        log_info "Backing up existing commands to: $BACKUP_DIR"
+        log "Backing up existing commands to: $BACKUP_DIR"
         cp -r "$CLAUDE_COMMANDS" "$BACKUP_DIR"
         
         # Remove existing commands
-        log_info "Removing existing commands directory..."
+        log "Removing existing commands directory..."
         rm -rf "$CLAUDE_COMMANDS"
     fi
     
     # Copy new commands
-    log_info "Copying commands from dotfiles..."
+    log "Copying commands from dotfiles..."
     cp -r "$DOTFILES_COMMANDS" "$CLAUDE_COMMANDS"
     
     # Verify the copy
     if [[ -d "$CLAUDE_COMMANDS" ]]; then
         local count=$(find "$CLAUDE_COMMANDS" -name "*.md" -type f | wc -l)
-        log_success "Successfully installed $count command files"
+        success "Successfully installed $count command files"
         
         # Show the command structure
         echo ""
-        log_info "Command structure:"
+        log "Command structure:"
         tree -d "$CLAUDE_COMMANDS" 2>/dev/null || find "$CLAUDE_COMMANDS" -type d | sort | sed 's|'"$CLAUDE_COMMANDS"'/||' | sed 's|^|  |'
     else
-        log_error "Failed to copy commands"
+        error "Failed to copy commands"
         
         # Attempt to restore backup
         if [[ -d "$BACKUP_DIR" ]]; then
-            log_info "Attempting to restore from backup..."
+            log "Attempting to restore from backup..."
             mv "$BACKUP_DIR" "$CLAUDE_COMMANDS"
         fi
         exit 1
@@ -70,36 +70,36 @@ update_claude_commands() {
     cleanup_old_backups 5 "claude_commands"
     
     echo ""
-    log_success "Claude commands updated successfully!"
-    log_info "Previous commands backed up to: $BACKUP_DIR"
+    success "Claude commands updated successfully!"
+    log "Previous commands backed up to: $BACKUP_DIR"
 }
 
 # Update CLAUDE.md function
 update_claude_md() {
-    log_info "Updating CLAUDE.md..."
+    log "Updating CLAUDE.md..."
     
     # Check if source file exists
     if [[ ! -f "$DOTFILES_CLAUDE_MD" ]]; then
-        log_error "Source CLAUDE.md not found: $DOTFILES_CLAUDE_MD"
+        error "Source CLAUDE.md not found: $DOTFILES_CLAUDE_MD"
         return 1
     fi
     
     # Backup existing CLAUDE.md if it exists
     if [[ -f "$CLAUDE_MD" ]]; then
         local claude_backup="$DOTFILES_BACKUP_PREFIX/CLAUDE.md.$(date +%Y%m%d_%H%M%S)"
-        log_info "Backing up existing CLAUDE.md to: $claude_backup"
+        log "Backing up existing CLAUDE.md to: $claude_backup"
         mkdir -p "$DOTFILES_BACKUP_PREFIX"
         cp "$CLAUDE_MD" "$claude_backup"
     fi
     
     # Copy new CLAUDE.md
-    log_info "Copying CLAUDE.md from dotfiles..."
+    log "Copying CLAUDE.md from dotfiles..."
     cp "$DOTFILES_CLAUDE_MD" "$CLAUDE_MD"
     
     if [[ -f "$CLAUDE_MD" ]]; then
-        log_success "Successfully updated CLAUDE.md"
+        success "Successfully updated CLAUDE.md"
     else
-        log_error "Failed to copy CLAUDE.md"
+        error "Failed to copy CLAUDE.md"
         return 1
     fi
     
@@ -107,7 +107,7 @@ update_claude_md() {
     if [[ -d "$DOTFILES_BACKUP_PREFIX" ]]; then
         local old_backups=$(ls -t "$DOTFILES_BACKUP_PREFIX"/CLAUDE.md.* 2>/dev/null | tail -n +6)
         if [[ -n "$old_backups" ]]; then
-            log_info "Cleaning up old CLAUDE.md backups..."
+            log "Cleaning up old CLAUDE.md backups..."
             echo "$old_backups" | xargs rm -f
         fi
     fi

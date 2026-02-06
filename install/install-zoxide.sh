@@ -59,14 +59,16 @@ if ! grep -q "zoxide" install.sh; then
     exit 1
 fi
 
-# Run installer with explicit /usr/local/bin directory
-log "Running zoxide installer (installing to /usr/local/bin)..."
+# Ensure user-local bin directory exists
+mkdir -p "$HOME/.local/bin"
+
+# Run installer with explicit ~/.local/bin directory (no sudo needed)
+log "Running zoxide installer (installing to ~/.local/bin)..."
 chmod +x install.sh
 
-# Install to /usr/local/bin for system-wide access
-if ! ./install.sh --bin-dir=/usr/local/bin; then
-    error "Installer failed. You may need sudo permissions for /usr/local/bin"
-    log "Try running: sudo ./install.sh --bin-dir=/usr/local/bin"
+# Install to ~/.local/bin for user-local access
+if ! ./install.sh --bin-dir="$HOME/.local/bin"; then
+    error "Installer failed"
     cd -
     rm -rf "$TEMP_DIR"
     exit 1

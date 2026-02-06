@@ -25,21 +25,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
-RESET='\033[0m'
-NC='\033[0m'  # Alias for RESET
+NC='\033[0m'
 
 # ==============================================================================
 # Logging Functions
 # ==============================================================================
 
 log() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 
 # ==============================================================================
@@ -103,52 +98,6 @@ EOF
     success "WSL clipboard integration setup complete"
 }
 
-# Import SSH keys from Windows (WSL only)
-import_windows_ssh_keys() {
-    if ! is_wsl; then
-        return 0
-    fi
-
-    local win_user=$(get_windows_username)
-    if [[ -z "$win_user" ]]; then
-        warn "Could not determine Windows username for SSH key import"
-        return 1
-    fi
-
-    local windows_ssh_dir="/mnt/c/Users/$win_user/.ssh"
-
-    if [[ ! -d "$windows_ssh_dir" ]]; then
-        wsl_log "No Windows SSH directory found at $windows_ssh_dir"
-        return 0
-    fi
-
-    wsl_log "Importing SSH keys from Windows..."
-
-    local ssh_dir="$HOME/.ssh"
-    mkdir -p "$ssh_dir"
-    chmod 700 "$ssh_dir"
-
-    # Copy SSH keys with proper permissions
-    for key_file in "$windows_ssh_dir"/*; do
-        if [[ -f "$key_file" ]]; then
-            local filename=$(basename "$key_file")
-            local target="$ssh_dir/$filename"
-
-            cp "$key_file" "$target"
-
-            # Set appropriate permissions
-            if [[ "$filename" == *.pub ]]; then
-                chmod 644 "$target"
-            else
-                chmod 600 "$target"
-            fi
-
-            wsl_log "Imported SSH key: $filename"
-        fi
-    done
-
-    success "SSH key import completed"
-}
 
 # ==============================================================================
 # Backup Functions
@@ -335,100 +284,16 @@ process_git_config() {
 }
 
 # ==============================================================================
-# Validation Functions
-# ==============================================================================
-
-# Validate prerequisites
-validate_prerequisites() {
-    log "Validating prerequisites..."
-
-    # Check for required commands
-    local required_commands=("curl" "wget" "git")
-    for cmd in "${required_commands[@]}"; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            error "Required command not found: $cmd"
-            exit 1
-        fi
-    done
-
-    # Check bash version
-    if [[ ${BASH_VERSION%%.*} -lt 4 ]]; then
-        error "Bash 4.0+ required (found: $BASH_VERSION)"
-        exit 1
-    fi
-
-    # Check available disk space (need at least 100MB)
-    local available_kb=$(df "$HOME" | awk 'NR==2 {print $4}')
-    local required_kb=102400  # 100MB
-
-    if [[ $available_kb -lt $required_kb ]]; then
-        error "Insufficient disk space. Need 100MB, have $(($available_kb/1024))MB"
-        exit 1
-    fi
-
-    success "Prerequisites validated"
-}
-
-# Post-installation validation
-validate_installation() {
-    log "Validating installation..."
-
-    local failed_validations=0
-
-    # Check critical files (some are symlinks, .gitconfig is templated)
-    local critical_files=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.config/nvim/init.vim" "$HOME/.gitconfig")
-    for file in "${critical_files[@]}"; do
-        if [[ "$file" == "$HOME/.gitconfig" ]]; then
-            # .gitconfig is a templated file, not a symlink
-            if [[ ! -f "$file" ]]; then
-                error "Git config file missing: $file"
-                ((failed_validations++))
-            elif [[ ! -r "$file" ]]; then
-                error "Git config file not readable: $file"
-                ((failed_validations++))
-            fi
-        else
-            # All other files should be symlinks
-            if [[ ! -L "$file" ]]; then
-                error "Critical symlink missing: $file"
-                ((failed_validations++))
-            else
-                # Validate symlink target exists and is readable
-                if [[ ! -r "$file" ]]; then
-                    error "Symlink target not readable: $file -> $(readlink "$file")"
-                    ((failed_validations++))
-                fi
-            fi
-        fi
-    done
-
-    # Check shell configuration loading
-    if [[ -f "$HOME/.bashrc" ]]; then
-        if ! grep -q "DOTFILES_DIR" "$HOME/.bashrc"; then
-            warn "Dotfiles integration may not be working in .bashrc - DOTFILES_DIR not found"
-        fi
-    fi
-
-    if [[ $failed_validations -eq 0 ]]; then
-        success "Installation validation passed"
-        return 0
-    else
-        error "Installation validation failed ($failed_validations issues)"
-        return 1
-    fi
-}
-
-# ==============================================================================
 # Package Management
 # ==============================================================================
 
 # Package definitions using associative array
 declare -A PACKAGES=(
     [core]="git build-essential"
-    [development]="zsh"
+    [development]="zsh direnv"
     [modern]="bat fd-find ripgrep fzf"
-    [terminal]="httpie htop tree"
-    [languages]="python3-pip pipx"
+    [terminal]="htop tree"
+    [languages]="python3-pip"
     [wsl]="socat wslu"
     [docker]="docker.io docker-compose-v2"
     [personal]="ffmpeg yt-dlp"
@@ -505,7 +370,7 @@ run_installer() {
     fi
 }
 
-# Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide)
+# Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop)
 install_shell_packages() {
     log "Installing shell tier packages..."
 
@@ -527,12 +392,14 @@ install_shell_packages() {
         warn "Some shell tier packages failed to install"
     fi
 
-    # Create command aliases for renamed packages
+    # Create command aliases for renamed packages (user-local symlinks)
     if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
-        safe_sudo ln -sf "$(which batcat)" /usr/local/bin/bat
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$(which batcat)" "$HOME/.local/bin/bat"
     fi
     if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
-        safe_sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$(which fdfind)" "$HOME/.local/bin/fd"
     fi
 
     # Install modern tools via dedicated installers (graceful failures)
@@ -540,11 +407,13 @@ install_shell_packages() {
     run_installer "starship"
     run_installer "eza"
     run_installer "zoxide"
+    run_installer "delta"
+    run_installer "btop"
 
     success "Shell tier installation complete"
 }
 
-# Dev tier: development tools (neovim, lazygit, tmux)
+# Dev tier: development tools (neovim, lazygit, tmux, Claude Code)
 install_dev_packages() {
     log "Installing dev tier packages..."
 
@@ -559,10 +428,14 @@ install_dev_packages() {
     run_installer "neovim"
     run_installer "lazygit"
 
+    # Install Claude Code CLI
+    log "Installing Claude Code..."
+    run_installer "claude-code" true
+
     success "Dev tier installation complete"
 }
 
-# Full tier: complete environment (NVM, pyenv, Docker, Azure CLI, Claude Code)
+# Full tier: complete environment (NVM, pyenv, Docker, Azure CLI)
 install_full_packages() {
     log "Installing full tier packages..."
 
@@ -580,9 +453,13 @@ install_full_packages() {
     log "Installing pyenv..."
     run_installer "pyenv" true
 
-    # Install Claude Code CLI (requires Node.js)
-    log "Installing Claude Code..."
-    run_installer "claude-code" true
+    # Install uv (fast Python package manager)
+    log "Installing uv..."
+    run_installer "uv"
+
+    # Install Poetry (Python dependency manager)
+    log "Installing Poetry..."
+    run_installer "poetry"
 
     success "Full tier installation complete"
 }

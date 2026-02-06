@@ -54,19 +54,27 @@ if [[ ! -f "nvim-linux-x86_64.tar.gz" ]]; then
     exit 1
 fi
 
-# Remove old installation if it exists
-if [[ -d "/opt/nvim-linux-x86_64" ]]; then
+# Remove old installation if it exists (user-local)
+if [[ -d "$HOME/.local/nvim" ]]; then
     log "Removing old Neovim installation..."
-    safe_sudo rm -rf /opt/nvim-linux-x86_64
+    rm -rf "$HOME/.local/nvim"
 fi
 
-# Extract to /opt
-log "Extracting Neovim to /opt..."
-safe_sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+# Also clean up legacy system-wide installation if present
+if [[ -d "/opt/nvim-linux-x86_64" ]]; then
+    log "Found legacy system-wide Neovim in /opt, skipping removal (may need manual cleanup)"
+fi
 
-# Create symlink to /usr/local/bin
-log "Creating symlink in /usr/local/bin..."
-safe_sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+# Extract to ~/.local/nvim
+log "Extracting Neovim to ~/.local/nvim..."
+mkdir -p "$HOME/.local"
+tar -C "$HOME/.local" -xzf nvim-linux-x86_64.tar.gz
+mv "$HOME/.local/nvim-linux-x86_64" "$HOME/.local/nvim"
+
+# Create symlink to ~/.local/bin
+log "Creating symlink in ~/.local/bin..."
+mkdir -p "$HOME/.local/bin"
+ln -sf "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
 
 # Cleanup
 cd -

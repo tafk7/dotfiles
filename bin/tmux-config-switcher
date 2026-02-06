@@ -9,38 +9,43 @@ source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [minimal|full|plugin]"
+    echo "Usage: $0 [minimal|full]"
     echo ""
     echo "Switch between tmux configurations:"
-    echo "  minimal - Streamlined config for VS Code workflow (default)"
-    echo "  full    - Original full-featured config with plugins"
-    echo "  plugin  - Full config with TPM plugins"
+    echo "  minimal - Lightweight config (no plugins, no TPM, hardcoded status bar)"
+    echo "  full    - Full-featured config with TPM and plugins"
     echo ""
-    echo "Navigation style:"
-    echo "  Set TMUX_NAV_STYLE=wasd for WASD navigation (default is ESDF)"
+    local current_target
+    current_target=$(readlink ~/.tmux.conf 2>/dev/null || echo "Unknown")
+    if [[ "$current_target" == *"minimal"* ]]; then
+        echo "Current config: minimal"
+    elif [[ "$current_target" == *"tmux.conf" ]]; then
+        echo "Current config: full"
+    else
+        echo "Current config: Unknown ($current_target)"
+    fi
     echo ""
-    echo "Current config: $(readlink ~/.tmux.conf 2>/dev/null || echo 'Unknown')"
-    echo "Current nav style: ${TMUX_NAV_STYLE:-ESDF}"
+    echo "Tip: Use minimal config on remote servers, full config for local development"
 }
 
 # Get the configuration choice
-CONFIG="${1:-minimal}"
+CONFIG="${1:-}"
+
+if [[ -z "$CONFIG" ]]; then
+    show_usage
+    exit 0
+fi
 
 case "$CONFIG" in
     minimal)
         log "Switching to minimal tmux configuration..."
         ln -sf "$DOTFILES_DIR/configs/tmux.conf.minimal" ~/.tmux.conf
-        success "Switched to minimal configuration"
+        success "Switched to minimal configuration (no plugins, fast startup)"
         ;;
     full)
         log "Switching to full tmux configuration..."
-        ln -sf "$DOTFILES_DIR/configs/tmux.conf.backup" ~/.tmux.conf
-        success "Switched to full configuration"
-        ;;
-    plugin)
-        log "Switching to original plugin-based configuration..."
         ln -sf "$DOTFILES_DIR/configs/tmux.conf" ~/.tmux.conf
-        success "Switched to plugin configuration"
+        success "Switched to full configuration (TPM + plugins)"
         ;;
     *)
         error "Unknown configuration: $CONFIG"
@@ -49,12 +54,27 @@ case "$CONFIG" in
         ;;
 esac
 
-# Show navigation tip
+# Store preference
+mkdir -p ~/.config/tmux
+echo "$CONFIG" > ~/.config/tmux/.tmux-mode
+
+# Auto-reload tmux if running
+if tmux info >/dev/null 2>&1; then
+    tmux source-file ~/.tmux.conf 2>/dev/null && log "Tmux configuration reloaded" || warn "Could not reload tmux config"
+fi
+
+# Show what changed
 echo ""
-log "Navigation style: ${TMUX_NAV_STYLE:-ESDF}"
-log "To change navigation style, add to your shell config:"
-log "  export TMUX_NAV_STYLE=wasd  # For WASD navigation"
-log "  export TMUX_NAV_STYLE=esdf  # For ESDF navigation (default)"
-echo ""
-log "Reload tmux config with: tmux source-file ~/.tmux.conf"
-log "Or press Ctrl+A, r inside tmux"
+log "Key differences:"
+if [[ "$CONFIG" == "minimal" ]]; then
+    echo "  - No TPM (plugin manager)"
+    echo "  - No plugins"
+    echo "  - Hardcoded status bar"
+    echo "  - Fast startup, zero dependencies"
+    echo "  - Perfect for remote servers"
+else
+    echo "  - TPM plugin manager"
+    echo "  - Theme-aware status bar"
+    echo "  - Extended keybindings"
+    echo "  - Full plugin suite"
+fi
