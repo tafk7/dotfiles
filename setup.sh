@@ -186,9 +186,11 @@ phase_verify_system() {
     if tier_includes "shell" && [[ "$DRY_RUN" != "true" ]]; then
         if ! locale -a | grep -qi "en_US.utf8"; then
             log "Generating en_US.UTF-8 locale..."
-            safe_sudo locale-gen en_US.UTF-8
-            safe_sudo update-locale LANG=en_US.UTF-8
-            success "Locale generated"
+            if safe_sudo locale-gen en_US.UTF-8 && safe_sudo update-locale LANG=en_US.UTF-8; then
+                success "Locale generated"
+            else
+                warn "Locale generation failed - some shell features may not work correctly"
+            fi
         fi
     fi
 
@@ -211,39 +213,41 @@ phase_install_packages() {
 
         # Shell tier packages
         log "  Shell tier packages:"
-        log "    - APT: git, build-essential, zsh, bat, fd-find, ripgrep, fzf, httpie, htop, tree, python3-pip, pipx"
-        is_wsl && log "    - WSL: socat, wslu"
+        local shell_apt=$(get_tier_packages "shell")
+        log "    - APT: $shell_apt"
         log "    - Scripts: starship, eza, zoxide"
 
         # Dev tier packages
         if tier_includes "dev"; then
             log "  Dev tier packages:"
+            log "    - APT: tmux (if not present)"
             log "    - Scripts: neovim, lazygit"
-            log "    - APT: tmux"
         fi
 
         # Full tier packages
         if tier_includes "full"; then
             log "  Full tier packages:"
+            log "    - APT: Azure CLI, python3-dev, python3-venv, docker.io, docker-compose-v2"
             log "    - Scripts: NVM, pyenv, Claude Code"
-            log "    - APT: Azure CLI, python3-dev, python3-venv"
-            log "    - Docker"
         fi
 
         # Personal packages
-        [[ "$INSTALL_PERSONAL" == "true" ]] && log "  Personal: ffmpeg, yt-dlp"
+        if [[ "$INSTALL_PERSONAL" == "true" ]]; then
+            local personal_apt=$(get_tier_packages "personal")
+            log "  Personal: $personal_apt"
+        fi
     else
         # Shell tier: modern CLI tools
-        install_shell_tier_packages
+        install_shell_packages
 
         # Dev tier: development tools
         if tier_includes "dev"; then
-            install_dev_tier_packages
+            install_dev_packages
         fi
 
         # Full tier: complete environment
         if tier_includes "full"; then
-            install_full_tier_packages
+            install_full_packages
         fi
 
         # Personal packages (any tier)

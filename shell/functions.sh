@@ -1,6 +1,5 @@
 #!/bin/bash
-# Core shell functions - Consolidated utilities
-# Combines: shared.sh, path.sh, process.sh, help-tmux.sh
+# Core shell functions and utilities
 
 # ==============================================================================
 # Directory & Navigation Functions
