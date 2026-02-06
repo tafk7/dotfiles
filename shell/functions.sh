@@ -112,61 +112,56 @@ extract() {
 }
 
 # ==============================================================================
-# Help & Documentation Functions
+# WSL Functions
 # ==============================================================================
 
-# Display tmux help and cheat sheet
-help-tmux() {
-    cat << 'EOF'
-Tmux Cheat Sheet - Common Commands
+# Import SSH keys from Windows (WSL only) — self-contained for runtime use
+import_windows_ssh_keys() {
+    if ! command -v wslpath >/dev/null 2>&1; then
+        echo "Not running on WSL — nothing to do."
+        return 0
+    fi
 
-PREFIX KEY: Ctrl-a (instead of default Ctrl-b)
+    local win_user
+    win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
+    if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
+        win_user="$USER"
+    fi
 
-SESSIONS:
-  tmux                    Create new session
-  tmux new -s name        Create new named session
-  tmux ls                 List sessions
-  tmux attach -t name     Attach to named session
-  tmux kill-session -t name   Kill named session
+    local windows_ssh_dir="/mnt/c/Users/$win_user/.ssh"
 
-WINDOWS (within tmux):
-  Ctrl-a c               Create new window
-  Ctrl-a n               Next window
-  Ctrl-a p               Previous window
-  Ctrl-a w               List windows
-  Ctrl-a &               Kill current window
-  Ctrl-a ,               Rename current window
+    if [[ ! -d "$windows_ssh_dir" ]]; then
+        echo "No Windows SSH directory found at $windows_ssh_dir"
+        return 0
+    fi
 
-PANES:
-  Ctrl-a |               Split vertically
-  Ctrl-a -               Split horizontally
-  Ctrl-a Left/Right/Up/Down   Navigate panes
-  Alt-Arrow              Navigate panes (no prefix needed)
-  Ctrl-a x               Kill current pane
-  Ctrl-a z               Toggle pane zoom
+    echo "Importing SSH keys from Windows ($windows_ssh_dir)..."
 
-COPY MODE:
-  Ctrl-a [               Enter copy mode
-  Space                  Start selection (in copy mode)
-  Enter                  Copy selection (in copy mode)
-  Ctrl-a ]               Paste
+    local ssh_dir="$HOME/.ssh"
+    mkdir -p "$ssh_dir"
+    chmod 700 "$ssh_dir"
 
-OTHER:
-  Ctrl-a d               Detach from session
-  Ctrl-a r               Reload tmux config
-  Ctrl-a ?               Show all key bindings
-  Ctrl-a :               Enter command mode
+    for key_file in "$windows_ssh_dir"/*; do
+        if [[ -f "$key_file" ]]; then
+            local filename=$(basename "$key_file")
+            local target="$ssh_dir/$filename"
 
-SESSION MANAGEMENT SHORTCUTS:
-  tm <name>              Create/attach to named session
-  ta <name>              Attach to session
-  tl                     List sessions
-EOF
+            cp "$key_file" "$target"
+
+            if [[ "$filename" == *.pub ]]; then
+                chmod 644 "$target"
+            else
+                chmod 600 "$target"
+            fi
+
+            echo "  Imported: $filename"
+        fi
+    done
+
+    echo "SSH key import completed."
 }
 
-# Note: SSH key import is handled by lib.sh import_windows_ssh_keys() function
-# Use: sync-ssh command (alias to lib.sh function)
-#!/bin/bash
+# ==============================================================================
 # FZF Advanced Functions
 # Optional enhanced FZF integrations for git, ripgrep, projects, etc.
 #
@@ -242,38 +237,6 @@ alias fp='fzf-project'       # FZF project finder
 # Python & Poetry Management Functions
 # ==============================================================================
 
-# Python command wrapper - enforces version management via pyenv
-python() {
-    if [[ ! -f "$HOME/.config/dotfiles/default-python-version" ]]; then
-        echo "Error: No default Python version set"
-        echo ""
-        echo "Set a default Python version to enable the python command:"
-        echo "  pyset --default <version>"
-        echo ""
-        echo "Example:"
-        echo "  pyenv install 3.11.9"
-        echo "  pyset --default 3.11.9"
-        return 1
-    fi
-    command python "$@"
-}
-
-# Python3 command wrapper - enforces version management via pyenv
-python3() {
-    if [[ ! -f "$HOME/.config/dotfiles/default-python-version" ]]; then
-        echo "Error: No default Python version set"
-        echo ""
-        echo "Set a default Python version to enable the python3 command:"
-        echo "  pyset --default <version>"
-        echo ""
-        echo "Example:"
-        echo "  pyenv install 3.11.9"
-        echo "  pyset --default 3.11.9"
-        return 1
-    fi
-    command python3 "$@"
-}
-
 # Set Python version for current project (works for both Poetry and pip projects)
 pyset() {
     if ! command -v pyenv >/dev/null 2>&1; then
@@ -301,20 +264,19 @@ pyset() {
             return 1
         fi
 
-        # Create config directory if it doesn't exist
-        mkdir -p "$HOME/.config/dotfiles"
-
-        # Write default version to cache file
-        echo "$version" > "$HOME/.config/dotfiles/default-python-version"
-
         # Set global Python version
         pyenv global "$version"
+
+        # Clean up legacy state file (migration from old wrapper system)
+        rm -f "$HOME/.config/dotfiles/default-python-version"
 
         echo ""
         echo "✓ Default Python version set to ${version}"
         echo "✓ python and python3 commands now available globally"
         echo ""
-        echo "This version will be used everywhere unless overridden by a project's .python-version file."
+        echo "This version will be used everywhere unless overridden by:"
+        echo "  - A project's .python-version file (pyenv local)"
+        echo "  - A .envrc with 'layout pyenv <version>' (direnv)"
         return 0
     fi
 
@@ -363,9 +325,13 @@ pyset() {
             rm -rf .venv
         fi
 
-        # Create new venv
+        # Create new venv (prefer uv for speed)
         echo "Creating virtual environment..."
-        python -m venv .venv
+        if command -v uv >/dev/null 2>&1; then
+            uv venv .venv --python "$(pyenv which python)"
+        else
+            python -m venv .venv
+        fi
 
         echo ""
         echo "✓ Python version set to ${version}"
@@ -373,11 +339,21 @@ pyset() {
         echo ""
         echo "Next steps:"
         echo "  1. Activate: vactivate (or: source .venv/bin/activate)"
-        if [[ -f requirements.txt ]]; then
-            echo "  2. Install: pip install -r requirements.txt"
+        if command -v uv >/dev/null 2>&1; then
+            if [[ -f requirements.txt ]]; then
+                echo "  2. Install: uv pip install -r requirements.txt"
+            else
+                echo "  2. Install packages: uv pip install <package-name>"
+            fi
         else
-            echo "  2. Install packages: pip install <package-name>"
+            if [[ -f requirements.txt ]]; then
+                echo "  2. Install: pip install -r requirements.txt"
+            else
+                echo "  2. Install packages: pip install <package-name>"
+            fi
         fi
+        echo ""
+        echo "Tip: Add 'layout pyenv ${version}' to .envrc for auto-activation with direnv."
     fi
 }
 
@@ -401,6 +377,25 @@ pyinfo() {
         echo "pyenv: not installed"
         echo ""
     fi
+
+    # uv info
+    if command -v uv >/dev/null 2>&1; then
+        echo "uv: $(uv --version 2>/dev/null)"
+    else
+        echo "uv: not installed"
+    fi
+    echo ""
+
+    # direnv info
+    if command -v direnv >/dev/null 2>&1; then
+        echo "direnv: $(direnv --version 2>/dev/null)"
+        if [[ -f .envrc ]]; then
+            echo "  .envrc found in current directory"
+        fi
+    else
+        echo "direnv: not installed"
+    fi
+    echo ""
 
     # System Python
     echo "Active Python:"
@@ -445,28 +440,8 @@ pylist() {
     echo "Example: pyenv install 3.11.9"
 }
 
-# Quick Poetry venv activation
-pactivate() {
-    if [[ -d .venv ]]; then
-        source .venv/bin/activate
-        echo "✓ Virtual environment activated"
-    elif [[ -f pyproject.toml ]]; then
-        echo "No .venv found. Run 'poetry install' first."
-        return 1
-    else
-        echo "Not in a Poetry project (no pyproject.toml found)"
-        return 1
-    fi
-}
-
-# Alias for backward compatibility (use pyset instead)
-pysetup() {
-    echo "Note: 'pysetup' is deprecated. Use 'pyset' instead (works for both Poetry and pip projects)"
-    echo ""
-    pyset "$@"
-}
-
 # Universal venv activation (works for both Poetry and pip projects)
+# Manual venv activation (for projects not using direnv)
 vactivate() {
     if [[ -d .venv ]]; then
         source .venv/bin/activate
@@ -484,10 +459,12 @@ vactivate() {
         if [[ -f pyproject.toml ]]; then
             echo "This is a Poetry project. Run: poetry install"
         elif [[ -f requirements.txt ]]; then
-            echo "This is a pip project. Run: pysetup <version>"
+            echo "This is a pip project. Run: pyset <version>"
         else
-            echo "Run 'pysetup <version>' or 'pyset <version>' to create one"
+            echo "Run 'pyset <version>' to create one"
         fi
+        echo ""
+        echo "Tip: Use 'layout pyenv <version>' in .envrc for auto-activation."
         return 1
     fi
 }

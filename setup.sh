@@ -33,6 +33,7 @@ declare -A CONFIG_MAP=(
     [init.vim]="$HOME/.config/nvim/init.vim:symlink"
     [config/bat]="$HOME/.config/bat:directory"
     [config/fd]="$HOME/.config/fd:directory"
+    [ssh_config]="$HOME/.ssh/config:symlink"
     
     # Special handling
     [gitconfig]="$HOME/.gitconfig:template"
@@ -107,13 +108,13 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Creates symlinks for all configuration files.
 
     --shell             Config + modern CLI tools. Requires sudo.
-                        Adds: starship, eza, bat, fd, ripgrep, fzf, zoxide
+                        Adds: starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
 
     --dev               Shell + development tools. Requires sudo.
-                        Adds: neovim, lazygit, tmux
+                        Adds: neovim, lazygit, tmux, Claude Code
 
     --full, --work      Dev + full environment. Requires sudo.
-                        Adds: NVM, pyenv, Docker, Azure CLI, Claude Code
+                        Adds: NVM, pyenv, uv, poetry, Docker, Azure CLI
 
 MODIFIERS:
     --personal          Add media tools (ffmpeg, yt-dlp) to any tier
@@ -138,9 +139,10 @@ TIER SUMMARY:
     │ Tier     │ What It Installs                                │ Sudo?     │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
     │ config   │ Symlinks only (zero installs)                   │ No        │
-    │ shell    │ + starship, eza, bat, fd, ripgrep, fzf, zoxide  │ Yes       │
-    │ dev      │ + neovim, lazygit, tmux                         │ Yes       │
-    │ full     │ + NVM, pyenv, Docker, Azure CLI, Claude Code    │ Yes       │
+    │ shell    │ + starship, eza, bat, fd, ripgrep, fzf, zoxide,   │ Yes       │
+    │          │   delta, btop, direnv                               │           │
+    │ dev      │ + neovim, lazygit, tmux, Claude Code            │ Yes       │
+    │ full     │ + NVM, pyenv, uv, poetry, Docker, Azure CLI     │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
 
 The script will:
@@ -215,20 +217,20 @@ phase_install_packages() {
         log "  Shell tier packages:"
         local shell_apt=$(get_tier_packages "shell")
         log "    - APT: $shell_apt"
-        log "    - Scripts: starship, eza, zoxide"
+        log "    - Scripts: starship, eza, zoxide, delta, btop"
 
         # Dev tier packages
         if tier_includes "dev"; then
             log "  Dev tier packages:"
             log "    - APT: tmux (if not present)"
-            log "    - Scripts: neovim, lazygit"
+            log "    - Scripts: neovim, lazygit, Claude Code"
         fi
 
         # Full tier packages
         if tier_includes "full"; then
             log "  Full tier packages:"
             log "    - APT: Azure CLI, python3-dev, python3-venv, docker.io, docker-compose-v2"
-            log "    - Scripts: NVM, pyenv, Claude Code"
+            log "    - Scripts: NVM, pyenv, uv, poetry"
         fi
 
         # Personal packages
@@ -336,6 +338,13 @@ process_symlink() {
     local parent_dir="$(dirname "$target")"
     if [[ ! -d "$parent_dir" ]]; then
         mkdir -p "$parent_dir"
+    fi
+
+    # SSH directory requires strict permissions
+    if [[ "$parent_dir" == *"/.ssh"* || "$parent_dir" == *"/.ssh" ]]; then
+        chmod 700 "$parent_dir"
+        mkdir -p "$parent_dir/sockets"
+        chmod 700 "$parent_dir/sockets"
     fi
     
     safe_symlink "$source" "$target" "$backup_dir"

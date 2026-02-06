@@ -32,7 +32,7 @@ vim-with() {
             nvim -u "$DOTFILES_DIR/configs/init.vim.minimal" "$@"
             ;;
         full)
-            nvim -u "$DOTFILES_DIR/configs/init.vim.full" "$@"
+            nvim -u "$DOTFILES_DIR/configs/init.vim" "$@"
             ;;
         none)
             nvim -u NONE "$@"

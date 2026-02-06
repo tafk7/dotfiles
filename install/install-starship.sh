@@ -33,13 +33,16 @@ log "Downloading and installing Starship..."
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Download and run installer (will install to /usr/local/bin)
+# Download and run installer
 curl -sS https://starship.rs/install.sh > install.sh
 chmod +x install.sh
 
-# Run installer with automatic yes and explicit bin directory (requires sudo)
-log "Installing Starship to /usr/local/bin (requires sudo)..."
-safe_sudo sh install.sh --yes --bin-dir /usr/local/bin
+# Ensure user-local bin directory exists
+mkdir -p "$HOME/.local/bin"
+
+# Run installer with automatic yes to user-local bin directory (no sudo needed)
+log "Installing Starship to ~/.local/bin..."
+sh install.sh --yes --bin-dir "$HOME/.local/bin"
 
 # Cleanup
 cd -

@@ -49,7 +49,7 @@ cdiff() {
     code --diff "$1" "$2"
 }
 
-# Note: EDITOR is set in env/common.sh (nvim by default)
+# Note: EDITOR is set in shell/env.sh (nvim by default)
 # To use VS Code as your default editor, add to ~/.zshrc.local:
 #   export EDITOR='code --wait'
 #   export VISUAL='code --wait'

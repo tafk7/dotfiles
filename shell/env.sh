@@ -5,9 +5,6 @@
 # Common Environment Variables
 # ==============================================================================
 
-# WSL environment detection is handled by lib.sh
-# IS_WSL variable is exported by the installer after running detect_environment()
-
 # Node Version Manager
 export NVM_DIR="$HOME/.nvm"
 
@@ -18,14 +15,32 @@ if [[ -d "$PYENV_ROOT" ]]; then
     export PATH="$PYENV_ROOT/bin:$PATH"
     eval "$(pyenv init --path 2>/dev/null || true)"
     eval "$(pyenv init - 2>/dev/null || true)"
+fi
 
-    # Set global default Python version if configured
-    DEFAULT_PYTHON_VERSION_FILE="$HOME/.config/dotfiles/default-python-version"
-    if [[ -f "$DEFAULT_PYTHON_VERSION_FILE" ]]; then
-        DEFAULT_PYTHON_VERSION=$(cat "$DEFAULT_PYTHON_VERSION_FILE" 2>/dev/null | tr -d '[:space:]')
-        if [[ -n "$DEFAULT_PYTHON_VERSION" ]]; then
-            pyenv global "$DEFAULT_PYTHON_VERSION" 2>/dev/null || true
-        fi
+# direnv - auto-load .envrc files
+if command -v direnv >/dev/null 2>&1; then
+    if [[ -n "${BASH_VERSION:-}" ]]; then
+        eval "$(direnv hook bash)"
+    elif [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval "$(direnv hook zsh)"
+    fi
+fi
+
+# uv - shell completion
+if command -v uv >/dev/null 2>&1; then
+    if [[ -n "${BASH_VERSION:-}" ]]; then
+        eval "$(uv generate-shell-completion bash 2>/dev/null || true)"
+    elif [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval "$(uv generate-shell-completion zsh 2>/dev/null || true)"
+    fi
+fi
+
+# poetry - shell completion
+if command -v poetry >/dev/null 2>&1; then
+    if [[ -n "${BASH_VERSION:-}" ]]; then
+        eval "$(poetry completions bash 2>/dev/null || true)"
+    elif [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval "$(poetry completions zsh 2>/dev/null || true)"
     fi
 fi
 
@@ -142,7 +157,7 @@ fi
 # WSL-Specific Environment
 # ==============================================================================
 
-if [[ "$IS_WSL" == "true" ]] || command -v wslpath >/dev/null 2>&1; then
+if command -v wslpath >/dev/null 2>&1; then
     # Display for GUI apps
     export DISPLAY=:0
     export LIBGL_ALWAYS_INDIRECT=1

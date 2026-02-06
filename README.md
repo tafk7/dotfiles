@@ -8,13 +8,13 @@ Streamlined, tiered dotfiles management system for Ubuntu/WSL. Install only what
 # Config only - just symlinks, no installs
 ./setup.sh --config
 
-# Modern shell - add starship, eza, bat, fd, ripgrep, fzf, zoxide
+# Modern shell - add starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
 ./setup.sh --shell
 
-# Development tools - add neovim, lazygit, tmux
+# Development tools - add neovim, lazygit, tmux, Claude Code
 ./setup.sh --dev
 
-# Complete environment - add NVM, pyenv, Docker, Azure CLI, Claude Code
+# Complete environment - add NVM, pyenv, uv, poetry, Docker, Azure CLI
 ./setup.sh --full
 
 # Everything including media tools
@@ -57,15 +57,19 @@ dotfiles/
 ├── install/              # Dedicated installers for modern tools
 │   ├── install-starship.sh
 │   ├── install-eza.sh
+│   ├── install-delta.sh
+│   ├── install-btop.sh
+│   ├── install-uv.sh
 │   ├── install-neovim.sh
 │   ├── install-pyenv.sh
 │   └── install-nvm.sh
 │
 └── bin/                  # User commands
     ├── theme-switcher    # Interactive theme management
+    ├── vim-config-switcher   # Switch vim minimal/full
+    ├── tmux-config-switcher  # Switch tmux minimal/full
     ├── check-setup       # Validate installation
-    ├── cheatsheet        # Interactive command reference
-    └── update-configs    # Refresh symlinks
+    └── cheatsheet        # Interactive command reference
 ```
 
 ### Core Components
@@ -91,9 +95,9 @@ The system uses **cumulative tiers** - each tier includes all previous tiers:
 | Tier | What It Installs | Sudo Required? |
 |------|------------------|----------------|
 | **config** | Symlinks only (zero installs) | No |
-| **shell** | + Modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide) | Yes |
-| **dev** | + Development tools (neovim, lazygit, tmux) | Yes |
-| **full** | + Complete environment (NVM, pyenv, Docker, Azure CLI, Claude Code) | Yes |
+| **shell** | + Modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv) | Yes |
+| **dev** | + Development tools (neovim, lazygit, tmux, Claude Code) | Yes |
+| **full** | + Complete environment (NVM, pyenv, uv, poetry, Docker, Azure CLI) | Yes |
 
 **Modifiers:**
 - `--personal` - Add media tools (ffmpeg, yt-dlp) to any tier
@@ -142,14 +146,25 @@ Replaces traditional Unix tools with modern alternatives:
 - `find` → `fd`
 - `grep` → `ripgrep`
 - `cd` → `zoxide`
+- `diff` → `delta` (syntax-highlighted git diffs)
+- `top` → `btop` (modern resource monitor)
+- `pip install` → `uv pip install` (fast Python package manager)
 
 ### 5. Python Development Workflow
-Advanced pyenv integration with Poetry/pip auto-detection:
+Advanced pyenv + uv integration with direnv auto-activation:
 ```bash
 pyset --default 3.11.9    # Set global default Python
-pyset 3.11.9              # Set project Python (auto-detects Poetry/pip)
-vactivate                 # Smart venv activation
-pyinfo                    # Show environment info
+pyset 3.11.9              # Set project Python + create .venv (uses uv when available)
+vactivate                 # Manual venv activation
+pyinfo                    # Show environment info (pyenv, uv, direnv status)
+
+# direnv auto-activation (recommended)
+echo 'layout pyenv 3.11.9' > .envrc && direnv allow
+
+# uv shortcuts
+uvs                       # uv sync
+uvr pytest                # uv run <command>
+uvpi requests             # uv pip install <package>
 ```
 
 ### 6. Performance Optimizations
@@ -180,9 +195,10 @@ lg            # Visual git interface (lazygit)
 
 # Python
 pyset         # Set Python version for project
-vactivate     # Smart venv activation
+vactivate     # Manual venv activation
 pyinfo        # Show Python environment info
 pylist        # List installed Python versions
+uvs / uvr     # uv sync / uv run
 
 # Node.js
 nvm           # Node Version Manager
@@ -202,8 +218,9 @@ cgrep         # Search content and open at line in VS Code
 ./bin/theme-switcher           # Switch themes interactively
 ./bin/check-setup              # Validate installation
 ./bin/cheatsheet               # Interactive command reference
-./bin/update-configs           # Refresh symlinks
+./setup.sh --config            # Refresh config symlinks
 vim-minimal / vim-full         # Switch vim configurations
+tmux-minimal / tmux-full       # Switch tmux configurations
 ```
 
 ### WSL-Specific

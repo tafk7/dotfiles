@@ -65,11 +65,13 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 if [ -n "$WSL_DISTRO_NAME" ]; then
     # Windows interop
     export WSLENV="USERPROFILE/pu:APPDATA/pu"
-    
-    # Fix for WSL PATH pollution
+
+    # Targeted WSL PATH cleanup: strip directories that shadow Linux tools
+    # Keeps: System32 (clip.exe, wsl.exe), VS Code path, Program Files, AppData
     if [ -n "$PATH" ]; then
-        export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "/mnt/c" | tr '\n' ':' | sed 's/:$//')
-        export PATH="$PATH:/mnt/c/Windows/System32:/mnt/c/Windows"
+        export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E \
+            '/mnt/c/Windows/(System32/(Wbem|WindowsPowerShell|OpenSSH)|SysWOW64)' | \
+            tr '\n' ':' | sed 's/:$//')
     fi
 fi
 

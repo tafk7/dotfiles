@@ -61,7 +61,7 @@ PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 # Load Shared Environment
 # ==============================================================================
 
-# Source environment variables (merged from env/common.sh, env/fzf.sh, env/wsl.sh)
+# Source environment variables (shared config for bash and zsh)
 if [[ -f "$DOTFILES_DIR/shell/env.sh" ]]; then
     source "$DOTFILES_DIR/shell/env.sh"
 fi
@@ -168,7 +168,7 @@ PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
 # WSL Integration
 # ==============================================================================
 
-if [[ "$IS_WSL" == "true" ]]; then
+if command -v wslpath >/dev/null 2>&1; then
     # WSL-specific aliases
     alias open='explorer.exe'
 
@@ -187,8 +187,6 @@ fi
 if [[ -d "$DOTFILES_DIR" ]]; then
     # Load functions (merged core and fzf-extras)
     [[ -f "$DOTFILES_DIR/shell/functions.sh" ]] && source "$DOTFILES_DIR/shell/functions.sh"
-    # Load WSL functions if on WSL
-    [[ "$IS_WSL" == "true" ]] && [[ -f "$DOTFILES_DIR/shell/wsl-functions.sh" ]] && source "$DOTFILES_DIR/shell/wsl-functions.sh"
 
     # Load aliases
     for file in "$DOTFILES_DIR"/shell/aliases/*.sh; do

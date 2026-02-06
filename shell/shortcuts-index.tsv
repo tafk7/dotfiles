@@ -47,6 +47,9 @@ tmux│Ctrl+a (│Switch to previous session│prefix + (
 tmux│Ctrl+a )│Switch to next session│prefix + )
 tmux│Ctrl+a r│Reload tmux configuration file│prefix + r
 tmux│Ctrl+a ?│Display all tmux keybindings│prefix + ?
+tmux│tmux-minimal│Switch to minimal tmux config (no plugins)│$DOTFILES_DIR/bin/tmux-config-switcher minimal
+tmux│tmux-full│Switch to full tmux config (TPM + plugins)│$DOTFILES_DIR/bin/tmux-config-switcher full
+tmux│tmux-mode│Show current tmux configuration mode│$DOTFILES_DIR/bin/tmux-config-switcher
 tmux│Alt+E│Move focus to pane above (no prefix)│Alt+E (no prefix needed)
 tmux│Alt+S│Move focus to pane on left (no prefix)│Alt+S (no prefix needed)
 tmux│Alt+D│Move focus to pane below (no prefix)│Alt+D (no prefix needed)
@@ -119,9 +122,11 @@ shell│ducks│Show largest directories and files in current dir│du -cks * | 
 shell│reload│Reload shell configuration│source ~/.zshrc or ~/.bashrc
 shell│themes│List available color themes│ls configs/themes/
 shell│theme-switch│Launch interactive theme selector│$DOTFILES_DIR/bin/theme-switcher
-shell│update-configs│Update dotfiles configurations│$DOTFILES_DIR/bin/update-configs
 shell│fr│Find and replace text across files│$DOTFILES_DIR/bin/fr
 shell│cheat│Show this interactive cheatsheet│$DOTFILES_DIR/bin/cheatsheet
+shell│da│Allow direnv in current directory│direnv allow
+shell│de│Edit .envrc file in current directory│${EDITOR:-nvim} .envrc
+shell│top│Launch btop system monitor│btop
 shell│cl│Start new Claude AI session│claude
 shell│clc│Continue previous Claude session│claude --continue
 shell│clp│Run one-off Claude command│claude --print
@@ -151,10 +156,9 @@ docker│dstopall│Stop all running containers at once│docker stop $(docker p
 
 # Python shortcuts (pyenv + Poetry/pip workflow)
 python│pyset│Set Python version for project (Poetry or pip)│pyset <version> (e.g., pyset 3.11.9)
-python│vactivate│Activate virtual environment (smart detection)│vactivate
+python│vactivate│Activate virtual environment manually (or use direnv)│vactivate
 python│pyinfo│Show current Python environment information│pyinfo
 python│pylist│List installed and available Python versions│pylist
-python│pactivate│Activate Poetry project venv│pactivate (Poetry-only alternative to vactivate)
 python│pyenv install│Install new Python version│pyenv install <version>
 python│pyenv versions│List installed Python versions│pyenv versions
 python│pyenv local│Set Python version for current directory│pyenv local <version>
@@ -166,6 +170,12 @@ python│pip install -e│Install package in editable mode (setuptools)│pip in
 python│py│Run Python 3 interpreter│python3
 python│pytest│Run test suite with pytest│python -m pytest
 python│pyt│Run pytest with verbose output│python -m pytest -v
+python│venv│Create virtual environment (uv if available)│uv venv / python3 -m venv .venv
+python│uvs│Sync project dependencies with uv│uv sync
+python│uvr│Run command in project environment│uv run <command>
+python│uvt│Install Python CLI tool globally│uv tool install <tool>
+python│uva│Add dependency to project│uv add <package>
+python│uvpi│Install package with uv pip│uv pip install <package>
 
 # Node.js shortcuts
 node│ni│Install dependencies from package.json│npm install

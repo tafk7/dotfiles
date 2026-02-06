@@ -56,6 +56,11 @@ alias ta='tmux attach -t'
 alias tl='tmux list-sessions'
 alias tk='tmux kill-session -t'
 
+# tmux config switching
+alias tmux-minimal='$DOTFILES_DIR/bin/tmux-config-switcher minimal'
+alias tmux-full='$DOTFILES_DIR/bin/tmux-config-switcher full'
+alias tmux-mode='$DOTFILES_DIR/bin/tmux-config-switcher'
+
 # File viewing and editing
 # Neovim as default editor with escape hatches to real vim/vi
 if command -v nvim >/dev/null 2>&1; then
@@ -94,8 +99,6 @@ alias theme-switch='$DOTFILES_DIR/bin/theme-switcher'
 alias themes='ls -1 "$DOTFILES_DIR/configs/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
 
 # Dotfiles management
-alias update-configs='$DOTFILES_DIR/bin/update-configs'
-alias update-configs-force='$DOTFILES_DIR/bin/update-configs --force'
 alias update-claude-commands='$DOTFILES_DIR/bin/update-claude'
 
 # Find and replace utility
@@ -108,3 +111,14 @@ alias cheat='$DOTFILES_DIR/bin/cheatsheet'
 alias cl='claude'                # New session
 alias clc='claude --continue'    # Continue last session
 alias clp='claude --print'       # One-off command (non-interactive)
+
+# direnv shortcuts
+if command -v direnv >/dev/null 2>&1; then
+    alias da='direnv allow'
+    alias de='${EDITOR:-nvim} .envrc'
+fi
+
+# btop as top replacement
+if command -v btop >/dev/null 2>&1; then
+    alias top='btop'
+fi
