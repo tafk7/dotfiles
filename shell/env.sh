@@ -1,7 +1,5 @@
 #!/bin/bash
 # Shell environment configuration
-# Environment Configuration
-# Historical note: Merged from scripts/env/{common,fzf,wsl}.sh during reorganization
 
 # ==============================================================================
 # Common Environment Variables

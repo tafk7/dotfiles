@@ -1,7 +1,6 @@
 #!/bin/bash
-# Consolidated dotfiles library
-# Merged from lib/{core,packages,backup,wsl}.sh into single file
-# Ubuntu-only support, human-readable, well-engineered
+# Dotfiles utilities library
+# Ubuntu-only support
 
 # Prevent double-sourcing
 [[ -n "${DOTFILES_LIB_LOADED:-}" ]] && return 0
@@ -260,14 +259,11 @@ detect_environment() {
 
     log "Detected Ubuntu $ubuntu_version ($ubuntu_codename)"
 
-    # Set and export WSL status
+    # Check if running on WSL
     if is_wsl; then
-        export IS_WSL="true"
         wsl_log "Running on Windows Subsystem for Linux"
         local win_user=$(get_windows_username)
         wsl_log "Windows username: $win_user"
-    else
-        export IS_WSL="false"
     fi
 }
 
@@ -314,8 +310,8 @@ process_git_config() {
         fi
     else
         # Non-interactive fallback
-        git_name="${USER}"
-        git_email="${USER}@localhost"
+        git_name="${USER:-dotfiles}"
+        git_email="${USER:-dotfiles}@${HOSTNAME:-localhost}"
         warn "Non-interactive mode: using default git config ($git_name, $git_email)"
     fi
 
@@ -466,41 +462,51 @@ update_packages() {
     safe_sudo apt-get update
 }
 
-# Install base packages - single apt transaction for efficiency
-install_base_packages() {
-    update_packages
+# Get package list for dry-run display
+get_tier_packages() {
+    local tier="$1"
+    local packages=""
 
-    # Combine all base packages for single dependency resolution
-    local all_base_packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
+    case "$tier" in
+        shell)
+            packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
+            if is_wsl; then
+                packages="$packages ${PACKAGES[wsl]}"
+            fi
+            ;;
+        personal)
+            packages="${PACKAGES[personal]}"
+            ;;
+    esac
 
-    # Add WSL packages if on WSL
-    if is_wsl; then
-        all_base_packages="$all_base_packages ${PACKAGES[wsl]}"
-    fi
-
-    log "Installing all base packages in single transaction..."
-    # shellcheck disable=SC2086
-    if safe_sudo apt-get install -y $all_base_packages; then
-        success "Base packages installed successfully"
-    else
-        warn "Some packages failed to install (this is normal for some optional packages)"
-    fi
-
-    # Create command aliases for renamed packages
-    if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
-        safe_sudo ln -sf "$(which batcat)" /usr/local/bin/bat
-    fi
-    if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
-        safe_sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
-    fi
+    echo "$packages"
 }
 
 # ==============================================================================
 # Tiered Installation Functions
 # ==============================================================================
 
+# Run installer script with consistent error handling
+run_installer() {
+    local name="$1"
+    local critical="${2:-false}"
+    local script="$DOTFILES_DIR/install/install-$name.sh"
+
+    if [[ ! -f "$script" ]]; then
+        error "Installer script not found: $script"
+        [[ "$critical" == "true" ]] && exit 1
+        return 1
+    fi
+
+    if [[ "$critical" == "true" ]]; then
+        "$script" || { error "$name installation failed"; exit 1; }
+    else
+        "$script" || warn "$name installation failed"
+    fi
+}
+
 # Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide)
-install_shell_tier_packages() {
+install_shell_packages() {
     log "Installing shell tier packages..."
 
     update_packages
@@ -531,15 +537,15 @@ install_shell_tier_packages() {
 
     # Install modern tools via dedicated installers (graceful failures)
     log "Installing shell tier tools via scripts..."
-    "$DOTFILES_DIR/install/install-starship.sh" || warn "Starship installation failed"
-    "$DOTFILES_DIR/install/install-eza.sh" || warn "Eza installation failed"
-    "$DOTFILES_DIR/install/install-zoxide.sh" || warn "Zoxide installation failed"
+    run_installer "starship"
+    run_installer "eza"
+    run_installer "zoxide"
 
     success "Shell tier installation complete"
 }
 
 # Dev tier: development tools (neovim, lazygit, tmux)
-install_dev_tier_packages() {
+install_dev_packages() {
     log "Installing dev tier packages..."
 
     # Install tmux via APT if not present
@@ -550,14 +556,14 @@ install_dev_tier_packages() {
 
     # Install neovim and lazygit via scripts (graceful failures)
     log "Installing dev tier tools via scripts..."
-    "$DOTFILES_DIR/install/install-neovim.sh" || warn "Neovim installation failed"
-    "$DOTFILES_DIR/install/install-lazygit.sh" || warn "Lazygit installation failed"
+    run_installer "neovim"
+    run_installer "lazygit"
 
     success "Dev tier installation complete"
 }
 
 # Full tier: complete environment (NVM, pyenv, Docker, Azure CLI, Claude Code)
-install_full_tier_packages() {
+install_full_packages() {
     log "Installing full tier packages..."
 
     # Azure CLI and Python dev tools
@@ -568,15 +574,15 @@ install_full_tier_packages() {
 
     # Install NVM and Node.js
     log "Installing NVM..."
-    "$DOTFILES_DIR/install/install-nvm.sh" || { error "NVM installation failed"; exit 1; }
+    run_installer "nvm" true
 
     # Install pyenv for Python version management
     log "Installing pyenv..."
-    "$DOTFILES_DIR/install/install-pyenv.sh" || { error "pyenv installation failed"; exit 1; }
+    run_installer "pyenv" true
 
     # Install Claude Code CLI (requires Node.js)
     log "Installing Claude Code..."
-    "$DOTFILES_DIR/install/install-claude-code.sh" || { error "Claude Code installation failed"; exit 1; }
+    run_installer "claude-code" true
 
     success "Full tier installation complete"
 }

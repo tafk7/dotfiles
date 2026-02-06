@@ -1,362 +1,331 @@
-# Dotfiles - Simplified Ubuntu Development Environment
+# Dotfiles - Ubuntu Development Environment
 
-A streamlined, human-readable dotfiles management system for Ubuntu environments (including WSL). Focused on simplicity, maintainability, and essential development tools.
+Streamlined, tiered dotfiles management system for Ubuntu/WSL. Install only what you need: from config-only (no sudo) to complete development environment.
 
-## 🎯 Key Features
-
-- **🚀 Simplified Architecture** - Modular design with clear separation of concerns
-- **🔒 Security-First** - HTTPS-only downloads, checksum verification, safe operations  
-- **🐧 Ubuntu Focused** - Optimized for Ubuntu/WSL, no cross-platform complexity
-- **✅ Validation System** - Pre/post installation checks ensure everything works
-- **🔄 Non-Destructive** - Automatic backups before any changes
-- **👀 Visible Configs** - No hidden source files, easy to discover and edit
-- **📝 Template Support** - Dynamic configuration (e.g., Git user setup)
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# Base installation (essential tools + Docker)
-./setup.sh
+# Config only - just symlinks, no installs
+./setup.sh --config
 
-# Add work tools (Azure CLI, Node.js/Python dev tools)
-./setup.sh --work
+# Modern shell - add starship, eza, bat, fd, ripgrep, fzf, zoxide
+./setup.sh --shell
 
-# Add personal tools (media applications)
-./setup.sh --personal
+# Development tools - add neovim, lazygit, tmux
+./setup.sh --dev
 
-# Everything
-./setup.sh --work --personal
+# Complete environment - add NVM, pyenv, Docker, Azure CLI, Claude Code
+./setup.sh --full
 
-# Force mode for existing installations
-./setup.sh --force          # Backup and replace existing files
+# Everything including media tools
+./setup.sh --full --personal
 ```
 
-## 📦 What You Get
+## Architecture Overview
 
-### Base Installation (Always)
-
-**Essential Tools:**
-- Build tools: build-essential, curl, wget, git, zip/unzip, jq
-- Modern shell: zsh with Starship prompt for fast, visual experience
-- Modern CLI replacements: eza (includes tree functionality), bat, fd-find, ripgrep, fzf
-- Development basics: Python 3, pip, pipx
-- **Docker**: Container platform with user group setup
-- **Theme System**: 5 pre-configured color schemes (Nord, Tokyo Night, Kanagawa, Gruvbox Material, Catppuccin)
-
-**Configuration Files:**
-- Shell configs: `.bashrc`, `.zshrc`, `.profile` with theme support
-- Development: `init.vim` (vim-plug + 18 plugins), `.tmux.conf` (TPM + plugins), `.gitconfig`, `.editorconfig`
-- Tool configs: `.ripgreprc`, bat, fd configurations
-- Theme configs: Unified color schemes for neovim, tmux, shell, and FZF
-- **VS Code Integration**: Optimized settings for hybrid vim/visual workflow
-
-### Work Tools (`--work`)
-
-**Professional Development:**
-- **Azure CLI**: Ubuntu-specific installation for cloud development
-- **Node.js via NVM**: Node Version Manager for flexible Node.js/npm management
-- **Python via pyenv**: Python Version Manager for flexible Python version management, works with Poetry and pip projects
-
-### Personal Tools (`--personal`)
-
-**Media & Entertainment:**
-- ffmpeg, yt-dlp
-
-### WSL Integration (Automatic)
-
-**Windows Subsystem for Linux:**
-- Clipboard integration: `pbcopy` and `pbpaste` commands
-- SSH key import from Windows SSH agent
-- Windows username detection for cross-system operations
-- WSL-specific packages: socat, wslu
-
-## 🏗️ Simplified Architecture
-
-The system is organized into modular components:
-
+### Directory Structure
 ```
 dotfiles/
-├── setup.sh                      # Main installer
-├── lib/
-│   ├── core.sh                   # Core utilities and functions
-│   └── packages.sh               # Package management
-├── configs/                      # Visible config files (no leading dots!)
-│   ├── bashrc, zshrc, init.vim  # Shell and editor configs
-│   ├── tmux.conf, gitconfig     # Development tools
-│   ├── config/                  # Additional config directories
-│   └── themes/                   # Theme configurations
-│       ├── nord/                 # Nord theme files
-│       ├── tokyo-night/          # Tokyo Night theme files
-│       └── ...                   # Other themes
-├── bin/              # User commands
-├── install/          # Installation scripts
-├── shell/            # Shell integration
-│   ├── env/                      # Environment variables
-│   │   └── common.sh            # Shared environment setup
-│   ├── aliases/                  # Shell aliases by category
-│   │   ├── general.sh           # Common command aliases
-│   │   ├── docker.sh            # Docker shortcuts
-│   │   ├── git.sh               # Git aliases
-│   │   └── wsl.sh               # WSL-specific aliases
-│   ├── functions/                # Shared shell functions
-│   │   └── shared.sh            # Common functions
-│   └── theme-switcher.sh        # Interactive theme switcher
-└── docs/                         # Documentation
+├── setup.sh              # Entry point - orchestrates installation
+├── lib.sh                # Utilities library
+│
+├── configs/              # Visible config files (symlinked to ~/.* locations)
+│   ├── bashrc, zshrc     # Shell configurations
+│   ├── init.vim          # Neovim config
+│   ├── tmux.conf         # Terminal multiplexer
+│   ├── gitconfig         # Template (prompts for user info)
+│   ├── starship.toml     # Modern prompt config
+│   └── themes/           # Unified theme system
+│       ├── nord/
+│       ├── kanagawa/
+│       ├── tokyo-night/
+│       ├── gruvbox/
+│       └── catppuccin/
+│
+├── shell/                # Runtime integration (auto-loaded at startup)
+│   ├── env.sh            # Environment variables (NVM, pyenv, FZF)
+│   ├── functions.sh      # Core utilities (extract, psg, mkcd, proj)
+│   ├── wsl-functions.sh  # WSL-specific utilities
+│   └── aliases/          # Organized by category
+│       ├── general.sh    # Modern CLI replacements
+│       ├── docker.sh     # Container shortcuts
+│       ├── git.sh        # Git workflow
+│       ├── python.sh     # Python development
+│       ├── node.sh       # Node.js aliases
+│       └── wsl.sh        # Windows integration
+│
+├── install/              # Dedicated installers for modern tools
+│   ├── install-starship.sh
+│   ├── install-eza.sh
+│   ├── install-neovim.sh
+│   ├── install-pyenv.sh
+│   └── install-nvm.sh
+│
+└── bin/                  # User commands
+    ├── theme-switcher    # Interactive theme management
+    ├── check-setup       # Validate installation
+    ├── cheatsheet        # Interactive command reference
+    └── update-configs    # Refresh symlinks
 ```
 
-## 🔧 Configuration Files
+### Core Components
 
-All config files are **visible** (no leading dots) for easy editing, but still symlink to the expected hidden locations:
+**setup.sh** - Entry point and orchestrator
+- Parses CLI arguments (`--config`, `--shell`, `--dev`, `--full`)
+- Orchestrates 3-phase installation:
+  1. System verification (Ubuntu version, WSL detection)
+  2. Package installation (tier-based)
+  3. Configuration setup (symlinks, templates, WSL integration)
 
-- `configs/bashrc` → `~/.bashrc`
-- `configs/zshrc` → `~/.zshrc`  
-- `configs/init.vim` → `~/.config/nvim/init.vim`
-- `configs/gitconfig` → `~/.gitconfig` (processed with your name/email)
+**lib.sh** - Consolidated utilities library
+- Logging and output formatting
+- WSL detection and integration
+- Backup management
+- Package installation (tier-based)
+- Security functions (safe_sudo, HTTPS-only downloads)
 
-**Benefits:**
-- Tab completion works when editing configs
-- Easy to find and modify
-- Clear file organization
-- Still work exactly as expected
+## Installation Tiers
 
-## 🛠️ Runtime Commands
+The system uses **cumulative tiers** - each tier includes all previous tiers:
 
-After installation, these commands are available:
+| Tier | What It Installs | Sudo Required? |
+|------|------------------|----------------|
+| **config** | Symlinks only (zero installs) | No |
+| **shell** | + Modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide) | Yes |
+| **dev** | + Development tools (neovim, lazygit, tmux) | Yes |
+| **full** | + Complete environment (NVM, pyenv, Docker, Azure CLI, Claude Code) | Yes |
 
+**Modifiers:**
+- `--personal` - Add media tools (ffmpeg, yt-dlp) to any tier
+- `--force` - Overwrite existing configs without prompting
+- `--dry-run` - Preview actions without making changes
+
+## Key Features
+
+### 1. Visible Configuration Files
+All configs stored **without leading dots** for discoverability:
+```
+configs/bashrc       → ~/.bashrc
+configs/zshrc        → ~/.zshrc
+configs/init.vim     → ~/.config/nvim/init.vim
+configs/gitconfig    → ~/.gitconfig (template processed)
+```
+**Benefits:** Tab completion works, easy to browse, still symlinked to expected locations.
+
+### 2. Unified Theme System
+Switch themes across vim/tmux/shell simultaneously:
 ```bash
-# Reload shell configuration without restarting
-reload
-
-# Search for running processes  
-psg <name>
-
-# View markdown files with syntax highlighting
-md <file>
-
-# Switch terminal theme interactively
-./bin/theme-switcher
-
-# List available themes
-themes
-
-# WSL: Import SSH keys from Windows
-sync-ssh
-
-# WSL: Cross-platform clipboard
-pbcopy / pbpaste
-
-# VS Code shortcuts (after running install-vscode.sh)
-c          # Open current directory in VS Code
-cf         # Find file with fzf and open in VS Code
-cgrep      # Search content and open at line in VS Code
-
-# Modern terminal tools
-z          # Smart directory jumping with zoxide
-zi         # Interactive directory search with fzf
-lg         # Visual git interface with lazygit
-glow       # Markdown preview in terminal
-
-# Enhanced FZF functions
-gb         # Interactive git branch switcher
-gl         # Interactive git log browser
-rg         # Content search with ripgrep + fzf
-fp         # Project finder
-
-# Configuration switchers
-tmux-config-switcher.sh minimal  # Use streamlined tmux
-vim-minimal     # Fast vim config for quick edits
-vim-full        # Full-featured vim config
-vim-status      # Show current vim configuration
-
-# Python development (pyenv + Poetry/pip)
-pyset 3.11.9    # Set Python version for project (Poetry or pip)
-vactivate       # Activate virtual environment (smart detection)
-pyinfo          # Show Python environment info
-pylist          # List installed and available Python versions
+./bin/theme-switcher              # Interactive FZF selection
+./bin/theme-switcher nord         # Direct switch
+./bin/theme-switcher --preview    # Preview before applying
 ```
+**Available themes:** Nord, Kanagawa, Tokyo Night, Gruvbox Material, Catppuccin Mocha
 
-## 🐍 Python Development Workflow
+Each theme provides:
+- `colors.sh` - RGB palette definitions
+- `shell.sh` - FZF and terminal colors
+- `vim.vim` - Neovim colorscheme
+- `tmux.conf` - Status bar and pane colors
 
-The dotfiles include a streamlined Python workflow using **pyenv** (version management) that works seamlessly with both **Poetry** and **pip** projects:
-
-### Quick Start
-
+### 3. WSL Integration
+Seamless Windows ↔ Linux integration (auto-detected):
 ```bash
-# 1. Install Python versions
-pyenv install 3.11.9
-pyenv install 3.12.4
-
-# 2. Set a default Python version (enables python/python3 commands globally)
-pyset --default 3.11.9
-
-# Now python/python3 work everywhere using the default version
-python --version
-# Python 3.11.9
-
-# Poetry project
-cd my-poetry-project
-pyset 3.11.9        # Set Python version + configure Poetry
-poetry install      # Install dependencies
-vactivate           # Activate venv
-
-# pip project
-cd my-pip-project
-pyset 3.10.14       # Set Python version + create venv
-vactivate           # Activate venv
-pip install -r requirements.txt
-
-# setuptools project (setup.py)
-cd my-package
-pyset 3.11.9        # Set Python version + create venv
-vactivate           # Activate venv
-pip install -e .    # Install in editable mode
+pbcopy / pbpaste    # Clipboard integration
+sync-ssh            # Import SSH keys from Windows
+winget              # Access Windows package manager
 ```
 
-### Benefits
+### 4. Modern CLI Tools
+Replaces traditional Unix tools with modern alternatives:
+- `ls` → `eza`
+- `cat` → `bat`
+- `find` → `fd`
+- `grep` → `ripgrep`
+- `cd` → `zoxide`
 
-- ✅ **Default version blocking** - `python`/`python3` blocked until you set a default (prevents accidental system Python usage)
-- ✅ **Per-project Python versions** - Each project can use different Python versions via `.python-version`
-- ✅ **Automatic detection** - `pyset` detects Poetry vs pip projects automatically
-- ✅ **Smart precedence** - Project `.python-version` overrides global default automatically
-- ✅ **Team consistency** - `.python-version` file ensures everyone uses same version
-- ✅ **Works everywhere** - Integrates with Poetry, pip, setuptools, and VS Code
-
-See `cheat` command for full list of Python helpers.
-
-## 🎨 Theme System
-
-### Quick Theme Switching
-
+### 5. Python Development Workflow
+Advanced pyenv integration with Poetry/pip auto-detection:
 ```bash
-# Interactive theme switcher with preview
-./bin/theme-switcher
-
-# Direct theme switch
-./bin/theme-switcher nord
-./bin/theme-switcher tokyo-night
-./bin/theme-switcher kanagawa
-./bin/theme-switcher gruvbox-material
-./bin/theme-switcher catppuccin-mocha
+pyset --default 3.11.9    # Set global default Python
+pyset 3.11.9              # Set project Python (auto-detects Poetry/pip)
+vactivate                 # Smart venv activation
+pyinfo                    # Show environment info
 ```
 
-**Available Themes:**
-- **Nord**: Cool, arctic-inspired professional theme
-- **Tokyo Night**: Modern theme with vibrant city-light colors
-- **Kanagawa**: Japanese-inspired earthy tones
-- **Gruvbox Material**: Warm, retro colors with softer contrast
-- **Catppuccin Mocha**: Soothing pastel colors
+### 6. Performance Optimizations
+- Starship prompt (fast startup)
+- Lazy-load NVM (loads on first use)
+- Optional minimal configs for vim/tmux
 
-Themes apply consistently across neovim, tmux, shell prompts, and FZF. See [Theme Documentation](docs/theme-system.md) for details.
+## Runtime Commands
 
-## 💻 VS Code Integration
+After installation, these commands become available:
 
-### Setup
-
+### Shell & Navigation
 ```bash
-# Install VS Code settings and extensions
-./install/install-vscode.sh
+reload        # Reload shell configuration
+psg <name>    # Search running processes
+mkcd <dir>    # Create directory and cd into it
+proj          # Interactive project finder (searches ~/projects, ~/dev, etc.)
+z <dir>       # Smart directory jumping (zoxide)
+zi            # Interactive directory search
 ```
 
-This installs:
-- **Hybrid Vim mode**: VS Code shortcuts preserved, vim motions for text editing
-- **Optimized settings**: Font ligatures, smooth scrolling, visual enhancements
-- **Essential extensions**: Vim, GitLens, themes matching your dotfiles
-- **Custom keybindings**: Vim-style window navigation, quick file access
+### Development Tools
+```bash
+# Git (enhanced with FZF)
+gb            # Interactive git branch switcher
+gl            # Interactive git log browser
+lg            # Visual git interface (lazygit)
 
-### Key Features
+# Python
+pyset         # Set Python version for project
+vactivate     # Smart venv activation
+pyinfo        # Show Python environment info
+pylist        # List installed Python versions
 
-- **Best of both worlds**: Use mouse/GUI when visual, vim motions for efficiency
-- **Preserved VS Code shortcuts**: Ctrl+P, Ctrl+Shift+P, Ctrl+S all work normally
-- **Quick terminal access**: Integrated terminal with your zsh configuration
-- **Theme consistency**: VS Code themes match your terminal theme
+# Node.js
+nvm           # Node Version Manager
+ni            # npm install
+nr            # npm run
+```
 
-See `configs/vscode/` for settings and customization options.
+### VS Code Integration
+```bash
+c             # Open current directory in VS Code
+cf            # Find file with fzf and open in VS Code
+cgrep         # Search content and open at line in VS Code
+```
 
-## ⚡ Streamlined Configurations
+### System Management
+```bash
+./bin/theme-switcher           # Switch themes interactively
+./bin/check-setup              # Validate installation
+./bin/cheatsheet               # Interactive command reference
+./bin/update-configs           # Refresh symlinks
+vim-minimal / vim-full         # Switch vim configurations
+```
 
-### Performance-Optimized Options
+### WSL-Specific
+```bash
+sync-ssh      # Import SSH keys from Windows
+pbcopy        # Copy to Windows clipboard
+pbpaste       # Paste from Windows clipboard
+```
 
-This dotfiles system now includes streamlined alternatives optimized for VS Code workflows:
-
-**Shell**: 
-- **Starship** prompt (200ms faster startup than Oh My Zsh)
-- Modern zsh config without framework overhead
-- No configuration switching needed - optimized by default
-
-**Terminal Multiplexer**:
-- Minimal tmux without plugins
-- ESDF/WASD navigation toggle via `TMUX_NAV_STYLE`
-- Switch with: `tmux-config-switcher.sh minimal`
-
-**Editor**:
-- Minimal vim with 5 essential plugins (<50ms startup)
-- Full vim with 18+ plugins for extended sessions
-- Switch with: `vim-minimal` or `vim-full`
-
-These configurations follow the principle: **Use VS Code for development, terminal tools for quick edits**.
-
-## 🎨 Customization
+## Extension Guide
 
 ### Adding New Packages
+**Base packages** (installed with `--shell` or higher):
+```bash
+# Edit lib.sh, add to PACKAGES array
+declare -A PACKAGES=(
+    [core]="git build-essential"
+    [modern]="bat fd-find ripgrep fzf your-new-package"
+    ...
+)
+```
 
-**Base packages:** Edit `base_packages` array in `lib/packages.sh`
-**Work packages:** Add to functions in `install_work_packages()`
-**Personal packages:** Add to `personal_packages` array
+**Tier-specific packages**:
+```bash
+# Edit appropriate function in lib.sh
+install_shell_packages() {
+    # Add your package here
+}
+```
 
 ### Adding New Configurations
+```bash
+# 1. Create config file in configs/ (no leading dot)
+configs/your-config
 
-1. Create config file in `configs/` (no leading dot)
-2. Add mapping to `config_mappings` array in `setup.sh`
-3. System automatically symlinks to hidden destination
+# 2. Add mapping to setup.sh
+declare -A CONFIG_MAP=(
+    [your-config]="$HOME/.your-config:symlink"
+)
+```
 
-### Adding Aliases/Functions
+### Adding Aliases or Functions
+```bash
+# Aliases: Create file in shell/aliases/
+shell/aliases/your-category.sh
 
-- **Aliases:** Add `.sh` file to `shell/aliases/`
-- **Functions:** Add functions to `shell/functions.sh`
-- Files are automatically sourced on shell startup
+# Functions: Add to shell/functions.sh
+your_function() {
+    # Implementation
+}
+```
 
-## 🔒 Security Features
+### Adding New Themes
+```bash
+# 1. Create theme directory
+configs/themes/your-theme/
 
-- **HTTPS-only** downloads for all external resources
-- **Checksum verification** for security-critical downloads
-- **Safe operations** with `safe_sudo` wrapper showing commands
-- **Automatic backups** before any file modifications
-- **Input validation** for user-provided data
+# 2. Add required files
+├── colors.sh      # RGB palette definitions
+├── shell.sh       # FZF and terminal colors
+├── vim.vim        # Neovim colorscheme
+└── tmux.conf      # Status bar colors
 
-## 📚 Documentation
+# 3. Update bin/theme-switcher
+declare -A THEMES=(
+    ["your-theme"]="Your Theme - Description"
+)
+```
 
-- **Theme System:** See `docs/theme-system.md` for detailed theme documentation
-- **Quick Start:** See `docs/THEME_QUICK_START.md` for theme quick reference
-- **AI Integration:** See `ai/` directory for Claude Code prompts and tools
-- **Architecture:** Simple 2-file library design, human-readable codebase
-- **Aliases:** See `shell/aliases/` for available shortcuts
+## Design Principles
 
-## 🎯 Design Principles
+1. **Ubuntu-Only** - No cross-platform complexity
+2. **Human-Readable** - Clear naming, extensive comments
+3. **Tiered Installation** - Install only what you need
+4. **Non-Destructive** - Automatic backups before changes
+5. **Visible Configs** - Files stored without leading dots
+6. **Security-First** - HTTPS-only downloads, input validation
+7. **Performance** - Lazy loading, fast prompt, optional minimal configs
 
-1. **Ubuntu Only** - No cross-platform complexity
-2. **Human Readable** - Any developer can understand the entire system in 20 minutes
-3. **Essential Tools** - Focus on what developers actually need
-4. **Visible Configs** - No hunting for hidden files
-5. **Fail Safe** - Automatic backups and validation
+## Security Features
 
-## 🚨 Breaking Changes from v1
+- Shows commands before sudo execution
+- Automatic backups before changes
+- HTTPS-only external downloads
+- Input validation (email format, etc.)
+- Fail-fast error handling
+- Proper SSH key permissions
 
-This is a complete rewrite that removes:
-- Cross-platform support (dnf, pacman)
-- VS Code installation (users manage their own editors)
-- Complex Microsoft integration
-- 8-module architecture
+## Troubleshooting
 
-**Migration:** The system will automatically backup existing configs and install the simplified version.
+**Installation fails:**
+```bash
+./bin/check-setup           # Validate system requirements
+./setup.sh --dry-run        # Preview without making changes
+```
 
-## 📈 Stats
+**Config not loading:**
+```bash
+reload                      # Reload shell configuration
+source ~/.bashrc            # Manually source (bash)
+source ~/.zshrc             # Manually source (zsh)
+```
 
-- **70% code reduction** from original complex system
-- **Ubuntu-focused** for simplified maintenance
-- **Human-readable** architecture
-- **Essential functionality** preserved
-- **Modern development tools** included
+**Restore from backup:**
+```bash
+ls -la .backups/            # List available backups
+cp .backups/backup-*/bashrc ~/.bashrc    # Restore specific file
+```
+
+**Theme not applying:**
+```bash
+./bin/theme-switcher --current     # Check current theme
+./bin/theme-switcher nord          # Reapply theme
+```
+
+## Documentation
+
+- **README.md** (this file) - Quick start and architecture overview
+- **docs/architecture.md** - Detailed technical architecture
+- **docs/theme-system.md** - Theme system documentation
+- **docs/customization.md** - Extension guide
 
 ---
 
-*A streamlined dotfiles system that gets out of your way and lets you focus on what matters: coding.*
+*Ubuntu/WSL development environment management system. Tiered installation, unified themes, modern CLI tools.*
