@@ -106,6 +106,8 @@ shell│l│Compact column listing (eza)│eza -CF --color=auto --group-director
 shell│tree│Display directory tree structure│eza --tree --color=auto
 shell│bat│View file with syntax highlighting│batcat
 shell│view│View file with syntax highlighting│batcat
+shell│md│Render Markdown (TUI if interactive, print if piped)│md README.md
+shell│glow│Terminal Markdown renderer│glow README.md
 shell│df│Show disk space usage (human readable)│df -h
 shell│du│Show directory size (human readable)│du -h
 shell│free│Show memory usage (human readable)│free -h

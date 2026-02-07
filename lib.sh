@@ -433,7 +433,7 @@ run_installer() {
     fi
 }
 
-# Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop)
+# Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, glow)
 install_shell_packages() {
     log "Installing shell tier packages..."
 
@@ -472,6 +472,7 @@ install_shell_packages() {
     run_installer "zoxide"
     run_installer "delta"
     run_installer "btop"
+    run_installer "glow"
 
     success "Shell tier installation complete"
 }
