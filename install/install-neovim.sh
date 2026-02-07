@@ -31,7 +31,7 @@ if [[ "$FORCE" != true ]] && verify_binary nvim; then
     CURRENT=$(nvim --version 2>/dev/null | head -n1 | awk '{print $2}' | sed 's/^v//')
     if [[ "$CURRENT" == "$VERSION" ]]; then
         success "Neovim v$VERSION already installed"
-        exit 0
+        exit 2
     fi
     log "Neovim v$CURRENT installed, updating to v$VERSION..."
 elif command -v nvim >/dev/null 2>&1; then

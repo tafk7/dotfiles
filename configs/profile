@@ -1,13 +1,12 @@
 # ~/.profile: executed by the command interpreter for login shells.
-# This file is sourced by sh-compatible shells for login sessions.
+# Owns: PATH baseline, locale, XDG, PAGER, TERM, TZ
+# Tool-specific settings live in shell/env.sh (sourced by bashrc/zshrc)
 
-# If not running interactively, don't do anything
-case $- in
-    *i*) ;;
-      *) return;;
-esac
+# Double-source guard — zshrc sources this for non-login shells
+[[ -n "$_PROFILE_LOADED" ]] && return
+_PROFILE_LOADED=1
 
-# Set PATH so it includes user's private bin directories
+# PATH baseline — user and system bin directories
 if [ -d "$HOME/bin" ] ; then
     PATH="$HOME/bin:$PATH"
 fi
@@ -16,26 +15,16 @@ if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
 
-# Add /usr/local/bin to PATH if it exists
 if [ -d "/usr/local/bin" ] ; then
     PATH="/usr/local/bin:$PATH"
 fi
 
-# Editor is set in shell/env.sh with neovim preference
-
-# Set default pager
-export PAGER=less
-export LESS='-F -g -i -M -R -S -w -X -z-4'
-
-# History settings
-export HISTSIZE=10000
-export HISTFILESIZE=20000
-
-# Set language environment
+# Locale
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
 
-# Set timezone if not set
+# Timezone
 if [ -z "$TZ" ]; then
     export TZ="UTC"
 fi
@@ -45,44 +34,17 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 
-# Development environment
+# Terminal
 export TERM="xterm-256color"
-
-# Node.js settings
-if command -v node >/dev/null 2>&1; then
-    export NODE_OPTIONS="--max-old-space-size=4096"
-fi
-
-# Python settings
-export PYTHONDONTWRITEBYTECODE=1
-export PIP_REQUIRE_VIRTUALENV=false
-
-# Docker settings
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
-
-# WSL specific settings
-if [ -n "$WSL_DISTRO_NAME" ]; then
-    # Windows interop
-    export WSLENV="USERPROFILE/pu:APPDATA/pu"
-
-    # Targeted WSL PATH cleanup: strip directories that shadow Linux tools
-    # Keeps: System32 (clip.exe, wsl.exe), VS Code path, Program Files, AppData
-    if [ -n "$PATH" ]; then
-        export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E \
-            '/mnt/c/Windows/(System32/(Wbem|WindowsPowerShell|OpenSSH)|SysWOW64)' | \
-            tr '\n' ':' | sed 's/:$//')
-    fi
-fi
+export PAGER=less
+export LESS='-F -g -i -M -R -S -w -X -z-4'
 
 # Load shell-specific configuration
 if [ -n "$BASH_VERSION" ]; then
-    # include .bashrc if it exists
     if [ -f "$HOME/.bashrc" ]; then
         . "$HOME/.bashrc"
     fi
 elif [ -n "$ZSH_VERSION" ]; then
-    # include .zshrc if it exists
     if [ -f "$HOME/.zshrc" ]; then
         . "$HOME/.zshrc"
     fi

@@ -15,6 +15,10 @@ set -e
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 export DOTFILES_DIR
 
+# Ensure ~/.local/bin is in PATH (where we install all binary tools)
+[[ -d "$HOME/.local/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && \
+    export PATH="$HOME/.local/bin:$PATH"
+
 # Backup directory
 DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
 
@@ -25,7 +29,37 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
+DIM='\033[2m'
 NC='\033[0m'
+
+# ==============================================================================
+# Install Result Tracking
+# ==============================================================================
+
+INSTALL_OK=()
+INSTALL_SKIP=()
+INSTALL_FAIL=()
+
+track_install() {
+    local name="$1" status="$2"
+    case "$status" in
+        ok)   INSTALL_OK+=("$name") ;;
+        skip) INSTALL_SKIP+=("$name") ;;
+        fail) INSTALL_FAIL+=("$name") ;;
+    esac
+}
+
+print_install_summary() {
+    [[ ${#INSTALL_OK[@]} -eq 0 && ${#INSTALL_SKIP[@]} -eq 0 && ${#INSTALL_FAIL[@]} -eq 0 ]] && return 0
+
+    echo
+    echo "Installation Summary"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    [[ ${#INSTALL_OK[@]} -gt 0 ]]   && echo -e "  ${GREEN}✓${NC} ${INSTALL_OK[*]}"
+    [[ ${#INSTALL_SKIP[@]} -gt 0 ]] && echo -e "  ${DIM}─ ${INSTALL_SKIP[*]} (up to date)${NC}"
+    [[ ${#INSTALL_FAIL[@]} -gt 0 ]] && echo -e "  ${RED}✗${NC} ${INSTALL_FAIL[*]}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
 
 # ==============================================================================
 # Logging Functions
@@ -158,6 +192,46 @@ EOF
     success "WSL clipboard integration setup complete"
 }
 
+# Write install-time environment to ~/.config/dotfiles/env
+# Avoids re-deriving known values on every shell startup
+write_dotfiles_env() {
+    local env_file="$HOME/.config/dotfiles/env"
+    local env_dir="$(dirname "$env_file")"
+    local marker="# Managed by dotfiles setup.sh — edits will be overwritten on next install"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would write $env_file"
+        return 0
+    fi
+
+    mkdir -p "$env_dir"
+
+    # Preserve any user-added lines (those without our marker or managed exports)
+    local user_lines=""
+    if [[ -f "$env_file" ]]; then
+        user_lines="$(grep -v -e "^$marker$" \
+                           -e '^export DOTFILES_DIR=' \
+                           -e '^export WIN_USER=' \
+                           "$env_file" || true)"
+    fi
+
+    # Build the managed block
+    local managed_block="$marker"
+    managed_block+=$'\n'"export DOTFILES_DIR=\"$DOTFILES_DIR\""
+
+    if is_wsl; then
+        managed_block+=$'\n'"export WIN_USER=\"$(get_windows_username)\""
+    fi
+
+    # Write: managed block first, then preserved user lines
+    echo "$managed_block" > "$env_file"
+    if [[ -n "$user_lines" ]]; then
+        echo "$user_lines" >> "$env_file"
+    fi
+
+    success "Wrote install-time environment to $env_file"
+}
+
 
 # ==============================================================================
 # Backup Functions
@@ -208,7 +282,13 @@ safe_symlink() {
         log "Backing up existing $target"
         mv "$target" "$backup_dir/$(basename "$target")"
     elif [[ -L "$target" ]]; then
-        # Remove existing symlink
+        # Back up the file the symlink points to (if it still exists)
+        local link_target
+        link_target="$(readlink -f "$target")"
+        if [[ -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
+            log "Backing up symlink target $target -> $link_target"
+            cp "$link_target" "$backup_dir/$(basename "$target")"
+        fi
         rm "$target"
     fi
 
@@ -351,7 +431,7 @@ process_git_config() {
 declare -A PACKAGES=(
     [core]="git build-essential"
     [development]="zsh direnv"
-    [modern]="bat fd-find ripgrep fzf"
+    [modern]="bat fd-find ripgrep"
     [terminal]="htop tree"
     [languages]="python3-pip"
     [wsl]="socat wslu"
@@ -384,7 +464,7 @@ install_package_set() {
 # Update package lists
 update_packages() {
     log "Updating package lists..."
-    safe_sudo apt-get update
+    safe_sudo apt-get update 2>&1 | grep -v '^W:' || true
 }
 
 # Get package list for dry-run display
@@ -412,6 +492,7 @@ get_tier_packages() {
 # ==============================================================================
 
 # Run installer script with consistent error handling
+# Exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
 run_installer() {
     local name="$1"
     local critical="${2:-false}"
@@ -419,6 +500,7 @@ run_installer() {
 
     if [[ ! -f "$script" ]]; then
         error "Installer script not found: $script"
+        track_install "$name" fail
         [[ "$critical" == "true" ]] && exit 1
         return 1
     fi
@@ -426,18 +508,76 @@ run_installer() {
     local args=()
     [[ "${FORCE_REINSTALL:-false}" == "true" ]] && args+=(--force)
 
-    if [[ "$critical" == "true" ]]; then
-        "$script" "${args[@]+"${args[@]}"}" || { error "$name installation failed"; exit 1; }
+    local rc=0
+    "$script" "${args[@]+"${args[@]}"}" || rc=$?
+
+    case $rc in
+        0) track_install "$name" ok ;;
+        2) track_install "$name" skip ;;
+        *)
+            track_install "$name" fail
+            if [[ "$critical" == "true" ]]; then
+                error "$name installation failed"
+                exit 1
+            else
+                warn "$name installation failed"
+            fi
+            ;;
+    esac
+}
+
+# Install all binary tools declared in eget.toml
+# Bootstraps eget first, then runs eget --download-all
+install_eget_tools() {
+    run_installer "eget" true
+
+    local config="$DOTFILES_DIR/eget.toml"
+    if [[ ! -f "$config" ]]; then
+        error "eget.toml not found at $config"
+        return 1
+    fi
+
+    log "Installing binary tools via eget..."
+
+    local eget_args=("--download-all")
+
+    # Force reinstall: remove existing binaries so eget re-downloads them
+    if [[ "${FORCE_REINSTALL:-false}" == "true" ]]; then
+        log "Force reinstall: clearing eget-managed binaries..."
+        local tools
+        tools=$(grep -oP '^\["\K[^"]+' "$config")
+        for repo in $tools; do
+            local name="${repo##*/}"
+            rm -f "$HOME/.local/bin/$name"
+        done
+    fi
+
+    if EGET_CONFIG="$config" eget "${eget_args[@]}"; then
+        # Track each tool from the config
+        local tools
+        tools=$(grep -oP '^\["\K[^"]+' "$config")
+        for repo in $tools; do
+            local name="${repo##*/}"
+            track_install "$name" ok
+        done
     else
-        "$script" "${args[@]+"${args[@]}"}" || warn "$name installation failed"
+        warn "Some eget tools failed to install"
+        local tools
+        tools=$(grep -oP '^\["\K[^"]+' "$config")
+        for repo in $tools; do
+            local name="${repo##*/}"
+            if verify_binary "$name"; then
+                track_install "$name" ok
+            else
+                track_install "$name" fail
+            fi
+        done
     fi
 }
 
 # Shell tier: modern CLI tools (starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, glow)
 install_shell_packages() {
     log "Installing shell tier packages..."
-
-    update_packages
 
     # APT packages for shell tier
     local shell_packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
@@ -447,12 +587,23 @@ install_shell_packages() {
         shell_packages="$shell_packages ${PACKAGES[wsl]}"
     fi
 
-    log "Installing shell tier APT packages..."
-    # shellcheck disable=SC2086
-    if safe_sudo apt-get install -y $shell_packages; then
-        success "Shell tier APT packages installed"
+    # Only run apt if something is actually missing
+    local missing=()
+    for pkg in $shell_packages; do
+        dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        log "All APT packages already installed"
     else
-        warn "Some shell tier packages failed to install"
+        update_packages
+        log "Installing shell tier APT packages: ${missing[*]}"
+        # shellcheck disable=SC2086
+        if safe_sudo apt-get install -y "${missing[@]}" 2>&1 | grep -v '^W:' || true; then
+            success "Shell tier APT packages installed"
+        else
+            warn "Some shell tier packages failed to install"
+        fi
     fi
 
     # Create command aliases for renamed packages (user-local symlinks)
@@ -465,19 +616,14 @@ install_shell_packages() {
         ln -sf "$(which fdfind)" "$HOME/.local/bin/fd"
     fi
 
-    # Install modern tools via dedicated installers (graceful failures)
-    log "Installing shell tier tools via scripts..."
-    run_installer "starship"
-    run_installer "eza"
-    run_installer "zoxide"
-    run_installer "delta"
-    run_installer "btop"
-    run_installer "glow"
+    # Install all binary tools via eget (starship, eza, fzf, zoxide, delta, btop, glow, lazygit, uv)
+    install_eget_tools
 
     success "Shell tier installation complete"
 }
 
-# Dev tier: development tools (neovim, lazygit, tmux, Claude Code)
+# Dev tier: development tools (neovim, tmux)
+# Note: lazygit is installed via eget in shell tier
 install_dev_packages() {
     log "Installing dev tier packages..."
 
@@ -487,19 +633,15 @@ install_dev_packages() {
         safe_sudo apt-get install -y tmux || warn "tmux installation failed"
     fi
 
-    # Install neovim and lazygit via scripts (graceful failures)
+    # Neovim has its own installer (glibc version logic, full directory extraction)
     log "Installing dev tier tools via scripts..."
     run_installer "neovim"
-    run_installer "lazygit"
-
-    # Install Claude Code CLI (non-critical — depends on external service)
-    log "Installing Claude Code..."
-    run_installer "claude-code"
 
     success "Dev tier installation complete"
 }
 
 # Full tier: complete environment (NVM, pyenv, Docker, Azure CLI)
+# Note: uv is installed via eget in shell tier
 install_full_packages() {
     log "Installing full tier packages..."
 
@@ -516,10 +658,6 @@ install_full_packages() {
     # Install pyenv for Python version management
     log "Installing pyenv..."
     run_installer "pyenv" true
-
-    # Install uv (fast Python package manager)
-    log "Installing uv..."
-    run_installer "uv"
 
     # Install Poetry (Python dependency manager)
     log "Installing Poetry..."
@@ -550,6 +688,7 @@ install_work_packages() {
 # Install personal packages
 install_personal_packages() {
     install_package_set "personal"
+    run_installer "claude-code"
 }
 
 # Install Docker

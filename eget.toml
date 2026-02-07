@@ -1,0 +1,37 @@
+# eget.toml — declarative binary tool management
+# Versions pinned to known-good releases. Update with: eget --download-all
+# To bump versions, update the tag values below.
+
+[global]
+target = "~/.local/bin"
+upgrade_only = true
+
+["starship/starship"]
+tag = "v1.24.2"
+
+["eza-community/eza"]
+tag = "v0.23.4"
+asset_filters = [".tar.gz"]
+
+["junegunn/fzf"]
+tag = "v0.67.0"
+
+["ajeetdsouza/zoxide"]
+tag = "v0.9.9"
+
+["dandavison/delta"]
+tag = "0.18.2"
+asset_filters = [".tar.gz", "gnu"]
+
+["aristocratos/btop"]
+tag = "v1.4.6"
+
+["charmbracelet/glow"]
+tag = "v2.1.1"
+
+["jesseduffield/lazygit"]
+tag = "v0.59.0"
+
+["astral-sh/uv"]
+tag = "0.10.0"
+asset_filters = [".tar.gz", "gnu"]

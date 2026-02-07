@@ -24,7 +24,15 @@ _claude_resolve_bin() {
 # Resolve once at shell init, define function that all aliases call through
 _CLAUDE_BIN=$(_claude_resolve_bin)
 if [[ -n "$_CLAUDE_BIN" ]]; then
-    claude() { "$_CLAUDE_BIN" "$@"; }
+    # CLAUDE_FLAGS intentionally unquoted — allows multiple space-separated flags
+    claude() { "$_CLAUDE_BIN" ${CLAUDE_FLAGS:-} "$@"; }
+else
+    claude() {
+        echo "Claude Code not found." >&2
+        echo "  VS Code: install the 'anthropic.claude-code' extension" >&2
+        echo "  Standalone: ./setup.sh --personal" >&2
+        return 1
+    }
 fi
 unset -f _claude_resolve_bin
 

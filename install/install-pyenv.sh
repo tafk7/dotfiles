@@ -32,7 +32,7 @@ if [[ -d "$PYENV_ROOT" ]] && [[ -x "$PYENV_ROOT/bin/pyenv" ]]; then
         log "Use: pyenv install <version> (e.g., pyenv install 3.11.9)"
     fi
 
-    exit 0
+    exit 2
 fi
 
 # Install build dependencies

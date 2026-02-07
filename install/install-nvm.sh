@@ -39,7 +39,7 @@ if [[ -d "$NVM_DIR" ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
     if command -v node >/dev/null 2>&1; then
         log "Node.js $(node --version) is already installed via NVM"
         log "npm $(npm --version) is available"
-        exit 0
+        exit 2
     else
         log "NVM is installed but Node.js is not. Installing Node.js LTS..."
     fi

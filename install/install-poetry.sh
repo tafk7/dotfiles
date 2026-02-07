@@ -15,7 +15,7 @@ log "Installing Poetry (Python dependency manager)..."
 if [[ "$FORCE" != true ]] && verify_binary poetry; then
     log "Poetry is already installed"
     poetry --version
-    exit 0
+    exit 2
 elif command -v poetry >/dev/null 2>&1; then
     warn "Existing poetry binary is broken — reinstalling"
 fi
