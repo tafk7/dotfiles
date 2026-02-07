@@ -1,76 +1,72 @@
-# Set DOTFILES_DIR for this installation
-# Auto-detect to handle symlinks and directory moves
+# Zsh configuration
+# Owns: zsh options, history, completion, keybindings, prompt, zsh-specific tool loading
+
+# PATH baseline — ~/.profile handles this for login shells, but VS Code and other
+# terminals launch zsh as non-login (skipping ~/.profile). Profile has a source
+# guard so this is safe in both login and non-login shells.
+[[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+
+# Load install-time environment (written by setup.sh)
+[[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
+
+# Fallback: derive DOTFILES_DIR from symlink if env file is missing
 if [[ -z "$DOTFILES_DIR" ]]; then
-    export DOTFILES_DIR="${0:A:h:h}"  # Zsh idiom: resolve symlinks, get parent dir
+    export DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
 fi
-# Fallback if auto-detection fails
 : ${DOTFILES_DIR:="$HOME/dotfiles"}
 
-# Modern Zsh Configuration - Optimized for VS Code + Visual Workflow
-# Uses Starship prompt for fast startup with visual features
-# Single optimized configuration - no switching needed
-
-# Fix locale settings to prevent warnings
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-
 # ==============================================================================
-# Essential Zsh Options
+# Zsh Options
 # ==============================================================================
 
-# History configuration
+# History
 HISTFILE=~/.zsh_history
 HISTSIZE=50000
 SAVEHIST=100000
 
-# History options (only the essential ones)
-setopt EXTENDED_HISTORY          # Write the history file in the ":start:elapsed;command" format
-setopt INC_APPEND_HISTORY        # Write to the history file immediately
-setopt SHARE_HISTORY             # Share history between all sessions
-setopt HIST_EXPIRE_DUPS_FIRST    # Expire duplicate entries first
-setopt HIST_IGNORE_DUPS          # Don't record duplicates
-setopt HIST_IGNORE_SPACE         # Don't record entries starting with a space
-setopt HIST_VERIFY               # Don't execute immediately upon history expansion
+setopt EXTENDED_HISTORY          # ":start:elapsed;command" format
+setopt INC_APPEND_HISTORY        # Write immediately
+setopt SHARE_HISTORY             # Share between sessions
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_VERIFY               # Don't execute on expansion
 
-# Navigation options
-setopt AUTO_PUSHD               # Push the current directory visited on the stack
-setopt PUSHD_IGNORE_DUPS        # Do not store duplicates in the stack
-setopt PUSHD_SILENT             # Do not print the directory stack
+# Navigation
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt PUSHD_SILENT
 
-# Expansion and globbing
-setopt EXTENDED_GLOB            # Use extended globbing syntax
-setopt GLOB_DOTS               # Include dotfiles in globbing
+# Globbing
+setopt EXTENDED_GLOB
+setopt GLOB_DOTS
 
-# Completion options
-setopt COMPLETE_IN_WORD        # Complete from both ends of a word
-setopt ALWAYS_TO_END          # Move cursor to the end of a completed word
-setopt AUTO_LIST              # List choices on ambiguous completion
-setopt AUTO_PARAM_SLASH       # Add trailing slash for directories
+# Completion behavior
+setopt COMPLETE_IN_WORD
+setopt ALWAYS_TO_END
+setopt AUTO_LIST
+setopt AUTO_PARAM_SLASH
 
 # ==============================================================================
 # Load Shared Environment
 # ==============================================================================
 
-# Source environment variables (shared config for bash and zsh)
-if [[ -f "$DOTFILES_DIR/shell/env.sh" ]]; then
-    source "$DOTFILES_DIR/shell/env.sh"
-fi
+# Tool initialization (version managers, EDITOR, tool-specific settings, WSL env)
+[[ -f "$DOTFILES_DIR/shell/env.sh" ]] && source "$DOTFILES_DIR/shell/env.sh"
 
-# Load theme configuration if available
-if [[ -f "$HOME/.config/dotfiles/theme.sh" ]]; then
-    source "$HOME/.config/dotfiles/theme.sh"
-fi
+# FZF configuration (commands, preview options)
+[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
+
+# Theme (prompt colors, FZF color scheme)
+[[ -f "$HOME/.config/dotfiles/theme.sh" ]] && source "$HOME/.config/dotfiles/theme.sh"
 
 # ==============================================================================
-# Starship Prompt
+# Prompt
 # ==============================================================================
 
-# Initialize starship if available
 if command -v starship >/dev/null 2>&1; then
     eval "$(starship init zsh)"
 else
-    # Fallback to simple prompt if starship not installed
     PS1='%F{cyan}%~%f %# '
 fi
 
@@ -78,18 +74,15 @@ fi
 # Completion System
 # ==============================================================================
 
-# Initialize completion system
 autoload -Uz compinit
 compinit
 
-# Basic completion styling
 zstyle ':completion:*' completer _complete _ignored
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 zstyle ':completion:*' menu select
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ~/.zsh/cache
 
-# Docker completion
 zstyle ':completion:*:*:docker:*' option-stacking yes
 zstyle ':completion:*:*:docker-*:*' option-stacking yes
 
@@ -97,95 +90,65 @@ zstyle ':completion:*:*:docker-*:*' option-stacking yes
 # Key Bindings
 # ==============================================================================
 
-# Emacs-style key bindings (default)
 bindkey -e
 
-# History search
 bindkey '^R' history-incremental-search-backward
 bindkey '^S' history-incremental-search-forward
 
-# Better word navigation
 bindkey '^[[1;5C' forward-word    # Ctrl+Right
 bindkey '^[[1;5D' backward-word   # Ctrl+Left
 
-# Edit command line in editor
 autoload -U edit-command-line
 zle -N edit-command-line
 bindkey '^X^E' edit-command-line
 
 # ==============================================================================
-# FZF Integration (config is in shell/env.sh; zsh-specific key bindings below)
+# FZF Key Bindings (zsh-specific)
 # ==============================================================================
 
 if command -v fzf >/dev/null 2>&1; then
-    # Load fzf key bindings (Ctrl-R for history, Ctrl-T for files, Alt-C for cd)
-    if [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+    [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && \
         source /usr/share/doc/fzf/examples/key-bindings.zsh
-    fi
-
-    # Load fzf completion
-    if [[ -f /usr/share/doc/fzf/examples/completion.zsh ]]; then
+    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && \
         source /usr/share/doc/fzf/examples/completion.zsh
-    fi
 fi
 
 # ==============================================================================
-# Modern CLI Tools
+# Zoxide
 # ==============================================================================
 
-# Zoxide for smart directory jumping
-# Note: Keep cd as standard builtin for Claude Code snapshot compatibility
-# Use 'z' command directly for smart directory jumping
 if command -v zoxide >/dev/null 2>&1; then
     eval "$(zoxide init zsh)"
 fi
 
 # ==============================================================================
-# Node.js - Lazy Load NVM
+# NVM (lazy-loaded)
 # ==============================================================================
 
-# Lazy load NVM for faster startup
 if [ -s "$NVM_DIR/nvm.sh" ]; then
-    # Helper function to load NVM once
     _load_nvm() {
         unset -f _load_nvm nvm node npm
         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
     }
 
-    # Create wrapper functions that load NVM on first use
     nvm() { _load_nvm; nvm "$@"; }
     node() { _load_nvm; node "$@"; }
     npm() { _load_nvm; npm "$@"; }
 fi
 
 # ==============================================================================
-# WSL Integration
+# Shared Functions and Aliases
 # ==============================================================================
 
-if command -v wslpath >/dev/null 2>&1; then
-    # WSL-specific aliases (most are in shell/aliases/wsl.sh)
-    alias winget='/mnt/c/Windows/System32/winget.exe'
-fi
-
-# ==============================================================================
-# Load Dotfiles Functions and Aliases
-# ==============================================================================
-
-# Load functions (merged core and fzf-extras)
 [[ -f "$DOTFILES_DIR/shell/functions.sh" ]] && source "$DOTFILES_DIR/shell/functions.sh"
 
-# Load aliases
-for file in "$DOTFILES_DIR"/shell/aliases/*.sh; do
+for file in "$DOTFILES_DIR"/shell/aliases/*.sh(N); do
     [[ -r "$file" ]] && source "$file"
 done
 
-
 # ==============================================================================
-# Local Configuration
+# Local Overrides (not tracked in git)
 # ==============================================================================
 
-# Source shared local configuration (bash + zsh)
 [[ -f ~/.shell.local ]] && source ~/.shell.local
-
-# Source zsh-specific local configuration (not tracked in git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

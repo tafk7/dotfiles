@@ -26,13 +26,3 @@ else
     error "Claude Code installation verification failed"
     exit 1
 fi
-
-echo ""
-log "Available shortcuts:"
-log "  cl    - Start new Claude session"
-log "  clc   - Continue last Claude session"
-log "  clp   - One-off command (non-interactive)"
-echo ""
-log "Next steps:"
-log "  1. Run 'claude' to authenticate"
-log "  2. Run 'update-claude-commands' to sync slash commands"

@@ -18,8 +18,15 @@ alias cddocs='cd $WIN_DOCUMENTS'
 # Windows program shortcuts
 alias notepad='notepad.exe'
 alias clip='clip.exe'
-alias pwsh='powershell.exe'
 alias cmd='cmd.exe'
+alias winget='/mnt/c/Windows/System32/winget.exe'
+
+# PowerShell 7 if available, otherwise Windows PowerShell
+if [[ -x "/mnt/c/Program Files/PowerShell/7/pwsh.exe" ]]; then
+    alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
+else
+    alias pwsh='powershell.exe'
+fi
 
 # File operations
 # Explorer in current directory (also provides 'open' functionality)

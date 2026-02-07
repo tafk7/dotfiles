@@ -9,3 +9,11 @@ Host *
     ForwardAgent no
     HashKnownHosts yes
     Compression yes
+
+
+# Personal github account
+Host github.com-tafk7
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_tafk7
+    IdentitiesOnly yes

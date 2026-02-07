@@ -7,12 +7,15 @@ set -euo pipefail
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Set DOTFILES_DIR before sourcing lib.sh (lib.sh uses it for DOTFILES_BACKUP_PREFIX)
+DOTFILES_DIR="$SCRIPT_DIR"
+export DOTFILES_DIR
+
 # Load core library (contains all functions)
 source "$SCRIPT_DIR/lib.sh"
 
 # Configuration
 CONFIGS_DIR="$SCRIPT_DIR/configs"
-DOTFILES_DIR="$SCRIPT_DIR"
 
 # Installation options
 INSTALL_TIER="config"  # Default tier: config, shell, dev, full
@@ -35,6 +38,7 @@ declare -A CONFIG_MAP=(
     [config/bat]="$HOME/.config/bat:directory"
     [config/fd]="$HOME/.config/fd:directory"
     [ssh_config]="$HOME/.ssh/config:symlink"
+    [starship.toml]="$HOME/.config/starship.toml:symlink"
     
     # Special handling
     [gitconfig]="$HOME/.gitconfig:template"
@@ -110,13 +114,15 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Creates symlinks for all configuration files.
 
     --shell             Config + modern CLI tools. Requires sudo.
-                        Adds: starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
+                        Installs binary tools via eget (starship, eza, fzf,
+                        zoxide, delta, btop, glow, lazygit, uv) plus APT
+                        packages (bat, fd, ripgrep, direnv).
 
     --dev               Shell + development tools. Requires sudo.
-                        Adds: neovim, lazygit, tmux, Claude Code
+                        Adds: neovim, tmux, Claude Code
 
     --full, --work      Dev + full environment. Requires sudo.
-                        Adds: NVM, pyenv, uv, poetry, Docker, Azure CLI
+                        Adds: NVM, pyenv, poetry, Docker, Azure CLI
 
 MODIFIERS:
     --personal          Add media tools (ffmpeg, yt-dlp) to any tier
@@ -141,10 +147,10 @@ TIER SUMMARY:
     │ Tier     │ What It Installs                                │ Sudo?     │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
     │ config   │ Symlinks only (zero installs)                   │ No        │
-    │ shell    │ + starship, eza, bat, fd, ripgrep, fzf, zoxide,   │ Yes       │
-    │          │   delta, btop, direnv                               │           │
-    │ dev      │ + neovim, lazygit, tmux, Claude Code            │ Yes       │
-    │ full     │ + NVM, pyenv, uv, poetry, Docker, Azure CLI     │ Yes       │
+    │ shell    │ + eget, starship, eza, fzf, zoxide, delta,      │ Yes       │
+    │          │   btop, glow, lazygit, uv, bat, fd, ripgrep     │           │
+    │ dev      │ + neovim, tmux, Claude Code                     │ Yes       │
+    │ full     │ + NVM, pyenv, poetry, Docker, Azure CLI         │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
 
 The script will:
@@ -219,20 +225,20 @@ phase_install_packages() {
         log "  Shell tier packages:"
         local shell_apt=$(get_tier_packages "shell")
         log "    - APT: $shell_apt"
-        log "    - Scripts: starship, eza, zoxide, delta, btop"
+        log "    - eget: starship, eza, fzf, zoxide, delta, btop, glow, lazygit, uv"
 
         # Dev tier packages
         if tier_includes "dev"; then
             log "  Dev tier packages:"
             log "    - APT: tmux (if not present)"
-            log "    - Scripts: neovim, lazygit, Claude Code"
+            log "    - Scripts: neovim, Claude Code"
         fi
 
         # Full tier packages
         if tier_includes "full"; then
             log "  Full tier packages:"
             log "    - APT: Azure CLI, python3-dev, python3-venv, docker.io, docker-compose-v2"
-            log "    - Scripts: NVM, pyenv, uv, poetry"
+            log "    - Scripts: NVM, pyenv, poetry"
         fi
 
         # Personal packages
@@ -319,7 +325,9 @@ phase_setup_configs() {
         setup_wsl_clipboard
         import_windows_ssh_keys
     fi
-    
+
+    # Write install-time environment to ~/.config/dotfiles/env
+    write_dotfiles_env
     
     # Cleanup
     cleanup_old_backups 10
@@ -376,6 +384,9 @@ run_installation() {
     phase_verify_system
     phase_install_packages
     phase_setup_configs
+
+    # Show what happened with tool installs
+    print_install_summary
 
     # Success message
     echo
