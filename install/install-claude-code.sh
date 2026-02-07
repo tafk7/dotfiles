@@ -5,14 +5,13 @@ source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
 
 log "Installing Claude Code CLI..."
 
-# Check if already installed and show version
-if command -v claude >/dev/null 2>&1; then
+# Check existing installation
+if verify_binary claude; then
     CURRENT_VERSION=$(claude --version 2>/dev/null | head -1 || echo "unknown")
     log "Claude Code already installed: $CURRENT_VERSION"
     log "Updating..."
 fi
 
-# Install/update via native installer
 if curl -fsSL https://cli.claude.ai/install.sh | sh; then
     success "Claude Code installed successfully!"
 else
@@ -20,8 +19,7 @@ else
     exit 1
 fi
 
-# Verify
-if command -v claude >/dev/null 2>&1; then
+if verify_binary claude; then
     INSTALLED_VERSION=$(claude --version 2>/dev/null | head -1 || echo "installed")
     success "Claude Code $INSTALLED_VERSION is ready!"
 else
@@ -29,7 +27,6 @@ else
     exit 1
 fi
 
-# Shortcuts and next steps
 echo ""
 log "Available shortcuts:"
 log "  cl    - Start new Claude session"

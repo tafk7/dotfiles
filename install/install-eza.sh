@@ -4,48 +4,38 @@
 
 set -euo pipefail
 
-# Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing eza (modern ls replacement)..."
 
-# Check if eza is already installed
-if command -v eza >/dev/null 2>&1; then
+# Check existing installation
+if [[ "$FORCE" != true ]] && verify_binary eza; then
     log "eza is already installed"
     eza --version
     exit 0
+elif command -v eza >/dev/null 2>&1; then
+    warn "Existing eza binary is broken — reinstalling"
 fi
 
-# Create temp directory
+ARCH=$(get_arch)
+EZA_VERSION=$(github_latest_version "eza-community/eza" --strip-v)
+log "Latest version: v${EZA_VERSION}"
+
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
-# Get latest version from GitHub
-log "Fetching latest eza release..."
-EZA_VERSION=$(curl -s "https://api.github.com/repos/eza-community/eza/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-
-if [[ -z "$EZA_VERSION" ]]; then
-    error "Could not determine latest eza version"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# Download binary
 log "Downloading eza v${EZA_VERSION}..."
-curl -Lo eza.tar.gz "https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_x86_64-unknown-linux-gnu.tar.gz"
+curl -Lo eza.tar.gz "https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_${ARCH}-unknown-linux-gnu.tar.gz"
 
-# Extract and install to user-local bin directory
 tar xf eza.tar.gz
 mkdir -p "$HOME/.local/bin"
 install -D ./eza -t "$HOME/.local/bin/"
 
-# Cleanup
-cd -
-rm -rf "$TEMP_DIR"
-
-# Verify installation
-if command -v eza >/dev/null 2>&1; then
+if verify_binary eza; then
     success "eza installed successfully!"
     eza --version
 else

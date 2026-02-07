@@ -4,25 +4,27 @@
 
 set -euo pipefail
 
-# Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing uv (fast Python package manager)..."
 
-# Check if uv is already installed
-if command -v uv >/dev/null 2>&1; then
+# Check existing installation
+if [[ "$FORCE" != true ]] && verify_binary uv; then
     log "uv is already installed"
     uv --version
     exit 0
+elif command -v uv >/dev/null 2>&1; then
+    warn "Existing uv binary is broken — reinstalling"
 fi
 
-# Install using official installer, targeting ~/.local/bin
 mkdir -p "$HOME/.local/bin"
 curl -LsSf https://astral.sh/uv/install.sh | \
     env UV_INSTALL_DIR="$HOME/.local/bin" UV_NO_MODIFY_PATH=1 sh
 
-# Verify installation
-if command -v uv >/dev/null 2>&1; then
+if verify_binary uv; then
     success "uv installed successfully!"
     uv --version
 else

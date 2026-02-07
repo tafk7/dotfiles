@@ -38,6 +38,66 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 
 # ==============================================================================
+# System Detection
+# ==============================================================================
+
+# Normalize architecture to x86_64 or aarch64
+get_arch() {
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64|amd64) echo "x86_64" ;;
+        aarch64|arm64) echo "aarch64" ;;
+        *) error "Unsupported architecture: $arch"; return 1 ;;
+    esac
+}
+
+# Parse system glibc version (e.g. "2.31")
+get_glibc_version() {
+    ldd --version 2>&1 | head -1 | grep -oP '[0-9]+\.[0-9]+$'
+}
+
+# Dotted version comparison: returns 0 (true) if $1 >= $2
+version_gte() {
+    printf '%s\n%s\n' "$2" "$1" | sort -V -C
+}
+
+# ==============================================================================
+# Installer Helpers
+# ==============================================================================
+
+# Fetch latest release version from GitHub. Args: "owner/repo" [--strip-v]
+# Returns the version string (e.g. "0.10.4" with --strip-v, or "v0.10.4" without)
+github_latest_version() {
+    local repo="$1"
+    local strip_v=false
+    [[ "${2:-}" == "--strip-v" ]] && strip_v=true
+
+    local tag
+    tag=$(curl -sf "https://api.github.com/repos/${repo}/releases/latest" \
+        | grep -Po '"tag_name": "\K[^"]*')
+
+    if [[ -z "$tag" ]]; then
+        error "Failed to fetch latest version from $repo (rate-limited or network error)"
+        return 1
+    fi
+
+    if [[ "$strip_v" == true ]]; then
+        echo "${tag#v}"
+    else
+        echo "$tag"
+    fi
+}
+
+# Verify a binary exists AND runs. Returns 1 if missing or broken.
+# Usage: verify_binary <command> [version_flag]
+verify_binary() {
+    local cmd="$1"
+    local flag="${2:---version}"
+    command -v "$cmd" >/dev/null 2>&1 && "$cmd" "$flag" >/dev/null 2>&1
+}
+
+# ==============================================================================
 # WSL Functions
 # ==============================================================================
 
@@ -363,10 +423,13 @@ run_installer() {
         return 1
     fi
 
+    local args=()
+    [[ "${FORCE_REINSTALL:-false}" == "true" ]] && args+=(--force)
+
     if [[ "$critical" == "true" ]]; then
-        "$script" || { error "$name installation failed"; exit 1; }
+        "$script" "${args[@]+"${args[@]}"}" || { error "$name installation failed"; exit 1; }
     else
-        "$script" || warn "$name installation failed"
+        "$script" "${args[@]+"${args[@]}"}" || warn "$name installation failed"
     fi
 }
 
@@ -428,9 +491,9 @@ install_dev_packages() {
     run_installer "neovim"
     run_installer "lazygit"
 
-    # Install Claude Code CLI
+    # Install Claude Code CLI (non-critical — depends on external service)
     log "Installing Claude Code..."
-    run_installer "claude-code" true
+    run_installer "claude-code"
 
     success "Dev tier installation complete"
 }

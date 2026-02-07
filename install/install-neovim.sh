@@ -1,93 +1,70 @@
 #!/bin/bash
-
-# Install latest stable Neovim from GitHub releases
+# Install Neovim from GitHub releases
+# glibc >= 2.32: latest release
+# glibc <  2.32: v0.10.4 (last version compatible with glibc 2.31)
 
 set -euo pipefail
 
-# Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
+
+# Last release that works on glibc 2.31 (Ubuntu 20.04)
+FALLBACK_VERSION="0.10.4"
+MIN_GLIBC="2.32"
 
 log "Installing Neovim..."
 
-# Check if neovim is already installed and get version
-if command -v nvim >/dev/null 2>&1; then
-    CURRENT_VERSION=$(nvim --version | head -n1 | awk '{print $2}' | sed 's/^v//')
-    log "Neovim $CURRENT_VERSION is already installed"
+# Determine which version to install
+GLIBC_VERSION=$(get_glibc_version)
+if version_gte "$GLIBC_VERSION" "$MIN_GLIBC"; then
+    VERSION=$(github_latest_version "neovim/neovim" --strip-v)
+    log "glibc $GLIBC_VERSION >= $MIN_GLIBC — installing latest (v$VERSION)"
+else
+    VERSION="$FALLBACK_VERSION"
+    log "glibc $GLIBC_VERSION < $MIN_GLIBC — installing v$VERSION (glibc 2.31 compatible)"
+fi
 
-    # Check for latest stable version
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/neovim/neovim/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-
-    if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
-        success "Already up to date!"
+# Check existing installation
+if [[ "$FORCE" != true ]] && verify_binary nvim; then
+    CURRENT=$(nvim --version 2>/dev/null | head -n1 | awk '{print $2}' | sed 's/^v//')
+    if [[ "$CURRENT" == "$VERSION" ]]; then
+        success "Neovim v$VERSION already installed"
         exit 0
-    else
-        log "Latest version available: $LATEST_VERSION"
-        log "Updating Neovim..."
     fi
+    log "Neovim v$CURRENT installed, updating to v$VERSION..."
+elif command -v nvim >/dev/null 2>&1; then
+    warn "Existing nvim binary is broken — reinstalling"
 fi
 
-# Get latest stable release version
-log "Fetching latest Neovim release..."
-LATEST_VERSION=$(curl -s https://api.github.com/repos/neovim/neovim/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-
-if [[ -z "$LATEST_VERSION" ]]; then
-    error "Failed to fetch latest version"
-    exit 1
-fi
-
-log "Latest stable version: $LATEST_VERSION"
-
-# Create temporary directory
+# Download and install
+ARCH=$(get_arch)
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
-# Download the latest prebuilt tarball (official method from GitHub releases)
-DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${LATEST_VERSION}/nvim-linux-x86_64.tar.gz"
-log "Downloading Neovim v${LATEST_VERSION}..."
-curl -LO "$DOWNLOAD_URL"
+TARBALL="nvim-linux-${ARCH}.tar.gz"
+DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${VERSION}/${TARBALL}"
 
-# Verify download succeeded
-if [[ ! -f "nvim-linux-x86_64.tar.gz" ]]; then
-    error "Download failed"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
+log "Downloading Neovim v${VERSION}..."
+curl -Lo "$TARBALL" "$DOWNLOAD_URL"
 
-# Remove old installation if it exists (user-local)
-if [[ -d "$HOME/.local/nvim" ]]; then
-    log "Removing old Neovim installation..."
-    rm -rf "$HOME/.local/nvim"
-fi
+# Remove old installation
+rm -rf "$HOME/.local/nvim"
+rm -f "$HOME/.local/bin/nvim"
+mkdir -p "$HOME/.local/bin" "$HOME/.local"
 
-# Also clean up legacy system-wide installation if present
-if [[ -d "/opt/nvim-linux-x86_64" ]]; then
-    log "Found legacy system-wide Neovim in /opt, skipping removal (may need manual cleanup)"
-fi
-
-# Extract to ~/.local/nvim
-log "Extracting Neovim to ~/.local/nvim..."
-mkdir -p "$HOME/.local"
-tar -C "$HOME/.local" -xzf nvim-linux-x86_64.tar.gz
-mv "$HOME/.local/nvim-linux-x86_64" "$HOME/.local/nvim"
-
-# Create symlink to ~/.local/bin
-log "Creating symlink in ~/.local/bin..."
-mkdir -p "$HOME/.local/bin"
+log "Extracting to ~/.local/nvim..."
+tar -C "$HOME/.local" -xzf "$TARBALL"
+mv "$HOME/.local/nvim-linux-${ARCH}" "$HOME/.local/nvim"
 ln -sf "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
 
-# Cleanup
-cd -
-rm -rf "$TEMP_DIR"
-
-# Verify installation
-if command -v nvim >/dev/null 2>&1; then
-    success "Neovim installed successfully!"
-    nvim --version | head -n 1
+# Verify
+if "$HOME/.local/bin/nvim" --version >/dev/null 2>&1; then
+    success "Neovim v$VERSION installed successfully!"
+    "$HOME/.local/bin/nvim" --version | head -n1
 else
-    error "Neovim installation failed"
+    error "Neovim installation failed — binary does not run"
     exit 1
 fi
-
-success "Neovim installation complete!"
-log "Run 'nvim' to start Neovim"
