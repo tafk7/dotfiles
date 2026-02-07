@@ -4,63 +4,47 @@
 
 set -euo pipefail
 
-# Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing lazygit (Terminal UI for git)..."
 
-# Initialize version variable
-LAZYGIT_VERSION=""
-
-# Check if lazygit is already installed and compare versions
-if command -v lazygit >/dev/null 2>&1; then
-    CURRENT_VERSION=$(lazygit --version | grep -oP 'version=\K[^,]+' || echo "0.0.0")
-    log "Checking for updates..."
-    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-    
-    if [[ "$CURRENT_VERSION" == "$LAZYGIT_VERSION" ]]; then
-        log "lazygit is already installed and up to date (v$CURRENT_VERSION)"
-        exit 0
-    else
-        log "lazygit v$CURRENT_VERSION is installed, but v$LAZYGIT_VERSION is available"
-        log "Updating to latest version..."
-    fi
-else
-    # Not installed, fetch latest version
-    log "Fetching latest lazygit release..."
-    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-fi
-
-if [[ -z "$LAZYGIT_VERSION" ]]; then
-    error "Could not determine latest lazygit version"
-    exit 1
-fi
-
+LAZYGIT_VERSION=$(github_latest_version "jesseduffield/lazygit" --strip-v)
 log "Latest version: v${LAZYGIT_VERSION}"
 
-# Download to temp directory
+# Check existing installation
+if [[ "$FORCE" != true ]] && verify_binary lazygit; then
+    CURRENT=$(lazygit --version | grep -oP 'version=\K[^,]+' || echo "0.0.0")
+    if [[ "$CURRENT" == "$LAZYGIT_VERSION" ]]; then
+        log "lazygit v$CURRENT already installed and up to date"
+        exit 0
+    fi
+    log "lazygit v$CURRENT installed, updating to v$LAZYGIT_VERSION..."
+elif command -v lazygit >/dev/null 2>&1; then
+    warn "Existing lazygit binary is broken — reinstalling"
+fi
+
+ARCH=$(get_arch)
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
-# Download the binary
-log "Downloading lazygit..."
-curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+# lazygit uses "x86_64" for amd64, "arm64" for aarch64
+DOWNLOAD_ARCH="$ARCH"
+[[ "$ARCH" == "aarch64" ]] && DOWNLOAD_ARCH="arm64"
 
-# Extract
+log "Downloading lazygit v${LAZYGIT_VERSION}..."
+curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${DOWNLOAD_ARCH}.tar.gz"
+
 tar xf lazygit.tar.gz lazygit
 
-# Install to ~/.local/bin
-log "Installing lazygit to ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"
 install lazygit -D -t "$HOME/.local/bin/"
 
-# Cleanup
-cd -
-rm -rf "$TEMP_DIR"
-
-# Verify installation
-if command -v lazygit >/dev/null 2>&1; then
-    success "lazygit installation complete!"
+if verify_binary lazygit; then
+    success "lazygit installed successfully!"
     lazygit --version
 else
     error "lazygit installation failed"

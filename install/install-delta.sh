@@ -4,48 +4,39 @@
 
 set -euo pipefail
 
-# Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing git-delta (syntax-highlighted diffs)..."
 
-# Check if delta is already installed
-if command -v delta >/dev/null 2>&1; then
+# Check existing installation
+if [[ "$FORCE" != true ]] && verify_binary delta; then
     log "delta is already installed"
     delta --version
     exit 0
+elif command -v delta >/dev/null 2>&1; then
+    warn "Existing delta binary is broken — reinstalling"
 fi
 
-# Create temp directory
+ARCH=$(get_arch)
+# delta tags have NO v prefix
+DELTA_VERSION=$(github_latest_version "dandavison/delta")
+log "Latest version: ${DELTA_VERSION}"
+
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
-# Get latest version from GitHub (tags have NO v prefix)
-log "Fetching latest delta release..."
-DELTA_VERSION=$(curl -s "https://api.github.com/repos/dandavison/delta/releases/latest" | grep -Po '"tag_name": "\K[^"]*')
-
-if [[ -z "$DELTA_VERSION" ]]; then
-    error "Could not determine latest delta version"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# Download binary
 log "Downloading delta ${DELTA_VERSION}..."
-curl -Lo delta.tar.gz "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+curl -Lo delta.tar.gz "https://github.com/dandavison/delta/releases/download/${DELTA_VERSION}/delta-${DELTA_VERSION}-${ARCH}-unknown-linux-gnu.tar.gz"
 
-# Extract and install to user-local bin directory
 tar xf delta.tar.gz
 mkdir -p "$HOME/.local/bin"
-install -D "./delta-${DELTA_VERSION}-x86_64-unknown-linux-gnu/delta" "$HOME/.local/bin/delta"
+install -D "./delta-${DELTA_VERSION}-${ARCH}-unknown-linux-gnu/delta" "$HOME/.local/bin/delta"
 
-# Cleanup
-cd -
-rm -rf "$TEMP_DIR"
-
-# Verify installation
-if command -v delta >/dev/null 2>&1; then
+if verify_binary delta; then
     success "delta installed successfully!"
     delta --version
 else

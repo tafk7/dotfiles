@@ -4,85 +4,48 @@
 
 set -euo pipefail
 
-# Source common functions
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing zoxide (smart directory jumper)..."
 
-# Check if zoxide is already installed and get version
-if command -v zoxide >/dev/null 2>&1; then
+# Check existing installation
+if [[ "$FORCE" != true ]] && verify_binary zoxide; then
     CURRENT_VERSION=$(zoxide --version | awk '{print $2}')
-    log "zoxide $CURRENT_VERSION is already installed"
-
-    # Check for latest version
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/ajeetdsouza/zoxide/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+    LATEST_VERSION=$(github_latest_version "ajeetdsouza/zoxide" --strip-v)
 
     if [[ "$CURRENT_VERSION" == "$LATEST_VERSION" ]]; then
-        success "Already up to date!"
+        success "zoxide v$CURRENT_VERSION already up to date!"
         exit 0
-    else
-        log "Latest version available: $LATEST_VERSION"
-        log "Updating zoxide..."
     fi
+    log "zoxide v$CURRENT_VERSION installed, updating to v$LATEST_VERSION..."
+elif command -v zoxide >/dev/null 2>&1; then
+    warn "Existing zoxide binary is broken — reinstalling"
 fi
 
-# Create temp directory
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
-# Download installer
 log "Downloading zoxide installer..."
 curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh -o install.sh
 
-# Verify we got a script (enhanced validation)
-if [[ ! -s install.sh ]]; then
-    error "Downloaded installer is empty"
-    cd -
-    rm -rf "$TEMP_DIR"
+if [[ ! -s install.sh ]] || ! grep -q "zoxide" install.sh; then
+    error "Downloaded installer is invalid"
     exit 1
 fi
 
-# Check file size (installer should be at least 1KB)
-INSTALLER_SIZE=$(stat -c%s install.sh 2>/dev/null || stat -f%z install.sh 2>/dev/null)
-if [[ $INSTALLER_SIZE -lt 1024 ]]; then
-    error "Downloaded installer is too small ($INSTALLER_SIZE bytes)"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# Verify content
-if ! grep -q "zoxide" install.sh; then
-    error "Downloaded installer does not appear to be for zoxide"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# Ensure user-local bin directory exists
 mkdir -p "$HOME/.local/bin"
 
-# Run installer with explicit ~/.local/bin directory (no sudo needed)
 log "Running zoxide installer (installing to ~/.local/bin)..."
 chmod +x install.sh
+./install.sh --bin-dir="$HOME/.local/bin"
 
-# Install to ~/.local/bin for user-local access
-if ! ./install.sh --bin-dir="$HOME/.local/bin"; then
-    error "Installer failed"
-    cd -
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# Cleanup
-cd -
-rm -rf "$TEMP_DIR"
-
-# Verify installation
-if command -v zoxide >/dev/null 2>&1; then
+if verify_binary zoxide; then
     success "zoxide installed successfully!"
     zoxide --version
-    log "Add 'eval \"\$(zoxide init zsh)\"' to your .zshrc to enable"
 else
     error "zoxide installation failed"
     exit 1

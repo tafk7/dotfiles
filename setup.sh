@@ -18,6 +18,7 @@ DOTFILES_DIR="$SCRIPT_DIR"
 INSTALL_TIER="config"  # Default tier: config, shell, dev, full
 INSTALL_PERSONAL=false
 FORCE_OVERWRITE=false
+FORCE_REINSTALL=false
 SHOW_HELP=false
 DRY_RUN=false
 
@@ -65,6 +66,7 @@ parse_arguments() {
                 ;;
             --force)
                 FORCE_OVERWRITE=true
+                FORCE_REINSTALL=true
                 shift
                 ;;
             --dry-run)
@@ -120,7 +122,7 @@ MODIFIERS:
     --personal          Add media tools (ffmpeg, yt-dlp) to any tier
 
 OPTIONS:
-    --force             Force overwrite existing configs
+    --force             Force overwrite configs and reinstall tools
     --dry-run           Preview actions without making changes
     --help              Show this help message
 
