@@ -115,8 +115,12 @@ elif command -v fdfind >/dev/null 2>&1; then
     export FZF_ALT_C_COMMAND='fdfind --type d --hidden --follow --exclude .git'
 fi
 
-# Ctrl-T: File preview with syntax highlighting
-if command -v bat >/dev/null 2>&1; then
+# Ctrl-T: File preview — glow for Markdown, bat for everything else
+if command -v glow >/dev/null 2>&1 && command -v bat >/dev/null 2>&1; then
+    export FZF_CTRL_T_OPTS="
+        --preview '[[ {} == *.md ]] && glow -s dark --width \$FZF_PREVIEW_COLUMNS {} || bat --style=numbers --color=always --line-range :500 {}'
+        --bind 'ctrl-p:toggle-preview'"
+elif command -v bat >/dev/null 2>&1; then
     export FZF_CTRL_T_OPTS="
         --preview 'bat --style=numbers --color=always --line-range :500 {}'
         --bind 'ctrl-p:toggle-preview'"
