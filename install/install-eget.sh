@@ -36,7 +36,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
 log "Downloading eget v${EGET_VERSION}..."
-curl -Lo eget.tar.gz "https://github.com/zyedidia/eget/releases/download/v${EGET_VERSION}/eget-${EGET_VERSION}-linux_${EGET_ARCH}.tar.gz"
+curl -fLSso eget.tar.gz "https://github.com/zyedidia/eget/releases/download/v${EGET_VERSION}/eget-${EGET_VERSION}-linux_${EGET_ARCH}.tar.gz"
 
 tar xf eget.tar.gz
 mkdir -p "$HOME/.local/bin"
