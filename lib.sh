@@ -430,13 +430,14 @@ process_git_config() {
 # Package definitions using associative array
 declare -A PACKAGES=(
     [core]="git build-essential"
-    [development]="zsh direnv"
+    [development]="zsh direnv bison libevent-dev libncurses-dev"
     [modern]="bat fd-find ripgrep"
     [terminal]="htop tree"
     [languages]="python3-pip"
     [wsl]="socat wslu"
     [docker]="docker.io docker-compose-v2"
     [personal]="ffmpeg yt-dlp"
+    [diagramming]="default-jre graphviz"
 )
 
 # Simple package installation - trust apt
@@ -622,20 +623,34 @@ install_shell_packages() {
     success "Shell tier installation complete"
 }
 
-# Dev tier: development tools (neovim, tmux)
+# Dev tier: development tools (neovim, tmux, plantuml + graphviz)
 # Note: lazygit is installed via eget in shell tier
 install_dev_packages() {
     log "Installing dev tier packages..."
 
-    # Install tmux via APT if not present
-    if ! command -v tmux >/dev/null 2>&1; then
-        log "Installing tmux..."
-        safe_sudo apt-get install -y tmux || warn "tmux installation failed"
+    # APT packages for dev tier (java runtime, graphviz for diagramming)
+    local dev_apt="${PACKAGES[diagramming]}"
+    local missing=()
+    for pkg in $dev_apt; do
+        dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        log "All dev tier APT packages already installed"
+    else
+        update_packages
+        log "Installing dev tier APT packages: ${missing[*]}"
+        if safe_sudo apt-get install -y "${missing[@]}" 2>&1 | grep -v '^W:' || true; then
+            success "Dev tier APT packages installed"
+        else
+            warn "Some dev tier packages failed to install"
+        fi
     fi
 
-    # Neovim has its own installer (glibc version logic, full directory extraction)
     log "Installing dev tier tools via scripts..."
+    run_installer "tmux"
     run_installer "neovim"
+    run_installer "plantuml"
 
     success "Dev tier installation complete"
 }

@@ -16,3 +16,8 @@ export THEME_YELLOW_R=216 THEME_YELLOW_G=166 THEME_YELLOW_B=87  # yellow #d8a657
 export THEME_GREEN_R=169 THEME_GREEN_G=182 THEME_GREEN_B=101    # green #a9b665
 export THEME_BLUE_R=125 THEME_BLUE_G=174 THEME_BLUE_B=163      # aqua #7daea3
 export THEME_PURPLE_R=211 THEME_PURPLE_G=134 THEME_PURPLE_B=155 # purple #d3869b
+
+# Pane tint backgrounds (gruvbox-material medium bg progression)
+export THEME_TINT_1='#1B1B1B'  # bg_dim
+export THEME_TINT_2='#32302F'  # bg1
+export THEME_TINT_3='#45403D'  # bg3

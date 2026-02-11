@@ -83,6 +83,57 @@ fkill() {
     fi
 }
 
+# Find and kill process listening on a port
+killport() {
+    if [[ -z "$1" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+        echo "Usage: killport [-f|--force] <port>"
+        echo "Find and kill the process listening on a given port."
+        echo "Shows process details and asks for confirmation unless --force is used."
+        return 1
+    fi
+
+    local force=false
+    local port
+    for arg in "$@"; do
+        case "$arg" in
+            -f|--force) force=true ;;
+            *) port="$arg" ;;
+        esac
+    done
+
+    if [[ ! "$port" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
+        echo "Error: invalid port number '$port'"
+        return 1
+    fi
+
+    local pid
+    pid=$(lsof -i :"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)
+
+    if [[ -z "$pid" ]]; then
+        echo "No process listening on port $port"
+        return 1
+    fi
+
+    local details
+    details=$(ps -p "$pid" -o pid=,user=,comm=,args= 2>/dev/null)
+    echo "Port $port is held by:"
+    echo "  PID:  $pid"
+    echo "  $details"
+
+    if $force; then
+        kill -9 "$pid"
+        echo "Killed PID $pid"
+    else
+        read -rp "Kill this process? [y/N] " answer
+        if [[ "$answer" =~ ^[Yy]$ ]]; then
+            kill -9 "$pid"
+            echo "Killed PID $pid"
+        else
+            echo "Aborted"
+        fi
+    fi
+}
+
 # ==============================================================================
 # Archive & File Functions
 # ==============================================================================
@@ -249,6 +300,61 @@ alias fgb='fzf-git-branch'   # FZF git branch switcher
 alias fgl='fzf-git-log'      # FZF git log browser
 alias frg='fzf-rg'           # FZF ripgrep search (rg is ripgrep itself)
 alias fp='fzf-project'       # FZF project finder
+
+# ==============================================================================
+# Tmux Pane Tinting
+# ==============================================================================
+
+# Apply a curated background variant to the current tmux pane. Each theme
+# defines three tint levels (THEME_TINT_1/2/3) — surface colors from the
+# theme's own palette, chosen to be visually distinct without hurting
+# readability.
+pane-tint() {
+    if [[ -z "${TMUX:-}" ]]; then
+        echo "Not in a tmux session"
+        return 1
+    fi
+
+    local level="${1:-}"
+
+    if [[ -z "$level" ]]; then
+        echo "Usage: pane-tint <0|1|2|3>"
+        return 0
+    fi
+
+    if [[ "$level" == "reset" || "$level" == "0" ]]; then
+        tmux select-pane -P 'default'
+        return 0
+    fi
+
+    # THEME_TINT_* variables are in the environment from the shell theme
+    # loader. Fall back to sourcing colors.sh directly if missing.
+    if [[ -z "${THEME_TINT_1:-}" ]]; then
+        local theme_name="${DOTFILES_THEME:-gruvbox}"
+        local dotfiles_dir="${DOTFILES_DIR:-$HOME/devdisk/dotfiles}"
+        local colors_file="$dotfiles_dir/configs/themes/$theme_name/colors.sh"
+
+        if [[ ! -f "$colors_file" ]]; then
+            echo "Theme colors not found: $colors_file"
+            return 1
+        fi
+        source "$colors_file"
+    fi
+
+    local hex
+    case "$level" in
+        1) hex="$THEME_TINT_1" ;;
+        2) hex="$THEME_TINT_2" ;;
+        3) hex="$THEME_TINT_3" ;;
+        *)
+            echo "Unknown level: $level"
+            echo "Available: 0, 1, 2, 3"
+            return 1
+            ;;
+    esac
+
+    tmux select-pane -P "bg=$hex"
+}
 
 # ==============================================================================
 # Python & Poetry Management Functions

@@ -16,3 +16,8 @@ export THEME_YELLOW_R=224 THEME_YELLOW_G=175 THEME_YELLOW_B=104 # yellow #e0af68
 export THEME_GREEN_R=158 THEME_GREEN_G=206 THEME_GREEN_B=106   # green #9ece6a
 export THEME_CYAN_R=125 THEME_CYAN_G=207 THEME_CYAN_B=255     # cyan #7dcfff
 export THEME_MAGENTA_R=187 THEME_MAGENTA_G=154 THEME_MAGENTA_B=247 # magenta #bb9af7
+
+# Pane tint backgrounds (night surface progression)
+export THEME_TINT_1='#16161E'  # bg_dark
+export THEME_TINT_2='#292E42'  # bg_highlight
+export THEME_TINT_3='#414868'  # terminal_black
