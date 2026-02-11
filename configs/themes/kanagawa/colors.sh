@@ -17,3 +17,8 @@ export THEME_GREEN_R=152 THEME_GREEN_G=187 THEME_GREEN_B=108   # springGreen #98
 export THEME_TEAL_R=126 THEME_TEAL_G=188 THEME_TEAL_B=182     # waveAqua1 #7fbbb3
 export THEME_BLUE_R=126 THEME_BLUE_G=156 THEME_BLUE_B=216     # oniViolet #7e9cd8
 export THEME_PURPLE_R=149 THEME_PURPLE_G=127 THEME_PURPLE_B=184 # crystalBlue #957fb8
+
+# Pane tint backgrounds (sumiInk progression)
+export THEME_TINT_1='#16161D'  # sumiInk0
+export THEME_TINT_2='#2A2A37'  # sumiInk4
+export THEME_TINT_3='#363646'  # sumiInk5

@@ -112,6 +112,11 @@ alias cl='claude'                # New session
 alias clc='claude --continue'    # Continue last session
 alias clp='claude --print'       # One-off command (non-interactive)
 
+# Claude local-only (no global settings)
+alias cll='claude --setting-sources project,local'
+alias cllc='claude --setting-sources project,local --continue'
+alias cllp='claude --setting-sources project,local --print'
+
 # direnv shortcuts
 if command -v direnv >/dev/null 2>&1; then
     alias da='direnv allow'

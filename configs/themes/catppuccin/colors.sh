@@ -17,3 +17,8 @@ export THEME_GREEN_R=166 THEME_GREEN_G=227 THEME_GREEN_B=161   # green #a6e3a1
 export THEME_TEAL_R=148 THEME_TEAL_G=226 THEME_TEAL_B=213     # teal #94e2d5
 export THEME_SKY_R=137 THEME_SKY_G=220 THEME_SKY_B=235       # sky #89dceb
 export THEME_LAVENDER_R=180 THEME_LAVENDER_G=190 THEME_LAVENDER_B=254 # lavender #b4befe
+
+# Pane tint backgrounds (mocha surface progression)
+export THEME_TINT_1='#181825'  # mantle
+export THEME_TINT_2='#313244'  # surface0
+export THEME_TINT_3='#45475A'  # surface1

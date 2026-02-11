@@ -230,8 +230,8 @@ phase_install_packages() {
         # Dev tier packages
         if tier_includes "dev"; then
             log "  Dev tier packages:"
-            log "    - APT: tmux (if not present)"
-            log "    - Scripts: neovim, Claude Code"
+            log "    - APT: default-jre, graphviz"
+            log "    - Scripts: tmux (from source), neovim, plantuml"
         fi
 
         # Full tier packages
@@ -326,9 +326,21 @@ phase_setup_configs() {
         import_windows_ssh_keys
     fi
 
+    # Initialize theme if no theme is currently set
+    if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
+            log "[DRY RUN] Would initialize default theme (gruvbox)"
+        fi
+    else
+        if [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
+            log "Initializing default theme..."
+            "$DOTFILES_DIR/bin/theme-switcher" gruvbox
+        fi
+    fi
+
     # Write install-time environment to ~/.config/dotfiles/env
     write_dotfiles_env
-    
+
     # Cleanup
     cleanup_old_backups 10
 
@@ -448,7 +460,7 @@ run_installation() {
         ((step++))
     fi
 
-    echo "$step. Optionally switch theme:"
+    echo "$step. Switch theme (default: gruvbox):"
     echo "   ./bin/theme-switcher"
 
     echo

@@ -31,182 +31,248 @@ git│gstp│Apply and remove most recent stash│git stash pop
 git│lg│Launch interactive terminal UI for git│lazygit
 git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 
-# Tmux shortcuts
-tmux│Ctrl+a |│Split current pane horizontally (top/bottom)│prefix + |
-tmux│Ctrl+a -│Split current pane vertically (left/right)│prefix + -
-tmux│Ctrl+a x│Close current pane│prefix + x
-tmux│Ctrl+a X│Close current window and all panes│prefix + X
-tmux│Ctrl+a c│Create new window│prefix + c
-tmux│Ctrl+a 1-9│Switch to window by number (1-9)│prefix + number
-tmux│Ctrl+a n│Switch to next window│prefix + n
-tmux│Ctrl+a p│Switch to previous window│prefix + p
-tmux│Ctrl+a d│Detach from current session│prefix + d
-tmux│Ctrl+a s│Show session list for switching│prefix + s
-tmux│Ctrl+a $│Rename current session│prefix + $
-tmux│Ctrl+a (│Switch to previous session│prefix + (
-tmux│Ctrl+a )│Switch to next session│prefix + )
-tmux│Ctrl+a r│Reload tmux configuration file│prefix + r
-tmux│Ctrl+a ?│Display all tmux keybindings│prefix + ?
-tmux│tmux-minimal│Switch to minimal tmux config (no plugins)│$DOTFILES_DIR/bin/tmux-config-switcher minimal
-tmux│tmux-full│Switch to full tmux config (TPM + plugins)│$DOTFILES_DIR/bin/tmux-config-switcher full
-tmux│tmux-mode│Show current tmux configuration mode│$DOTFILES_DIR/bin/tmux-config-switcher
-tmux│Alt+E│Move focus to pane above (no prefix)│Alt+E (no prefix needed)
-tmux│Alt+S│Move focus to pane on left (no prefix)│Alt+S (no prefix needed)
-tmux│Alt+D│Move focus to pane below (no prefix)│Alt+D (no prefix needed)
-tmux│Alt+F│Move focus to pane on right (no prefix)│Alt+F (no prefix needed)
-tmux│Alt+1-9│Switch to window by number (no prefix)│Alt+number (no prefix needed)
-tmux│Ctrl+a E│Resize pane upward by 5 lines│prefix + E (5 lines)
-tmux│Ctrl+a S│Resize pane leftward by 5 lines│prefix + S (5 lines)
-tmux│Ctrl+a D│Resize pane downward by 5 lines│prefix + D (5 lines)
-tmux│Ctrl+a F│Resize pane rightward by 5 lines│prefix + F (5 lines)
+# Tmux shortcuts (prefix is Ctrl+a)
+# No-prefix bindings (instant, left-hand optimized)
+tmux│Alt+Shift+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
+tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
+tmux│Alt+Shift+Q│Toggle back to last active window│last-window
+tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
+tmux│Alt+Shift+A│Zoom pane toggle│resize-pane -Z
+tmux│Alt+Shift+T│New window (inherits current path)│new-window -c #{pane_current_path}
+tmux│Alt+Shift+X│Kill pane (with confirmation)│confirm-before kill-pane
+tmux│Alt+Shift+G│Toggle synchronized input to all panes│setw synchronize-panes
+# Prefix — Panes
+tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
+tmux│Ctrl+a Shift+↑↓←→│Resize pane 5 lines in direction (repeatable)│resize-pane -U/-D/-L/-R 5
+tmux│Ctrl+a a│Zoom pane toggle│resize-pane -Z
+tmux│Ctrl+a q│Show pane numbers (3s) — type number to jump│display-panes -d 3000
+tmux│Ctrl+a Space│Next pane layout│next-layout
+tmux│Ctrl+a Ctrl+Space│Previous pane layout│previous-layout
+tmux│Ctrl+a j│Pull a pane from another window into this one│join-pane -s
+tmux│Ctrl+a g│Toggle synchronized input to all panes│setw synchronize-panes
+# Prefix — Splits
+tmux│Ctrl+a \│Split side-by-side (vertical divider)│split-window -h
+tmux│Ctrl+a b│Split side-by-side (left-hand alternative)│split-window -h
+tmux│Ctrl+a -│Split top/bottom (horizontal divider)│split-window -v
+# Prefix — Windows
+tmux│Ctrl+a t│New window (inherits current path)│new-window -c #{pane_current_path}
+tmux│Ctrl+a w│Window picker tree view│choose-tree -Zw
+tmux│Ctrl+a x│Kill window and all its panes│kill-window
+tmux│Ctrl+a c│Rename current window│command-prompt rename-window
+# Prefix — Sessions
+tmux│Ctrl+a C│Create new session│new-session
+tmux│Ctrl+a s│Session chooser tree view│choose-tree -Zs
+tmux│Ctrl+a d│Detach (session keeps running in background)│detach-client
+tmux│Ctrl+a e/E│Next/previous session│switch-client -n/-p
+tmux│Ctrl+a $│Rename current session│command-prompt rename-session
+# Copy mode (vi keys)
+tmux│Ctrl+a v│Enter copy mode (scroll/select)│copy-mode
+tmux│v / V / Ctrl+v│Begin char/line/block selection (in copy mode)│begin-selection / select-line / rectangle-toggle
+tmux│y│Yank selection to system clipboard (in copy mode)│copy-pipe-and-cancel xclip -sel clipboard
+tmux│Ctrl+a p│Paste from tmux buffer│paste-buffer
+tmux│Ctrl+a P│Paste from system clipboard│xclip -o -sel clipboard | tmux load-buffer - ; tmux paste-buffer
+# Utility
+tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
+tmux│Ctrl+a Ctrl+l│Clear screen and scrollback history│send-keys C-l; clear-history
+tmux│Ctrl+a ?│List all keybindings│list-keys
+tmux│tmux-minimal│Switch to minimal config (no plugins)│tmux-config-switcher minimal
+tmux│tmux-full│Switch to full config (TPM + plugins)│tmux-config-switcher full
 
-# Vim shortcuts
-vim│Ctrl+P│Fuzzy search and open files│Ctrl+P
-vim│,f│Open file browser sidebar│leader + f
-vim│,b│Show list of open buffers│leader + b
-vim│,g│Search text across project│leader + g
-vim│Space│Clear search highlighting│Space
-vim│jk│Exit insert mode and return to normal mode│jk
-vim│,gs│Show git status in split│leader + gs
-vim│,gd│Show git diff in split│leader + gd
-vim│,gb│Show git blame for current line│leader + gb
-vim│,hn│Jump to next git change (hunk)│leader + hn
-vim│,hs│Stage git hunk under cursor│leader + hs
-vim│,hu│Undo git hunk under cursor│leader + hu
-vim│,af│Auto-fix linting issues in file│leader + af
-vim│,an│Jump to next linting error│leader + an
-vim│,ap│Jump to previous linting error│leader + ap
-vim│,/│Toggle comment on current line/selection│leader + /
-vim│,n│Toggle relative line numbers│leader + n
-vim│,ss│Remove trailing whitespace from file│leader + ss
-vim│Ctrl+E│Move to split window above│Ctrl+E
-vim│Ctrl+S│Move to split window on left│Ctrl+S
-vim│Ctrl+D│Move to split window below│Ctrl+D
-vim│Ctrl+F│Move to split window on right│Ctrl+F
-vim│cs"'│Change surrounding " to '│cs"' (change " to ')
-vim│ds"│Delete surrounding quotes│ds"
-vim│ysiw"│Add quotes around current word│ysiw"
-vim│gc│Comment out motion/selection│gc + motion
-vim│,w│Save file (force write)│leader + w
-vim│,Q│Quit all windows and buffers│leader + Q
-vim│:w│Save current file│:w
-vim│:q│Quit current window│:q
-vim│,q│Quit current window│leader + q
-vim│u│Undo last change│u
-vim│.│Repeat last edit command│.
+# Vim shortcuts (leader is comma)
+# File navigation (FZF)
+vim│Ctrl+P│Fuzzy find files│:Files
+vim│,f│Fuzzy find files (same as Ctrl+P)│:Files
+vim│,b│Fuzzy switch open buffers│:Buffers
+vim│,g│Ripgrep search across project│:Rg
+# Git integration (Fugitive + GitGutter)
+vim│,gs│Open git status split│:Git
+vim│,gd│Open side-by-side diff of current file│:Gdiffsplit
+vim│,gc│Open git commit editor│:Git commit
+vim│,gb│Show git blame annotations│:Git blame
+vim│,hn│Jump to next git hunk│:GitGutterNextHunk
+vim│,hp│Jump to previous git hunk│:GitGutterPrevHunk
+vim│,hs│Stage git hunk under cursor│:GitGutterStageHunk
+vim│,hu│Undo git hunk under cursor│:GitGutterUndoHunk
+# Editing
+vim│jk│Exit insert mode│imap jk <Esc>
+vim│,/│Toggle comment on line/selection│:Commentary
+vim│gc│Comment out motion (e.g. gcap for paragraph)│gc{motion}
+vim│,w│Force-save file│:w!
+vim│,q│Close current window│:q
+vim│,Q│Quit all windows│:qa!
+vim│,n│Toggle line numbers on/off│:call ToggleNumber()
+vim│,ss│Strip trailing whitespace from file│:call StripTrailingWhitespace()
+vim│Space│Clear search highlighting│:nohlsearch
+# Surround (vim-surround)
+vim│cs"'│Change surrounding " to '│cs{old}{new}
+vim│ds"│Delete surrounding quotes│ds{char}
+vim│ysiw"│Wrap word in quotes│ysiw{char}
+# Split navigation (matches tmux ESDF)
+vim│Ctrl+E│Move to split above│<C-w>k
+vim│Ctrl+S│Move to split left│<C-w>h
+vim│Ctrl+D│Move to split below│<C-w>j
+vim│Ctrl+F│Move to split right│<C-w>l
+# ALE (linting)
+vim│,af│Auto-fix linting issues│:ALEFix
+vim│,an│Jump to next lint error│:ALENext
 
 # Shell shortcuts
-shell│..│Change to parent directory│cd ..
-shell│...│Go up two directory levels│cd ../..
+# Navigation
+shell│..│Go up one directory│cd ..
+shell│...│Go up two directories│cd ../..
 shell│-│Return to previous directory│cd -
-shell│ls│List directory with colors (standard)│ls --color=auto
-shell│ll│Long listing with eza enhancements│eza -l --color=auto --group-directories-first
-shell│la│List all files including hidden (eza)│eza -la --color=auto --group-directories-first
-shell│l│Compact column listing (eza)│eza -CF --color=auto --group-directories-first
-shell│tree│Display directory tree structure│eza --tree --color=auto
-shell│bat│View file with syntax highlighting│batcat
-shell│view│View file with syntax highlighting│batcat
-shell│md│Render Markdown (TUI if interactive, print if piped)│md README.md
-shell│glow│Terminal Markdown renderer│glow README.md
-shell│df│Show disk space usage (human readable)│df -h
-shell│du│Show directory size (human readable)│du -h
-shell│free│Show memory usage (human readable)│free -h
-shell│ports│List all open network ports│netstat -tulanp
-shell│myip│Show your public IP address│curl ifconfig.me
-shell│localip│Show your local network IP│hostname -I
+shell│cdl│cd and list directory contents│cdl <dir>
+shell│mkcd│Create directory and cd into it│mkcd <dir>
+# Listing (eza when available, otherwise ls)
+shell│ls│List with colors│ls --color=auto
+shell│ll│Long listing with timestamps│eza -l --color=auto --group-directories-first --time-style=long-iso
+shell│la│Long listing including hidden files│eza -la --color=auto --group-directories-first --time-style=long-iso
+shell│l│Compact column listing│eza -CF --color=auto --group-directories-first
+shell│tree│Recursive directory tree│eza --tree --color=auto --group-directories-first
+# File viewing
+shell│bat│Syntax-highlighted file viewer│batcat
+shell│view│Same as bat│batcat
+shell│md│Render Markdown in terminal│glow (TUI if interactive, print if piped)
+# System info
+shell│df│Disk space (human readable)│df -h
+shell│du│Directory size (human readable)│du -h
+shell│du1│Directory size one level deep│du -h --max-depth=1
+shell│free│Memory usage (human readable)│free -h
+shell│top│System monitor (btop)│btop
+shell│ports│List open network ports│netstat -tulanp
+shell│myip│Show public IP address│curl ifconfig.me
+shell│localip│Show local network IP│hostname -I
+shell│psg│Search running processes by name│ps aux | grep
+shell│fkill│Fuzzy-find and kill a process│FZF process selector + kill
+shell│killport│Kill process on a port (--force to skip confirm)│killport <port>
+# Archive
+shell│extract│Extract any archive format (.tar.gz, .zip, etc.)│extract <file>
+# Tmux session management
 shell│tm│Create new named tmux session│tmux new -s
 shell│ta│Attach to existing tmux session│tmux attach -t
 shell│tl│List all tmux sessions│tmux list-sessions
 shell│tk│Kill specific tmux session│tmux kill-session -t
+# History
 shell│h│Show command history│history
 shell│hgrep│Search command history│history | grep
-shell│ducks│Show largest directories and files in current dir│du -cks * | sort -rn | head
-shell│reload│Reload shell configuration│source ~/.zshrc or ~/.bashrc
-shell│themes│List available color themes│ls configs/themes/
-shell│theme-switch│Launch interactive theme selector│$DOTFILES_DIR/bin/theme-switcher
-shell│fr│Find and replace text across files│$DOTFILES_DIR/bin/fr
-shell│cheat│Show this interactive cheatsheet│$DOTFILES_DIR/bin/cheatsheet
+shell│ducks│Show largest items in current directory│du -cks * | sort -rn | head
+# Configuration
+shell│reload│Reload shell configuration│source ~/.bashrc
+shell│themes│List available themes and show usage│ls $DOTFILES_DIR/configs/themes/
+shell│theme-switch│Interactive theme selector (FZF)│theme-switcher
+shell│pane-tint│Tint current tmux pane background│pane-tint <0|1|2|3>
+shell│vim-minimal│Switch to minimal vim config (no plugins)│vim-config-switcher minimal
+shell│vim-full│Switch to full vim config│vim-config-switcher full
+shell│vim-status│Show current vim config mode│vim-status
+shell│vimrc│Edit neovim config│nvim ~/.config/nvim/init.vim
+shell│vplug│Install vim plugins│nvim +PlugInstall +qall
+shell│vplugup│Update vim plugins│nvim +PlugUpdate +qall
+# FZF tools
+shell│fgb│Fuzzy search and checkout git branch│fzf-git-branch
+shell│fgl│Fuzzy search git log│FZF git log browser
+shell│frg│Fuzzy search file contents│FZF + ripgrep
+shell│fp│Fuzzy search and open project directory│FZF project finder
+# Other tools
+shell│fr│Find and replace text across files│fr
+shell│cheat│Show this interactive cheatsheet│cheatsheet
 shell│da│Allow direnv in current directory│direnv allow
-shell│de│Edit .envrc file in current directory│${EDITOR:-nvim} .envrc
-shell│top│Launch btop system monitor│btop
-shell│cl│Start new Claude AI session│claude
+shell│de│Edit .envrc for current directory│${EDITOR:-nvim} .envrc
+shell│show_path│Show PATH entries one per line│show_path
+# Claude
+shell│cl│Start new Claude session│claude
 shell│clc│Continue previous Claude session│claude --continue
-shell│clp│Run one-off Claude command│claude --print
-shell│fgb│Fuzzy search and switch git branches│FZF git branch selector
-shell│fgl│Fuzzy search git commit history│FZF git log browser
-shell│frg│Fuzzy search file contents with ripgrep│FZF + ripgrep content search
-shell│fp│Fuzzy search and open project directories│FZF project directory finder
+shell│clp│Run one-off Claude prompt│claude --print
+shell│cll│Claude local (no global settings)│claude --setting-sources project,local
+shell│cllc│Continue Claude local session│claude --setting-sources project,local --continue
+shell│cllp│One-off Claude local prompt│claude --setting-sources project,local --print
 
 # Docker shortcuts
-docker│dps│List currently running containers│docker ps
-docker│dpsa│List all containers (running and stopped)│docker ps -a
-docker│dexec│Execute command in running container│docker exec -it
-docker│dlogs│Stream container logs in real-time│docker logs -f
-docker│dstop│Stop running container│docker stop
-docker│drm│Remove stopped container│docker rm
-docker│di│List all Docker images│docker images
-docker│dpull│Download image from registry│docker pull
-docker│dbuild│Build image from Dockerfile with tag│docker build -t
-docker│dc│Run Docker Compose command│docker compose
-docker│dcu│Start all services in background│docker compose up -d
-docker│dcd│Stop and remove all containers│docker compose down
-docker│dcl│Stream logs from all services│docker compose logs -f
+docker│dps│List running containers│docker ps
+docker│dpsa│List all containers (including stopped)│docker ps -a
+docker│dexec│Exec into a running container│docker exec -it
+docker│dlogs│Tail container logs│docker logs -f
+docker│dstop│Stop a container│docker stop
+docker│drm│Remove a stopped container│docker rm
+docker│di│List images│docker images
+docker│dpull│Pull image from registry│docker pull
+docker│dbuild│Build image with tag│docker build -t
+docker│dc│Run docker compose command│docker compose
+docker│dcu│Start services in background│docker compose up -d
+docker│dcd│Stop and remove containers│docker compose down
+docker│dcl│Tail logs from all services│docker compose logs -f
 docker│dprune│Remove unused containers and images│docker system prune
 docker│dprunea│Remove all unused Docker resources│docker system prune -a
-docker│denter│Open interactive bash shell in container│docker exec -it <container> /bin/bash
-docker│dstopall│Stop all running containers at once│docker stop $(docker ps -q)
+docker│denter│Open bash shell in container│docker exec -it <container> /bin/bash
+docker│dstopall│Stop all running containers│docker stop $(docker ps -q)
 
-# Python shortcuts (pyenv + Poetry/pip workflow)
-python│pyset│Set Python version for project (Poetry or pip)│pyset <version> (e.g., pyset 3.11.9)
-python│vactivate│Activate virtual environment manually (or use direnv)│vactivate
-python│pyinfo│Show current Python environment information│pyinfo
+# Python shortcuts
+python│py│Python 3 interpreter│python3
+python│ipy│IPython interpreter│ipython
+python│pyset│Set Python version for project (configures pyenv + venv)│pyset <version>
+python│vactivate│Activate virtual environment│vactivate
+python│pyinfo│Show current Python environment│pyinfo
 python│pylist│List installed and available Python versions│pylist
-python│pyenv install│Install new Python version│pyenv install <version>
+python│pyenv install│Install a Python version│pyenv install <version>
 python│pyenv versions│List installed Python versions│pyenv versions
-python│pyenv local│Set Python version for current directory│pyenv local <version>
-python│pyenv global│Set default Python version system-wide│pyenv global <version>
-python│poetry install│Install Poetry project dependencies│poetry install
-python│poetry add│Add package to Poetry project│poetry add <package>
-python│poetry env info│Show Poetry environment details│poetry env info
-python│pip install -e│Install package in editable mode (setuptools)│pip install -e .
-python│py│Run Python 3 interpreter│python3
-python│pytest│Run test suite with pytest│python -m pytest
-python│pyt│Run pytest with verbose output│python -m pytest -v
-python│venv│Create virtual environment (uv if available)│uv venv / python3 -m venv .venv
-python│uvs│Sync project dependencies with uv│uv sync
+python│pyenv local│Pin Python version for current directory│pyenv local <version>
+python│pyenv global│Set default Python version│pyenv global <version>
+# Testing and code quality
+python│pytest│Run tests│python -m pytest
+python│pyt│Run tests with verbose output│python -m pytest -v
+python│fmt│Format code with black│black .
+python│lint│Check code with ruff│ruff check .
+python│lintf│Auto-fix ruff issues│ruff check . --fix
+# Virtual environments
+python│venv│Create .venv (uses uv if available)│uv venv .venv / python3 -m venv .venv
+python│pipreqs│Install from requirements.txt│pip install -r requirements.txt
+python│pyserver│Start HTTP server in current directory│python -m http.server
+# Poetry
+python│poetry install│Install project dependencies│poetry install
+python│poetry add│Add package to project│poetry add <package>
+python│poetry env info│Show environment details│poetry env info
+python│pip install -e│Install package in editable/dev mode│pip install -e .
+# uv shortcuts
+python│uvs│Sync project dependencies│uv sync
 python│uvr│Run command in project environment│uv run <command>
-python│uvt│Install Python CLI tool globally│uv tool install <tool>
+python│uvt│Install CLI tool globally│uv tool install <tool>
 python│uva│Add dependency to project│uv add <package>
 python│uvpi│Install package with uv pip│uv pip install <package>
 
 # Node.js shortcuts
-node│ni│Install dependencies from package.json│npm install
-node│nr│Run npm script from package.json│npm run
-node│nrd│Run development script│npm run dev
-node│nrb│Run build script│npm run build
-node│nrt│Run test script│npm run test
-node│nrs│Run start script│npm run start
+node│ni│Install dependencies│npm install
+node│nr│Run npm script│npm run
+node│nrd│Run dev server│npm run dev
+node│nrb│Run build│npm run build
+node│nrt│Run tests│npm run test
+node│nrs│Run start│npm run start
+node│nrm│Delete node_modules and lockfile│rm -rf node_modules package-lock.json
+node│nclean│Clean reinstall (delete + install)│nrm && npm install
 
 # VS Code shortcuts
 vscode│c│Open VS Code in current directory│code .
-vscode│cdot│Open dotfiles directory in VS Code│code $DOTFILES_DIR
-vscode│cproj│Fuzzy search and open project in VS Code│FZF project finder + open in VSCode
-vscode│cf│Fuzzy search and open file in VS Code│FZF file finder + open in VSCode
-vscode│cdiff│Compare two files side-by-side│code --diff file1 file2
+vscode│cdot│Open dotfiles in VS Code│code $DOTFILES_DIR
+vscode│cproj│Fuzzy search and open project in VS Code│FZF project finder + code
+vscode│cf│Fuzzy search and open file in VS Code│FZF file finder + code
+vscode│cdiff│Diff two files side-by-side│code --diff file1 file2
 
 # WSL shortcuts
-wsl│cdwin│Navigate to Windows home directory│cd $WIN_HOME
-wsl│cddesk│Navigate to Windows desktop│cd $WIN_DESKTOP
-wsl│cddl│Navigate to Windows downloads folder│cd $WIN_DOWNLOADS
-wsl│cddocs│Navigate to Windows documents folder│cd $WIN_DOCUMENTS
-wsl│notepad│Open Windows Notepad│notepad.exe
-wsl│clip│Access Windows clipboard│clip.exe
-wsl│pwsh│Launch PowerShell│powershell.exe
+wsl│cdwin│Go to Windows home directory│cd $WIN_HOME
+wsl│cddesk│Go to Windows desktop│cd $WIN_DESKTOP
+wsl│cddl│Go to Windows downloads│cd $WIN_DOWNLOADS
+wsl│cddocs│Go to Windows documents│cd $WIN_DOCUMENTS
+wsl│notepad│Open Notepad│notepad.exe
+wsl│clip│Pipe to Windows clipboard│clip.exe
+wsl│pwsh│Launch PowerShell (7 if installed, otherwise 5)│pwsh.exe / powershell.exe
 wsl│cmd│Launch Windows Command Prompt│cmd.exe
-wsl│explorer│Open Windows File Explorer│explorer.exe
-wsl│open│Open Windows File Explorer (alias)│explorer.exe
-wsl│cwd│Copy current directory path to clipboard│pwd | clip.exe
-wsl│wcd│Copy Windows path to clipboard│wslpath -w $(pwd) | clip.exe
+wsl│explorer│Open Explorer (defaults to current directory)│explorer.exe "${1:-.}"
+wsl│open│Same as explorer│explorer
+wsl│winget│Windows package manager│winget.exe
+wsl│cwd│Copy current path to clipboard│pwd | clip.exe
+wsl│wcd│Copy Windows-format path to clipboard│wslpath -w $(pwd) | clip.exe
 wsl│wpath│Convert Linux path to Windows format│wslpath -w
 wsl│lpath│Convert Windows path to Linux format│wslpath -u
 wsl│sync-ssh│Import SSH keys from Windows│import_windows_ssh_keys
+
+# Diagramming shortcuts
+diagramming│plantuml│Generate diagrams from text (UML, sequence, etc.)│plantuml <file.puml>
+diagramming│dot│Render Graphviz DOT graph to image│dot -Tpng input.dot -o output.png
