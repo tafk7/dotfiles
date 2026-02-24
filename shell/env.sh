@@ -11,7 +11,7 @@ fi
 # Tool Initialization
 # ==============================================================================
 
-# Node Version Manager
+# Node Version Manager (NVM_DIR also set in profile for non-interactive contexts)
 export NVM_DIR="$HOME/.nvm"
 
 # pyenv
@@ -122,13 +122,9 @@ if command -v wslpath >/dev/null 2>&1; then
             tr '\n' ':' | sed 's/:$//')
     fi
 
-    # Windows username — set at install time by setup.sh, fallback to cmd.exe
-    if [[ -z "$WIN_USER" ]]; then
-        WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
-        if [[ -z "$WIN_USER" ]] || [[ "$WIN_USER" == "SYSTEM" ]]; then
-            WIN_USER="$USER"
-        fi
-    fi
+    # WIN_USER is set at install time by setup.sh → write_dotfiles_env()
+    # If missing, fall back to Linux username (run setup.sh to resolve properly)
+    : ${WIN_USER:="$USER"}
 
     # Windows paths (derived from WIN_USER)
     export WIN_HOME="/mnt/c/Users/$WIN_USER"

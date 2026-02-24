@@ -135,12 +135,19 @@ verify_binary() {
 # WSL Functions
 # ==============================================================================
 
-# Check if running on WSL
+# Check if running on WSL (cached after first call)
 is_wsl() {
-    [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || \
-    [[ -n "${WSL_DISTRO_NAME:-}" ]] || \
-    grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null || \
-    grep -qiE "(microsoft|wsl)" /proc/sys/kernel/osrelease 2>/dev/null
+    if [[ -z "${_IS_WSL+x}" ]]; then
+        if [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]] || \
+           [[ -n "${WSL_DISTRO_NAME:-}" ]] || \
+           grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null || \
+           grep -qiE "(microsoft|wsl)" /proc/sys/kernel/osrelease 2>/dev/null; then
+            _IS_WSL=1
+        else
+            _IS_WSL=0
+        fi
+    fi
+    [[ "$_IS_WSL" -eq 1 ]]
 }
 
 # Get Windows username for WSL operations
@@ -247,20 +254,6 @@ create_backup_dir() {
     echo "$backup_dir"
 }
 
-# Backup a single file
-backup_file() {
-    local file="$1"
-    if [[ -f "$file" ]]; then
-        # Ensure .backups directory exists
-        mkdir -p "$DOTFILES_BACKUP_PREFIX"
-
-        local filename=$(basename "$file")
-        local backup="$DOTFILES_BACKUP_PREFIX/${filename}.backup-$(date +%Y%m%d-%H%M%S)"
-        cp "$file" "$backup"
-        log "Backed up: $file -> $backup"
-    fi
-}
-
 # Create symlink with backup
 safe_symlink() {
     local source="$1"
@@ -339,8 +332,8 @@ safe_sudo() {
 # Detect Ubuntu version and WSL
 detect_environment() {
     if ! command -v lsb_release >/dev/null 2>&1; then
-        error "This script requires Ubuntu. lsb_release not found."
-        exit 1
+        warn "lsb_release not found — skipping environment detection"
+        return 0
     fi
 
     local ubuntu_version=$(lsb_release -rs)
@@ -348,11 +341,8 @@ detect_environment() {
 
     log "Detected Ubuntu $ubuntu_version ($ubuntu_codename)"
 
-    # Check if running on WSL
     if is_wsl; then
         wsl_log "Running on Windows Subsystem for Linux"
-        local win_user=$(get_windows_username)
-        wsl_log "Windows username: $win_user"
     fi
 }
 
@@ -440,25 +430,33 @@ declare -A PACKAGES=(
     [diagramming]="default-jre graphviz"
 )
 
-# Simple package installation - trust apt
-install_package_set() {
-    local set_name="$1"
-    local packages="${PACKAGES[$set_name]}"
+# Install APT packages, skipping already-installed ones
+install_apt() {
+    local label="$1"
+    shift
+    local packages=("$@")
 
-    if [[ -z "$packages" ]]; then
-        error "Unknown package set: $set_name"
-        return 1
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would install $label APT packages: ${packages[*]}"
+        return 0
     fi
 
-    log "Installing $set_name packages..."
-    # shellcheck disable=SC2086
-    if safe_sudo apt-get install -y $packages; then
-        success "$set_name packages installed"
+    local missing=()
+    for pkg in "${packages[@]}"; do
+        dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        log "All $label APT packages already installed"
         return 0
+    fi
+
+    update_packages
+    log "Installing $label APT packages: ${missing[*]}"
+    if safe_sudo apt-get install -y "${missing[@]}"; then
+        success "$label APT packages installed"
     else
-        # Some packages might fail, that's OK
-        warn "Some $set_name packages failed to install"
-        return 0
+        warn "Some $label packages failed to install"
     fi
 }
 
@@ -468,25 +466,6 @@ update_packages() {
     safe_sudo apt-get update 2>&1 | grep -v '^W:' || true
 }
 
-# Get package list for dry-run display
-get_tier_packages() {
-    local tier="$1"
-    local packages=""
-
-    case "$tier" in
-        shell)
-            packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
-            if is_wsl; then
-                packages="$packages ${PACKAGES[wsl]}"
-            fi
-            ;;
-        personal)
-            packages="${PACKAGES[personal]}"
-            ;;
-    esac
-
-    echo "$packages"
-}
 
 # ==============================================================================
 # Tiered Installation Functions
@@ -580,34 +559,12 @@ install_eget_tools() {
 install_shell_packages() {
     log "Installing shell tier packages..."
 
-    # APT packages for shell tier
-    local shell_packages="${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]}"
+    local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]})
+    is_wsl && packages+=(${PACKAGES[wsl]})
 
-    # Add WSL packages if on WSL
-    if is_wsl; then
-        shell_packages="$shell_packages ${PACKAGES[wsl]}"
-    fi
+    install_apt "shell" "${packages[@]}"
 
-    # Only run apt if something is actually missing
-    local missing=()
-    for pkg in $shell_packages; do
-        dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
-    done
-
-    if [[ ${#missing[@]} -eq 0 ]]; then
-        log "All APT packages already installed"
-    else
-        update_packages
-        log "Installing shell tier APT packages: ${missing[*]}"
-        # shellcheck disable=SC2086
-        if safe_sudo apt-get install -y "${missing[@]}" 2>&1 | grep -v '^W:' || true; then
-            success "Shell tier APT packages installed"
-        else
-            warn "Some shell tier packages failed to install"
-        fi
-    fi
-
-    # Create command aliases for renamed packages (user-local symlinks)
+    # bat/fd symlinks for Ubuntu renames
     if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
         mkdir -p "$HOME/.local/bin"
         ln -sf "$(which batcat)" "$HOME/.local/bin/bat"
@@ -628,24 +585,7 @@ install_shell_packages() {
 install_dev_packages() {
     log "Installing dev tier packages..."
 
-    # APT packages for dev tier (java runtime, graphviz for diagramming)
-    local dev_apt="${PACKAGES[diagramming]}"
-    local missing=()
-    for pkg in $dev_apt; do
-        dpkg -s "$pkg" &>/dev/null || missing+=("$pkg")
-    done
-
-    if [[ ${#missing[@]} -eq 0 ]]; then
-        log "All dev tier APT packages already installed"
-    else
-        update_packages
-        log "Installing dev tier APT packages: ${missing[*]}"
-        if safe_sudo apt-get install -y "${missing[@]}" 2>&1 | grep -v '^W:' || true; then
-            success "Dev tier APT packages installed"
-        else
-            warn "Some dev tier packages failed to install"
-        fi
-    fi
+    install_apt "dev" ${PACKAGES[diagramming]}
 
     log "Installing dev tier tools via scripts..."
     run_installer "tmux"
@@ -660,67 +600,40 @@ install_dev_packages() {
 install_full_packages() {
     log "Installing full tier packages..."
 
-    # Azure CLI and Python dev tools
-    install_work_packages
+    # Azure CLI
+    if ! command -v az >/dev/null 2>&1; then
+        log "Installing Azure CLI..."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log "[DRY RUN] Would install Azure CLI"
+        else
+            curl -sL https://aka.ms/InstallAzureCLIDeb | safe_sudo bash
+        fi
+    else
+        log "Azure CLI already installed"
+    fi
 
-    # Docker
-    install_docker
+    # Python dev tools + Docker
+    install_apt "full" python3-dev python3-venv ${PACKAGES[docker]}
 
-    # Install NVM and Node.js
-    log "Installing NVM..."
+    # Docker group
+    if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
+        log "Adding $USER to docker group..."
+        safe_sudo usermod -aG docker "$USER"
+        success "Added to docker group (restart shell to activate)"
+    fi
+
+    # Version managers
     run_installer "nvm" true
-
-    # Install pyenv for Python version management
-    log "Installing pyenv..."
     run_installer "pyenv" true
-
-    # Install Poetry (Python dependency manager)
-    log "Installing Poetry..."
     run_installer "poetry"
 
     success "Full tier installation complete"
 }
 
-# Install work packages (Azure CLI, Python tools, etc.)
-install_work_packages() {
-    log "Installing work tools..."
-
-    # Azure CLI
-    if ! command -v az >/dev/null 2>&1; then
-        log "Installing Azure CLI..."
-        curl -sL https://aka.ms/InstallAzureCLIDeb | safe_sudo bash
-    else
-        log "Azure CLI already installed"
-    fi
-
-    # Python development tools (system-level only)
-    log "Installing Python development tools..."
-    safe_sudo apt-get install -y python3-dev python3-venv
-
-    success "Work tools installed"
-}
-
-# Install personal packages
+# Install personal packages (claude-code lives here — work systems use the VS Code extension)
 install_personal_packages() {
-    install_package_set "personal"
+    install_apt "personal" ${PACKAGES[personal]}
     run_installer "claude-code"
-}
-
-# Install Docker
-install_docker() {
-    if command -v docker >/dev/null 2>&1; then
-        log "Docker already installed"
-        return 0
-    fi
-
-    install_package_set "docker"
-
-    # Add user to docker group
-    if ! groups | grep -q docker; then
-        log "Adding $USER to docker group..."
-        safe_sudo usermod -aG docker "$USER"
-        success "Added to docker group (restart shell to activate)"
-    fi
 }
 
 # Note: Functions are available when this file is sourced

@@ -152,3 +152,4 @@ done
 
 [[ -f ~/.shell.local ]] && source ~/.shell.local
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion

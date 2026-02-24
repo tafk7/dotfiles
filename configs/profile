@@ -19,6 +19,22 @@ if [ -d "/usr/local/bin" ] ; then
     PATH="/usr/local/bin:$PATH"
 fi
 
+# Version managers — lightweight PATH-only, no eval/sourcing
+# Full init (completions, switching) lives in env.sh via bashrc/zshrc.
+# This ensures non-interactive processes (VS Code extensions, cron, etc.)
+# find the user-managed binaries instead of falling back to system ones.
+
+# NVM default node (stable symlink created by install-nvm.sh)
+export NVM_DIR="$HOME/.nvm"
+if [ -d "$NVM_DIR/default/bin" ]; then
+    PATH="$NVM_DIR/default/bin:$PATH"
+fi
+
+# pyenv
+if [ -d "$HOME/.pyenv/bin" ]; then
+    PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
+fi
+
 # Locale
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
