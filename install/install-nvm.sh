@@ -83,15 +83,17 @@ if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
         warn "npm update failed, using version $(npm --version)"
     fi
 
+    # Create stable symlink so ~/.profile can add nvm's node to PATH
+    # without sourcing nvm.sh (needed for non-interactive contexts like VS Code)
+    default_version=$(node --version)
+    if [[ -d "$NVM_DIR/versions/node/$default_version" ]]; then
+        ln -sfn "$NVM_DIR/versions/node/$default_version" "$NVM_DIR/default"
+        success "Symlinked $NVM_DIR/default → $default_version"
+    fi
+
     log "NVM will be automatically loaded in new shell sessions"
     log "To use in current session: source ~/.bashrc (or ~/.zshrc)"
 else
     error "Node.js installation via NVM failed"
     exit 1
-fi
-
-# Clean up any old npm global directory if it exists
-if [[ -d "$HOME/.npm-global" ]] && [[ -z "$(ls -A "$HOME/.npm-global" 2>/dev/null)" ]]; then
-    log "Removing empty legacy .npm-global directory..."
-    rm -rf "$HOME/.npm-global"
 fi

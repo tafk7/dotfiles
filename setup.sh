@@ -35,8 +35,8 @@ declare -A CONFIG_MAP=(
     [editorconfig]="$HOME/.editorconfig:symlink"
     [ripgreprc]="$HOME/.ripgreprc:symlink"
     [init.vim]="$HOME/.config/nvim/init.vim:symlink"
-    [config/bat]="$HOME/.config/bat:directory"
-    [config/fd]="$HOME/.config/fd:directory"
+    [config/bat]="$HOME/.config/bat:symlink"
+    [config/fd]="$HOME/.config/fd:symlink"
     [ssh_config]="$HOME/.ssh/config:symlink"
     [starship.toml]="$HOME/.config/starship.toml:symlink"
     
@@ -48,7 +48,7 @@ declare -A CONFIG_MAP=(
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --config|--sync)
+            --config)
                 INSTALL_TIER="config"
                 shift
                 ;;
@@ -60,7 +60,7 @@ parse_arguments() {
                 INSTALL_TIER="dev"
                 shift
                 ;;
-            --full|--work)
+            --full)
                 INSTALL_TIER="full"
                 shift
                 ;;
@@ -110,7 +110,7 @@ USAGE:
     ./setup.sh [TIER] [OPTIONS]
 
 TIERS (cumulative - each tier includes all previous tiers):
-    --config, --sync    Symlinks only. Zero installs. No sudo required.
+    --config            Symlinks only. Zero installs. No sudo required.
                         Creates symlinks for all configuration files.
 
     --shell             Config + modern CLI tools. Requires sudo.
@@ -121,7 +121,7 @@ TIERS (cumulative - each tier includes all previous tiers):
     --dev               Shell + development tools. Requires sudo.
                         Adds: neovim, tmux, Claude Code
 
-    --full, --work      Dev + full environment. Requires sudo.
+    --full              Dev + full environment. Requires sudo.
                         Adds: NVM, pyenv, poetry, Docker, Azure CLI
 
 MODIFIERS:
@@ -139,7 +139,6 @@ EXAMPLES:
     ./setup.sh --dev                 # Full development setup
     ./setup.sh --full                # Complete work environment
     ./setup.sh --full --personal     # Everything including media tools
-    ./setup.sh --work                # Alias for --full (backwards compatible)
     ./setup.sh --shell --dry-run     # Preview shell tier installation
 
 TIER SUMMARY:
@@ -211,58 +210,22 @@ phase_verify_system() {
 phase_install_packages() {
     log "Phase 2: Package Installation"
 
-    # Skip entirely for config tier
     if ! tier_includes "shell"; then
         log "Config tier: skipping package installation"
-        success "Package installation skipped (config tier)"
         return 0
     fi
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would install packages for tier: $INSTALL_TIER"
+    install_shell_packages
 
-        # Shell tier packages
-        log "  Shell tier packages:"
-        local shell_apt=$(get_tier_packages "shell")
-        log "    - APT: $shell_apt"
-        log "    - eget: starship, eza, fzf, zoxide, delta, btop, glow, lazygit, uv"
-
-        # Dev tier packages
-        if tier_includes "dev"; then
-            log "  Dev tier packages:"
-            log "    - APT: default-jre, graphviz"
-            log "    - Scripts: tmux (from source), neovim, plantuml"
-        fi
-
-        # Full tier packages
-        if tier_includes "full"; then
-            log "  Full tier packages:"
-            log "    - APT: Azure CLI, python3-dev, python3-venv, docker.io, docker-compose-v2"
-            log "    - Scripts: NVM, pyenv, poetry"
-        fi
-
-        # Personal packages
-        if [[ "$INSTALL_PERSONAL" == "true" ]]; then
-            local personal_apt=$(get_tier_packages "personal")
-            log "  Personal: $personal_apt"
-        fi
-    else
-        # Shell tier: modern CLI tools
-        install_shell_packages
-
-        # Dev tier: development tools
-        if tier_includes "dev"; then
-            install_dev_packages
-        fi
-
-        # Full tier: complete environment
-        if tier_includes "full"; then
-            install_full_packages
-        fi
-
-        # Personal packages (any tier)
-        [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
+    if tier_includes "dev"; then
+        install_dev_packages
     fi
+
+    if tier_includes "full"; then
+        install_full_packages
+    fi
+
+    [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
 
     success "Package installation complete"
 }
@@ -307,9 +270,6 @@ phase_setup_configs() {
                 symlink)
                     process_symlink "$source" "$target" "$backup_dir"
                     ;;
-                directory)
-                    process_directory "$source" "$target" "$backup_dir"
-                    ;;
                 template)
                     process_template "$source" "$target" "$backup_dir"
                     ;;
@@ -326,16 +286,13 @@ phase_setup_configs() {
         import_windows_ssh_keys
     fi
 
-    # Initialize theme if no theme is currently set
+    # Initialize default theme if none is set (theme-switcher owns the default)
     if [[ "$DRY_RUN" == "true" ]]; then
         if [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
-            log "[DRY RUN] Would initialize default theme (gruvbox)"
+            log "[DRY RUN] Would initialize default theme"
         fi
     else
-        if [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
-            log "Initializing default theme..."
-            "$DOTFILES_DIR/bin/theme-switcher" gruvbox
-        fi
+        "$DOTFILES_DIR/bin/theme-switcher" --init
     fi
 
     # Write install-time environment to ~/.config/dotfiles/env
@@ -370,12 +327,6 @@ process_symlink() {
     fi
     
     safe_symlink "$source" "$target" "$backup_dir"
-}
-
-# Process directory configuration
-process_directory() {
-    local source="$1" target="$2" backup_dir="$3"
-    process_symlink "$source" "$target" "$backup_dir"
 }
 
 # Process template configuration

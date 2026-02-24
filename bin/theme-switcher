@@ -308,6 +308,7 @@ OPTIONS:
     --current, -c       Show current theme
     --preview, -p       Preview theme without applying
     --revert, -r        Revert to previous theme
+    --init              Apply default theme if none is set (used by setup.sh)
     --help, -h          Show this help message
 
 THEMES:
@@ -328,6 +329,13 @@ EOF
 
 main() {
     case "${1:-}" in
+        --init)
+            # Apply default theme if none is set (used by setup.sh)
+            if [[ ! -f "$THEME_FILE" ]]; then
+                log "Initializing default theme: $DEFAULT_THEME"
+                apply_theme "$DEFAULT_THEME"
+            fi
+            ;;
         --list|-l)
             list_themes
             ;;

@@ -4,16 +4,21 @@
 _claude_resolve_bin() {
     # VS Code extension (WSL or remote SSH)
     local vscode_bin
-    vscode_bin=$(ls -d ~/.vscode-server/extensions/anthropic.claude-code-*-linux-x64/resources/native-binary/claude 2>/dev/null | sort -V | tail -1)
-    if [[ -n "$vscode_bin" && -x "$vscode_bin" ]]; then
+    local vscode_root="$HOME/.vscode-server/extensions"
+    if [[ -d "$vscode_root" ]]; then
+        vscode_bin=$(find "$vscode_root" \
+            -path "*/anthropic.claude-code-*-linux-x64/resources/native-binary/claude" \
+            -type f -perm -111 2>/dev/null | sort -V | tail -1)
+    fi
+    if [[ -n "$vscode_bin" ]]; then
         echo "$vscode_bin"
         return
     fi
 
     # Standalone CLI on PATH
     local standalone
-    standalone=$(command -v claude 2>/dev/null)
-    if [[ -n "$standalone" ]]; then
+    standalone=$(type -P claude 2>/dev/null)
+    if [[ -n "$standalone" && -x "$standalone" ]]; then
         echo "$standalone"
         return
     fi
