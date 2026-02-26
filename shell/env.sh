@@ -49,6 +49,14 @@ if command -v poetry >/dev/null 2>&1; then
     fi
 fi
 
+# Nix (multi-user Determinate Systems install)
+NIX_PROFILE="/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+if [[ -f "$NIX_PROFILE" ]] && ! command -v nix >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    . "$NIX_PROFILE"
+fi
+unset NIX_PROFILE
+
 # ==============================================================================
 # Tool-Specific PATH Extensions
 # ==============================================================================
