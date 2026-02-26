@@ -98,9 +98,6 @@ alias theme-switch='$DOTFILES_DIR/bin/theme-switcher'
 # Dynamic theme listing from configs/themes directory
 alias themes='ls -1 "$DOTFILES_DIR/configs/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
 
-# Dotfiles management
-alias update-claude-commands='$DOTFILES_DIR/bin/update-claude'
-
 # Find and replace utility
 alias fr='$DOTFILES_DIR/bin/fr'
 

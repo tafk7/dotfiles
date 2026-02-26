@@ -4,17 +4,20 @@
 # PATH baseline — ~/.profile handles this for login shells, but VS Code and other
 # terminals launch bash as non-login (skipping ~/.profile). Profile has a source
 # guard so this is safe in both login and non-login shells.
-[[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+# _BASHRC_LOADED prevents double-sourcing when profile sources bashrc back.
+if [[ -z "$_BASHRC_LOADED" ]]; then
+    [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+fi
+_BASHRC_LOADED=1
 
 # Load install-time environment (written by setup.sh)
 [[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
 
 # Fallback: derive DOTFILES_DIR from symlink if env file is missing
-if [[ -z "$DOTFILES_DIR" ]]; then
+if [[ -z "${DOTFILES_DIR:-}" ]]; then
     DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
     export DOTFILES_DIR
 fi
-: ${DOTFILES_DIR:="$HOME/dotfiles"}
 
 # ==============================================================================
 # Core Shell Settings
@@ -52,8 +55,9 @@ HISTCONTROL=ignoreboth:erasedups
 HISTTIMEFORMAT="%F %T "
 HISTIGNORE=""
 
-# Real-time history sharing
-PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+# Real-time history sharing (idempotent — safe on reload)
+[[ "$PROMPT_COMMAND" != *"history -a"* ]] && \
+    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 
 # ==============================================================================
 # Load Shared Environment
@@ -62,11 +66,11 @@ PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 # Tool initialization (version managers, EDITOR, tool-specific settings, WSL env)
 [[ -f "$DOTFILES_DIR/shell/env.sh" ]] && source "$DOTFILES_DIR/shell/env.sh"
 
-# FZF configuration (commands, preview options)
-[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
-
-# Theme (prompt colors, FZF color scheme)
+# Theme (prompt colors, FZF color scheme — must load before fzf.sh to merge colors)
 [[ -f "$HOME/.config/dotfiles/theme.sh" ]] && source "$HOME/.config/dotfiles/theme.sh"
+
+# FZF configuration (commands, preview options, merges theme colors)
+[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
 
 # ==============================================================================
 # FZF Key Bindings (bash-specific)
@@ -125,7 +129,8 @@ set_prompt() {
     PS1+=" ${prompt_symbol} "
 }
 
-PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
+[[ "$PROMPT_COMMAND" != *"set_prompt"* ]] && \
+    PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
 
 # ==============================================================================
 # NVM

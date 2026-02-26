@@ -31,21 +31,17 @@ if command -v direnv >/dev/null 2>&1; then
     fi
 fi
 
-# uv completion
+# uv completion (bash only — zsh completions loaded after compinit in zshrc)
 if command -v uv >/dev/null 2>&1; then
     if [[ -n "${BASH_VERSION:-}" ]]; then
         eval "$(uv generate-shell-completion bash 2>/dev/null || true)"
-    elif [[ -n "${ZSH_VERSION:-}" ]]; then
-        eval "$(uv generate-shell-completion zsh 2>/dev/null || true)"
     fi
 fi
 
-# poetry completion
+# poetry completion (bash only — zsh completions loaded after compinit in zshrc)
 if command -v poetry >/dev/null 2>&1; then
     if [[ -n "${BASH_VERSION:-}" ]]; then
         eval "$(poetry completions bash 2>/dev/null || true)"
-    elif [[ -n "${ZSH_VERSION:-}" ]]; then
-        eval "$(poetry completions zsh 2>/dev/null || true)"
     fi
 fi
 
@@ -117,7 +113,15 @@ export PROJECTS_DIR="$HOME/projects"
 # ==============================================================================
 
 if command -v wslpath >/dev/null 2>&1; then
-    export DISPLAY=:0
+    # DISPLAY: don't override if already set (WSLg sets this automatically)
+    if [[ -z "${DISPLAY:-}" ]]; then
+        # WSL2 needs the Windows host IP; WSL1 uses :0
+        if [[ -f /etc/resolv.conf ]] && grep -q "nameserver.*172\." /etc/resolv.conf 2>/dev/null; then
+            export DISPLAY="$(awk '/nameserver/{print $2; exit}' /etc/resolv.conf):0"
+        else
+            export DISPLAY=:0
+        fi
+    fi
     export LIBGL_ALWAYS_INDIRECT=1
     export BROWSER="wslview"
     export WSLENV="USERPROFILE/pu:APPDATA/pu"

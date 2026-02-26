@@ -1,6 +1,11 @@
 #!/bin/bash
 # Installation verification - checks for real issues and installation status
 
+# Derive DOTFILES_DIR if not set (when run directly as ./bin/check-setup)
+if [[ -z "${DOTFILES_DIR:-}" ]]; then
+    DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+fi
+
 echo "=== Dotfiles Setup Verification ==="
 echo
 

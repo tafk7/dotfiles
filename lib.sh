@@ -277,8 +277,8 @@ safe_symlink() {
     elif [[ -L "$target" ]]; then
         # Back up the file the symlink points to (if it still exists)
         local link_target
-        link_target="$(readlink -f "$target")"
-        if [[ -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
+        link_target="$(readlink -f "$target" 2>/dev/null || true)"
+        if [[ -n "$link_target" && -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
             log "Backing up symlink target $target -> $link_target"
             cp "$link_target" "$backup_dir/$(basename "$target")"
         fi
@@ -402,12 +402,12 @@ process_git_config() {
         rm "$target"
     fi
 
-    # Process template with sed (escape special characters)
+    # Process template with sed (use | delimiter to avoid issues with / in values)
     git_name_escaped=$(printf '%s\n' "$git_name" | sed 's/[[\.*^$()+?{|]/\\&/g')
     git_email_escaped=$(printf '%s\n' "$git_email" | sed 's/[[\.*^$()+?{|]/\\&/g')
 
-    sed -e "s/{{GIT_NAME}}/$git_name_escaped/g" \
-        -e "s/{{GIT_EMAIL}}/$git_email_escaped/g" \
+    sed -e "s|{{GIT_NAME}}|$git_name_escaped|g" \
+        -e "s|{{GIT_EMAIL}}|$git_email_escaped|g" \
         "$source" > "$target"
 
     success "Git config created: $target"
@@ -420,12 +420,12 @@ process_git_config() {
 # Package definitions using associative array
 declare -A PACKAGES=(
     [core]="git build-essential"
-    [development]="zsh direnv bison libevent-dev libncurses-dev"
+    [development]="zsh direnv bison libevent-dev libncurses-dev xclip"
     [modern]="bat fd-find ripgrep"
     [terminal]="htop tree"
     [languages]="python3-pip"
     [wsl]="socat wslu"
-    [docker]="docker.io docker-compose-v2"
+    [docker]="docker-ce docker-ce-cli containerd.io docker-compose-plugin"
     [personal]="ffmpeg yt-dlp"
     [diagramming]="default-jre graphviz"
 )
@@ -464,6 +464,38 @@ install_apt() {
 update_packages() {
     log "Updating package lists..."
     safe_sudo apt-get update 2>&1 | grep -v '^W:' || true
+}
+
+# Ensure Docker's official apt repository is configured
+ensure_docker_repo() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would ensure Docker apt repo is configured"
+        return 0
+    fi
+
+    # Skip if repo already configured
+    if [[ -f /etc/apt/sources.list.d/docker.list ]]; then
+        return 0
+    fi
+
+    log "Adding Docker official apt repository..."
+    safe_sudo apt-get install -y ca-certificates curl gnupg
+
+    safe_sudo install -m 0755 -d /etc/apt/keyrings
+    if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | safe_sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        safe_sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    fi
+
+    local codename
+    codename=$(lsb_release -cs)
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" | \
+        safe_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # Force package list refresh since we added a new repo
+    _APT_UPDATED=""
+    update_packages
+    success "Docker apt repository configured"
 }
 
 
@@ -612,14 +644,27 @@ install_full_packages() {
         log "Azure CLI already installed"
     fi
 
+    # Azure DevOps git credential helper
+    if [[ -f "$DOTFILES_DIR/bin/git-credential-azdo" ]]; then
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
+        success "Azure DevOps credential helper linked"
+    fi
+
+    # Docker: ensure official repo is configured before installing
+    ensure_docker_repo
+
     # Python dev tools + Docker
     install_apt "full" python3-dev python3-venv ${PACKAGES[docker]}
 
-    # Docker group
+    # Docker group (non-fatal — user may already be in group from a previous run)
     if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
         log "Adding $USER to docker group..."
-        safe_sudo usermod -aG docker "$USER"
-        success "Added to docker group (restart shell to activate)"
+        if safe_sudo usermod -aG docker "$USER"; then
+            success "Added to docker group (restart shell to activate)"
+        else
+            warn "Could not add to docker group (try: sudo usermod -aG docker $USER)"
+        fi
     fi
 
     # Version managers

@@ -1,14 +1,15 @@
 #!/bin/bash
 # FZF configuration — layout, commands, and preview integration
 
-# Default options
+# Default options (layout, keybinds — theme colors merged from FZF_THEME_COLORS)
 export FZF_DEFAULT_OPTS="
     --height 60%
     --layout=reverse
     --border=rounded
     --preview-window=right:60%:wrap
     --bind 'ctrl-/:change-preview-window(down|hidden|)'
-    --bind 'ctrl-p:toggle-preview'"
+    --bind 'ctrl-p:toggle-preview'
+    ${FZF_THEME_COLORS:-}"
 
 # Use fd for better file/directory listing
 if command -v fd >/dev/null 2>&1; then

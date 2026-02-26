@@ -47,13 +47,22 @@ tar -xzf "$TARBALL"
 cd "tmux-${VERSION}"
 
 log "Configuring (--prefix=$HOME/.local)..."
-./configure --prefix="$HOME/.local" >/dev/null 2>&1
+BUILD_LOG="$TEMP_DIR/build.log"
+if ! ./configure --prefix="$HOME/.local" >"$BUILD_LOG" 2>&1; then
+    error "configure failed — build log:"
+    tail -30 "$BUILD_LOG"
+    exit 1
+fi
 
 log "Compiling..."
-make -j"$(nproc)" >/dev/null 2>&1
+if ! make -j"$(nproc)" >>"$BUILD_LOG" 2>&1; then
+    error "make failed — build log:"
+    tail -30 "$BUILD_LOG"
+    exit 1
+fi
 
 log "Installing to ~/.local/bin..."
-make install >/dev/null 2>&1
+make install >>"$BUILD_LOG" 2>&1
 
 # Verify
 if "$HOME/.local/bin/tmux" -V >/dev/null 2>&1; then

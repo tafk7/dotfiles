@@ -4,7 +4,7 @@
 
 [global]
 target = "~/.local/bin"
-upgrade_only = true
+upgrade_only = false
 
 ["starship/starship"]
 tag = "v1.24.2"

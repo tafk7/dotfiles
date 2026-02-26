@@ -19,7 +19,16 @@ log "Installing Neovim..."
 # Determine which version to install
 GLIBC_VERSION=$(get_glibc_version)
 if version_gte "$GLIBC_VERSION" "$MIN_GLIBC"; then
-    VERSION=$(github_latest_version "neovim/neovim" --strip-v)
+    VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
+        # If API fails (rate-limited) and --force, fall back to reinstalling current
+        if [[ "$FORCE" == true ]] && verify_binary nvim; then
+            VERSION=$(nvim --version 2>/dev/null | head -n1 | awk '{print $2}' | sed 's/^v//')
+            warn "GitHub API unavailable — reinstalling current v$VERSION"
+        else
+            error "Failed to fetch latest Neovim version"
+            exit 1
+        fi
+    }
     log "glibc $GLIBC_VERSION >= $MIN_GLIBC — installing latest (v$VERSION)"
 else
     VERSION="$FALLBACK_VERSION"

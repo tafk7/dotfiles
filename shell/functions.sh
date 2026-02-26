@@ -331,7 +331,7 @@ pane-tint() {
     # loader. Fall back to sourcing colors.sh directly if missing.
     if [[ -z "${THEME_TINT_1:-}" ]]; then
         local theme_name="${DOTFILES_THEME:-gruvbox}"
-        local dotfiles_dir="${DOTFILES_DIR:-$HOME/devdisk/dotfiles}"
+        local dotfiles_dir="${DOTFILES_DIR:-$HOME/dotfiles}"
         local colors_file="$dotfiles_dir/configs/themes/$theme_name/colors.sh"
 
         if [[ ! -f "$colors_file" ]]; then
