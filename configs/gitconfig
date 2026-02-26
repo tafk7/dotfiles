@@ -141,3 +141,9 @@
     navigate = true
     line-numbers = true
     hyperlinks = true
+
+[credential "https://msasg.visualstudio.com"]
+    helper = azdo
+
+[credential "https://dev.azure.com"]
+    helper = azdo

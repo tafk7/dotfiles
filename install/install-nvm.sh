@@ -49,7 +49,7 @@ else
 
     # Download and install NVM
     log "Downloading NVM installer..."
-    run_nvm_command bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+    run_nvm_command bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash"
 
     # Verify installation
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then

@@ -5,7 +5,6 @@ Host *
     ServerAliveInterval 60
     ServerAliveCountMax 3
     AddKeysToAgent yes
-    IdentitiesOnly yes
     ForwardAgent no
     HashKnownHosts yes
     Compression yes

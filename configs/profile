@@ -50,8 +50,8 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 
-# Terminal
-export TERM="xterm-256color"
+# Terminal (don't override TERM if already set — tmux sets tmux-256color)
+export TERM="${TERM:-xterm-256color}"
 export PAGER=less
 export LESS='-F -g -i -M -R -S -w -X -z-4'
 

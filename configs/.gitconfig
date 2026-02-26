@@ -1,7 +1,0 @@
-[user]
-	email = tkeller787@gmail.com
-	name = Thomas Keller
-[credential]
-	helper = store
-[core]
-	editor = vim

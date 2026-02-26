@@ -10,10 +10,9 @@
 [[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
 
 # Fallback: derive DOTFILES_DIR from symlink if env file is missing
-if [[ -z "$DOTFILES_DIR" ]]; then
+if [[ -z "${DOTFILES_DIR:-}" ]]; then
     export DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
 fi
-: ${DOTFILES_DIR:="$HOME/dotfiles"}
 
 # ==============================================================================
 # Zsh Options
@@ -54,11 +53,11 @@ setopt AUTO_PARAM_SLASH
 # Tool initialization (version managers, EDITOR, tool-specific settings, WSL env)
 [[ -f "$DOTFILES_DIR/shell/env.sh" ]] && source "$DOTFILES_DIR/shell/env.sh"
 
-# FZF configuration (commands, preview options)
-[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
-
-# Theme (prompt colors, FZF color scheme)
+# Theme (prompt colors, FZF color scheme — must load before fzf.sh to merge colors)
 [[ -f "$HOME/.config/dotfiles/theme.sh" ]] && source "$HOME/.config/dotfiles/theme.sh"
+
+# FZF configuration (commands, preview options, merges theme colors)
+[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
 
 # ==============================================================================
 # Prompt
@@ -85,6 +84,18 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 
 zstyle ':completion:*:*:docker:*' option-stacking yes
 zstyle ':completion:*:*:docker-*:*' option-stacking yes
+
+# Tool completions (must be after compinit)
+if command -v uv >/dev/null 2>&1; then
+    eval "$(uv generate-shell-completion zsh 2>/dev/null || true)"
+fi
+if command -v poetry >/dev/null 2>&1; then
+    # Poetry's completion script ends with a bare call to the completion function
+    # (e.g. `_poetry_xxx_complete "$@"`), which executes it immediately at eval time.
+    # This triggers _describe → _tags → comptags errors because comptags can only
+    # run inside the ZLE completion widget context. Strip that line, keep compdef.
+    eval "$(poetry completions zsh 2>/dev/null | sed '/_poetry_[a-f0-9]*_complete "\$@"/d' || true)"
+fi
 
 # ==============================================================================
 # Key Bindings
@@ -152,4 +163,3 @@ done
 
 [[ -f ~/.shell.local ]] && source ~/.shell.local
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion

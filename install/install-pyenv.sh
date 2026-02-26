@@ -37,8 +37,8 @@ fi
 
 # Install build dependencies
 log "Installing Python build dependencies..."
-sudo apt-get update
-sudo apt-get install -y \
+safe_sudo apt-get update
+safe_sudo apt-get install -y \
     build-essential \
     libssl-dev \
     zlib1g-dev \
