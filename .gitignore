@@ -1,6 +1,10 @@
+# Machine-written runtime state
+generated/
+
 # Development artifacts
 docs/archive/
 _archive/
+.scratchpad/
 CLAUDE.md
 
 # Backup directory

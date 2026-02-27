@@ -45,7 +45,6 @@ dotfiles/
 │   ├── gitconfig             → ~/.gitconfig (template)
 │   ├── tmux.conf, init.vim, editorconfig, ripgreprc, starship.toml
 │   ├── ssh_config, config/bat, config/fd
-│   └── init.vim.minimal, tmux.conf.minimal
 ├── installers/               ← per-tool install scripts
 ├── shell/
 │   ├── shared.sh             ← single sourcing sequence for bash + zsh
@@ -72,7 +71,7 @@ dotfiles/
 │   ├── theme-switcher        (sources lib/runtime.sh, reads themes/)
 │   ├── verify                (derives checklist from lib/config.sh + eget.toml)
 │   ├── replace               (composes rg + sd)
-│   ├── cheatsheet, uninstall-tool, vim-config-switcher, tmux-config-switcher
+│   ├── cheatsheet, uninstall-tool
 │   └── git-credential-azdo
 └── docs/
 ```

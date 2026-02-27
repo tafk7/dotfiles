@@ -1,6 +1,6 @@
 #!/bin/bash
 # FZF advanced integrations — git, ripgrep, and project finder
-# Aliases are co-located with their functions (tightly coupled one-liners)
+# Aliases co-located with their functions (tightly coupled one-liners)
 
 # Interactive git branch switcher
 fzf-git-branch() {

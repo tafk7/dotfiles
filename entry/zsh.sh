@@ -1,12 +1,16 @@
 # Zsh configuration
 # Owns: zsh options, history, completion, keybindings, prompt
 
-[[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+# Load bridge
 [[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
 
+# Fallback
 if [[ -z "${DOTFILES_DIR:-}" ]]; then
     export DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
 fi
+
+# PATH baseline for non-login interactive
+[[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
 
 # ==============================================================================
 # Zsh Options
@@ -41,13 +45,13 @@ setopt AUTO_LIST
 setopt AUTO_PARAM_SLASH
 
 # ==============================================================================
-# Shared sequence (env → theme → fzf → functions → aliases)
+# Shared initialization sequence
 # ==============================================================================
 
-source "$DOTFILES_DIR/shell/shared.sh"
+source "$DOTFILES_DIR/shell/init.sh"
 
 # ==============================================================================
-# Prompt
+# Prompt — starship
 # ==============================================================================
 
 if command -v starship >/dev/null 2>&1; then
@@ -77,10 +81,6 @@ if command -v uv >/dev/null 2>&1; then
     eval "$(uv generate-shell-completion zsh 2>/dev/null || true)"
 fi
 if command -v poetry >/dev/null 2>&1; then
-    # Poetry's completion script ends with a bare call to the completion function
-    # (e.g. `_poetry_xxx_complete "$@"`), which executes it immediately at eval time.
-    # This triggers _describe → _tags → comptags errors because comptags can only
-    # run inside the ZLE completion widget context. Strip that line, keep compdef.
     eval "$(poetry completions zsh 2>/dev/null | sed '/_poetry_[a-f0-9]*_complete "\$@"/d' || true)"
 fi
 
@@ -121,7 +121,7 @@ command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
 # NVM (lazy)
 # ==============================================================================
 
-source "$DOTFILES_DIR/shell/nvm-lazy.sh"
+source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
 # ==============================================================================
 # Local Overrides (not tracked in git)
