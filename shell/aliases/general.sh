@@ -20,11 +20,8 @@ fi
 # Keep ls as system default
 alias ls='ls --color=auto'
 
-# OS-aware aliases for bat and fd (safe aliases that don't override system commands)
-if command -v batcat &> /dev/null; then
-    alias bat='batcat'
-    alias view='batcat'
-elif command -v bat &> /dev/null; then
+# File viewer (bat is available via install-time symlink ~/.local/bin/bat → batcat)
+if command -v bat &> /dev/null; then
     alias view='bat'
 fi
 
@@ -95,11 +92,11 @@ fi
 
 # Theme management
 alias theme-switch='$DOTFILES_DIR/bin/theme-switcher'
-# Dynamic theme listing from configs/themes directory
-alias themes='ls -1 "$DOTFILES_DIR/configs/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
+# Dynamic theme listing from themes directory
+alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
 
 # Find and replace utility
-alias fr='$DOTFILES_DIR/bin/fr'
+alias fr='$DOTFILES_DIR/bin/replace'
 
 # Cheatsheet for keybindings
 alias cheat='$DOTFILES_DIR/bin/cheatsheet'

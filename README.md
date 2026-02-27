@@ -7,15 +7,14 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ```bash
 ./setup.sh --config              # Symlinks only (no sudo)
 ./setup.sh --shell               # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
-./setup.sh --dev                 # + neovim, lazygit, tmux, Claude Code
+./setup.sh --dev                 # + neovim, lazygit, tmux
 ./setup.sh --full                # + NVM, pyenv, uv, poetry, Docker, Azure CLI
-./setup.sh --full --personal     # + media tools (ffmpeg, yt-dlp)
 ./setup.sh --shell --dry-run     # Preview without changes
 ```
 
 Each tier includes all previous tiers. Use `--force` to overwrite without prompting.
 
-After installation, verify with `./bin/check-setup` and restart your shell.
+After installation, verify with `./bin/verify` and restart your shell.
 
 ## What You Get
 
@@ -132,37 +131,41 @@ Five unified themes applied simultaneously to neovim, tmux, and shell (FZF):
 ## Architecture
 
 ```
-setup.sh                  Entry point — 3-phase orchestrator
-lib.sh                    Shared utilities (sourced by everything)
+setup.sh                  Entry point — 3-phase orchestrator (reads lib/config.sh)
+lib/
+  install.sh              Install-time helpers (APT, backup, eget, tier functions)
+  runtime.sh              Runtime helpers (logging, is_wsl, verify_binary)
+  config.sh               Declarative data: CONFIG_MAP + PACKAGES
 configs/                  Config files without dots (symlinked to ~/.<name>)
-configs/themes/           5 theme directories, each with colors.sh, vim.vim, tmux.conf, shell.sh
-shell/env.sh              Environment: PATH, pyenv, direnv, FZF, WSL vars
-shell/functions.sh        Core functions + FZF-git + Python management
-shell/aliases/*.sh        9 alias categories (general, git, docker, python, node, vim, vscode, wsl, claude)
-install/                  12 tool installer scripts (one per binary)
-bin/                      User commands (theme-switcher, check-setup, cheatsheet, fr, vim/tmux-config-switcher)
+themes/                   5 theme directories, each with colors.sh, vim.vim, tmux.conf, shell.sh
+shell/
+  shared.sh               Single sourcing sequence for bash + zsh
+  bash.sh / zsh.sh        Shell-specific config → ~/.bashrc / ~/.zshrc
+  profile.sh              Login shell → ~/.profile
+  env.sh                  Environment: PATH, pyenv, direnv, EDITOR, WSL vars
+  nvm-lazy.sh             Lazy NVM loader for both shells
+  functions/*.sh          Domain-split functions (nav, process, python, fzf, wsl, tmux, docker, git)
+  aliases/*.sh            9 alias categories (general, git, docker, python, node, vim, vscode, wsl, claude)
+installers/               Per-tool install scripts
+bin/                      User commands (theme-switcher, verify, cheatsheet, replace, vim/tmux-config-switcher)
 ```
 
-**`setup.sh`** parses CLI args, defines `CONFIG_MAP` (config → target + type), runs: system verification → package installation → config symlinks/templates.
-
-**`lib.sh`** provides logging, WSL detection, backup management (`safe_symlink`), `safe_sudo`, and tier-specific install functions.
-
-**Shell startup** (`~/.bashrc`) sources: `env.sh` → theme → FZF bindings → NVM → `functions.sh` → `aliases/*.sh` → `~/.shell.local` / `~/.bashrc.local`.
+**Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `shared.sh` → `env.sh` → theme → `fzf.sh` → `functions/*.sh` → `aliases/*.sh` → `~/.shell.local` → shell-specific (prompt, completion, nvm-lazy).
 
 ## Extending
 
-**New tool:** Create `install/install-<tool>.sh` (binary → `~/.local/bin`), wire in `lib.sh` tier function, add aliases to `shell/aliases/`, add cheatsheet entries to `shell/shortcuts-index.tsv`.
+**New tool:** Create `installers/install-<tool>.sh`, wire in `lib/install.sh` tier function, add aliases to `shell/aliases/`, add cheatsheet entries to `shell/shortcuts-index.tsv`.
 
-**New config:** Add file to `configs/`, add to `CONFIG_MAP` in `setup.sh` (`[name]="$HOME/.target:symlink"`).
+**New config:** Add file to `configs/`, add to `CONFIG_MAP` in `lib/config.sh`.
 
-**New theme:** Create `configs/themes/<name>/` with `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`. Register in `THEMES` array in `bin/theme-switcher`.
+**New theme:** Create `themes/<name>/` with `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`. Register in `THEMES` array in `bin/theme-switcher`.
 
-**Local overrides:** `~/.shell.local` and `~/.bashrc.local` are sourced last and not tracked.
+**Local overrides:** `~/.shell.local` and `~/.bashrc.local` / `~/.zshrc.local` are sourced last and not tracked.
 
 ## Troubleshooting
 
 ```bash
-./bin/check-setup                 # Validate installation
+./bin/verify                      # Validate installation
 ./setup.sh --dry-run --shell      # Preview what would happen
 reload                            # Reload shell config
 ls .backups/                      # See available backups

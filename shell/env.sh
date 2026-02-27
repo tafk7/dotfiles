@@ -135,13 +135,18 @@ if command -v wslpath >/dev/null 2>&1; then
     fi
 
     # WIN_USER is set at install time by setup.sh → write_dotfiles_env()
-    # If missing, fall back to Linux username (run setup.sh to resolve properly)
-    : ${WIN_USER:="$USER"}
+    # If missing, warn once and skip Windows path derivation
+    if [[ -z "${WIN_USER:-}" ]]; then
+        [[ -z "${_WIN_USER_WARNED:-}" ]] && echo "Warning: WIN_USER not set — run setup.sh to configure WSL environment." >&2
+        _WIN_USER_WARNED=1
+    fi
 
-    # Windows paths (derived from WIN_USER)
-    export WIN_HOME="/mnt/c/Users/$WIN_USER"
-    export WIN_DESKTOP="$WIN_HOME/Desktop"
-    export WIN_DOWNLOADS="$WIN_HOME/Downloads"
-    export WIN_DOCUMENTS="$WIN_HOME/Documents"
-    export WIN_SSH="$WIN_HOME/.ssh"
+    # Windows paths (derived from WIN_USER — only set when available)
+    if [[ -n "${WIN_USER:-}" ]]; then
+        export WIN_HOME="/mnt/c/Users/$WIN_USER"
+        export WIN_DESKTOP="$WIN_HOME/Desktop"
+        export WIN_DOWNLOADS="$WIN_HOME/Downloads"
+        export WIN_DOCUMENTS="$WIN_HOME/Documents"
+        export WIN_SSH="$WIN_HOME/.ssh"
+    fi
 fi

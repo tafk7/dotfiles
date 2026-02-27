@@ -5,7 +5,7 @@
 set -eo pipefail  # Remove -u flag to avoid NVM's unbound variable issues
 
 # Source common functions
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
 
 # Helper function to run NVM commands safely
 # NVM uses unbound variables internally, so we need to temporarily disable -u checking

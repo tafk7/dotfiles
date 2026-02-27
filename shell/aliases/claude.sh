@@ -35,7 +35,6 @@ else
     claude() {
         echo "Claude Code not found." >&2
         echo "  VS Code: install the 'anthropic.claude-code' extension" >&2
-        echo "  Standalone: ./setup.sh --personal" >&2
         return 1
     }
 fi

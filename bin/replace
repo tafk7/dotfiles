@@ -1,0 +1,45 @@
+#!/bin/bash
+# Find and replace — composes rg for discovery and sd for substitution
+set -euo pipefail
+
+source "${DOTFILES_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}/lib/runtime.sh"
+
+# Require rg and sd
+for cmd in rg sd; do
+    command_exists "$cmd" || { error "$cmd is required but not found"; exit 1; }
+done
+
+# Parse args: [--dry-run] <find> <replace> [path]
+DRY_RUN=false
+[[ "${1:-}" == "--dry-run" ]] && { DRY_RUN=true; shift; }
+
+if [[ $# -lt 2 ]]; then
+    echo "Usage: replace [--dry-run] <find> <replace> [path]"
+    echo ""
+    echo "Find and replace text across files using rg + sd."
+    echo "Respects .gitignore. No hardcoded extension list."
+    echo ""
+    echo "Options:"
+    echo "  --dry-run    Show what would be changed without modifying files"
+    exit 1
+fi
+
+FIND="$1"; REPLACE="$2"; TARGET="${3:-.}"
+
+# Show matches
+rg --color=always -n -F "$FIND" "$TARGET" || { echo "No matches found."; exit 0; }
+echo
+FILES=$(rg -l -F "$FIND" "$TARGET")
+echo "Found in $(echo "$FILES" | wc -l) file(s)"
+
+if [[ "$DRY_RUN" == true ]]; then
+    echo "[DRY RUN] Would replace in:"
+    echo "$FILES" | sed 's/^/  /'
+    exit 0
+fi
+
+read -rp "Proceed? [y/N] " confirm
+[[ "$confirm" == [yY] ]] || { echo "Aborted."; exit 0; }
+
+echo "$FILES" | while read -r f; do sd -F "$FIND" "$REPLACE" "$f"; done
+echo "✓ Replaced '$FIND' with '$REPLACE'"

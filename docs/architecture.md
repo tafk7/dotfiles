@@ -1,364 +1,103 @@
-# Simplified Dotfiles Architecture
+# Dotfiles Architecture
 
 ## Overview
 
-This dotfiles system is designed as a streamlined, Ubuntu-focused configuration management framework. It emphasizes simplicity, maintainability, and essential functionality while removing unnecessary complexity.
-
-## Design Principles
-
-1. **Simplicity** - Just 3 focused files with clear responsibilities
-2. **Non-destructive** - Always backs up existing configurations before changes  
-3. **Ubuntu-focused** - Optimized for Ubuntu/WSL environments only
-4. **Security-first** - HTTPS only, checksum verification, safe operations
-5. **Human-readable** - Any developer can understand the entire system in 20 minutes
-6. **Visible configs** - No hidden source files, easy to discover and edit
+This dotfiles system manages an Ubuntu/WSL development environment through a tiered
+installation system (`--config`, `--shell`, `--dev`, `--full`) with declarative
+configuration, domain-split shell modules, and unified theme management.
 
 ## System Architecture
 
 ```
-┌─────────────────┐
-│   setup.sh      │  ← Entry point
-└────────┬────────┘
-         │
-         ├─── Core Modules ──────────────┐
-         │                               │
-    ┌────▼─────┐          ┌─────────────▼┐
-    │lib.sh    │          │configs/      │
-    │          │          │(visible      │
-    │(530      │          │ files)       │
-    │ lines)   │          │              │
-    └──────────┘          └──────────────┘
-         │
-    ┌────▼─────┐          ┌──────────────┐
-    │bin/      │          │shell/        │
-    │commands  │          │aliases &     │
-    │          │          │functions     │
-    │          │          │              │
-    └──────────┘          └──────────────┘
+setup.sh ─┬─ source → lib/install.sh (pulls in runtime.sh + config.sh)
+           └─ calls  → installers/install-*.sh
+
+shell/bash.sh ─┐
+shell/zsh.sh  ─┤─ source → shell/shared.sh
+               │            ├─ env.sh → theme → fzf.sh
+               │            ├─ functions/*.sh
+               │            └─ aliases/*.sh
+               ├─ source → shell/nvm-lazy.sh
+               └─ shell-specific (prompt, completion, keybindings)
+
+bin/*     ──── source → lib/runtime.sh
 ```
 
-## Core Components
+### Boundary Rules
 
-### 1. setup.sh (238 lines)
-**Main orchestrator and entry point**
+- `lib/install.sh` — sourced only by `setup.sh` and `installers/`. Never at shell startup.
+- `lib/runtime.sh` — safe for all contexts (bin/, shell startup).
+- `lib/config.sh` — declarative data (CONFIG_MAP, PACKAGES). No functions, no side effects.
+- `shell/functions/` — only function definitions.
+- `shell/aliases/` — only alias declarations.
 
-```bash
-├── Command line parsing (--work, --personal, --force, --help)
-├── Help system and user guidance  
-├── Configuration symlink creation
-├── Shell integration setup
-└── Installation workflow coordination
-```
-
-**Key Functions:**
-- `parse_arguments()` - Handle CLI flags
-- `show_help()` - Display usage information
-- `create_config_symlinks()` - Link visible configs to hidden destinations
-- `run_installation()` - Coordinate entire installation process
-
-### 2. lib.sh (530 lines)
-**Consolidated library with all utilities**
-
-```bash
-├── Logging system (colored output)
-├── WSL detection and integration
-├── Environment validation
-├── File operations (symlinks, backups)
-├── SSH key management
-├── Package management
-└── Security functions
-```
-
-**Key Functions:**
-- `log()`, `success()`, `warn()`, `error()` - Colored output functions
-- `is_wsl()` - Detect Windows Subsystem for Linux
-- `get_windows_username()` - Cross-platform user detection
-- `safe_sudo()` - Transparent sudo operations
-- `create_backup_dir()` - Timestamped backup creation
-- `safe_symlink()` - Non-destructive symlink creation
-- `setup_wsl_clipboard()` - pbcopy/pbpaste integration
-- `import_windows_ssh_keys()` - SSH key synchronization
-- `validate_prerequisites()` - Pre-installation checks
-- `validate_installation()` - Post-installation verification
-- `install_base_packages()` - Essential tools for everyone
-- `install_docker()` - Container platform setup
-- `install_work_packages()` - Professional development tools
-- `install_azure_cli_ubuntu()` - Cloud development tools
-- `install_nodejs_tools()` - JavaScript ecosystem
-- `install_python_tools()` - Python development environment
-- `install_personal_packages()` - Media and entertainment tools
-
-### 3. bin/
-**User commands and utilities**
-
-### 4. shell/
-**Runtime scripts and shell configuration**
-
-The shell directory contains modular components loaded at shell startup:
+## Directory Layout
 
 ```
-shell/
-├── env.sh                 # Merged environment configuration
-├── functions.sh           # Merged core functions
-├── wsl-functions.sh       # WSL-specific functions
-└── aliases/               # Shell aliases organized by category
-    ├── general.sh        # Common command aliases (ls, cd, etc.)
-    ├── docker.sh         # Docker shortcuts
-    ├── git.sh            # Git workflow aliases
-    ├── vim.sh            # Vim mode switching
-    ├── vscode.sh         # VS Code integration
-    ├── node.sh           # Node.js aliases
-    ├── python.sh         # Python aliases
-    └── wsl.sh            # WSL-specific integrations
+dotfiles/
+├── setup.sh                  ← orchestrator (reads lib/config.sh)
+├── lib/
+│   ├── install.sh            ← install-time helpers
+│   ├── runtime.sh            ← runtime helpers (logging, is_wsl, verify_binary)
+│   └── config.sh             ← declarative data: CONFIG_MAP + PACKAGES
+├── eget.toml                 ← binary tool manifest
+├── configs/                  ← config files symlinked to $HOME
+│   ├── gitconfig             → ~/.gitconfig (template)
+│   ├── tmux.conf, init.vim, editorconfig, ripgreprc, starship.toml
+│   ├── ssh_config, config/bat, config/fd
+│   └── init.vim.minimal, tmux.conf.minimal
+├── installers/               ← per-tool install scripts
+├── shell/
+│   ├── shared.sh             ← single sourcing sequence for bash + zsh
+│   ├── bash.sh               → ~/.bashrc
+│   ├── zsh.sh                → ~/.zshrc
+│   ├── profile.sh            → ~/.profile
+│   ├── env.sh                ← tool init (pyenv, direnv, EDITOR, WSL env)
+│   ├── fzf.sh                ← FZF configuration
+│   ├── nvm-lazy.sh           ← lazy NVM loader for both shells
+│   ├── functions/            ← domain-split shell functions
+│   │   ├── nav.sh            (cdl, mkcd, proj, PATH utils, md)
+│   │   ├── process.sh        (psg, fkill, killport, extract)
+│   │   ├── python.sh         (pyset, pyinfo, pylist, vactivate)
+│   │   ├── fzf.sh            (fzf-git-branch/log/rg/project + aliases)
+│   │   ├── wsl.sh            (import_windows_ssh_keys, winapp, winopen)
+│   │   ├── tmux.sh           (pane-tint)
+│   │   ├── docker.sh         (denter, dstopall)
+│   │   └── git.sh            (gundo)
+│   ├── aliases/              ← pure alias files
+│   └── shortcuts-index.tsv
+├── themes/                   ← color themes (5 themes)
+│   └── <name>/ {colors.sh, shell.sh, tmux.conf, vim.vim}
+├── bin/
+│   ├── theme-switcher        (sources lib/runtime.sh, reads themes/)
+│   ├── verify                (derives checklist from lib/config.sh + eget.toml)
+│   ├── replace               (composes rg + sd)
+│   ├── cheatsheet, uninstall-tool, vim-config-switcher, tmux-config-switcher
+│   └── git-credential-azdo
+└── docs/
 ```
 
-**Key Features:**
-- **Environment Setup**: Centralized environment variables in `shell/env.sh`
-- **WSL Detection**: Automatic detection and configuration for WSL environments
-- **Modular Loading**: Shell configs source these files dynamically
-- **SSH Key Import**: `sync-ssh` command for WSL users to import Windows SSH keys
+## Installation Tiers
 
-## Configuration Management
+| Tier   | What It Installs                                   | Sudo? |
+|--------|---------------------------------------------------|-------|
+| config | Symlinks only (zero installs)                      | No    |
+| shell  | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
+| dev    | + neovim, tmux                                     | Yes   |
+| full   | + NVM, pyenv, poetry, Docker, Azure CLI            | Yes   |
 
-### Visible Configuration Files
+## Key Design Decisions
 
-All configuration files are stored visibly (no leading dots) for easy discovery and editing:
+1. **Shared sourcing sequence** (`shell/shared.sh`) — both bash and zsh
+   source it. Adding a new shared module requires editing one file.
 
-```
-configs/
-├── bashrc              → ~/.bashrc
-├── zshrc               → ~/.zshrc  
-├── init.vim            → ~/.config/nvim/init.vim
-├── tmux.conf           → ~/.tmux.conf
-├── gitconfig           → ~/.gitconfig (template processed)
-├── editorconfig        → ~/.editorconfig
-├── profile             → ~/.profile
-├── ripgreprc           → ~/.ripgreprc
-└── config/             → ~/.config/
-    ├── bat/config      → ~/.config/bat/config
-    └── fd/ignore       → ~/.config/fd/ignore
-```
+2. **Lazy NVM** (`shell/nvm-lazy.sh`) — both shells defer nvm.sh loading
+   until first `nvm`, `node`, `npm`, or `npx` call. Eliminates ~200ms
+   startup penalty.
 
-**Benefits:**
-- Tab completion works when editing configs
-- Easy to find and browse in file managers
-- Clear file organization  
-- Still symlinked to expected hidden locations
+3. **Single CONFIG_MAP** (`lib/config.sh`) — both the installer and
+   verifier read the same data. Adding a config automatically extends
+   verification.
 
-### Template Processing
-
-The system supports dynamic configuration through templates:
-
-- **gitconfig**: Prompts for user name and email, processes `{{GIT_NAME}}` and `{{GIT_EMAIL}}` placeholders
-- **Future templates**: Easy to add new template variables
-
-## Installation Workflow
-
-The system follows a clean, linear workflow:
-
-```
-1. Prerequisites Validation
-   ├── Check bash version (4.0+)
-   ├── Verify required commands (curl, wget, git)
-   ├── Check available disk space (100MB+)
-   └── Detect Ubuntu version and WSL
-
-2. Package Installation  
-   ├── Update apt package lists
-   ├── Install base packages (always)
-   ├── Install Docker (always)
-   ├── Install work packages (optional)
-   ├── Install personal packages (optional)
-   └── Install WSL packages (if applicable)
-
-3. Configuration Setup
-   ├── Create timestamped backup directory
-   ├── Process git config template  
-   ├── Create symlinks for all configs
-   └── Setup shell integration
-
-4. WSL Integration (if applicable)
-   ├── Setup clipboard integration (pbcopy/pbpaste)
-   ├── Import SSH keys from Windows
-   └── Configure cross-platform utilities
-
-5. Final Setup & Validation
-   ├── Configure NPM global directory
-   ├── Verify critical symlinks exist
-   ├── Display success message and next steps
-   └── Return success/failure status
-```
-
-## Package Categories
-
-### Base Packages (Always Installed)
-Essential tools for any Ubuntu development environment:
-
-```bash
-# Build and development essentials
-build-essential, curl, wget, git, unzip, zip, jq
-
-# Modern shell environment  
-zsh, neovim
-
-# Enhanced CLI tools
-eza (with tree functionality), bat, fd-find, ripgrep, fzf
-
-# Development platforms
-python3-pip, pipx, nodejs, npm
-
-# System utilities
-net-tools, fontconfig, openssh-client
-
-# Container platform
-docker-ce, docker-compose (with user group setup)
-```
-
-### Work Packages (--work flag)
-Professional development tools:
-
-```bash
-# Cloud development
-azure-cli (Ubuntu-specific installation)
-
-# Node.js ecosystem  
-yarn, eslint, prettier
-
-# Python development
-python3-dev, python3-venv (system libraries for venv support)
-```
-
-### Personal Packages (--personal flag)
-Media and entertainment tools:
-
-```bash
-# Media processing
-ffmpeg, yt-dlp
-```
-
-### WSL Packages (Automatic if WSL detected)
-Windows Subsystem for Linux integration:
-
-```bash
-# WSL utilities
-socat, wslu
-```
-
-## Runtime Integration
-
-### Shell Integration
-The system integrates with shell environments through:
-
-```
-shell/
-├── env.sh              # Environment variables
-├── functions.sh        # Core utility functions
-├── wsl-functions.sh    # WSL-specific functions
-└── aliases/            # Command shortcuts
-    ├── docker.sh      # Docker command aliases
-    ├── general.sh     # Modern CLI replacements
-    ├── git.sh         # Git workflow shortcuts
-    ├── vim.sh         # Vim mode switching
-    ├── vscode.sh      # VS Code integration
-    └── wsl.sh         # WSL-specific commands
-```
-
-**Auto-loading**: All files are automatically sourced on shell startup
-
-### Available Commands
-
-After installation, these commands become available:
-
-```bash
-# Shell management
-reload              # Reload shell without restart
-
-# Process management  
-psg <name>          # Search running processes
-
-# File operations
-md <file>           # View markdown with syntax highlighting
-
-# WSL integration (if applicable)
-sync-ssh            # Import SSH keys from Windows
-pbcopy / pbpaste    # Cross-platform clipboard
-```
-
-## Security Architecture
-
-### Safe Operations
-- **safe_sudo()**: Shows commands before execution for transparency
-- **Automatic backups**: All existing configs backed up before changes
-- **Input validation**: User-provided data is validated before use
-- **Fail-fast**: Scripts exit immediately on any error
-
-### Download Security
-- **HTTPS-only**: All external downloads use secure connections
-- **Checksum verification**: Security-critical downloads verified
-- **Temporary files**: Proper cleanup of temporary files and directories
-
-### Permission Management
-- **SSH keys**: Proper permissions (600 for private, 644 for public)
-- **Directories**: Secure permissions for sensitive directories
-- **Docker group**: Safe addition to docker group for container access
-
-## Extensibility
-
-### Adding New Packages
-1. **Base packages**: Edit `base_packages` array in `lib/packages.sh`
-2. **Work packages**: Add to `install_work_packages()` function
-3. **Personal packages**: Add to `personal_packages` array
-
-### Adding New Configurations
-1. Create config file in `configs/` (no leading dot)
-2. Add mapping to `config_mappings` array in `setup.sh`
-3. System automatically creates symlink to hidden destination
-
-### Adding Runtime Features
-1. **Aliases**: Create `.sh` file in `shell/aliases/`
-2. **Functions**: Add to `shell/functions.sh`
-3. Files are automatically sourced on shell startup
-
-## Error Handling
-
-### Validation Strategy
-- **Pre-installation**: Check prerequisites before starting
-- **During installation**: Validate each step before proceeding
-- **Post-installation**: Verify critical components are working
-
-### Recovery Mechanisms
-- **Automatic backups**: Easy rollback if issues occur
-- **Graceful degradation**: Optional features fail safely
-- **Clear error messages**: Specific guidance when things go wrong
-
-## Performance Characteristics
-
-### Installation Speed
-- **Streamlined process**: No complex orchestration overhead
-- **Parallel operations**: Multiple packages installed efficiently
-- **Minimal dependencies**: Only essential components included
-
-### Resource Usage
-- **Small footprint**: ~800 lines of code total
-- **Efficient operations**: No redundant or duplicate processes
-- **Clean dependencies**: Clear module relationships
-
----
-
-## Comparison with Original Architecture
-
-### Before: Complex 8-Module System
-- 8 core modules with intricate dependencies
-- Cross-platform package management complexity
-- 264-line Microsoft integration
-- 7-phase orchestrated installation
-- 1,400+ lines of code
-
-### After: Simple 3-File System  
-- 3 focused files with clear responsibilities
-- Ubuntu-only simplicity
-- Integrated Azure CLI (30 lines)
-- Linear installation process
-- 800 lines of code
-
-**Result**: 43% code reduction while maintaining all essential functionality and improving maintainability.
+4. **Domain-split functions** — each file in `shell/functions/` owns one
+   domain. Finding where a function lives is self-evident from the filename.

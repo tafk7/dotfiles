@@ -40,10 +40,3 @@ alias gstp='git stash pop'
 
 # Lazygit TUI
 alias lg='lazygit'
-
-# Useful functions
-
-# Undo last commit but keep changes
-gundo() {
-    git reset HEAD~1 --soft
-}

@@ -1,5 +1,5 @@
 # Bash configuration
-# Owns: shell options, history, completion, prompt, bash-specific tool loading
+# Owns: shell options, history, completion, prompt, bash-specific keybindings
 
 # PATH baseline — ~/.profile handles this for login shells, but VS Code and other
 # terminals launch bash as non-login (skipping ~/.profile). Profile has a source
@@ -19,18 +19,14 @@ if [[ -z "${DOTFILES_DIR:-}" ]]; then
     export DOTFILES_DIR
 fi
 
-# ==============================================================================
-# Core Shell Settings
-# ==============================================================================
-
-# If not running interactively, don't do anything
+# Non-interactive: stop here
 [[ $- != *i* ]] && return
 
-# Shell options
-shopt -s histappend                # Append to history, don't overwrite
-shopt -s checkwinsize              # Check window size after each command
-shopt -s globstar                  # Enable ** recursive globbing
-shopt -s extglob                  # Extended globbing patterns
+# ==============================================================================
+# Shell Options
+# ==============================================================================
+
+shopt -s histappend checkwinsize globstar extglob
 
 # Completion
 if ! shopt -oq posix; then
@@ -55,22 +51,14 @@ HISTCONTROL=ignoreboth:erasedups
 HISTTIMEFORMAT="%F %T "
 HISTIGNORE=""
 
-# Real-time history sharing (idempotent — safe on reload)
 [[ "$PROMPT_COMMAND" != *"history -a"* ]] && \
     PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
 
 # ==============================================================================
-# Load Shared Environment
+# Shared sequence (env → theme → fzf → functions → aliases)
 # ==============================================================================
 
-# Tool initialization (version managers, EDITOR, tool-specific settings, WSL env)
-[[ -f "$DOTFILES_DIR/shell/env.sh" ]] && source "$DOTFILES_DIR/shell/env.sh"
-
-# Theme (prompt colors, FZF color scheme — must load before fzf.sh to merge colors)
-[[ -f "$HOME/.config/dotfiles/theme.sh" ]] && source "$HOME/.config/dotfiles/theme.sh"
-
-# FZF configuration (commands, preview options, merges theme colors)
-[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
+source "$DOTFILES_DIR/shell/shared.sh"
 
 # ==============================================================================
 # FZF Key Bindings (bash-specific)
@@ -133,27 +121,13 @@ set_prompt() {
     PROMPT_COMMAND="set_prompt; $PROMPT_COMMAND"
 
 # ==============================================================================
-# NVM
+# NVM (lazy)
 # ==============================================================================
 
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-# ==============================================================================
-# Shared Functions and Aliases
-# ==============================================================================
-
-if [[ -d "$DOTFILES_DIR" ]]; then
-    [[ -f "$DOTFILES_DIR/shell/functions.sh" ]] && source "$DOTFILES_DIR/shell/functions.sh"
-
-    for file in "$DOTFILES_DIR"/shell/aliases/*.sh; do
-        [[ -r "$file" ]] && source "$file" 2>/dev/null || true
-    done
-fi
+source "$DOTFILES_DIR/shell/nvm-lazy.sh"
 
 # ==============================================================================
 # Local Overrides (not tracked in git)
 # ==============================================================================
 
-[[ -f ~/.shell.local ]] && source ~/.shell.local
 [[ -f ~/.bashrc.local ]] && source ~/.bashrc.local

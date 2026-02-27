@@ -1,0 +1,234 @@
+#!/bin/bash
+# Dotfiles verification — dynamically derives checklist from lib/config.sh + eget.toml
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+
+source "$DOTFILES_DIR/lib/runtime.sh"
+source "$DOTFILES_DIR/lib/config.sh"
+
+# Counters
+PASS=0
+WARN=0
+FAIL=0
+
+check_pass() { echo -e "  ${GREEN}✅${NC} $1"; ((PASS++)) || true; }
+check_warn() { echo -e "  ${YELLOW}⚠️${NC}  $1"; ((WARN++)) || true; }
+check_fail() { echo -e "  ${RED}❌${NC} $1"; ((FAIL++)) || true; }
+
+# ==============================================================================
+# 1. CONFIG_MAP — check every symlink and template
+# ==============================================================================
+
+echo "Configuration files"
+echo "─────────────────────────────────────"
+
+readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
+for config in "${sorted_configs[@]}"; do
+    local_mapping="${CONFIG_MAP[$config]}"
+    target="${local_mapping%%:*}"
+    type="${local_mapping##*:}"
+    source_path="$(config_source_path "$config")"
+
+    case "$type" in
+        symlink)
+            if [[ -L "$target" ]]; then
+                link_dest="$(readlink -f "$target" 2>/dev/null || true)"
+                real_source="$(readlink -f "$source_path" 2>/dev/null || true)"
+                if [[ "$link_dest" == "$real_source" ]]; then
+                    check_pass "$target → $config"
+                else
+                    check_warn "$target (symlink exists but points elsewhere)"
+                fi
+            elif [[ -e "$target" ]]; then
+                check_warn "$target (exists but not a symlink)"
+            else
+                check_fail "$target (missing)"
+            fi
+            ;;
+        template)
+            if [[ -f "$target" ]]; then
+                if grep -q '{{GIT_' "$target" 2>/dev/null; then
+                    check_fail "$target (has unresolved template placeholders)"
+                else
+                    check_pass "$target (processed template)"
+                fi
+            else
+                check_fail "$target (missing)"
+            fi
+            ;;
+    esac
+done
+
+# ==============================================================================
+# 2. eget.toml — check every binary tool
+# ==============================================================================
+
+echo
+echo "Binary tools (eget.toml)"
+echo "─────────────────────────────────────"
+
+eget_config="$DOTFILES_DIR/eget.toml"
+if [[ -f "$eget_config" ]]; then
+    while IFS= read -r repo; do
+        name="${repo##*/}"
+        if verify_binary "$name"; then
+            check_pass "$name"
+        else
+            check_fail "$name (not found or broken)"
+        fi
+    done < <(grep -oP '^\["\K[^"]+' "$eget_config")
+else
+    check_warn "eget.toml not found"
+fi
+
+# ==============================================================================
+# 3. Installer-managed tools
+# ==============================================================================
+
+echo
+echo "Installer-managed tools"
+echo "─────────────────────────────────────"
+
+for tool in tmux neovim plantuml; do
+    case "$tool" in
+        tmux)    cmd="tmux" ;;
+        neovim)  cmd="nvim" ;;
+        plantuml) cmd="plantuml" ;;
+    esac
+    if verify_binary "$cmd"; then
+        check_pass "$tool ($cmd)"
+    else
+        check_warn "$tool (not installed)"
+    fi
+done
+
+# ==============================================================================
+# 4. Version managers
+# ==============================================================================
+
+echo
+echo "Version managers"
+echo "─────────────────────────────────────"
+
+if [[ -d "$HOME/.nvm" ]] && [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+    check_pass "NVM ($HOME/.nvm)"
+else
+    check_warn "NVM (not installed)"
+fi
+
+if [[ -d "$HOME/.pyenv" ]]; then
+    check_pass "pyenv ($HOME/.pyenv)"
+else
+    check_warn "pyenv (not installed)"
+fi
+
+if command -v poetry >/dev/null 2>&1; then
+    check_pass "poetry"
+else
+    check_warn "poetry (not installed)"
+fi
+
+# ==============================================================================
+# 5. Git configuration
+# ==============================================================================
+
+echo
+echo "Git"
+echo "─────────────────────────────────────"
+
+git_name=$(git config --get user.name 2>/dev/null || true)
+git_email=$(git config --get user.email 2>/dev/null || true)
+if [[ -n "$git_name" && -n "$git_email" ]]; then
+    check_pass "user: $git_name <$git_email>"
+else
+    check_warn "user not configured"
+fi
+
+# ==============================================================================
+# 6. Docker
+# ==============================================================================
+
+if command -v docker >/dev/null 2>&1; then
+    echo
+    echo "Docker"
+    echo "─────────────────────────────────────"
+
+    if grep "^docker:" /etc/group 2>/dev/null | grep -q "\b$USER\b"; then
+        if groups | grep -q docker; then
+            check_pass "docker group (active)"
+        else
+            check_warn "docker group (added — restart shell to activate)"
+        fi
+    else
+        check_fail "not in docker group (sudo usermod -aG docker $USER)"
+    fi
+fi
+
+# ==============================================================================
+# 7. WSL
+# ==============================================================================
+
+if is_wsl; then
+    echo
+    echo "WSL"
+    echo "─────────────────────────────────────"
+
+    if [[ -x "$HOME/.local/bin/pbcopy" ]]; then
+        check_pass "clipboard integration"
+    else
+        check_warn "clipboard scripts not installed (run setup.sh)"
+    fi
+fi
+
+# ==============================================================================
+# 8. Environment files
+# ==============================================================================
+
+echo
+echo "Environment"
+echo "─────────────────────────────────────"
+
+if [[ -f "$HOME/.config/dotfiles/env" ]]; then
+    check_pass "~/.config/dotfiles/env"
+else
+    check_warn "~/.config/dotfiles/env (missing — run setup.sh)"
+fi
+
+if [[ -f "$HOME/.config/dotfiles/current-theme" ]]; then
+    theme=$(cat "$HOME/.config/dotfiles/current-theme" 2>/dev/null)
+    check_pass "theme: $theme"
+else
+    check_warn "no theme set (run: bin/theme-switcher <theme>)"
+fi
+
+# ==============================================================================
+# 9. EDITOR conflict detection
+# ==============================================================================
+
+echo
+echo "Conflict checks"
+echo "─────────────────────────────────────"
+
+editor_conflict=false
+for alias_file in "$DOTFILES_DIR"/shell/aliases/*.sh; do
+    if [[ -f "$alias_file" ]] && grep -v "^[[:space:]]*#" "$alias_file" 2>/dev/null | grep -q "^[[:space:]]*export EDITOR"; then
+        check_warn "EDITOR set in $(basename "$alias_file") (should only be in shell/env.sh)"
+        editor_conflict=true
+    fi
+done
+if [[ "$editor_conflict" == false ]]; then
+    check_pass "EDITOR (single source: shell/env.sh)"
+fi
+
+# ==============================================================================
+# Summary
+# ==============================================================================
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "  ${GREEN}✅ $PASS passed${NC}  ${YELLOW}⚠️  $WARN warnings${NC}  ${RED}❌ $FAIL errors${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+exit "$FAIL"
