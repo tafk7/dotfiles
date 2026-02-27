@@ -1,10 +1,7 @@
 #!/bin/bash
-
-# General aliases for modern CLI tools and productivity
+# General aliases — modern CLI tools and productivity
 
 # Modern CLI tool aliases
-# Note: 'ls' kept as system default for compatibility (muscle memory for -ltr, etc.)
-# Use eza variants (ll, la, l, tree) for enhanced features
 if command -v eza >/dev/null 2>&1; then
     alias ll='eza -l --color=auto --group-directories-first --time-style=long-iso'
     alias la='eza -la --color=auto --group-directories-first --time-style=long-iso'
@@ -17,20 +14,15 @@ else
     command -v tree >/dev/null 2>&1 && alias tree='tree -C'
 fi
 
-# Keep ls as system default
 alias ls='ls --color=auto'
 
-# File viewer (bat is available via install-time symlink ~/.local/bin/bat → batcat)
-if command -v bat &> /dev/null; then
-    alias view='bat'
-fi
+# File viewer
+command -v bat &>/dev/null && alias view='bat'
 
 # Directory navigation
 alias ..='cd ..'
 alias ...='cd ../..'
 alias -- -='cd -'
-
-# File operations
 
 # Grep with color
 alias grep='grep --color=auto'
@@ -47,26 +39,7 @@ alias ports='netstat -tulanp'
 alias myip='curl ifconfig.me'
 alias localip='hostname -I'
 
-# tmux shortcuts
-alias tm='tmux new -s'
-alias ta='tmux attach -t'
-alias tl='tmux list-sessions'
-alias tk='tmux kill-session -t'
-
-# tmux config switching
-alias tmux-minimal='$DOTFILES_DIR/bin/tmux-config-switcher minimal'
-alias tmux-full='$DOTFILES_DIR/bin/tmux-config-switcher full'
-alias tmux-mode='$DOTFILES_DIR/bin/tmux-config-switcher'
-
 # File viewing and editing
-# Neovim as default editor with escape hatches to real vim/vi
-if command -v nvim >/dev/null 2>&1; then
-    alias vim='nvim'
-    alias vi='nvim'
-    # Escape hatches to use actual vim/vi if needed
-    command -v vim >/dev/null 2>&1 && alias vimvim='command vim'
-    command -v vi >/dev/null 2>&1 && alias vivim='command vi'
-fi
 alias nano='nano -w'
 alias less='less -R'
 
@@ -92,7 +65,6 @@ fi
 
 # Theme management
 alias theme-switch='$DOTFILES_DIR/bin/theme-switcher'
-# Dynamic theme listing from themes directory
 alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
 
 # Find and replace utility
@@ -101,16 +73,6 @@ alias fr='$DOTFILES_DIR/bin/replace'
 # Cheatsheet for keybindings
 alias cheat='$DOTFILES_DIR/bin/cheatsheet'
 
-# Claude CLI shortcuts
-alias cl='claude'                # New session
-alias clc='claude --continue'    # Continue last session
-alias clp='claude --print'       # One-off command (non-interactive)
-
-# Claude local-only (no global settings)
-alias cll='claude --setting-sources project,local'
-alias cllc='claude --setting-sources project,local --continue'
-alias cllp='claude --setting-sources project,local --print'
-
 # direnv shortcuts
 if command -v direnv >/dev/null 2>&1; then
     alias da='direnv allow'
@@ -118,6 +80,4 @@ if command -v direnv >/dev/null 2>&1; then
 fi
 
 # btop as top replacement
-if command -v btop >/dev/null 2>&1; then
-    alias top='btop'
-fi
+command -v btop >/dev/null 2>&1 && alias top='btop'

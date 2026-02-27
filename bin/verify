@@ -47,7 +47,7 @@ for config in "${sorted_configs[@]}"; do
                 check_fail "$target (missing)"
             fi
             ;;
-        template)
+        template|gitconfig)
             if [[ -f "$target" ]]; then
                 if grep -q '{{GIT_' "$target" 2>/dev/null; then
                     check_fail "$target (has unresolved template placeholders)"
@@ -190,15 +190,20 @@ echo
 echo "Environment"
 echo "─────────────────────────────────────"
 
-if [[ -f "$HOME/.config/dotfiles/env" ]]; then
-    check_pass "~/.config/dotfiles/env"
+if [[ -f "$DOTFILES_DIR/generated/bridge.sh" ]]; then
+    check_pass "generated/bridge.sh"
+elif [[ -f "$HOME/.config/dotfiles/env" ]]; then
+    check_warn "~/.config/dotfiles/env (legacy path — re-run setup.sh)"
 else
-    check_warn "~/.config/dotfiles/env (missing — run setup.sh)"
+    check_warn "bridge file missing (run setup.sh)"
 fi
 
-if [[ -f "$HOME/.config/dotfiles/current-theme" ]]; then
-    theme=$(cat "$HOME/.config/dotfiles/current-theme" 2>/dev/null)
+if [[ -f "$DOTFILES_DIR/generated/current-theme" ]]; then
+    theme=$(cat "$DOTFILES_DIR/generated/current-theme" 2>/dev/null)
     check_pass "theme: $theme"
+elif [[ -f "$HOME/.config/dotfiles/current-theme" ]]; then
+    theme=$(cat "$HOME/.config/dotfiles/current-theme" 2>/dev/null)
+    check_pass "theme: $theme (legacy path)"
 else
     check_warn "no theme set (run: bin/theme-switcher <theme>)"
 fi

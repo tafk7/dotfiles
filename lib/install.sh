@@ -149,40 +149,32 @@ EOF
     success "WSL clipboard integration setup complete"
 }
 
-# Write install-time environment to ~/.config/dotfiles/env
+# Write install-time environment to generated/bridge.sh
 write_dotfiles_env() {
-    local env_file="$HOME/.config/dotfiles/env"
-    local env_dir="$(dirname "$env_file")"
-    local marker="# Managed by dotfiles setup.sh — edits will be overwritten on next install"
+    local bridge_file="$DOTFILES_DIR/generated/bridge.sh"
+    local legacy_file="$HOME/.config/dotfiles/env"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would write $env_file"
+        log "[DRY RUN] Would write $bridge_file"
         return 0
     fi
 
-    mkdir -p "$env_dir"
+    mkdir -p "$(dirname "$bridge_file")" "$(dirname "$legacy_file")"
 
-    local user_lines=""
-    if [[ -f "$env_file" ]]; then
-        user_lines="$(grep -v -e "^$marker$" \
-                           -e '^export DOTFILES_DIR=' \
-                           -e '^export WIN_USER=' \
-                           "$env_file" || true)"
-    fi
-
-    local managed_block="$marker"
-    managed_block+=$'\n'"export DOTFILES_DIR=\"$DOTFILES_DIR\""
+    cat > "$bridge_file" << EOF
+# DO NOT EDIT — written by setup.sh write_dotfiles_env()
+export DOTFILES_DIR="$DOTFILES_DIR"
+EOF
 
     if is_wsl; then
-        managed_block+=$'\n'"export WIN_USER=\"$(get_windows_username)\""
+        echo "export DOTFILES_WSL=1" >> "$bridge_file"
+        echo "export WIN_USER=\"$(get_windows_username)\"" >> "$bridge_file"
     fi
 
-    echo "$managed_block" > "$env_file"
-    if [[ -n "$user_lines" ]]; then
-        echo "$user_lines" >> "$env_file"
-    fi
+    # Transition symlink — old consumers source this path
+    ln -sf "$bridge_file" "$legacy_file"
 
-    success "Wrote install-time environment to $env_file"
+    success "Wrote install-time environment to $bridge_file"
 }
 
 # ==============================================================================
@@ -423,30 +415,24 @@ install_eget_tools() {
 
     log "Installing binary tools via eget..."
 
-    local eget_args=("--download-all")
+    # Parse tool list once
+    local -a tools
+    mapfile -t tools < <(grep -oP '^\["\K[^"]+' "$config")
 
     if [[ "${FORCE_REINSTALL:-false}" == "true" ]]; then
         log "Force reinstall: clearing eget-managed binaries..."
-        local tools
-        tools=$(grep -oP '^\["\K[^"]+' "$config")
-        for repo in $tools; do
-            local name="${repo##*/}"
-            rm -f "$HOME/.local/bin/$name"
+        for repo in "${tools[@]}"; do
+            rm -f "$HOME/.local/bin/${repo##*/}"
         done
     fi
 
-    if EGET_CONFIG="$config" eget "${eget_args[@]}"; then
-        local tools
-        tools=$(grep -oP '^\["\K[^"]+' "$config")
-        for repo in $tools; do
-            local name="${repo##*/}"
-            track_install "$name" ok
+    if EGET_CONFIG="$config" eget --download-all; then
+        for repo in "${tools[@]}"; do
+            track_install "${repo##*/}" ok
         done
     else
-        warn "Some eget tools failed to install"
-        local tools
-        tools=$(grep -oP '^\["\K[^"]+' "$config")
-        for repo in $tools; do
+        warn "Some eget tools may have failed"
+        for repo in "${tools[@]}"; do
             local name="${repo##*/}"
             if verify_binary "$name"; then
                 track_install "$name" ok

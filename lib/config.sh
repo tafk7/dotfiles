@@ -4,16 +4,17 @@
 
 # Directory constants
 CONFIGS_DIR="$DOTFILES_DIR/configs"
-SHELL_DIR="$DOTFILES_DIR/shell"
+ENTRY_DIR="$DOTFILES_DIR/entry"
 
 # Configuration mappings: key → "target:type"
 # Keys under shell/ use SHELL_DIR; keys under configs/ use CONFIGS_DIR.
 # setup.sh resolves the source path using config_source_path().
 declare -A CONFIG_MAP=(
-    # Shell RC files (source: shell/)
+    # Shell RC files (source: entry/)
     [bash.sh]="$HOME/.bashrc:symlink"
     [zsh.sh]="$HOME/.zshrc:symlink"
     [profile.sh]="$HOME/.profile:symlink"
+    [bash_profile]="$HOME/.bash_profile:symlink"
 
     # Config files (source: configs/)
     [tmux.conf]="$HOME/.tmux.conf:symlink"
@@ -26,15 +27,15 @@ declare -A CONFIG_MAP=(
     [starship.toml]="$HOME/.config/starship.toml:symlink"
 
     # Special handling
-    [gitconfig]="$HOME/.gitconfig:template"
+    [gitconfig]="$HOME/.gitconfig:gitconfig"
 )
 
 # Resolve the source path for a CONFIG_MAP key
 config_source_path() {
     local key="$1"
     case "$key" in
-        bash.sh|zsh.sh|profile.sh) echo "$SHELL_DIR/$key" ;;
-        *)                          echo "$CONFIGS_DIR/$key" ;;
+        bash.sh|zsh.sh|profile.sh|bash_profile) echo "$ENTRY_DIR/$key" ;;
+        *)                                       echo "$CONFIGS_DIR/$key" ;;
     esac
 }
 

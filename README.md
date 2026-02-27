@@ -102,7 +102,6 @@ nclean                    # rm node_modules + reinstall
 ```bash
 tm <name> / ta <name>     # New session / attach
 tl / tk <name>            # List / kill session
-tmux-minimal / tmux-full  # Switch config mode
 ```
 
 ### WSL (auto-detected)
@@ -147,7 +146,7 @@ shell/
   functions/*.sh          Domain-split functions (nav, process, python, fzf, wsl, tmux, docker, git)
   aliases/*.sh            9 alias categories (general, git, docker, python, node, vim, vscode, wsl, claude)
 installers/               Per-tool install scripts
-bin/                      User commands (theme-switcher, verify, cheatsheet, replace, vim/tmux-config-switcher)
+bin/                      User commands (theme-switcher, verify, cheatsheet, replace)
 ```
 
 **Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `shared.sh` → `env.sh` → theme → `fzf.sh` → `functions/*.sh` → `aliases/*.sh` → `~/.shell.local` → shell-specific (prompt, completion, nvm-lazy).

@@ -1,8 +1,5 @@
 #!/bin/bash
-
-# Essential git aliases for daily use
-# Naming convention: g + command abbreviation
-# Letters consistently map to commands: s=status/switch/staged, d=diff, c=commit, etc.
+# Git — aliases and functions
 
 # Status and inspection
 alias gs='git status'
@@ -40,3 +37,8 @@ alias gstp='git stash pop'
 
 # Lazygit TUI
 alias lg='lazygit'
+
+# Undo last commit but keep changes
+gundo() {
+    git reset HEAD~1 --soft
+}

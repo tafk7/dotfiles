@@ -1,57 +1,15 @@
 #!/bin/bash
-# Tool initialization and tool-specific environment
-# Owns: version managers, tool PATH extensions, EDITOR, tool-specific settings, WSL env
-
-# Validate DOTFILES_DIR — set by ~/.config/dotfiles/env, sourced before this file
-if [[ -z "$DOTFILES_DIR" ]]; then
-    echo "Warning: DOTFILES_DIR not set. Some functionality may not work." >&2
-fi
+# Static exports only. No eval. No subshells. No tool initialization.
+# Tool init (pyenv, direnv, uv, poetry, nix) lives in shell/tool-init.sh.
 
 # ==============================================================================
-# Tool Initialization
+# Version Manager Roots (PATH-only, no eval)
 # ==============================================================================
 
-# Node Version Manager (NVM_DIR also set in profile for non-interactive contexts)
 export NVM_DIR="$HOME/.nvm"
 
-# pyenv
 export PYENV_ROOT="$HOME/.pyenv"
-if [[ -d "$PYENV_ROOT" ]]; then
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init --path 2>/dev/null || true)"
-    eval "$(pyenv init - 2>/dev/null || true)"
-fi
-
-# direnv
-if command -v direnv >/dev/null 2>&1; then
-    if [[ -n "${BASH_VERSION:-}" ]]; then
-        eval "$(direnv hook bash)"
-    elif [[ -n "${ZSH_VERSION:-}" ]]; then
-        eval "$(direnv hook zsh)"
-    fi
-fi
-
-# uv completion (bash only — zsh completions loaded after compinit in zshrc)
-if command -v uv >/dev/null 2>&1; then
-    if [[ -n "${BASH_VERSION:-}" ]]; then
-        eval "$(uv generate-shell-completion bash 2>/dev/null || true)"
-    fi
-fi
-
-# poetry completion (bash only — zsh completions loaded after compinit in zshrc)
-if command -v poetry >/dev/null 2>&1; then
-    if [[ -n "${BASH_VERSION:-}" ]]; then
-        eval "$(poetry completions bash 2>/dev/null || true)"
-    fi
-fi
-
-# Nix (multi-user Determinate Systems install)
-NIX_PROFILE="/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
-if [[ -f "$NIX_PROFILE" ]] && ! command -v nix >/dev/null 2>&1; then
-    # shellcheck source=/dev/null
-    . "$NIX_PROFILE"
-fi
-unset NIX_PROFILE
+[[ -d "$PYENV_ROOT/bin" ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 
 # ==============================================================================
 # Tool-Specific PATH Extensions
@@ -87,9 +45,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PIP_REQUIRE_VIRTUALENV=false
 
 # Node.js
-if command -v node >/dev/null 2>&1; then
-    export NODE_OPTIONS="--max-old-space-size=4096"
-fi
+command -v node >/dev/null 2>&1 && export NODE_OPTIONS="--max-old-space-size=4096"
 
 # Docker
 export DOCKER_BUILDKIT=1
@@ -101,10 +57,13 @@ if command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1; then
 fi
 
 # Theme name (read from persistent storage)
-THEME_FILE="$HOME/.config/dotfiles/current-theme"
-if [[ -f "$THEME_FILE" ]]; then
-    export DOTFILES_THEME=$(cat "$THEME_FILE" 2>/dev/null)
-fi
+for _theme_file in "$DOTFILES_DIR/generated/current-theme" "$HOME/.config/dotfiles/current-theme"; do
+    if [[ -f "$_theme_file" ]]; then
+        export DOTFILES_THEME=$(cat "$_theme_file" 2>/dev/null)
+        break
+    fi
+done
+unset _theme_file
 
 export PROJECTS_DIR="$HOME/projects"
 
@@ -112,10 +71,9 @@ export PROJECTS_DIR="$HOME/projects"
 # WSL-Specific Environment
 # ==============================================================================
 
-if command -v wslpath >/dev/null 2>&1; then
+if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
     # DISPLAY: don't override if already set (WSLg sets this automatically)
     if [[ -z "${DISPLAY:-}" ]]; then
-        # WSL2 needs the Windows host IP; WSL1 uses :0
         if [[ -f /etc/resolv.conf ]] && grep -q "nameserver.*172\." /etc/resolv.conf 2>/dev/null; then
             export DISPLAY="$(awk '/nameserver/{print $2; exit}' /etc/resolv.conf):0"
         else
@@ -127,21 +85,19 @@ if command -v wslpath >/dev/null 2>&1; then
     export WSLENV="USERPROFILE/pu:APPDATA/pu"
 
     # Strip Windows PATH entries that shadow Linux tools
-    # Keeps: System32 (clip.exe, wsl.exe), VS Code, Program Files, AppData
     if [[ -n "$PATH" ]]; then
         export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E \
             '/mnt/c/Windows/(System32/(Wbem|WindowsPowerShell|OpenSSH)|SysWOW64)' | \
             tr '\n' ':' | sed 's/:$//')
     fi
 
-    # WIN_USER is set at install time by setup.sh → write_dotfiles_env()
-    # If missing, warn once and skip Windows path derivation
+    # WIN_USER set at install time in generated/bridge.sh
     if [[ -z "${WIN_USER:-}" ]]; then
         [[ -z "${_WIN_USER_WARNED:-}" ]] && echo "Warning: WIN_USER not set — run setup.sh to configure WSL environment." >&2
         _WIN_USER_WARNED=1
     fi
 
-    # Windows paths (derived from WIN_USER — only set when available)
+    # Windows paths (derived from WIN_USER)
     if [[ -n "${WIN_USER:-}" ]]; then
         export WIN_HOME="/mnt/c/Users/$WIN_USER"
         export WIN_DESKTOP="$WIN_HOME/Desktop"

@@ -1,11 +1,13 @@
 #!/bin/bash
-# WSL-specific functions for Windows integration
+# All WSL-specific runtime concerns — functions and aliases.
+# Sourced conditionally by shell/init.sh when DOTFILES_WSL=1.
+# No WSL guard needed here — init.sh handles the check.
 
-# Only load on WSL systems
-command -v wslpath >/dev/null 2>&1 || return 0
+# ==============================================================================
+# Functions
+# ==============================================================================
 
-# Import SSH keys from Windows — single consolidated definition
-# Uses $WIN_USER from env file, does NOT call cmd.exe to re-derive
+# Import SSH keys from Windows
 import_windows_ssh_keys() {
     local win_user="${WIN_USER:-}"
     if [[ -z "$win_user" ]]; then
@@ -50,7 +52,6 @@ import_windows_ssh_keys() {
 winapp() {
     if [[ -z "$1" ]]; then
         echo "Usage: winapp <application> [args]"
-        echo "Example: winapp chrome https://google.com"
         return 1
     fi
     cmd.exe /c start "$@"
@@ -60,7 +61,6 @@ winapp() {
 winopen() {
     if [[ -z "$1" ]]; then
         echo "Usage: winopen <file>"
-        echo "Opens file with default Windows application"
         return 1
     fi
     if [[ -f "$1" ]]; then
@@ -70,3 +70,49 @@ winopen() {
         return 1
     fi
 }
+
+# Explorer in current directory
+explorer() {
+    explorer.exe "${1:-.}"
+}
+
+# Copy current Windows path to clipboard
+wcd() {
+    local winpath=$(wslpath -w "$(pwd)")
+    echo "$winpath" | clip.exe
+    echo "Windows path copied to clipboard: $winpath"
+}
+
+# ==============================================================================
+# Aliases
+# ==============================================================================
+
+# Navigation
+alias cdwin='cd $WIN_HOME'
+alias cddesk='cd $WIN_DESKTOP'
+alias cddl='cd $WIN_DOWNLOADS'
+alias cddocs='cd $WIN_DOCUMENTS'
+
+# Windows programs
+alias notepad='notepad.exe'
+alias clip='clip.exe'
+alias cmd='cmd.exe'
+alias winget='/mnt/c/Windows/System32/winget.exe'
+
+# PowerShell
+if [[ -x "/mnt/c/Program Files/PowerShell/7/pwsh.exe" ]]; then
+    alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
+else
+    alias pwsh='powershell.exe'
+fi
+
+# File operations
+alias open='explorer'
+alias cwd='pwd | clip.exe'
+
+# Path conversion
+alias wpath='wslpath -w'
+alias lpath='wslpath -u'
+
+# SSH import
+alias sync-ssh='import_windows_ssh_keys'

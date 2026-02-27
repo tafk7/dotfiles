@@ -42,3 +42,13 @@ unset -f _claude_resolve_bin
 
 # Clean Claude Code shell snapshots (fixes zoxide issues)
 alias clean-claude-snapshots='rm -rf ~/.claude/shell-snapshots/ ~/.zcompdump* && echo "Cleaned Claude snapshots and zsh cache"'
+
+# Claude CLI shortcuts
+alias cl='claude'                # New session
+alias clc='claude --continue'    # Continue last session
+alias clp='claude --print'       # One-off command (non-interactive)
+
+# Claude local-only (no global settings)
+alias cll='claude --setting-sources project,local'
+alias cllc='claude --setting-sources project,local --continue'
+alias cllp='claude --setting-sources project,local --print'

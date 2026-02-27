@@ -237,8 +237,8 @@ phase_setup_configs() {
                 symlink)
                     process_symlink "$source" "$target" "$backup_dir"
                     ;;
-                template)
-                    process_template "$source" "$target" "$backup_dir"
+                gitconfig)
+                    process_git_config "$source" "$target" "$backup_dir" "$FORCE_OVERWRITE"
                     ;;
                 *)
                     error "Unknown config type: $type for $config"
@@ -250,20 +250,20 @@ phase_setup_configs() {
     # WSL-specific setup
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
         setup_wsl_clipboard
-        source "$DOTFILES_DIR/shell/functions/wsl.sh"
+        source "$DOTFILES_DIR/shell/platform/wsl.sh"
         import_windows_ssh_keys
     fi
 
     # Initialize default theme if none is set (theme-switcher owns the default)
     if [[ "$DRY_RUN" == "true" ]]; then
-        if [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
+        if [[ ! -f "$DOTFILES_DIR/generated/current-theme" ]] && [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
             log "[DRY RUN] Would initialize default theme"
         fi
     else
         "$DOTFILES_DIR/bin/theme-switcher" --init
     fi
 
-    # Write install-time environment to ~/.config/dotfiles/env
+    # Write install-time environment to generated/bridge.sh
     write_dotfiles_env
 
     # Cleanup
@@ -296,19 +296,6 @@ process_symlink() {
     
     safe_symlink "$source" "$target" "$backup_dir"
 }
-
-# Process template configuration
-process_template() {
-    local source="$1" target="$2" backup_dir="$3"
-    
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would process git config template"
-        return 0
-    fi
-
-    process_git_config "$source" "$target" "$backup_dir" "$FORCE_OVERWRITE"
-}
-
 
 # Main installation workflow
 run_installation() {

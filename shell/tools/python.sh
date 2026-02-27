@@ -1,7 +1,43 @@
 #!/bin/bash
-# Python & Poetry management functions
+# Python — aliases and functions
 
-# Set Python version for current project (works for both Poetry and pip projects)
+# Virtual environment shortcuts (uv-aware)
+if command -v uv >/dev/null 2>&1; then
+    alias venv='uv venv .venv'
+    alias pipreqs='uv pip install -r requirements.txt'
+else
+    alias venv='python3 -m venv .venv'
+    alias pipreqs='pip install -r requirements.txt'
+fi
+
+# Core Python aliases
+alias py='python3'
+alias ipy='ipython'
+
+# Testing
+alias pytest='python -m pytest'
+alias pyt='python -m pytest -v'
+
+# Code quality (if installed)
+command -v black >/dev/null 2>&1 && alias fmt='black .'
+if command -v ruff >/dev/null 2>&1; then
+    alias lint='ruff check .'
+    alias lintf='ruff check . --fix'
+fi
+
+# Quick server
+alias pyserver='python -m http.server'
+
+# uv shortcuts
+if command -v uv >/dev/null 2>&1; then
+    alias uvs='uv sync'
+    alias uvr='uv run'
+    alias uvt='uv tool install'
+    alias uva='uv add'
+    alias uvpi='uv pip install'
+fi
+
+# Set Python version for current project
 pyset() {
     if ! command -v pyenv >/dev/null 2>&1; then
         echo "Error: pyenv is not installed"
@@ -187,7 +223,7 @@ pylist() {
     echo "Example: pyenv install 3.11.9"
 }
 
-# Universal venv activation (works for both Poetry and pip projects)
+# Universal venv activation
 vactivate() {
     if [[ -d .venv ]]; then
         source .venv/bin/activate

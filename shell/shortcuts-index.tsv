@@ -75,8 +75,6 @@ tmux│Ctrl+a P│Paste from system clipboard│xclip -o -sel clipboard | tmux l
 tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
 tmux│Ctrl+a Ctrl+l│Clear screen and scrollback history│send-keys C-l; clear-history
 tmux│Ctrl+a ?│List all keybindings│list-keys
-tmux│tmux-minimal│Switch to minimal config (no plugins)│tmux-config-switcher minimal
-tmux│tmux-full│Switch to full config (TPM + plugins)│tmux-config-switcher full
 
 # Vim shortcuts (leader is comma)
 # File navigation (FZF)
@@ -161,9 +159,6 @@ shell│reload│Reload shell configuration│source ~/.bashrc
 shell│themes│List available themes and show usage│ls $DOTFILES_DIR/configs/themes/
 shell│theme-switch│Interactive theme selector (FZF)│theme-switcher
 shell│pane-tint│Tint current tmux pane background│pane-tint <0|1|2|3>
-shell│vim-minimal│Switch to minimal vim config (no plugins)│vim-config-switcher minimal
-shell│vim-full│Switch to full vim config│vim-config-switcher full
-shell│vim-status│Show current vim config mode│vim-status
 shell│vimrc│Edit neovim config│nvim ~/.config/nvim/init.vim
 shell│vplug│Install vim plugins│nvim +PlugInstall +qall
 shell│vplugup│Update vim plugins│nvim +PlugUpdate +qall

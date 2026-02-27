@@ -1,6 +1,13 @@
 #!/bin/bash
-# Tmux pane tinting — apply themed background variant to current pane
+# Tmux — aliases and functions
 
+# Session management
+alias tm='tmux new -s'
+alias ta='tmux attach -t'
+alias tl='tmux list-sessions'
+alias tk='tmux kill-session -t'
+
+# Pane tinting — apply themed background variant to current pane
 pane-tint() {
     if [[ -z "${TMUX:-}" ]]; then
         echo "Not in a tmux session"
