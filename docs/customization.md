@@ -8,7 +8,6 @@ This guide explains how to customize and extend the dotfiles system for your spe
 
 - **Base packages** - Essential tools that everyone needs (git, curl, vim, etc.)
 - **Work packages** - Professional development tools (Docker, Azure CLI, Node.js/Python dev tools)
-- **Personal packages** - Personal preferences and utilities
 
 ### 2. Adding a New Package
 
@@ -35,17 +34,6 @@ local npm_packages=("yarn" "eslint" "prettier" "your-npm-package")
 
 # For Python packages:
 local python_packages=("black" "ruff" "your-python-package")
-```
-
-### 5. For Personal Packages
-
-Edit `lib/packages.sh` and add to the `personal_packages` array (line ~253):
-
-```bash
-local personal_packages=(
-    # ... existing packages ...
-    "your-personal-package"
-)
 ```
 
 ## Adding Custom Configuration Files
@@ -156,7 +144,6 @@ success "Success message"
 warn "Warning message"
 error "Error message"
 work_log "Work-specific message"
-personal_log "Personal setup message"
 ```
 
 ## Adding Complex Software
@@ -197,8 +184,6 @@ install_your_software || warn "Your Software installation failed"
    ```bash
    ./setup.sh                    # Base only
    ./setup.sh --work            # Base + work
-   ./setup.sh --personal        # Base + personal
-   ./setup.sh --work --personal # Everything
    ```
 
 3. Test on different distributions if possible
@@ -216,7 +201,7 @@ install_your_software || warn "Your Software installation failed"
 
 1. Run the installer with your preferred options:
    ```bash
-   ./setup.sh --work --personal
+   ./setup.sh --work
    ```
 
 2. Or reload your shell configuration:
@@ -254,6 +239,6 @@ If you create useful customizations that others might benefit from:
 
 If you're unsure about something:
 1. Look at existing implementations in the setup files
-2. Check the security functions in `lib.sh`
+2. Check the utility functions in `lib/runtime.sh`
 3. Test in a safe environment first
 4. Follow the patterns used by existing code

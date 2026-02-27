@@ -51,10 +51,7 @@ wcd() {
 alias wpath='wslpath -w'
 alias lpath='wslpath -u'
 
-# Functions are now in shell/wsl-functions.sh
-
-# Note: Core WSL functions (SSH management, clipboard, etc.) are handled in lib.sh
-# This file contains WSL-specific aliases
+# WSL functions live in shell/functions/wsl.sh
 
 # SSH import functionality (main alias)
 alias sync-ssh='import_windows_ssh_keys'

@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true

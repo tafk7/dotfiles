@@ -1,15 +1,9 @@
 # Zsh configuration
-# Owns: zsh options, history, completion, keybindings, prompt, zsh-specific tool loading
+# Owns: zsh options, history, completion, keybindings, prompt
 
-# PATH baseline — ~/.profile handles this for login shells, but VS Code and other
-# terminals launch zsh as non-login (skipping ~/.profile). Profile has a source
-# guard so this is safe in both login and non-login shells.
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
-
-# Load install-time environment (written by setup.sh)
 [[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
 
-# Fallback: derive DOTFILES_DIR from symlink if env file is missing
 if [[ -z "${DOTFILES_DIR:-}" ]]; then
     export DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
 fi
@@ -47,17 +41,10 @@ setopt AUTO_LIST
 setopt AUTO_PARAM_SLASH
 
 # ==============================================================================
-# Load Shared Environment
+# Shared sequence (env → theme → fzf → functions → aliases)
 # ==============================================================================
 
-# Tool initialization (version managers, EDITOR, tool-specific settings, WSL env)
-[[ -f "$DOTFILES_DIR/shell/env.sh" ]] && source "$DOTFILES_DIR/shell/env.sh"
-
-# Theme (prompt colors, FZF color scheme — must load before fzf.sh to merge colors)
-[[ -f "$HOME/.config/dotfiles/theme.sh" ]] && source "$HOME/.config/dotfiles/theme.sh"
-
-# FZF configuration (commands, preview options, merges theme colors)
-[[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
+source "$DOTFILES_DIR/shell/shared.sh"
 
 # ==============================================================================
 # Prompt
@@ -128,38 +115,16 @@ fi
 # Zoxide
 # ==============================================================================
 
-if command -v zoxide >/dev/null 2>&1; then
-    eval "$(zoxide init zsh)"
-fi
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
 
 # ==============================================================================
-# NVM (lazy-loaded)
+# NVM (lazy)
 # ==============================================================================
 
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-    _load_nvm() {
-        unset -f _load_nvm nvm node npm
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    }
-
-    nvm() { _load_nvm; nvm "$@"; }
-    node() { _load_nvm; node "$@"; }
-    npm() { _load_nvm; npm "$@"; }
-fi
-
-# ==============================================================================
-# Shared Functions and Aliases
-# ==============================================================================
-
-[[ -f "$DOTFILES_DIR/shell/functions.sh" ]] && source "$DOTFILES_DIR/shell/functions.sh"
-
-for file in "$DOTFILES_DIR"/shell/aliases/*.sh(N); do
-    [[ -r "$file" ]] && source "$file"
-done
+source "$DOTFILES_DIR/shell/nvm-lazy.sh"
 
 # ==============================================================================
 # Local Overrides (not tracked in git)
 # ==============================================================================
 
-[[ -f ~/.shell.local ]] && source ~/.shell.local
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

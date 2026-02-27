@@ -5,7 +5,7 @@
 set -eo pipefail
 
 # Source common functions
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib.sh"
+source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
 
 log "Installing pyenv (Python Version Manager)..."
 

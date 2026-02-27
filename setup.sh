@@ -7,42 +7,19 @@ set -euo pipefail
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Set DOTFILES_DIR before sourcing lib.sh (lib.sh uses it for DOTFILES_BACKUP_PREFIX)
+# Set DOTFILES_DIR before sourcing lib
 DOTFILES_DIR="$SCRIPT_DIR"
 export DOTFILES_DIR
 
-# Load core library (contains all functions)
-source "$SCRIPT_DIR/lib.sh"
-
-# Configuration
-CONFIGS_DIR="$SCRIPT_DIR/configs"
+# Load install library (pulls in runtime.sh + config.sh)
+source "$SCRIPT_DIR/lib/install.sh"
 
 # Installation options
 INSTALL_TIER="config"  # Default tier: config, shell, dev, full
-INSTALL_PERSONAL=false
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
 SHOW_HELP=false
 DRY_RUN=false
-
-# Configuration mappings using associative array
-declare -A CONFIG_MAP=(
-    # Simple symlinks
-    [bashrc]="$HOME/.bashrc:symlink"
-    [zshrc]="$HOME/.zshrc:symlink"
-    [profile]="$HOME/.profile:symlink"
-    [tmux.conf]="$HOME/.tmux.conf:symlink"
-    [editorconfig]="$HOME/.editorconfig:symlink"
-    [ripgreprc]="$HOME/.ripgreprc:symlink"
-    [init.vim]="$HOME/.config/nvim/init.vim:symlink"
-    [config/bat]="$HOME/.config/bat:symlink"
-    [config/fd]="$HOME/.config/fd:symlink"
-    [ssh_config]="$HOME/.ssh/config:symlink"
-    [starship.toml]="$HOME/.config/starship.toml:symlink"
-    
-    # Special handling
-    [gitconfig]="$HOME/.gitconfig:template"
-)
 
 # Parse command line arguments
 parse_arguments() {
@@ -62,10 +39,6 @@ parse_arguments() {
                 ;;
             --full)
                 INSTALL_TIER="full"
-                shift
-                ;;
-            --personal)
-                INSTALL_PERSONAL=true
                 shift
                 ;;
             --force)
@@ -119,13 +92,10 @@ TIERS (cumulative - each tier includes all previous tiers):
                         packages (bat, fd, ripgrep, direnv).
 
     --dev               Shell + development tools. Requires sudo.
-                        Adds: neovim, tmux, Claude Code
+                        Adds: neovim, tmux
 
     --full              Dev + full environment. Requires sudo.
                         Adds: NVM, pyenv, poetry, Docker, Azure CLI
-
-MODIFIERS:
-    --personal          Add media tools (ffmpeg, yt-dlp) to any tier
 
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
@@ -138,7 +108,6 @@ EXAMPLES:
     ./setup.sh --shell               # Modern shell experience
     ./setup.sh --dev                 # Full development setup
     ./setup.sh --full                # Complete work environment
-    ./setup.sh --full --personal     # Everything including media tools
     ./setup.sh --shell --dry-run     # Preview shell tier installation
 
 TIER SUMMARY:
@@ -148,7 +117,7 @@ TIER SUMMARY:
     │ config   │ Symlinks only (zero installs)                   │ No        │
     │ shell    │ + eget, starship, eza, fzf, zoxide, delta,      │ Yes       │
     │          │   btop, glow, lazygit, uv, bat, fd, ripgrep     │           │
-    │ dev      │ + neovim, tmux, Claude Code                     │ Yes       │
+    │ dev      │ + neovim, tmux                                │ Yes       │
     │ full     │ + NVM, pyenv, poetry, Docker, Azure CLI         │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
 
@@ -225,8 +194,6 @@ phase_install_packages() {
         install_full_packages
     fi
 
-    [[ "$INSTALL_PERSONAL" == "true" ]] && install_personal_packages
-
     success "Package installation complete"
 }
 
@@ -264,7 +231,7 @@ phase_setup_configs() {
             local mapping="${CONFIG_MAP[$config]}"
             local target="${mapping%%:*}"
             local type="${mapping##*:}"
-            local source="$CONFIGS_DIR/$config"
+            local source="$(config_source_path "$config")"
             
             case "$type" in
                 symlink)
@@ -283,6 +250,7 @@ phase_setup_configs() {
     # WSL-specific setup
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
         setup_wsl_clipboard
+        source "$DOTFILES_DIR/shell/functions/wsl.sh"
         import_windows_ssh_keys
     fi
 
@@ -400,7 +368,7 @@ run_installation() {
     fi
 
     echo "$step. Verify installation:"
-    echo "   ./bin/check-setup"
+    echo "   ./bin/verify"
     echo
     ((step++))
 
@@ -433,7 +401,7 @@ main() {
     echo "Dotfiles Installation"
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
-    echo "Tier: $INSTALL_TIER$([ "$INSTALL_PERSONAL" = "true" ] && echo " + personal")"
+    echo "Tier: $INSTALL_TIER"
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     

@@ -108,7 +108,7 @@ To add a new theme:
 
 1. **Create theme directory:**
    ```bash
-   mkdir -p ~/dotfiles/configs/themes/my-theme
+   mkdir -p ~/dotfiles/themes/my-theme
    ```
 
 2. **Create required files:**
@@ -187,7 +187,7 @@ To add a new theme:
 
 ### File Structure
 ```
-configs/themes/
+themes/
 ├── nord/
 │   ├── vim.vim      # Vim colorscheme and settings
 │   ├── tmux.conf    # Tmux status bar and colors
