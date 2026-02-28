@@ -1,13 +1,10 @@
 # Zsh configuration
-# Owns: zsh options, history, completion, keybindings, prompt
+# Owns: zsh options, history, completion, keybindings
 
-# Load bridge
-[[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
-
-# Fallback
-if [[ -z "${DOTFILES_DIR:-}" ]]; then
-    export DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
-fi
+# Derive DOTFILES_DIR from symlink — always works regardless of install state
+DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
+export DOTFILES_DIR
+[[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
 
 # PATH baseline for non-login interactive
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
@@ -48,20 +45,11 @@ setopt AUTO_PARAM_SLASH
 # Shared initialization sequence
 # ==============================================================================
 
+SHELL_NAME=zsh
 source "$DOTFILES_DIR/shell/init.sh"
 
 # ==============================================================================
-# Prompt — starship
-# ==============================================================================
-
-if command -v starship >/dev/null 2>&1; then
-    eval "$(starship init zsh)"
-else
-    PS1='%F{cyan}%~%f %# '
-fi
-
-# ==============================================================================
-# Completion System
+# Completion System (must be after init.sh)
 # ==============================================================================
 
 autoload -Uz compinit
@@ -99,32 +87,3 @@ bindkey '^[[1;5D' backward-word   # Ctrl+Left
 autoload -U edit-command-line
 zle -N edit-command-line
 bindkey '^X^E' edit-command-line
-
-# ==============================================================================
-# FZF Key Bindings (zsh-specific)
-# ==============================================================================
-
-if command -v fzf >/dev/null 2>&1; then
-    [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && \
-        source /usr/share/doc/fzf/examples/key-bindings.zsh
-    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && \
-        source /usr/share/doc/fzf/examples/completion.zsh
-fi
-
-# ==============================================================================
-# Zoxide
-# ==============================================================================
-
-command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
-
-# ==============================================================================
-# NVM (lazy)
-# ==============================================================================
-
-source "$DOTFILES_DIR/shell/lazy/nvm.sh"
-
-# ==============================================================================
-# Local Overrides (not tracked in git)
-# ==============================================================================
-
-[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

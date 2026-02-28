@@ -256,7 +256,7 @@ phase_setup_configs() {
 
     # Initialize default theme if none is set (theme-switcher owns the default)
     if [[ "$DRY_RUN" == "true" ]]; then
-        if [[ ! -f "$DOTFILES_DIR/generated/current-theme" ]] && [[ ! -f "$HOME/.config/dotfiles/current-theme" ]]; then
+        if [[ ! -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
             log "[DRY RUN] Would initialize default theme"
         fi
     else

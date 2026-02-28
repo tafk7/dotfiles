@@ -1,5 +1,5 @@
 #!/bin/bash
-# Dotfiles verification — dynamically derives checklist from lib/config.sh + eget.toml
+# Dotfiles verification — checks configs, tools, and environment health.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,76 +62,39 @@ for config in "${sorted_configs[@]}"; do
 done
 
 # ==============================================================================
-# 2. eget.toml — check every binary tool
+# 2. Managed tools — single loop over registry, grouped by tier
 # ==============================================================================
 
-echo
-echo "Binary tools (eget.toml)"
-echo "─────────────────────────────────────"
+for tier in shell dev full; do
+    readarray -t tier_tools < <(tools_for_tier "$tier")
+    [[ ${#tier_tools[@]} -eq 0 ]] && continue
 
-eget_config="$DOTFILES_DIR/eget.toml"
-if [[ -f "$eget_config" ]]; then
-    while IFS= read -r repo; do
-        name="${repo##*/}"
-        if verify_binary "$name"; then
-            check_pass "$name"
+    echo
+    echo "Tools [$tier tier]"
+    echo "─────────────────────────────────────"
+
+    for name in "${tier_tools[@]}"; do
+        local verify_cmd
+        verify_cmd="$(tool_verify_command "$name")"
+        local binary="${TOOL_BINARY[$name]}"
+        local label="$name"
+        [[ "$name" != "$binary" ]] && label="$name ($binary)"
+
+        if eval "$verify_cmd"; then
+            check_pass "$label"
         else
-            check_fail "$name (not found or broken)"
+            # Version managers and full-tier tools are optional — warn, not fail
+            if [[ "$tier" == "full" ]] || [[ "${TOOL_METHOD[$name]}" == "installer" && "$tier" != "shell" ]]; then
+                check_warn "$label (not installed)"
+            else
+                check_fail "$label (not found)"
+            fi
         fi
-    done < <(grep -oP '^\["\K[^"]+' "$eget_config")
-else
-    check_warn "eget.toml not found"
-fi
-
-# ==============================================================================
-# 3. Installer-managed tools
-# ==============================================================================
-
-echo
-echo "Installer-managed tools"
-echo "─────────────────────────────────────"
-
-for tool in tmux neovim plantuml; do
-    case "$tool" in
-        tmux)    cmd="tmux" ;;
-        neovim)  cmd="nvim" ;;
-        plantuml) cmd="plantuml" ;;
-    esac
-    if verify_binary "$cmd"; then
-        check_pass "$tool ($cmd)"
-    else
-        check_warn "$tool (not installed)"
-    fi
+    done
 done
 
 # ==============================================================================
-# 4. Version managers
-# ==============================================================================
-
-echo
-echo "Version managers"
-echo "─────────────────────────────────────"
-
-if [[ -d "$HOME/.nvm" ]] && [[ -s "$HOME/.nvm/nvm.sh" ]]; then
-    check_pass "NVM ($HOME/.nvm)"
-else
-    check_warn "NVM (not installed)"
-fi
-
-if [[ -d "$HOME/.pyenv" ]]; then
-    check_pass "pyenv ($HOME/.pyenv)"
-else
-    check_warn "pyenv (not installed)"
-fi
-
-if command -v poetry >/dev/null 2>&1; then
-    check_pass "poetry"
-else
-    check_warn "poetry (not installed)"
-fi
-
-# ==============================================================================
-# 5. Git configuration
+# 3. Git configuration
 # ==============================================================================
 
 echo
@@ -147,7 +110,7 @@ else
 fi
 
 # ==============================================================================
-# 6. Docker
+# 4. Docker
 # ==============================================================================
 
 if command -v docker >/dev/null 2>&1; then
@@ -167,7 +130,7 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 # ==============================================================================
-# 7. WSL
+# 5. WSL
 # ==============================================================================
 
 if is_wsl; then
@@ -183,7 +146,7 @@ if is_wsl; then
 fi
 
 # ==============================================================================
-# 8. Environment files
+# 6. Environment files
 # ==============================================================================
 
 echo
@@ -192,24 +155,24 @@ echo "────────────────────────�
 
 if [[ -f "$DOTFILES_DIR/generated/bridge.sh" ]]; then
     check_pass "generated/bridge.sh"
-elif [[ -f "$HOME/.config/dotfiles/env" ]]; then
-    check_warn "~/.config/dotfiles/env (legacy path — re-run setup.sh)"
 else
     check_warn "bridge file missing (run setup.sh)"
 fi
 
-if [[ -f "$DOTFILES_DIR/generated/current-theme" ]]; then
-    theme=$(cat "$DOTFILES_DIR/generated/current-theme" 2>/dev/null)
-    check_pass "theme: $theme"
-elif [[ -f "$HOME/.config/dotfiles/current-theme" ]]; then
-    theme=$(cat "$HOME/.config/dotfiles/current-theme" 2>/dev/null)
-    check_pass "theme: $theme (legacy path)"
+if [[ -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
+    # Extract theme name from generated/theme.sh
+    theme=$(grep -oP 'DOTFILES_THEME="\K[^"]+' "$DOTFILES_DIR/generated/theme.sh" 2>/dev/null || true)
+    if [[ -n "$theme" ]]; then
+        check_pass "theme: $theme"
+    else
+        check_warn "theme.sh exists but no theme name found"
+    fi
 else
     check_warn "no theme set (run: bin/theme-switcher <theme>)"
 fi
 
 # ==============================================================================
-# 9. EDITOR conflict detection
+# 7. EDITOR conflict detection
 # ==============================================================================
 
 echo
@@ -217,7 +180,7 @@ echo "Conflict checks"
 echo "─────────────────────────────────────"
 
 editor_conflict=false
-for alias_file in "$DOTFILES_DIR"/shell/aliases/*.sh; do
+for alias_file in "$DOTFILES_DIR"/shell/tools/*.sh; do
     if [[ -f "$alias_file" ]] && grep -v "^[[:space:]]*#" "$alias_file" 2>/dev/null | grep -q "^[[:space:]]*export EDITOR"; then
         check_warn "EDITOR set in $(basename "$alias_file") (should only be in shell/env.sh)"
         editor_conflict=true
