@@ -31,39 +31,23 @@ fi
 # Tool-Specific Settings
 # ==============================================================================
 
-# Editor — prefer neovim
-if command -v nvim >/dev/null 2>&1; then
-    export EDITOR="nvim"
-    export VISUAL="nvim"
-else
-    export EDITOR="vim"
-    export VISUAL="vim"
-fi
+# Editor
+export EDITOR="${EDITOR:-nvim}"
+export VISUAL="${VISUAL:-nvim}"
 
 # Python
 export PYTHONDONTWRITEBYTECODE=1
 export PIP_REQUIRE_VIRTUALENV=false
 
 # Node.js
-command -v node >/dev/null 2>&1 && export NODE_OPTIONS="--max-old-space-size=4096"
+export NODE_OPTIONS="--max-old-space-size=4096"
 
 # Docker
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
 # Bat
-if command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1; then
-    export BAT_THEME="${BAT_THEME:-gruvbox-dark}"
-fi
-
-# Theme name (read from persistent storage)
-for _theme_file in "$DOTFILES_DIR/generated/current-theme" "$HOME/.config/dotfiles/current-theme"; do
-    if [[ -f "$_theme_file" ]]; then
-        export DOTFILES_THEME=$(cat "$_theme_file" 2>/dev/null)
-        break
-    fi
-done
-unset _theme_file
+export BAT_THEME="${BAT_THEME:-gruvbox-dark}"
 
 export PROJECTS_DIR="$HOME/projects"
 

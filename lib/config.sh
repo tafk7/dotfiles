@@ -2,6 +2,9 @@
 # Declarative configuration — single source of truth for managed files and packages.
 # This file defines data only. No functions. No side effects.
 
+# Tool registry (single source of truth for managed tools)
+source "$(dirname "${BASH_SOURCE[0]}")/registry.sh"
+
 # Directory constants
 CONFIGS_DIR="$DOTFILES_DIR/configs"
 ENTRY_DIR="$DOTFILES_DIR/entry"

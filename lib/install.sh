@@ -152,14 +152,13 @@ EOF
 # Write install-time environment to generated/bridge.sh
 write_dotfiles_env() {
     local bridge_file="$DOTFILES_DIR/generated/bridge.sh"
-    local legacy_file="$HOME/.config/dotfiles/env"
 
     if [[ "$DRY_RUN" == "true" ]]; then
         log "[DRY RUN] Would write $bridge_file"
         return 0
     fi
 
-    mkdir -p "$(dirname "$bridge_file")" "$(dirname "$legacy_file")"
+    mkdir -p "$(dirname "$bridge_file")"
 
     cat > "$bridge_file" << EOF
 # DO NOT EDIT — written by setup.sh write_dotfiles_env()
@@ -170,9 +169,6 @@ EOF
         echo "export DOTFILES_WSL=1" >> "$bridge_file"
         echo "export WIN_USER=\"$(get_windows_username)\"" >> "$bridge_file"
     fi
-
-    # Transition symlink — old consumers source this path
-    ln -sf "$bridge_file" "$legacy_file"
 
     success "Wrote install-time environment to $bridge_file"
 }
@@ -415,26 +411,28 @@ install_eget_tools() {
 
     log "Installing binary tools via eget..."
 
-    # Parse tool list once
-    local -a tools
-    mapfile -t tools < <(grep -oP '^\["\K[^"]+' "$config")
+    # Collect eget tool names from registry
+    local -a eget_tools=()
+    local name
+    for name in "${!TOOL_METHOD[@]}"; do
+        [[ "${TOOL_METHOD[$name]}" == "eget" ]] && eget_tools+=("$name")
+    done
 
     if [[ "${FORCE_REINSTALL:-false}" == "true" ]]; then
         log "Force reinstall: clearing eget-managed binaries..."
-        for repo in "${tools[@]}"; do
-            rm -f "$HOME/.local/bin/${repo##*/}"
+        for name in "${eget_tools[@]}"; do
+            rm -f "$HOME/.local/bin/${TOOL_BINARY[$name]}"
         done
     fi
 
     if EGET_CONFIG="$config" eget --download-all; then
-        for repo in "${tools[@]}"; do
-            track_install "${repo##*/}" ok
+        for name in "${eget_tools[@]}"; do
+            track_install "$name" ok
         done
     else
         warn "Some eget tools may have failed"
-        for repo in "${tools[@]}"; do
-            local name="${repo##*/}"
-            if verify_binary "$name"; then
+        for name in "${eget_tools[@]}"; do
+            if verify_binary "${TOOL_BINARY[$name]}"; then
                 track_install "$name" ok
             else
                 track_install "$name" fail

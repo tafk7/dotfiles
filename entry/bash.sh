@@ -1,14 +1,10 @@
 # Bash configuration
-# Owns: shell options, history, completion, prompt, bash-specific keybindings
+# Owns: shell options, history, completion, bash-specific settings
 
-# Load bridge (sole DOTFILES_DIR source)
-[[ -f "$HOME/.config/dotfiles/env" ]] && source "$HOME/.config/dotfiles/env"
-
-# Fallback: derive from symlink (one fallback, one place)
-if [[ -z "${DOTFILES_DIR:-}" ]]; then
-    DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
-    export DOTFILES_DIR
-fi
+# Derive DOTFILES_DIR from symlink — always works regardless of install state
+DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+export DOTFILES_DIR
+[[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
 
 # Non-interactive: just set PATH baseline and stop
 if [[ $- != *i* ]]; then
@@ -50,37 +46,5 @@ HISTIGNORE=""
 # Shared initialization sequence
 # ==============================================================================
 
+SHELL_NAME=bash
 source "$DOTFILES_DIR/shell/init.sh"
-
-# ==============================================================================
-# Prompt — starship (unified across shells)
-# ==============================================================================
-
-if command -v starship >/dev/null 2>&1; then
-    eval "$(starship init bash)"
-else
-    PS1='\[\e[38;5;108m\]\u\[\e[0m\]@\[\e[38;5;214m\]\h\[\e[0m\]:\[\e[38;5;108m\]\w\[\e[0m\] \$ '
-fi
-
-# ==============================================================================
-# FZF Key Bindings (bash-specific)
-# ==============================================================================
-
-if command -v fzf >/dev/null 2>&1; then
-    [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && \
-        source /usr/share/doc/fzf/examples/key-bindings.bash
-    [[ -f /usr/share/doc/fzf/examples/completion.bash ]] && \
-        source /usr/share/doc/fzf/examples/completion.bash
-fi
-
-# ==============================================================================
-# NVM (lazy)
-# ==============================================================================
-
-source "$DOTFILES_DIR/shell/lazy/nvm.sh"
-
-# ==============================================================================
-# Local Overrides (not tracked in git)
-# ==============================================================================
-
-[[ -f ~/.bashrc.local ]] && source ~/.bashrc.local
