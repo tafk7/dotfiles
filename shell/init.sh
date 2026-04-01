@@ -41,19 +41,10 @@ else
     PS1='\[\e[38;5;108m\]\u\[\e[0m\]@\[\e[38;5;214m\]\h\[\e[0m\]:\[\e[38;5;108m\]\w\[\e[0m\] \$ '
 fi
 
-# FZF key bindings (shell-specific paths)
-if command -v fzf >/dev/null 2>&1; then
-    if [[ "$SHELL_NAME" == "zsh" ]]; then
-        [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]] && \
-            source /usr/share/doc/fzf/examples/key-bindings.zsh
-        [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && \
-            source /usr/share/doc/fzf/examples/completion.zsh
-    else
-        [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && \
-            source /usr/share/doc/fzf/examples/key-bindings.bash
-        [[ -f /usr/share/doc/fzf/examples/completion.bash ]] && \
-            source /usr/share/doc/fzf/examples/completion.bash
-    fi
+# FZF key bindings + completion (fzf >= 0.48 generates its own shell integration)
+# zsh: deferred to entry/zsh.sh after compinit so tab completion integrates properly
+if command -v fzf >/dev/null 2>&1 && [[ "$SHELL_NAME" != "zsh" ]]; then
+    eval "$(fzf --bash)"
 fi
 
 # Zoxide

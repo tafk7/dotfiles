@@ -1,30 +1,44 @@
 #!/bin/bash
-# Static exports only. No eval. No subshells. No tool initialization.
-# Tool init (pyenv, direnv, uv, poetry, nix) lives in shell/tool-init.sh.
+# Static exports and PATH composition. No eval. No subshells.
+# Single source of truth for everything on PATH.
+#
+# Sourced by:
+#   - entry/profile.sh (login shells, non-interactive subshells)
+#   - shell/init.sh (interactive shells)
+# Safe to source multiple times — idempotency guard below.
+#
+# Tool init (pyenv eval, direnv hook, completions) lives in shell/tool-init.sh.
+
+[[ -n "${_DOTFILES_ENV_LOADED:-}" ]] && return 0
+_DOTFILES_ENV_LOADED=1
 
 # ==============================================================================
-# Version Manager Roots (PATH-only, no eval)
+# PATH Composition
 # ==============================================================================
 
+# User directories
+[[ -d "$HOME/bin" ]] && PATH="$HOME/bin:$PATH"
+[[ -d "$HOME/.local/bin" ]] && PATH="$HOME/.local/bin:$PATH"
+[[ -d "/usr/local/bin" ]] && PATH="/usr/local/bin:$PATH"
+
+# NVM (stable symlink to active version — no nvm.sh sourcing needed)
 export NVM_DIR="$HOME/.nvm"
+[[ -d "$NVM_DIR/default/bin" ]] && PATH="$NVM_DIR/default/bin:$PATH"
 
+# pyenv
 export PYENV_ROOT="$HOME/.pyenv"
-[[ -d "$PYENV_ROOT/bin" ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-
-# ==============================================================================
-# Tool-Specific PATH Extensions
-# ==============================================================================
+[[ -d "$PYENV_ROOT/bin" ]] && PATH="$PYENV_ROOT/bin:$PATH"
 
 # Go
 if [[ -d "$HOME/go" ]]; then
     export GOPATH="$HOME/go"
-    [[ -d "$GOPATH/bin" ]] && export PATH="$GOPATH/bin:$PATH"
+    [[ -d "$GOPATH/bin" ]] && PATH="$GOPATH/bin:$PATH"
 fi
 
 # Rust
 if [[ -d "$HOME/.cargo" ]]; then
     export CARGO_HOME="$HOME/.cargo"
-    [[ -d "$CARGO_HOME/bin" ]] && export PATH="$CARGO_HOME/bin:$PATH"
+    [[ -d "$CARGO_HOME/bin" ]] && PATH="$CARGO_HOME/bin:$PATH"
 fi
 
 # ==============================================================================
