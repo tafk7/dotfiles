@@ -78,12 +78,12 @@ fi
 
 bindkey -e
 
-bindkey '^R' history-incremental-search-backward
-bindkey '^S' history-incremental-search-forward
-
 bindkey '^[[1;5C' forward-word    # Ctrl+Right
 bindkey '^[[1;5D' backward-word   # Ctrl+Left
 
 autoload -U edit-command-line
 zle -N edit-command-line
 bindkey '^X^E' edit-command-line
+
+# FZF integration (after compinit + keybindings so it can wrap completion and bind ^R)
+command -v fzf >/dev/null 2>&1 && eval "$(fzf --zsh)"
