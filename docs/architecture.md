@@ -29,8 +29,8 @@ bin/*     ──── source → lib/runtime.sh
 - `lib/install.sh` — sourced only by `setup.sh` and `installers/`. Never at shell startup.
 - `lib/runtime.sh` — safe for all contexts (bin/, shell startup).
 - `lib/config.sh` — declarative data (CONFIG_MAP, PACKAGES). No functions, no side effects.
-- `shell/env.sh` — static exports and PATH composition. No eval, no subshells.
-- `shell/tool-init.sh` — all `eval` calls (pyenv, direnv, completions). Interactive only.
+- `shell/env.sh` — static exports and PATH composition. The one `eval` here is `direnv export bash` at the bottom (see Claude Code compatibility below).
+- `shell/tool-init.sh` — interactive-only `eval` calls (pyenv, direnv hook, completions).
 - `shell/tools/*.sh` — domain-split functions and aliases (one file per tool domain).
 
 ## Directory Layout
@@ -144,6 +144,24 @@ When adding a new tool to PATH:
 1. Add the `[[ -d ... ]] && PATH=...` line to `shell/env.sh`
 2. Restart Claude Code to re-capture the snapshot
 3. Do NOT add PATH entries in `.profile`, `init.sh`, or tool-specific files
+
+### direnv in non-interactive subshells
+
+`direnv hook bash` (in `tool-init.sh`) only fires before interactive
+prompts via `PROMPT_COMMAND`. Claude Code's `bash -c` invocations are
+non-interactive — they never trigger the hook, so a project's `.envrc`
+(and any venv it activates) would not load.
+
+To fix this, `shell/env.sh` ends with `eval "$(direnv export bash)"`,
+which runs the standalone `.envrc` loader against the spawn `$PWD`.
+This activates the project venv for every Claude Bash invocation that
+lands inside an allowed project tree. The shared allow-list at
+`~/.local/share/direnv/allow/` is honored — interactive `direnv allow`
+carries over to non-interactive subshells.
+
+`DIRENV_LOG_FORMAT=""` suppresses the `loading .envrc` chatter so
+Bash-tool stdout/stderr stays clean. Genuine load errors still surface
+because we don't blanket-redirect stderr at the eval site.
 
 ## Installation Tiers
 
