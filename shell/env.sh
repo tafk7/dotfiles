@@ -1,13 +1,17 @@
 #!/bin/bash
-# Static exports and PATH composition. No eval. No subshells.
-# Single source of truth for everything on PATH.
+# Static exports and PATH composition. Single source of truth for
+# everything on PATH.
 #
 # Sourced by:
 #   - entry/profile.sh (login shells, non-interactive subshells)
 #   - shell/init.sh (interactive shells)
 # Safe to source multiple times — idempotency guard below.
 #
-# Tool init (pyenv eval, direnv hook, completions) lives in shell/tool-init.sh.
+# Interactive-only tool init (pyenv eval, direnv hook, completions)
+# lives in shell/tool-init.sh. The one exception is the direnv export
+# at the bottom of this file: non-interactive subprocesses (Claude
+# Code's `bash -c`, scripts) need .envrc activation too, and the
+# PROMPT_COMMAND-based hook only fires for interactive shells.
 
 [[ -n "${_DOTFILES_ENV_LOADED:-}" ]] && return 0
 _DOTFILES_ENV_LOADED=1
@@ -103,4 +107,23 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
         export WIN_DOCUMENTS="$WIN_HOME/Documents"
         export WIN_SSH="$WIN_HOME/.ssh"
     fi
+fi
+
+# ==============================================================================
+# direnv .envrc activation (non-interactive shells)
+# ==============================================================================
+#
+# `direnv hook` only fires before each interactive prompt, so non-
+# interactive subprocesses (Claude Code's `bash -c`, scripts) never get
+# their project venv activated. `direnv export bash` is the standalone
+# equivalent — walks up from $PWD, honors the shared allow-list, and
+# emits the .envrc's exports immediately. Safe no-op when no .envrc
+# applies. `|| true` avoids aborting startup under `set -e` if an
+# .envrc errors. Quiet log format keeps Bash-tool output clean.
+#
+# Interactive shells still get the hook from tool-init.sh on top —
+# that handles the `cd into another project` case mid-session.
+if command -v direnv >/dev/null 2>&1; then
+    export DIRENV_LOG_FORMAT=""
+    eval "$(direnv export bash 2>/dev/null)" || true
 fi
