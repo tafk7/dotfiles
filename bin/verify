@@ -7,6 +7,11 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
+source "$DOTFILES_DIR/lib/theme-resolve.sh"
+
+# Make sure on-disk theme overrides are reflected in this process's env so
+# the cascade resolution below matches what apply_theme would do.
+load_theme_overrides
 
 # Counters
 PASS=0
@@ -47,7 +52,7 @@ for config in "${sorted_configs[@]}"; do
                 check_fail "$target (missing)"
             fi
             ;;
-        template|gitconfig)
+        gitconfig)
             if [[ -f "$target" ]]; then
                 if grep -q '{{GIT_' "$target" 2>/dev/null; then
                     check_fail "$target (has unresolved template placeholders)"
@@ -74,10 +79,9 @@ for tier in shell dev full; do
     echo "─────────────────────────────────────"
 
     for name in "${tier_tools[@]}"; do
-        local verify_cmd
         verify_cmd="$(tool_verify_command "$name")"
-        local binary="${TOOL_BINARY[$name]}"
-        local label="$name"
+        binary="${TOOL_BINARY[$name]}"
+        label="$name"
         [[ "$name" != "$binary" ]] && label="$name ($binary)"
 
         if eval "$verify_cmd"; then
@@ -169,6 +173,123 @@ if [[ -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
     fi
 else
     check_warn "no theme set (run: bin/theme-switcher <theme>)"
+    theme=""
+fi
+
+# ==============================================================================
+# 6b. Theme integration — per-surface wiring (cascade-aware)
+# ==============================================================================
+
+if [[ -n "$theme" ]]; then
+    # Resolve effective theme per surface using the loaded overrides.
+    # `theme` here is the global default; overrides may select something else.
+    DOTFILES_THEME="$theme"
+    r_bat="$(resolve_surface_theme bat)"
+    r_starship="$(resolve_surface_theme starship)"
+    r_delta="$(resolve_surface_theme delta)"
+    r_btop="$(resolve_surface_theme btop)"
+    r_lazygit="$(resolve_surface_theme lazygit)"
+
+    # Heading: collapsed when no overrides, expanded otherwise.
+    overrides_active=0
+    for g in code chrome apps; do
+        group_has_override "$g" && overrides_active=1
+    done
+    for s in vim bat delta tmux starship fzf btop lazygit; do
+        surface_has_override "$s" && overrides_active=1
+    done
+
+    echo
+    if [[ $overrides_active -eq 0 ]]; then
+        echo "Theme integration [$theme]"
+    else
+        echo "Theme integration [global=$theme — per-component overrides active]"
+    fi
+    echo "─────────────────────────────────────"
+
+    # bat: built-in themes (gruvbox-dark, Nord) need no vendored file
+    if [[ -d "$DOTFILES_DIR/themes/$r_bat/bat" ]]; then
+        bat_files=("$DOTFILES_DIR/themes/$r_bat/bat"/*.tmTheme)
+        if [[ -e "${bat_files[0]}" ]]; then
+            check_pass "bat [$r_bat]: vendored ${#bat_files[@]} .tmTheme file(s)"
+            if [[ -f "$DOTFILES_DIR/generated/bat/cache/themes.bin" ]]; then
+                check_pass "bat: isolated cache built (generated/bat/cache/themes.bin)"
+            else
+                check_warn "bat: isolated cache missing (run bin/theme-switcher $r_bat)"
+            fi
+        else
+            check_warn "bat [$r_bat]: themes/$r_bat/bat exists but is empty"
+        fi
+    else
+        check_pass "bat [$r_bat]: uses bat built-in (no vendored .tmTheme needed)"
+    fi
+
+    # starship: generated/starship.toml + palette directive
+    if [[ -f "$DOTFILES_DIR/generated/starship.toml" ]]; then
+        if grep -q "^palette = \"$r_starship\"" "$DOTFILES_DIR/generated/starship.toml"; then
+            check_pass "starship [$r_starship]: generated/starship.toml pinned correctly"
+        else
+            check_warn "starship: generated config palette doesn't match resolved theme '$r_starship'"
+        fi
+    else
+        check_warn "starship: generated/starship.toml missing (run bin/theme-switcher --init)"
+    fi
+
+    # delta: generated/delta.gitconfig + ~/.gitconfig include
+    if [[ -f "$DOTFILES_DIR/generated/delta.gitconfig" ]]; then
+        if grep -q "features = $r_delta" "$DOTFILES_DIR/generated/delta.gitconfig"; then
+            check_pass "delta [$r_delta]: generated/delta.gitconfig active"
+        else
+            check_warn "delta: generated config doesn't list resolved theme '$r_delta'"
+        fi
+        if git config --global --get-all include.path 2>/dev/null | grep -Fxq "$DOTFILES_DIR/generated/delta.gitconfig"; then
+            check_pass "delta: ~/.gitconfig includes generated/delta.gitconfig"
+        else
+            check_warn "delta: ~/.gitconfig missing include for generated/delta.gitconfig"
+        fi
+    else
+        if [[ -f "$DOTFILES_DIR/themes/$r_delta/delta.gitconfig" ]]; then
+            check_warn "delta: generated/delta.gitconfig missing"
+        fi
+    fi
+
+    # btop: ~/.config/btop/btop.conf color_theme
+    if [[ -f "$HOME/.config/btop/btop.conf" ]]; then
+        if grep -qE "^color_theme = \"dotfiles-$r_btop\"" "$HOME/.config/btop/btop.conf"; then
+            check_pass "btop [$r_btop]: color_theme set to dotfiles-$r_btop"
+        else
+            current_btop=$(grep -oE '^color_theme = "[^"]+"' "$HOME/.config/btop/btop.conf" | head -1 || true)
+            check_warn "btop: color_theme not pinned to dotfiles-$r_btop ($current_btop)"
+        fi
+    else
+        if [[ -f "$DOTFILES_DIR/themes/$r_btop/btop.theme" ]]; then
+            check_warn "btop: ~/.config/btop/btop.conf missing (run bin/theme-switcher $r_btop)"
+        fi
+    fi
+
+    # lazygit: marker block in ~/.config/lazygit/config.yml
+    if [[ -f "$HOME/.config/lazygit/config.yml" ]]; then
+        if grep -qF "# >>> dotfiles theme >>>" "$HOME/.config/lazygit/config.yml"; then
+            check_pass "lazygit [$r_lazygit]: dotfiles theme block present"
+        else
+            check_warn "lazygit: config.yml missing dotfiles theme marker"
+        fi
+    else
+        if [[ -f "$DOTFILES_DIR/themes/$r_lazygit/lazygit.yml" ]]; then
+            check_warn "lazygit: ~/.config/lazygit/config.yml missing"
+        fi
+    fi
+
+    # Override summary (only when active)
+    if [[ $overrides_active -eq 1 ]]; then
+        echo
+        ovs="$(_theme_overrides_list || true)"
+        if [[ -n "$ovs" ]]; then
+            log "Active overrides:"
+            printf '%s\n' "$ovs" | sed 's/^/    /'
+            log "Run 'theme-switcher show' for the full cascade tree."
+        fi
+    fi
 fi
 
 # ==============================================================================

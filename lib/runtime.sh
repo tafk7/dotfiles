@@ -45,8 +45,10 @@ fi
 
 log() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# warn/error go to stderr per Unix convention — and so they don't get
+# swallowed by callers that capture stdout via $(...).
+warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 
 # ==============================================================================

@@ -13,6 +13,36 @@
 # Code's `bash -c`, scripts) need .envrc activation too, and the
 # PROMPT_COMMAND-based hook only fires for interactive shells.
 
+# ==============================================================================
+# Always-evaluate exports — these point at generated files that may be
+# created/updated AFTER env.sh first runs (e.g., `theme-switcher` → `reload`).
+# Putting them above the idempotency guard ensures `reload` picks up new
+# generated artifacts instead of cached-empty values from the first sourcing.
+# ==============================================================================
+
+if [[ -n "${DOTFILES_DIR:-}" ]]; then
+    if [[ -f "$DOTFILES_DIR/generated/starship.toml" ]]; then
+        export STARSHIP_CONFIG="$DOTFILES_DIR/generated/starship.toml"
+    elif [[ -f "$DOTFILES_DIR/configs/starship.toml" ]] \
+         && ! grep -q '__DOTFILES_PALETTE__' "$DOTFILES_DIR/configs/starship.toml" 2>/dev/null; then
+        # Only fall back to the base config if it doesn't contain the
+        # placeholder marker (would otherwise cause starship warnings).
+        export STARSHIP_CONFIG="$DOTFILES_DIR/configs/starship.toml"
+    fi
+
+    if [[ -d "$DOTFILES_DIR/generated/bat/cache" ]]; then
+        export BAT_CACHE_PATH="$DOTFILES_DIR/generated/bat/cache"
+    fi
+
+    # Per-component theme overrides — sourced after generated/theme.sh emits
+    # the global DOTFILES_THEME, so DOTFILES_THEME_<GROUP|SURFACE>=... overrides
+    # the global default. Cascade applied at apply-time by bin/theme-switcher.
+    # Read by lib/theme-resolve.sh and consumed by tools (BAT_THEME etc.) that
+    # generated/theme.sh emits per-surface based on the cascade.
+    [[ -f "$DOTFILES_DIR/generated/theme-overrides.sh" ]] \
+        && source "$DOTFILES_DIR/generated/theme-overrides.sh"
+fi
+
 [[ -n "${_DOTFILES_ENV_LOADED:-}" ]] && return 0
 _DOTFILES_ENV_LOADED=1
 
@@ -24,6 +54,9 @@ _DOTFILES_ENV_LOADED=1
 [[ -d "$HOME/bin" ]] && PATH="$HOME/bin:$PATH"
 [[ -d "$HOME/.local/bin" ]] && PATH="$HOME/.local/bin:$PATH"
 [[ -d "/usr/local/bin" ]] && PATH="/usr/local/bin:$PATH"
+
+# Dotfiles user commands (theme-switcher, verify, cheatsheet, replace)
+[[ -d "${DOTFILES_DIR:-}/bin" ]] && PATH="$DOTFILES_DIR/bin:$PATH"
 
 # NVM (stable symlink to active version — no nvm.sh sourcing needed)
 export NVM_DIR="$HOME/.nvm"
@@ -64,10 +97,20 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-# Bat
+# Bat / Starship / Delta defaults (themes' shell.sh overrides these)
 export BAT_THEME="${BAT_THEME:-gruvbox-dark}"
+export STARSHIP_PALETTE="${STARSHIP_PALETTE:-gruvbox}"
+export DELTA_FEATURE="${DELTA_FEATURE:-gruvbox}"
+
+# Note: STARSHIP_CONFIG and BAT_CACHE_PATH are set above the idempotency
+# guard at the top of this file so they re-resolve on `reload` after a
+# theme switch. Don't duplicate them here.
 
 export PROJECTS_DIR="$HOME/projects"
+
+# Project search roots — colon-separated, like PATH. Used by `proj`,
+# `fzf-project`, and `cproj`. Override per-machine via your shell rc.
+export PROJECTS_DIRS="${PROJECTS_DIRS:-$HOME/projects:$HOME/work:$HOME/dev:$HOME/code:$HOME/src}"
 
 # ==============================================================================
 # WSL-Specific Environment
@@ -115,15 +158,24 @@ fi
 #
 # `direnv hook` only fires before each interactive prompt, so non-
 # interactive subprocesses (Claude Code's `bash -c`, scripts) never get
-# their project venv activated. `direnv export bash` is the standalone
+# their project venv activated. `direnv export <shell>` is the standalone
 # equivalent — walks up from $PWD, honors the shared allow-list, and
 # emits the .envrc's exports immediately. Safe no-op when no .envrc
 # applies. `|| true` avoids aborting startup under `set -e` if an
 # .envrc errors. Quiet log format keeps Bash-tool output clean.
 #
+# Shell-aware: zsh and bash use different export syntax (zsh's `typeset`
+# vs bash's `declare`/plain assignment); using the wrong one silently
+# leaks malformed quoting into the parent shell. Detect via the version
+# vars each shell sets natively. Default to bash for POSIX `sh`.
+#
 # Interactive shells still get the hook from tool-init.sh on top —
 # that handles the `cd into another project` case mid-session.
 if command -v direnv >/dev/null 2>&1; then
     export DIRENV_LOG_FORMAT=""
-    eval "$(direnv export bash 2>/dev/null)" || true
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        eval "$(direnv export zsh 2>/dev/null)" || true
+    else
+        eval "$(direnv export bash 2>/dev/null)" || true
+    fi
 fi

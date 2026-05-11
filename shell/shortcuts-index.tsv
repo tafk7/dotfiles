@@ -158,6 +158,10 @@ shell│ducks│Show largest items in current directory│du -cks * | sort -rn |
 shell│reload│Reload shell configuration│source ~/.bashrc
 shell│themes│List available themes and show usage│ls $DOTFILES_DIR/configs/themes/
 shell│theme-switch│Interactive theme selector (FZF)│theme-switcher
+shell│theme-set│Override a group or surface theme│theme-switcher set <target> <theme>
+shell│theme-unset│Remove one theme override│theme-switcher unset <target>
+shell│theme-reset│Clear ALL theme overrides│theme-switcher reset
+shell│theme-show│Show effective theme cascade tree│theme-switcher show
 shell│pane-tint│Tint current tmux pane background│pane-tint <0|1|2|3>
 shell│vimrc│Edit neovim config│nvim ~/.config/nvim/init.vim
 shell│vplug│Install vim plugins│nvim +PlugInstall +qall
