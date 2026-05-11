@@ -158,7 +158,6 @@ shell│ducks│Show largest items in current directory│du -cks * | sort -rn |
 shell│reload│Reload shell configuration│source ~/.bashrc
 shell│themes│List available themes and show usage│ls $DOTFILES_DIR/configs/themes/
 shell│theme│Apply theme globally / interactive picker│theme [name]
-shell│theme-switch│Alias of `theme` (long form)│theme-switch
 shell│theme-set│Override a group or surface theme│theme set <target> <theme>
 shell│theme-unset│Remove one theme override│theme unset <target>
 shell│theme-reset│Clear ALL theme overrides│theme reset
