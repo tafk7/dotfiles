@@ -64,8 +64,9 @@ elif [[ -n "$BASH_VERSION" ]]; then
 fi
 
 # Theme management
+alias theme='$DOTFILES_DIR/bin/theme-switcher'
 alias theme-switch='$DOTFILES_DIR/bin/theme-switcher'
-alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme-switch <name>"'
+alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme <name>  (or: theme set <target> <name>)"'
 
 # Find and replace utility
 alias fr='$DOTFILES_DIR/bin/replace'
