@@ -104,6 +104,10 @@ tm <name> / ta <name>     # New session / attach
 tl / tk <name>            # List / kill session
 ```
 
+Clipboard: copy-mode `y` and `<prefix> P` auto-detect WSL (`clip.exe` /
+`powershell.exe Get-Clipboard`), Wayland (`wl-copy` / `wl-paste`), or X11
+(`xclip`). OSC 52 (`set-clipboard on`) handles SSH sessions.
+
 ### WSL (auto-detected)
 
 ```bash
@@ -115,7 +119,9 @@ open / explorer           # Open in Windows Explorer
 
 ## Theme System
 
-Five unified themes applied simultaneously to neovim, tmux, and shell (FZF):
+Five unified themes applied across **eight surfaces** with a single command:
+neovim, tmux, shell (FZF colors + env exports), bat, starship, delta, btop,
+and lazygit.
 
 ```bash
 ./bin/theme-switcher              # Interactive FZF selection
@@ -123,9 +129,44 @@ Five unified themes applied simultaneously to neovim, tmux, and shell (FZF):
 ./bin/theme-switcher --preview tokyo-night
 ./bin/theme-switcher --revert     # Revert to previous
 ./bin/theme-switcher --list       # Show available themes
+./bin/theme-switcher --init       # Re-render all surfaces from current theme
 ```
 
+**Per-component overrides** (CSS-style cascade — `surface > group > global`):
+
+```bash
+./bin/theme-switcher set code tokyo-night       # editor group → tokyo-night
+./bin/theme-switcher set starship nord          # just starship → nord
+./bin/theme-switcher set chrome.starship nord   # qualified form, same thing
+./bin/theme-switcher show                       # see the full cascade tree
+./bin/theme-switcher unset starship             # back to chrome group/global
+./bin/theme-switcher reset                      # clear all overrides
+```
+
+Groups: `code` (vim, bat, delta) · `chrome` (tmux, starship, fzf) ·
+`apps` (btop, lazygit). See [docs/theme-system.md](docs/theme-system.md#per-component-overrides).
+
 **Available:** Nord, Kanagawa, Tokyo Night, Gruvbox Material, Catppuccin Mocha
+
+Per-tool palettes live under `themes/<name>/`:
+
+| File                          | Consumer                                  |
+|-------------------------------|-------------------------------------------|
+| `meta.sh`                     | Theme metadata (display name, description)|
+| `colors.sh`                   | Canonical hex/RGB palette                 |
+| `vim.vim`                     | Neovim/vim colorscheme + overrides        |
+| `tmux.conf`                   | tmux status bar + pane borders            |
+| `shell.sh`                    | FZF colors + `BAT_THEME`/`STARSHIP_PALETTE`/`DELTA_FEATURE` exports |
+| `starship.palette.toml`       | Starship `[palettes.<name>]` block        |
+| `delta.gitconfig`             | Delta `[delta "<name>"]` feature          |
+| `btop.theme`                  | btop color theme                          |
+| `lazygit.yml`                 | lazygit `gui.theme` block                 |
+| `bat/<name>.tmTheme` (opt.)   | bat tmTheme — only when not a bat builtin |
+
+Generated artifacts live in `generated/` (gitignored):
+`theme.sh`, `starship.toml`, `delta.gitconfig`, `bat/cache/`. The bat cache
+is **isolated** (`BAT_CACHE_PATH`) so it doesn't pollute delta's embedded
+bat (different versions are binary-incompatible).
 
 ## Architecture
 
@@ -133,33 +174,49 @@ Five unified themes applied simultaneously to neovim, tmux, and shell (FZF):
 setup.sh                  Entry point — 3-phase orchestrator (reads lib/config.sh)
 lib/
   install.sh              Install-time helpers (APT, backup, eget, tier functions)
-  runtime.sh              Runtime helpers (logging, is_wsl, verify_binary)
+  runtime.sh              Runtime helpers (logging, is_wsl, command_exists)
   config.sh               Declarative data: CONFIG_MAP + PACKAGES
+  registry.sh             Tool registry: TOOL_BINARY/METHOD/TIER/PATHS for verify + bin/cheatsheet
 configs/                  Config files without dots (symlinked to ~/.<name>)
-themes/                   5 theme directories, each with colors.sh, vim.vim, tmux.conf, shell.sh
+themes/                   5 theme dirs — see "Theme System" table above
 shell/
-  shared.sh               Single sourcing sequence for bash + zsh
-  bash.sh / zsh.sh        Shell-specific config → ~/.bashrc / ~/.zshrc
+  init.sh                 Single sourcing sequence for bash + zsh
+  bash.sh / zsh.sh        Shell-specific entry → ~/.bashrc / ~/.zshrc
   profile.sh              Login shell → ~/.profile
-  env.sh                  Environment: PATH, pyenv, direnv, EDITOR, WSL vars
-  nvm-lazy.sh             Lazy NVM loader for both shells
-  functions/*.sh          Domain-split functions (nav, process, python, fzf, wsl, tmux, docker, git)
-  aliases/*.sh            9 alias categories (general, git, docker, python, node, vim, vscode, wsl, claude)
-installers/               Per-tool install scripts
+  env.sh                  Environment: PATH, EDITOR, PROJECTS_DIRS, BAT_CACHE_PATH, STARSHIP_CONFIG, theme exports
+  fzf.sh / tool-init.sh   Tool initializers (zoxide, starship, fzf keybinds)
+  tools/*.sh              Domain-split functions + aliases (nav, process, python, fzf, vscode, claude, docker, git, node, tmux, vim, general)
+  platform/wsl.sh         WSL-only helpers (pbcopy/pbpaste, sync-ssh, cdwin)
+  lazy/nvm.sh             Lazy NVM loader
+installers/               Per-tool install scripts (run by lib/install.sh::run_installer)
+generated/                Theme artifacts + bridge.sh (gitignored)
 bin/                      User commands (theme-switcher, verify, cheatsheet, replace)
+eget.toml                 Static binary downloads (tier=shell tools)
 ```
 
-**Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `shared.sh` → `env.sh` → theme → `fzf.sh` → `functions/*.sh` → `aliases/*.sh` → `~/.shell.local` → shell-specific (prompt, completion, nvm-lazy).
+**Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `init.sh` → `env.sh` →
+`tool-init.sh` (interactive only) → `generated/theme.sh` → `fzf.sh` →
+`tools/*.sh` → `platform/wsl.sh` (when WSL) → `lazy/nvm.sh` → `~/.shell.local`.
+
+**Project search roots** (`proj`, `fzf-project`, `cproj`) are unified behind
+`PROJECTS_DIRS` (colon-separated, default `~/projects:~/work:~/dev:~/code:~/src`).
+Override per-machine in `~/.shell.local`.
 
 ## Extending
 
-**New tool:** Create `installers/install-<tool>.sh`, wire in `lib/install.sh` tier function, add aliases to `shell/aliases/`, add cheatsheet entries to `shell/shortcuts-index.tsv`.
+**New tool:**
+1. Add an entry to `lib/registry.sh` (`TOOL_BINARY`, `TOOL_METHOD`, `TOOL_TIER`, `TOOL_PATHS`).
+2. For `eget`-installable binaries, add to `eget.toml`. Otherwise create `installers/install-<tool>.sh` and call it from the appropriate `install_<tier>` function in `lib/install.sh` via `run_installer "<tool>"`.
+3. Add aliases/functions in `shell/tools/<domain>.sh`.
+4. Add a row to `shell/shortcuts-index.tsv` for `cheatsheet`.
 
-**New config:** Add file to `configs/`, add to `CONFIG_MAP` in `lib/config.sh`.
+**New APT package:** Append to `PACKAGES[<group>]` in `lib/config.sh`.
 
-**New theme:** Create `themes/<name>/` with `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`. Register in `THEMES` array in `bin/theme-switcher`.
+**New config:** Add file to `configs/`, add a `[<file>]` block to `CONFIG_MAP` in `lib/config.sh` with `target=` (and optional `template=true`). Templates support `{{GIT_NAME}}`, `{{GIT_EMAIL}}`, `{{DOTFILES_DIR}}` substitution.
 
-**Local overrides:** `~/.shell.local` and `~/.bashrc.local` / `~/.zshrc.local` are sourced last and not tracked.
+**New theme:** Create `themes/<name>/` with the required files (`meta.sh`, `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`) — themes are auto-discovered from disk. Add per-tool palette files (`starship.palette.toml`, `delta.gitconfig`, `btop.theme`, `lazygit.yml`, optional `bat/<name>.tmTheme`) for full surface coverage.
+
+**Local overrides:** `~/.shell.local` (sourced last by both shells) and `~/.bashrc.local` / `~/.zshrc.local` are sourced after dotfiles config and not tracked. Use them for machine-specific `PROJECTS_DIRS`, secrets, and personal aliases.
 
 ## Troubleshooting
 

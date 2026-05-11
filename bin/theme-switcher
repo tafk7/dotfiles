@@ -1,8 +1,8 @@
 #!/bin/bash
-# Theme Switcher - Unified theme management for neovim, tmux, and shell
-# Part of dotfiles - seamless theme switching across all tools
+# Theme Switcher - Unified theme management for neovim, tmux, shell,
+# bat, starship, delta, btop, and lazygit.
 
-set -e
+set -euo pipefail
 
 # ==============================================================================
 # Configuration
@@ -13,12 +13,23 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 readonly THEMES_DIR="$DOTFILES_DIR/themes"
 readonly GENERATED_DIR="$DOTFILES_DIR/generated"
 readonly THEME_SH="$GENERATED_DIR/theme.sh"
+readonly STARSHIP_GEN="$GENERATED_DIR/starship.toml"
+readonly DELTA_GEN="$GENERATED_DIR/delta.gitconfig"
 
 # Source runtime helpers
 source "$DOTFILES_DIR/lib/runtime.sh"
+source "$DOTFILES_DIR/lib/theme-resolve.sh"
+
+# Always reflect the on-disk overrides into our env before resolving.
+# (Lets `set/unset/reset` write the file, then immediately re-resolve.)
+load_theme_overrides
 
 # Default theme
 DEFAULT_THEME="gruvbox"
+
+# Lazygit theme block markers (kept in sync with apply_lazygit_theme)
+readonly LAZYGIT_BEGIN="# >>> dotfiles theme >>>"
+readonly LAZYGIT_END="# <<< dotfiles theme <<<"
 
 # ==============================================================================
 # Helper Functions
@@ -61,6 +72,11 @@ get_previous_theme() {
 # Theme Application Functions
 # ==============================================================================
 
+# Required theme files (warn-only on missing for the optional set).
+# Required: meta.sh, vim.vim, tmux.conf, shell.sh, colors.sh.
+# Optional (per-tool palette files; apply_* are no-ops when missing):
+#   bat/<theme>.tmTheme | starship.palette.toml | delta.gitconfig
+#   btop.theme           | lazygit.yml
 validate_theme_files() {
     local theme="$1"
     local missing_files=()
@@ -82,6 +98,21 @@ validate_theme_files() {
     if [[ ${#missing_files[@]} -gt 0 ]]; then
         error "Theme '$theme' is missing required files: ${missing_files[*]}"
         return 1
+    fi
+
+    # Optional surfaces: warn-only
+    local optional_files=(
+        "starship.palette.toml"
+        "delta.gitconfig"
+        "btop.theme"
+        "lazygit.yml"
+    )
+    local missing_optional=()
+    for opt in "${optional_files[@]}"; do
+        [[ -f "$THEMES_DIR/$theme/$opt" ]] || missing_optional+=("$opt")
+    done
+    if [[ ${#missing_optional[@]} -gt 0 ]]; then
+        warn "Theme '$theme' has no $(IFS=,; echo "${missing_optional[*]}"); those tools will keep their previous look."
     fi
 
     return 0
@@ -139,59 +170,589 @@ EOF
     fi
 }
 
-# Write generated/theme.sh — sole owner of DOTFILES_THEME
+# Extract a single `export VAR=value` from a theme's shell.sh.
+# Used to translate dotfiles-theme name -> bat-internal/starship-palette/delta-feature name.
+_extract_export_value() {
+    local file="$1" var="$2"
+    [[ -f "$file" ]] || return 1
+    grep -oP "^export ${var}=['\"]\\K[^'\"]+" "$file" 2>/dev/null | head -1
+}
+
+# Write generated/theme.sh — the shell-side bridge file.
+# Emits the global theme + cascade-resolved per-surface exports, so subshells
+# (and `reload`) see the same effective configuration that apply_*_theme just
+# wrote to vim/tmux/bat/starship/delta/btop/lazygit.
+#
+# Args: <global-theme-name>
 apply_shell_theme() {
-    local theme="$1"
+    local global="$1"
     local previous
     previous="$(get_current_theme)"
 
-    local shell_theme_file="$THEMES_DIR/$theme/shell.sh"
+    local shell_theme_file="$THEMES_DIR/$global/shell.sh"
     if [[ ! -f "$shell_theme_file" ]]; then
-        warn "Shell theme file not found for $theme"
+        warn "Shell theme file not found for $global"
         return 1
     fi
+
+    # Resolve each surface using current cascade. DOTFILES_THEME is forced
+    # to the global being applied so callers without env.sh sourced still get
+    # the right defaults.
+    local r_vim r_bat r_delta r_tmux r_starship r_fzf r_btop r_lazygit
+    DOTFILES_THEME="$global" r_vim="$(resolve_surface_theme vim)"
+    DOTFILES_THEME="$global" r_bat="$(resolve_surface_theme bat)"
+    DOTFILES_THEME="$global" r_delta="$(resolve_surface_theme delta)"
+    DOTFILES_THEME="$global" r_tmux="$(resolve_surface_theme tmux)"
+    DOTFILES_THEME="$global" r_starship="$(resolve_surface_theme starship)"
+    DOTFILES_THEME="$global" r_fzf="$(resolve_surface_theme fzf)"
+    DOTFILES_THEME="$global" r_btop="$(resolve_surface_theme btop)"
+    DOTFILES_THEME="$global" r_lazygit="$(resolve_surface_theme lazygit)"
+
+    # Translate dotfiles theme names -> tool-native palette/theme/feature names
+    # by looking up each resolved theme's own shell.sh exports. Falls back to
+    # the dotfiles theme name itself if the export is missing.
+    local bat_value starship_value delta_value
+    bat_value="$(_extract_export_value "$THEMES_DIR/$r_bat/shell.sh" BAT_THEME)"
+    bat_value="${bat_value:-$r_bat}"
+    starship_value="$(_extract_export_value "$THEMES_DIR/$r_starship/shell.sh" STARSHIP_PALETTE)"
+    starship_value="${starship_value:-$r_starship}"
+    delta_value="$(_extract_export_value "$THEMES_DIR/$r_delta/shell.sh" DELTA_FEATURE)"
+    delta_value="${delta_value:-$r_delta}"
 
     mkdir -p "$GENERATED_DIR"
 
     cat > "$THEME_SH" << EOF
 # Theme loader - Auto-generated by theme-switcher
-# Current theme: $theme
-export DOTFILES_THEME="$theme"
+# Global theme: $global
+# Resolved cascade: vim=$r_vim bat=$r_bat delta=$r_delta tmux=$r_tmux starship=$r_starship fzf=$r_fzf btop=$r_btop lazygit=$r_lazygit
+export DOTFILES_THEME="$global"
 _DOTFILES_PREVIOUS_THEME="$previous"
-# Resolve at runtime via \$DOTFILES_DIR
-if [[ -n "\$DOTFILES_DIR" && -f "\$DOTFILES_DIR/themes/\$DOTFILES_THEME/shell.sh" ]]; then
-    source "\$DOTFILES_DIR/themes/\$DOTFILES_THEME/shell.sh"
+
+# Per-surface effective themes (post-cascade — for diagnostics & verify)
+export DOTFILES_THEME_VIM_RESOLVED="$r_vim"
+export DOTFILES_THEME_BAT_RESOLVED="$r_bat"
+export DOTFILES_THEME_DELTA_RESOLVED="$r_delta"
+export DOTFILES_THEME_TMUX_RESOLVED="$r_tmux"
+export DOTFILES_THEME_STARSHIP_RESOLVED="$r_starship"
+export DOTFILES_THEME_FZF_RESOLVED="$r_fzf"
+export DOTFILES_THEME_BTOP_RESOLVED="$r_btop"
+export DOTFILES_THEME_LAZYGIT_RESOLVED="$r_lazygit"
+
+# Source the FZF-resolved theme's shell.sh for FZF_THEME_COLORS.
+# This file also exports BAT_THEME / STARSHIP_PALETTE / DELTA_FEATURE
+# from the FZF-resolved theme's perspective; we override those just below
+# to honour the per-surface cascade resolution.
+if [[ -n "\$DOTFILES_DIR" && -f "\$DOTFILES_DIR/themes/$r_fzf/shell.sh" ]]; then
+    source "\$DOTFILES_DIR/themes/$r_fzf/shell.sh"
 fi
+
+# Cascade-resolved exports (override anything FZF's shell.sh set)
+export BAT_THEME="$bat_value"
+export STARSHIP_PALETTE="$starship_value"
+export DELTA_FEATURE="$delta_value"
 EOF
 
-    success "Shell theme applied: $theme (restart shell to see changes)"
+    success "Shell theme applied: $global (open new shell or run: reload)"
+}
+
+# ==============================================================================
+# bat — copy vendored .tmTheme files into bat's config dir, rebuild cache
+# ==============================================================================
+apply_bat_theme() {
+    local theme="$1"
+    local bat_theme_dir="$THEMES_DIR/$theme/bat"
+
+    # Resolve a bat invocation (works for both bat and batcat)
+    local bat_cmd
+    if command -v bat >/dev/null 2>&1; then
+        bat_cmd="bat"
+    elif command -v batcat >/dev/null 2>&1; then
+        bat_cmd="batcat"
+    else
+        warn "bat: not installed — skipping theme install"
+        return 0
+    fi
+
+    # Isolated cache & source dirs. We never touch ~/.cache/bat/ because
+    # delta embeds bat 0.24+ which is binary-incompatible with our system
+    # bat 0.19's cache format. Keeping the cache here means delta keeps
+    # using its embedded themes unhindered.
+    local bat_root="$DOTFILES_DIR/generated/bat"
+    local bat_src="$bat_root/source"
+    local bat_cache="$bat_root/cache"
+    mkdir -p "$bat_src/themes" "$bat_cache"
+
+    # Built-in bat themes (gruvbox-dark, Nord) need no vendored file.
+    # We still ensure the isolated cache exists so BAT_CACHE_PATH is valid.
+    if [[ ! -d "$bat_theme_dir" ]]; then
+        log "bat: theme '$theme' uses a bat built-in (no vendored .tmTheme)"
+        # Cache only needs to exist if a previous theme created it.
+        return 0
+    fi
+
+    local copied=0
+    local file
+    for file in "$bat_theme_dir"/*.tmTheme; do
+        [[ -e "$file" ]] || continue
+        local dest="$bat_src/themes/$(basename "$file")"
+        if [[ ! -f "$dest" ]] || ! cmp -s "$file" "$dest"; then
+            cp "$file" "$dest"
+            copied=1
+        fi
+    done
+
+    if [[ $copied -eq 1 ]] || [[ ! -f "$bat_cache/themes.bin" ]]; then
+        if "$bat_cmd" cache --build --source="$bat_src" --target="$bat_cache" >/dev/null 2>&1; then
+            success "bat: vendored themes installed in isolated cache"
+        else
+            warn "bat: cache rebuild failed (BAT_CACHE_PATH=$bat_cache)"
+        fi
+    else
+        log "bat: vendored themes already up to date"
+    fi
+}
+
+# ==============================================================================
+# starship — substitute the active palette name into generated/starship.toml
+# ==============================================================================
+apply_starship_theme() {
+    local theme="$1"
+    local base="$DOTFILES_DIR/configs/starship.toml"
+
+    if [[ ! -f "$base" ]]; then
+        warn "starship: configs/starship.toml not found — skipping"
+        return 0
+    fi
+
+    mkdir -p "$GENERATED_DIR"
+
+    # Sed-substitute the placeholder. If the base config doesn't contain the
+    # marker (older repo state), fall back to copying verbatim.
+    if grep -q '__DOTFILES_PALETTE__' "$base"; then
+        sed "s|__DOTFILES_PALETTE__|$theme|g" "$base" > "$STARSHIP_GEN"
+    else
+        cp "$base" "$STARSHIP_GEN"
+    fi
+
+    # Self-heal: if a previous setup run left ~/.config/starship.toml as a
+    # symlink to the template (which contains the unresolved palette marker),
+    # remove it so starship falls back to STARSHIP_CONFIG (set in shell/env.sh).
+    local user_starship="$HOME/.config/starship.toml"
+    if [[ -L "$user_starship" ]]; then
+        local target
+        target="$(readlink -f "$user_starship" 2>/dev/null || true)"
+        if [[ "$target" == "$base" ]] || [[ "$target" == "$DOTFILES_DIR/configs/starship.toml" ]]; then
+            rm -f "$user_starship"
+            log "starship: removed stale ~/.config/starship.toml symlink (template would shadow generated config)"
+        fi
+    fi
+
+    success "starship: $STARSHIP_GEN regenerated for palette '$theme' (open a new shell)"
+}
+
+# ==============================================================================
+# delta — write a tiny generated/delta.gitconfig that includes the active
+# theme's [delta "<name>"] block and activates it via `features = <name>`.
+# Also ensures ~/.gitconfig has an [include] directive pointing at the
+# generated file (idempotent — only added once).
+# ==============================================================================
+apply_delta_theme() {
+    local theme="$1"
+    local theme_delta="$THEMES_DIR/$theme/delta.gitconfig"
+
+    if [[ ! -f "$theme_delta" ]]; then
+        log "delta: theme '$theme' has no delta.gitconfig — keeping previous"
+        return 0
+    fi
+
+    mkdir -p "$GENERATED_DIR"
+
+    cat > "$DELTA_GEN" << EOF
+# Auto-generated by bin/theme-switcher — do not edit.
+# Active delta theme: $theme
+[include]
+    path = $theme_delta
+[delta]
+    features = $theme
+EOF
+
+    # Make sure ~/.gitconfig includes the generated file. Adding via
+    # `git config --global --add include.path` is idempotent for new keys
+    # but creates duplicates if called twice with the same path; check first.
+    if command -v git >/dev/null 2>&1; then
+        local include_path="$DELTA_GEN"
+        if ! git config --global --get-all include.path 2>/dev/null | grep -Fxq "$include_path"; then
+            git config --global --add include.path "$include_path" 2>/dev/null && \
+                log "delta: added include.path to ~/.gitconfig"
+        fi
+    fi
+
+    success "delta: $DELTA_GEN regenerated for '$theme'"
+}
+
+# ==============================================================================
+# btop — copy vendored .theme into btop's config dir, patch color_theme
+# ==============================================================================
+apply_btop_theme() {
+    local theme="$1"
+    local theme_file="$THEMES_DIR/$theme/btop.theme"
+
+    if [[ ! -f "$theme_file" ]]; then
+        log "btop: theme '$theme' has no btop.theme — keeping previous"
+        return 0
+    fi
+
+    local btop_dir="$HOME/.config/btop"
+    local themes_dir="$btop_dir/themes"
+    local conf="$btop_dir/btop.conf"
+    local dest="$themes_dir/dotfiles-$theme.theme"
+
+    mkdir -p "$themes_dir"
+
+    if [[ ! -f "$dest" ]] || ! cmp -s "$theme_file" "$dest"; then
+        cp "$theme_file" "$dest"
+    fi
+
+    # Create btop.conf with safe defaults if it doesn't exist
+    if [[ ! -f "$conf" ]]; then
+        cat > "$conf" << EOF
+#? Config file for btop v. 1.4.0 — managed by dotfiles
+color_theme = "dotfiles-$theme"
+theme_background = True
+truecolor = True
+EOF
+    else
+        # Patch existing color_theme line idempotently
+        if grep -qE '^[[:space:]]*color_theme[[:space:]]*=' "$conf"; then
+            sed -i.bak -E "s|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = \"dotfiles-$theme\"|" "$conf"
+            rm -f "$conf.bak"
+        else
+            printf '\ncolor_theme = "dotfiles-%s"\n' "$theme" >> "$conf"
+        fi
+    fi
+
+    success "btop: theme set to dotfiles-$theme"
+}
+
+# ==============================================================================
+# lazygit — merge the theme's gui.theme block into config.yml between
+# marker lines. Anything outside the markers is preserved.
+# ==============================================================================
+apply_lazygit_theme() {
+    local theme="$1"
+    local snippet="$THEMES_DIR/$theme/lazygit.yml"
+
+    if [[ ! -f "$snippet" ]]; then
+        log "lazygit: theme '$theme' has no lazygit.yml — keeping previous"
+        return 0
+    fi
+
+    local lz_dir="$HOME/.config/lazygit"
+    local conf="$lz_dir/config.yml"
+    mkdir -p "$lz_dir"
+
+    # Build the marked block (header + indented snippet contents + footer).
+    local block
+    block=$(printf '%s\n%s\n%s\n' "$LAZYGIT_BEGIN" "$(cat "$snippet")" "$LAZYGIT_END")
+
+    if [[ ! -f "$conf" ]]; then
+        printf '%s\n' "$block" > "$conf"
+    elif grep -qF "$LAZYGIT_BEGIN" "$conf" && grep -qF "$LAZYGIT_END" "$conf"; then
+        # Replace the existing block in place
+        local tmp
+        tmp="$(mktemp)"
+        awk -v begin="$LAZYGIT_BEGIN" -v end="$LAZYGIT_END" -v block="$block" '
+            $0 == begin { in_block = 1; print block; next }
+            $0 == end   { in_block = 0; next }
+            !in_block   { print }
+        ' "$conf" > "$tmp"
+        mv "$tmp" "$conf"
+    else
+        # Append block to end (preserving trailing newline)
+        printf '\n%s\n' "$block" >> "$conf"
+    fi
+
+    success "lazygit: theme block updated for '$theme' (restart lazygit)"
 }
 
 apply_theme() {
-    local theme="$1"
+    local global="$1"
+
+    if ! theme_exists "$global"; then
+        error "Theme not found: $global"
+        return 1
+    fi
+
+    if ! validate_theme_files "$global"; then
+        error "Cannot apply incomplete theme: $global"
+        return 1
+    fi
+
+    # Always reload overrides from disk so we resolve against the latest state.
+    load_theme_overrides
+
+    # Resolve each surface independently. If overrides select different themes,
+    # each apply_<surface>_theme is called with its own resolved theme.
+    local r_vim r_bat r_delta r_tmux r_starship r_fzf r_btop r_lazygit
+    DOTFILES_THEME="$global" r_vim="$(resolve_surface_theme vim)"
+    DOTFILES_THEME="$global" r_bat="$(resolve_surface_theme bat)"
+    DOTFILES_THEME="$global" r_delta="$(resolve_surface_theme delta)"
+    DOTFILES_THEME="$global" r_tmux="$(resolve_surface_theme tmux)"
+    DOTFILES_THEME="$global" r_starship="$(resolve_surface_theme starship)"
+    DOTFILES_THEME="$global" r_fzf="$(resolve_surface_theme fzf)"
+    DOTFILES_THEME="$global" r_btop="$(resolve_surface_theme btop)"
+    DOTFILES_THEME="$global" r_lazygit="$(resolve_surface_theme lazygit)"
+
+    # Validate every resolved surface theme actually exists. Catches orphan
+    # overrides left over after a theme was deleted from themes/.
+    local resolved t bad=0
+    for resolved in "$r_vim" "$r_bat" "$r_delta" "$r_tmux" "$r_starship" "$r_fzf" "$r_btop" "$r_lazygit"; do
+        if ! theme_exists "$resolved"; then
+            error "Resolved theme '$resolved' not found in themes/ (orphan override?)"
+            bad=1
+        fi
+    done
+    if [[ $bad -eq 1 ]]; then
+        error "Run 'theme-switcher show' to inspect the cascade and 'theme-switcher unset <target>' to clear bad overrides."
+        return 1
+    fi
+
+    # Show effective cascade if non-trivial
+    local has_overrides=0
+    for t in code chrome apps; do
+        group_has_override "$t" && has_overrides=1
+    done
+    for t in vim bat delta tmux starship fzf btop lazygit; do
+        surface_has_override "$t" && has_overrides=1
+    done
+
+    if [[ $has_overrides -eq 1 ]]; then
+        log "Applying theme cascade (global: $global)"
+        log "  code:   vim=$r_vim  bat=$r_bat  delta=$r_delta"
+        log "  chrome: tmux=$r_tmux  starship=$r_starship  fzf=$r_fzf"
+        log "  apps:   btop=$r_btop  lazygit=$r_lazygit"
+    else
+        log "Applying theme: $global"
+    fi
+
+    # Required surfaces (always succeed)
+    apply_vim_theme  "$r_vim"
+    apply_tmux_theme "$r_tmux"
+
+    # Optional surfaces — each is no-op when its source files are missing
+    apply_bat_theme      "$r_bat"
+    apply_starship_theme "$r_starship"
+    apply_delta_theme    "$r_delta"
+    apply_btop_theme     "$r_btop"
+    apply_lazygit_theme  "$r_lazygit"
+
+    # Shell bridge LAST — captures the resolved cascade for reload/subshells
+    apply_shell_theme "$global"
+
+    success "Theme '$global' has been applied successfully!"
+    echo
+    log "To see all changes:"
+    log "  - Restart your shell or run: reload"
+    log "  - Restart neovim or run: :source ~/.config/nvim/init.vim"
+    log "  - Tmux has been reloaded automatically (if running)"
+}
+
+# ==============================================================================
+# Subcommands: set / unset / reset / show
+# ==============================================================================
+
+# Parse a target string into "<group> <surface>" (surface "" for whole groups).
+# Accepts: <group> | <surface> | <group>.<surface>
+# Returns: 0 + "<group> <surface>" on stdout. 1 on parse error (with error log).
+_parse_target() {
+    local raw="$1"
+    local g s
+
+    if [[ "$raw" == *.* ]]; then
+        g="${raw%%.*}"
+        s="${raw#*.}"
+        if ! is_group "$g"; then
+            error "Unknown group '$g' (try: $(list_all_groups | tr '\n' ' '))"
+            return 1
+        fi
+        if ! is_surface "$s"; then
+            error "Unknown surface '$s' (try: $(list_all_surfaces | tr '\n' ' '))"
+            return 1
+        fi
+        local sg
+        sg="$(group_for_surface "$s")"
+        if [[ "$sg" != "$g" ]]; then
+            error "Surface '$s' is in group '$sg', not '$g'. Use '${sg}.${s}' or just '${s}'."
+            return 1
+        fi
+        printf '%s %s\n' "$g" "$s"
+        return 0
+    fi
+
+    if is_group "$raw"; then
+        printf '%s \n' "$raw"
+        return 0
+    fi
+
+    if is_surface "$raw"; then
+        g="$(group_for_surface "$raw")"
+        printf '%s %s\n' "$g" "$raw"
+        return 0
+    fi
+
+    error "Unknown target '$raw'"
+    log "Groups:   $(list_all_groups | tr '\n' ' ')"
+    log "Surfaces: $(list_all_surfaces | tr '\n' ' ')"
+    return 1
+}
+
+# theme-switcher set <target> <theme>
+cmd_set() {
+    local target="${1:-}" theme="${2:-}"
+    if [[ -z "$target" || -z "$theme" ]]; then
+        error "Usage: theme-switcher set <target> <theme>"
+        log "  <target>: a group ($(list_all_groups | tr '\n' ' ')) or surface ($(list_all_surfaces | tr '\n' ' '))"
+        log "  <theme>:  one of: $(for d in "$THEMES_DIR"/*/; do basename "$d"; done | tr '\n' ' ')"
+        return 1
+    fi
 
     if ! theme_exists "$theme"; then
         error "Theme not found: $theme"
+        log "Available themes:"
+        list_themes
         return 1
     fi
 
-    if ! validate_theme_files "$theme"; then
-        error "Cannot apply incomplete theme: $theme"
+    local parsed group surface
+    parsed="$(_parse_target "$target")" || return 1
+    group="${parsed%% *}"
+    surface="${parsed#* }"
+    surface="${surface// /}"   # strip whitespace; empty if group-only
+
+    if [[ -n "$surface" ]]; then
+        _theme_overrides_set "$surface" "$theme"
+        log "Override set: $surface = $theme  (group: $group)"
+    else
+        _theme_overrides_set "$group" "$theme"
+        log "Override set: $group group = $theme"
+    fi
+
+    # Re-apply against current global so the override takes effect immediately.
+    apply_theme "$(get_current_theme)"
+}
+
+# theme-switcher unset <target>
+cmd_unset() {
+    local target="${1:-}"
+    if [[ -z "$target" ]]; then
+        error "Usage: theme-switcher unset <target>"
+        log "Active overrides:"; cmd_show_overrides_only
         return 1
     fi
 
-    log "Applying theme: $theme"
+    local parsed group surface
+    parsed="$(_parse_target "$target")" || return 1
+    group="${parsed%% *}"
+    surface="${parsed#* }"
+    surface="${surface// /}"
 
-    apply_vim_theme "$theme"
-    apply_tmux_theme "$theme"
-    apply_shell_theme "$theme"
+    if [[ -n "$surface" ]]; then
+        if ! surface_has_override "$surface"; then
+            warn "No override set for surface '$surface' — nothing to do."
+            return 0
+        fi
+        _theme_overrides_unset "$surface"
+        log "Override removed: $surface"
+    else
+        if ! group_has_override "$group"; then
+            warn "No override set for group '$group' — nothing to do."
+            return 0
+        fi
+        _theme_overrides_unset "$group"
+        log "Override removed: $group group"
+    fi
 
-    success "Theme '$theme' has been applied successfully!"
+    apply_theme "$(get_current_theme)"
+}
+
+# theme-switcher reset
+cmd_reset() {
+    _theme_overrides_reset
+    log "All theme overrides cleared."
+    apply_theme "$(get_current_theme)"
+}
+
+# Internal: just print current overrides (used by `unset` error message).
+cmd_show_overrides_only() {
+    local lines
+    lines="$(_theme_overrides_list || true)"
+    if [[ -z "$lines" ]]; then
+        log "  (none)"
+    else
+        printf '%s\n' "$lines" | sed 's/^/  /'
+    fi
+}
+
+# theme-switcher show
+cmd_show() {
+    local global resolved tag
+    global="$(get_current_theme)"
+
+    # Make sure the env reflects on-disk overrides for accurate resolution.
+    load_theme_overrides
+
+    echo "global: $global"
+    local groups=(code chrome apps)
+    local i last_group_idx=$((${#groups[@]} - 1))
+
+    for i in "${!groups[@]}"; do
+        local g="${groups[$i]}"
+        local g_branch g_indent
+        if [[ $i -eq $last_group_idx ]]; then
+            g_branch="└─"; g_indent="   "
+        else
+            g_branch="├─"; g_indent="│  "
+        fi
+
+        local g_resolved g_tag
+        g_resolved="$(DOTFILES_THEME="$global" resolve_group_theme "$g")"
+        g_tag=""; group_has_override "$g" && g_tag="  (override)"
+
+        # Pad group name to 7 chars for column alignment
+        printf '%s %-7s: %s%s\n' "$g_branch" "$g" "$g_resolved" "$g_tag"
+
+        local surfaces=()
+        # shellcheck disable=SC2207
+        surfaces=($(list_surfaces_in_group "$g"))
+        local j last_surface_idx=$((${#surfaces[@]} - 1))
+        for j in "${!surfaces[@]}"; do
+            local s="${surfaces[$j]}"
+            local s_branch
+            if [[ $j -eq $last_surface_idx ]]; then
+                s_branch="└─"
+            else
+                s_branch="├─"
+            fi
+            local s_resolved s_tag
+            s_resolved="$(DOTFILES_THEME="$global" resolve_surface_theme "$s")"
+            s_tag=""
+            if surface_has_override "$s"; then
+                s_tag="  (override)"
+            fi
+            # Pad surface name to 8 chars for column alignment
+            printf '%s%s %-8s: %s%s\n' "$g_indent" "$s_branch" "$s" "$s_resolved" "$s_tag"
+        done
+    done
+
     echo
-    log "To see all changes:"
-    log "  - Restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
-    log "  - Restart neovim or run: :source ~/.config/nvim/init.vim"
-    log "  - Tmux has been reloaded automatically (if running)"
+    local overrides
+    overrides="$(_theme_overrides_list || true)"
+    if [[ -z "$overrides" ]]; then
+        echo "Overrides: (none — pure global)"
+    else
+        echo "Overrides:"
+        printf '%s\n' "$overrides" | sed 's/^/  /'
+    fi
 }
 
 # ==============================================================================
@@ -288,34 +849,57 @@ list_themes() {
 
 show_help() {
     cat << EOF
-Theme Switcher - Unified theme management for neovim, tmux, and shell
+Theme Switcher — unified theme management with per-component overrides
 
 USAGE:
-    ./bin/theme-switcher [OPTIONS] [THEME]
+    theme-switcher [GLOBAL_THEME]               Apply theme globally (overrides preserved)
+    theme-switcher set <target> <theme>         Override a group or surface
+    theme-switcher unset <target>               Remove one override
+    theme-switcher reset                        Clear ALL overrides
+    theme-switcher show                         Show effective theme cascade
+    theme-switcher --list | -l                  List available themes
+    theme-switcher --current | -c               Show global theme
+    theme-switcher --preview | -p <theme>       Preview theme without applying
+    theme-switcher --revert | -r                Revert to previous theme
+    theme-switcher --init                       Apply default theme if none set
+    theme-switcher --help | -h                  This message
 
-OPTIONS:
-    --list, -l          List available themes
-    --current, -c       Show current theme
-    --preview, -p       Preview theme without applying
-    --revert, -r        Revert to previous theme
-    --init              Apply default theme if none is set (used by setup.sh)
-    --help, -h          Show this help message
+CASCADE:
+    Effective theme for each surface follows: surface > group > global.
 
-THEMES:
-    Themes are discovered from the themes/ directory.
-    Run --list to see available themes.
+GROUPS  →  SURFACES:
+    code   → vim, bat, delta              (editor + diff viewers)
+    chrome → tmux, starship, fzf          (persistent UI)
+    apps   → btop, lazygit                (full-screen TUI apps)
 
 EXAMPLES:
-    ./bin/theme-switcher                    # Interactive selection with FZF
-    ./bin/theme-switcher nord              # Apply Nord theme
-    ./bin/theme-switcher --preview tokyo-night  # Preview without applying
-    ./bin/theme-switcher --list            # List all available themes
+    theme-switcher catppuccin                   # global → catppuccin
+    theme-switcher set code tokyo-night         # editor group → tokyo-night
+    theme-switcher set starship nord            # just starship → nord
+    theme-switcher set chrome.fzf catppuccin    # qualified surface form
+    theme-switcher unset starship               # back to chrome group/global
+    theme-switcher reset                        # clear all overrides
+    theme-switcher show                         # see the cascade tree
 
 EOF
 }
 
 main() {
     case "${1:-}" in
+        set)
+            shift
+            cmd_set "$@"
+            ;;
+        unset)
+            shift
+            cmd_unset "$@"
+            ;;
+        reset)
+            cmd_reset
+            ;;
+        show)
+            cmd_show
+            ;;
         --init)
             local current
             current="$(get_current_theme)"
@@ -326,7 +910,7 @@ main() {
                 warn "Current theme '$current' not found — resetting to $DEFAULT_THEME"
                 apply_theme "$DEFAULT_THEME"
             else
-                # Regenerate loaders to pick up path changes
+                # Regenerate loaders to pick up path/cascade changes
                 apply_theme "$current"
             fi
             ;;
