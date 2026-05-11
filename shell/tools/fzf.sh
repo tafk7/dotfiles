@@ -36,11 +36,16 @@ fzf-rg() {
         --bind 'ctrl-v:execute(code -g {1}:{2})'
 }
 
-# Project finder
+# Project finder — any subdir under PROJECTS_DIRS (not git-only)
 fzf-project() {
-    local project_dirs=("$HOME/projects" "$HOME/work" "$HOME/dev")
+    local dirs
+    mapfile -t dirs < <(_dotfiles_iter_project_dirs)
+    if [[ ${#dirs[@]} -eq 0 ]]; then
+        echo "fzf-project: no project directories found in PROJECTS_DIRS" >&2
+        return 1
+    fi
     local project
-    project=$(find "${project_dirs[@]}" -maxdepth 2 -type d 2>/dev/null |
+    project=$(find "${dirs[@]}" -maxdepth 2 -type d 2>/dev/null |
               fzf --preview 'eza --tree --color=always --level=1 {} | head -20' \
                   --header 'Select project directory')
     [[ -n "$project" ]] && cd "$project"

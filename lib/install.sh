@@ -6,7 +6,7 @@
 [[ -n "${_DOTFILES_INSTALL_LOADED:-}" ]] && return 0
 _DOTFILES_INSTALL_LOADED=1
 
-set -e
+set -euo pipefail
 
 # Source runtime helpers (logging, is_wsl, etc.)
 source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
@@ -153,7 +153,7 @@ EOF
 write_dotfiles_env() {
     local bridge_file="$DOTFILES_DIR/generated/bridge.sh"
 
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
         log "[DRY RUN] Would write $bridge_file"
         return 0
     fi
@@ -283,11 +283,13 @@ process_git_config() {
         rm "$target"
     fi
 
-    git_name_escaped=$(printf '%s\n' "$git_name" | sed 's/[[\.*^$()+?{|]/\\&/g')
-    git_email_escaped=$(printf '%s\n' "$git_email" | sed 's/[[\.*^$()+?{|]/\\&/g')
+    git_name_escaped=$(printf '%s' "$git_name" | sed 's/[][\\.*^$()+?{}|]/\\&/g')
+    git_email_escaped=$(printf '%s' "$git_email" | sed 's/[][\\.*^$()+?{}|]/\\&/g')
+    dotfiles_dir_escaped=$(printf '%s' "$DOTFILES_DIR" | sed 's/[][\\.*^$()+?{}|]/\\&/g')
 
     sed -e "s|{{GIT_NAME}}|$git_name_escaped|g" \
         -e "s|{{GIT_EMAIL}}|$git_email_escaped|g" \
+        -e "s|{{DOTFILES_DIR}}|$dotfiles_dir_escaped|g" \
         "$source" > "$target"
 
     success "Git config created: $target"
@@ -302,7 +304,7 @@ install_apt() {
     shift
     local packages=("$@")
 
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
         log "[DRY RUN] Would install $label APT packages: ${packages[*]}"
         return 0
     fi
@@ -332,7 +334,7 @@ update_packages() {
 }
 
 ensure_docker_repo() {
-    if [[ "$DRY_RUN" == "true" ]]; then
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
         log "[DRY RUN] Would ensure Docker apt repo is configured"
         return 0
     fi
@@ -355,7 +357,6 @@ ensure_docker_repo() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" | \
         safe_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    _APT_UPDATED=""
     update_packages
     success "Docker apt repository configured"
 }
@@ -487,7 +488,7 @@ install_full_packages() {
     # Azure CLI
     if ! command -v az >/dev/null 2>&1; then
         log "Installing Azure CLI..."
-        if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
             log "[DRY RUN] Would install Azure CLI"
         else
             curl -sL https://aka.ms/InstallAzureCLIDeb | safe_sudo bash

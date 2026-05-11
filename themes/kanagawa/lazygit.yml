@@ -1,0 +1,30 @@
+# Kanagawa Wave — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#7e9cd8'
+      - bold
+    inactiveBorderColor:
+      - '#54546d'
+    searchingActiveBorderColor:
+      - '#dca561'
+    optionsTextColor:
+      - '#7e9cd8'
+    selectedLineBgColor:
+      - '#2a2a37'
+    inactiveViewSelectedLineBgColor:
+      - '#363646'
+    cherryPickedCommitFgColor:
+      - '#7e9cd8'
+    cherryPickedCommitBgColor:
+      - '#363646'
+    markedBaseCommitFgColor:
+      - '#dca561'
+    markedBaseCommitBgColor:
+      - '#363646'
+    unstagedChangesColor:
+      - '#c34043'
+    defaultFgColor:
+      - '#dcd7ba'
+  authorColors:
+    '*': '#957fb8'

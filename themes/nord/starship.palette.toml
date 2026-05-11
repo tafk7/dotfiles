@@ -1,0 +1,16 @@
+# Nord — Starship palette
+[palettes.nord]
+bg          = "#2E3440"
+bg_dim      = "#242933"
+bg_alt      = "#3B4252"
+fg          = "#D8DEE9"
+fg_dim      = "#616E88"
+red         = "#BF616A"
+orange      = "#D08770"
+yellow      = "#EBCB8B"
+green       = "#A3BE8C"
+aqua        = "#88C0D0"
+blue        = "#81A1C1"
+purple      = "#B48EAD"
+bracket     = "#88C0D0"
+bracket_alt = "#81A1C1"

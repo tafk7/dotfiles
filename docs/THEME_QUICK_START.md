@@ -4,82 +4,90 @@
 
 ### Interactive Mode (Recommended)
 ```bash
-theme-switch
+bin/theme-switcher
 ```
 - Use ↑/↓ arrows to browse themes
-- Press Enter to preview
-- Press Enter again to apply
-- Press Esc to cancel
+- Type to fuzzy-search
+- Enter to apply
 
 ### Direct Switch
 ```bash
-# Switch to a specific theme
-theme-switch nord
-theme-switch tokyo-night
-theme-switch kanagawa
-theme-switch gruvbox
-theme-switch catppuccin
+bin/theme-switcher nord
+bin/theme-switcher tokyo-night
+bin/theme-switcher kanagawa
+bin/theme-switcher gruvbox
+bin/theme-switcher catppuccin
 ```
 
-### List Themes
+### List / Inspect
 ```bash
-themes
+bin/theme-switcher --list        # all themes
+bin/theme-switcher --current     # active theme
+bin/theme-switcher --preview nord   # preview without applying
+bin/theme-switcher --revert      # back to previous theme
 ```
 
 ## 🔄 After Switching
 
-Most applications update automatically, but:
+Most surfaces update on next launch, but some need a nudge:
 
-- **Tmux**: Press `Ctrl-a r` to reload
-- **Vim**: Theme applies to new vim sessions
-- **Shell**: New terminals use new theme immediately
+- **Tmux**: `Ctrl-a r` to reload
+- **Vim**: applies to new sessions
+- **Shell**: applies to new terminals; `reload` for current
+- **Bat**: cache is rebuilt automatically by the switcher when vendored themes change
 
 ## 🎯 Theme Descriptions
 
 | Theme | Best For | Vibe |
 |-------|----------|------|
-| **Nord** | Long coding sessions | Cool, professional, Arctic |
-| **Tokyo Night** | Modern development | Vibrant, city lights, contemporary |
-| **Kanagawa** | Focused work | Earthy, Japanese aesthetic, calming |
-| **Gruvbox Material** | Retro feel | Warm, comfortable, nostalgic |
-| **Catppuccin Mocha** | Gentle on eyes | Soft pastels, cozy, smooth |
+| **gruvbox** | Retro feel | Warm, comfortable, nostalgic (default) |
+| **nord** | Long coding sessions | Cool, professional, Arctic |
+| **tokyo-night** | Modern development | Vibrant, city lights, contemporary |
+| **kanagawa** | Focused work | Earthy, Japanese aesthetic, calming |
+| **catppuccin** | Gentle on eyes | Soft pastels, cozy, smooth (Mocha) |
 
 ## 🚀 Pro Tips
 
-1. **Quick Preview**: The theme switcher shows a color preview in the selection menu
-
-2. **Keyboard Shortcuts**: 
-   - In theme switcher: `j/k` or arrows to navigate
-   - `/` to search for a theme name
-
-3. **Default Theme**: Gruvbox Material is the default if no theme is selected
-
-4. **Check Current Theme**: 
+1. **Quick aliases** in `~/.zshrc.local` or `~/.bashrc.local`:
    ```bash
-   cat ~/.config/dotfiles/current-theme
+   alias nord='bin/theme-switcher nord'
+   alias tokyo='bin/theme-switcher tokyo-night'
+   ```
+
+2. **Default theme**: gruvbox if none is set.
+
+3. **Check current theme**:
+   ```bash
+   bin/theme-switcher --current
+   # or look at:
+   grep DOTFILES_THEME generated/theme.sh
    ```
 
 ## 🛠️ Troubleshooting
 
-**Theme not showing?**
-```bash
-# Reinstall vim plugins
-vim +PlugInstall +qall
+**Theme partially applied?**
+The theme switcher applies each surface independently. If one tool's vendored
+file is missing, that tool is skipped (with a warning) but the others still
+update. Run `./bin/verify` to see what's wired up.
 
-# Reload shell
+**Reset everything:**
+```bash
+rm generated/theme.sh
+rm generated/starship.toml generated/delta.gitconfig
+rm ~/.config/nvim/theme.vim ~/.tmux/theme.conf
+bin/theme-switcher gruvbox
+```
+
+**Vim plugin missing?**
+```bash
+nvim +PlugInstall +qall
+```
+
+**Reload current shell:**
+```bash
 exec $SHELL
 ```
 
-**Want to reset?**
-```bash
-rm ~/.config/dotfiles/current-theme
-rm ~/.vim/theme.vim
-rm ~/.tmux/theme.conf
-rm ~/.config/dotfiles/theme.sh
-```
-
-Then run `theme-switch` to select a fresh theme.
-
 ---
 
-For detailed documentation, see [Theme System Documentation](./theme-system.md)
+For detailed documentation, see [Theme System Documentation](./theme-system.md).

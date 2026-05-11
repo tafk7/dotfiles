@@ -1,0 +1,22 @@
+# Tokyo Night — delta feature
+# syntax-theme: delta embeds bat 0.24+ which can't read system bat 0.19's cache
+# format. We use a delta-bat built-in that approximates Tokyo Night's bluish
+# dark palette ("Nord" is the closest match for syntax tokens). All other
+# colors below are exact Tokyo Night values for diff chrome.
+[delta "tokyo-night"]
+syntax-theme = Nord
+plus-style = "syntax #20303b"
+plus-emph-style = "syntax #2e4854 bold"
+plus-non-emph-style = "syntax #20303b"
+minus-style = "syntax #37222c"
+minus-emph-style = "syntax #5e2839 bold"
+minus-non-emph-style = "syntax #37222c"
+file-style = "#7aa2f7 bold"
+file-decoration-style = "#292e42 ul"
+hunk-header-style = "syntax bold #c0caf5"
+hunk-header-decoration-style = "#292e42 box"
+line-numbers-zero-style = "#3b4261"
+line-numbers-left-style = "#7aa2f7"
+line-numbers-right-style = "#7aa2f7"
+line-numbers-minus-style = "#f7768e"
+line-numbers-plus-style = "#9ece6a"

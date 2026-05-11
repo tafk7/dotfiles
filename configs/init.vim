@@ -1,5 +1,5 @@
 " Modern Vim Configuration with Power User Features
-" Part of dotfiles - https://github.com/yourusername/dotfiles
+" Part of dotfiles
 
 " ==============================================================================
 " Vim-Plug Auto-Installation

@@ -1,6 +1,6 @@
 # fd ignore patterns
 # https://github.com/sharkdp/fd
-# Part of dotfiles - https://github.com/yourusername/dotfiles
+# Part of dotfiles
 #
 # This file uses gitignore syntax
 # Patterns are matched relative to the directory fd is run from

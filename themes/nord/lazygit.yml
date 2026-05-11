@@ -1,0 +1,30 @@
+# Nord — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#88C0D0'
+      - bold
+    inactiveBorderColor:
+      - '#4C566A'
+    searchingActiveBorderColor:
+      - '#EBCB8B'
+    optionsTextColor:
+      - '#81A1C1'
+    selectedLineBgColor:
+      - '#3B4252'
+    inactiveViewSelectedLineBgColor:
+      - '#434C5E'
+    cherryPickedCommitFgColor:
+      - '#88C0D0'
+    cherryPickedCommitBgColor:
+      - '#434C5E'
+    markedBaseCommitFgColor:
+      - '#EBCB8B'
+    markedBaseCommitBgColor:
+      - '#434C5E'
+    unstagedChangesColor:
+      - '#BF616A'
+    defaultFgColor:
+      - '#D8DEE9'
+  authorColors:
+    '*': '#B48EAD'

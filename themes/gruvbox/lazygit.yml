@@ -1,0 +1,30 @@
+# Gruvbox Material — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#a9b665'
+      - bold
+    inactiveBorderColor:
+      - '#928374'
+    searchingActiveBorderColor:
+      - '#d8a657'
+    optionsTextColor:
+      - '#7daea3'
+    selectedLineBgColor:
+      - '#3c3836'
+    inactiveViewSelectedLineBgColor:
+      - '#504945'
+    cherryPickedCommitFgColor:
+      - '#7daea3'
+    cherryPickedCommitBgColor:
+      - '#504945'
+    markedBaseCommitFgColor:
+      - '#d8a657'
+    markedBaseCommitBgColor:
+      - '#504945'
+    unstagedChangesColor:
+      - '#ea6962'
+    defaultFgColor:
+      - '#d4be98'
+  authorColors:
+    '*': '#d3869b'

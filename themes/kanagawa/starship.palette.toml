@@ -1,0 +1,16 @@
+# Kanagawa Wave — Starship palette
+[palettes.kanagawa]
+bg          = "#1f1f28"
+bg_dim      = "#16161d"
+bg_alt      = "#2a2a37"
+fg          = "#dcd7ba"
+fg_dim      = "#727169"
+red         = "#c34043"
+orange      = "#ffa066"
+yellow      = "#dca561"
+green       = "#76946a"
+aqua        = "#7fb4ca"
+blue        = "#7e9cd8"
+purple      = "#957fb8"
+bracket     = "#957fb8"
+bracket_alt = "#ffa066"

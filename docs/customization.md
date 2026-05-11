@@ -1,244 +1,202 @@
 # Dotfiles Customization Guide
 
-This guide explains how to customize and extend the dotfiles system for your specific needs.
+This guide explains how to customize and extend the dotfiles system. The repo
+is data-driven: you almost never edit `setup.sh` directly. You add an entry to
+a declarative table in `lib/config.sh` or `lib/registry.sh`, and the existing
+machinery picks it up.
 
-## Adding Custom Packages
+## Architecture in One Page
 
-### 1. Choose the Right Package Category
+| Layer            | File(s)                                  | Purpose                                                                              |
+| ---------------- | ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| Declarative data | `lib/config.sh`, `lib/registry.sh`       | `PACKAGES`, `CONFIG_MAP`, `TOOL_*` arrays. No side effects. Read by every other layer. |
+| Runtime helpers  | `lib/runtime.sh`                         | `log`, `success`, `warn`, `error`, `is_wsl`, `command_exists`. Safe everywhere.      |
+| Install helpers  | `lib/install.sh`                         | `install_apt`, `safe_sudo`, `run_installer`, `track_install`. Sourced ONLY by `setup.sh` and installers. |
+| Tool installers  | `installers/install-<tool>.sh`           | One script per non-apt tool (neovim, tmux, nvm, pyenv, …). Exit 0 = installed, 2 = up-to-date, 1 = failed. |
+| Shell entrypoints | `entry/{bash.sh,zsh.sh,profile.sh}`     | Symlinked to `~/.bashrc`, `~/.zshrc`, `~/.profile`. Source `generated/bridge.sh` then `shell/init.sh`. |
+| Shell startup    | `shell/env.sh`, `shell/init.sh`, `shell/tools/*.sh`, `shell/platform/*.sh` | PATH composition, tool-init, domain-grouped functions/aliases. |
+| Themes           | `themes/<name>/`                         | One directory per theme. `bin/theme-switcher` writes runtime files.                  |
 
-- **Base packages** - Essential tools that everyone needs (git, curl, vim, etc.)
-- **Work packages** - Professional development tools (Docker, Azure CLI, Node.js/Python dev tools)
+## Adding a New APT Package
 
-### 2. Adding a New Package
-
-The system is Ubuntu-only, so package names are straightforward.
-
-### 3. For Base Packages
-
-Edit `lib/packages.sh` and add to the `base_packages` array (line ~32):
+Edit `lib/config.sh` and add the package to the appropriate `PACKAGES` group:
 
 ```bash
-local base_packages=(
-    # ... existing packages ...
-    "your-package"
+declare -A PACKAGES=(
+    [core]="git build-essential"
+    [development]="zsh direnv ... lsof psmisc your-package"  # add here
+    [modern]="bat fd-find ripgrep"
+    ...
 )
 ```
 
-### 4. For Work Packages
+Groups are mapped to tiers in `lib/install.sh`:
 
-Edit the `install_work_packages()` function in `lib/packages.sh` (line ~181):
+- `install_shell_packages` → core + development + modern + languages + terminal (+ wsl on WSL)
+- `install_dev_packages`   → diagramming
+- `install_full_packages`  → docker
+
+## Adding a New Binary Tool (eget)
+
+1. Add a release block to `eget.toml`:
+   ```toml
+   ["owner/repo"]
+   tag = "v1.2.3"
+   asset_filters = [".tar.gz", "gnu"]
+   ```
+
+2. Register the tool in `lib/registry.sh` (all five arrays):
+   ```bash
+   TOOL_BINARY[mytool]=mytool
+   TOOL_METHOD[mytool]=eget
+   TOOL_TIER[mytool]=shell      # shell|dev|full
+   ```
+
+3. Run `./setup.sh --shell` (or just `eget --download-all`) to install.
+4. `bin/verify` and `bin/remove` automatically pick up the new tool.
+
+## Adding a New Tool With a Custom Installer
+
+For tools that need more than `eget`:
+
+1. Create `installers/install-mytool.sh`. Follow the existing pattern:
+   - `set -euo pipefail`
+   - Source `lib/install.sh` if needed
+   - Exit `0` on install/update, `2` if already up-to-date, `1` on failure
+2. Register in `lib/registry.sh`:
+   ```bash
+   TOOL_BINARY[mytool]=mytool
+   TOOL_METHOD[mytool]=installer
+   TOOL_TIER[mytool]=dev
+   TOOL_PATHS[mytool]="\$HOME/.local/bin/mytool"   # for bin/remove
+   ```
+3. Call it from the appropriate `install_*_packages` function in `lib/install.sh`:
+   ```bash
+   run_installer "mytool"           # non-critical; warn-only on failure
+   run_installer "mytool" true      # critical; abort setup on failure
+   ```
+
+## Adding a New Config File
+
+Edit `lib/config.sh` and add to `CONFIG_MAP`:
 
 ```bash
-# For npm packages:
-local npm_packages=("yarn" "eslint" "prettier" "your-npm-package")
-
-# For Python packages:
-local python_packages=("black" "ruff" "your-python-package")
-```
-
-## Adding Custom Configuration Files
-
-### 1. Add Your Config File
-
-Place your configuration file in the `configs/` directory:
-```bash
-cp ~/.your-config configs/.your-config
-```
-
-### 2. Update Configuration Mappings
-
-Edit `setup.sh` and add to the `config_mappings` array (line ~125):
-```bash
-config_mappings=(
-    # ... existing mappings ...
-    "$CONFIGS_DIR/your-config:$HOME/.your-config"
+declare -A CONFIG_MAP=(
+    ...
+    [your-config]="$HOME/.your-config:symlink"
+    [config/your-app]="$HOME/.config/your-app:symlink"
 )
 ```
+
+- Source path is resolved by `config_source_path()`:
+  - `bash.sh|zsh.sh|profile.sh|bash_profile` → `entry/`
+  - everything else → `configs/`
+- Place the file at the resolved source path, then run `./setup.sh --config`.
+- Type `gitconfig` is special-cased for template processing (`{{GIT_NAME}}`,
+  `{{GIT_EMAIL}}`).
 
 ## Adding Custom Aliases or Functions
 
-### 1. Create New Alias File
+Shell tooling is grouped by domain in `shell/tools/`:
 
-Create a new file in `shell/aliases/`:
-```bash
-touch shell/aliases/mytools.sh
+```
+shell/tools/
+├── claude.sh    # Claude Code helpers
+├── docker.sh    # docker / compose aliases
+├── fzf.sh       # fzf-* functions and bindings
+├── general.sh   # ll, la, reload, ...
+├── git.sh       # git aliases beyond gitconfig
+├── nav.sh       # cdl, mkcd, proj, add_to_path
+├── node.sh      # npm/yarn/pnpm shortcuts
+├── process.sh   # killport, pidof helpers
+├── python.sh    # venv helpers
+├── tmux.sh      # tmux session helpers
+├── vim.sh       # vim wrappers
+└── vscode.sh    # code/cdiff/cf/cproj
 ```
 
-### 2. Add Your Aliases
+Add to an existing file when your function fits a domain. Create a new
+`shell/tools/<domain>.sh` only when there's a clear new domain (e.g. `kube.sh`).
+All `*.sh` in `shell/tools/` are sourced automatically by `shell/init.sh`.
 
-```bash
-#!/bin/bash
-# My custom aliases
+For WSL-specific code, use `shell/platform/wsl.sh` (only sourced when
+`is_wsl` is true). For Linux-specific (non-WSL), use `shell/platform/linux.sh`.
 
-alias mycommand='some-long-command --with-options'
-alias work='cd ~/projects/work'
-```
+## Local Overrides (Per-Machine, Untracked)
 
-### 3. Automatic Loading
+Keep machine-specific tweaks out of git via `*.local`:
 
-The file will be automatically sourced on shell startup - no additional configuration needed!
+- `~/.bashrc.local`, `~/.zshrc.local` — sourced at the end of `shell/init.sh`.
+- `~/.gitconfig.local` — included by the templated `~/.gitconfig`.
 
-## Creating Custom Functions
+These are gitignored.
 
-### 1. Add to Functions File
+## Framework Helpers Available
 
-Add your functions to `shell/functions.sh`:
-```bash
-# Open the functions file
-nano shell/functions.sh
-```
+In `installers/install-*.sh` and `lib/install.sh`-context only:
 
-### 2. Define Your Functions
-
-```bash
-#!/bin/bash
-# My utility functions
-
-# Example: Quick project setup
-new-project() {
-    local name="$1"
-    mkdir -p "$HOME/projects/$name"
-    cd "$HOME/projects/$name"
-    git init
-    echo "# $name" > README.md
-}
-```
-
-## WSL-Specific Customizations
-
-For WSL-specific aliases, add them to `shell/aliases/wsl.sh`. For WSL-specific functions, add them to `shell/wsl-functions.sh`. They'll only be loaded when running in WSL.
-
-## Framework Functions Available
-
-### Package Management
-```bash
-# Install packages from mapping array
-install_packages package_array "description"
-
-# Install single package
-install_single_package "package-name"
-
-# Install npm packages globally
-install_npm_packages npm_array "description"
-
-# Install VS Code extensions
-install_vscode_extensions extension_array "description"
-```
-
-### Security Functions
-```bash
-# Verify downloaded files
-verify_download "$url" "$checksum" "$output_file" "description"
-
-# Validate SSH keys
-validate_ssh_key "$key_file"
-
-# Safe sudo execution
-safe_sudo command args
-```
-
-### Logging
 ```bash
 log "Info message"
-success "Success message"
-warn "Warning message"
-error "Error message"
-work_log "Work-specific message"
+success "OK"
+warn "Heads up"
+error "Failure"
+wsl_log "WSL-specific message"
+
+safe_sudo apt-get install -y foo    # honors DRY_RUN, logs the command
+install_apt "label" pkg1 pkg2 ...   # idempotent, batches missing pkgs
+run_installer "name" [critical]     # runs installers/install-name.sh
+track_install "name" ok|skip|fail   # contributes to the summary
 ```
 
-## Adding Complex Software
+Available everywhere (sourced by `lib/runtime.sh`):
 
-For software that requires more than a simple package install:
-
-1. Create a function in the appropriate setup file:
 ```bash
-install_your_software() {
-    work_log "Installing Your Software..."
-    
-    # Download and verify if needed
-    local temp_dir=$(mktemp -d)
-    local installer="$temp_dir/installer.sh"
-    
-    if verify_download "$url" "$checksum" "$installer" "Your Software"; then
-        chmod +x "$installer"
-        "$installer" --options
-    else
-        error "Failed to download Your Software"
-        rm -rf "$temp_dir"
-        return 1
-    fi
-    
-    rm -rf "$temp_dir"
-    success "Your Software installed"
-}
-
-# Call it in the setup
-install_your_software || warn "Your Software installation failed"
+is_wsl                # 0 if on WSL
+command_exists git
+verify_binary nvim    # exists AND --version works
+get_arch              # x86_64 | aarch64
+get_glibc_version     # 2.35
+version_gte "$a" "$b" # 0 if a >= b
 ```
 
+## Adding a Theme
+
+See [`docs/theme-system.md`](./theme-system.md). Short version: create
+`themes/<name>/` with `meta.sh`, `vim.vim`, `tmux.conf`, `shell.sh`, `colors.sh`
+plus the per-tool palette files (`bat/<name>.tmTheme`, `starship.palette.toml`,
+`delta.gitconfig`, `btop.theme`, `lazygit.yml`). The theme is auto-discovered
+on next `bin/theme-switcher` invocation.
 
 ## Testing Your Changes
 
-1. Test on a clean system or container
-2. Test each installation mode:
-   ```bash
-   ./setup.sh                    # Base only
-   ./setup.sh --work            # Base + work
-   ```
+```bash
+./bin/verify              # reports configs / tools / env health
+bash -n shell/env.sh      # syntax check any modified shell script
+./setup.sh --dry-run --shell    # preview install without making changes
+```
 
-3. Test on different distributions if possible
+For theme changes, cycle every theme to make sure your wiring works:
 
-## Best Practices
-
-1. **Package Names**: Always provide mappings for all three package managers
-2. **Error Handling**: Use the provided error handling functions
-3. **Security**: Use `verify_download()` for any external downloads
-4. **Logging**: Use appropriate log levels for user feedback
-5. **Testing**: Test your changes before committing
-6. **Documentation**: Update README.md if you add user-facing features
-
-## Testing Your Customizations
-
-1. Run the installer with your preferred options:
-   ```bash
-   ./setup.sh --work
-   ```
-
-2. Or reload your shell configuration:
-   ```bash
-   source ~/.bashrc  # or ~/.zshrc
-   ```
-
-3. Use the `reload` alias for quick testing without restarting
+```bash
+for t in nord tokyo-night kanagawa catppuccin gruvbox; do
+    ./bin/theme-switcher "$t"
+done
+```
 
 ## Best Practices
 
-1. **Keep it modular** - Put related aliases/functions in their own files
-2. **Use descriptive names** - Make it clear what your customizations do  
-3. **Document complex functions** - Add comments explaining usage
-4. **Test across distributions** - If sharing, ensure package names work everywhere
-5. **Backup first** - The installer creates backups, but manual backups are good too
-
-## Ubuntu-Specific Notes
-
-- The system uses `apt-get` commands with `-y` flag
-- Some packages have different names (e.g., `fd-find` instead of `fd`)
-- Docker requires adding official Docker repository
-- Azure CLI requires Microsoft repository
-
-## Contributing Back
-
-If you create useful customizations that others might benefit from:
-
-1. Ensure they're generic enough for broad use
-2. Test on multiple distributions if adding packages
-3. Document any special requirements
-4. Submit a pull request with your additions
+- **Don't put business logic in `setup.sh`** — it's an orchestrator. Add to
+  `lib/`, `installers/`, or `shell/`.
+- **Don't `set EDITOR` outside `shell/env.sh`** — it's the single source of
+  truth (verified by `bin/verify`).
+- **Don't add side effects to `lib/runtime.sh` or `lib/config.sh`** — they're
+  sourced on every shell start.
+- **Use `track_install`** in installers so the install summary stays accurate.
+- **Pin tool versions in `eget.toml`** — bump explicitly, not implicitly.
 
 ## Getting Help
 
-If you're unsure about something:
-1. Look at existing implementations in the setup files
-2. Check the utility functions in `lib/runtime.sh`
-3. Test in a safe environment first
-4. Follow the patterns used by existing code
+- `./bin/verify` shows what's broken.
+- `./setup.sh --help` lists tier flags.
+- `./bin/theme-switcher --help` lists theme commands.
+- See `lib/runtime.sh` and `lib/install.sh` for the full helper surface.

@@ -15,9 +15,11 @@ cproj() {
         return 1
     fi
 
+    local dirs
+    mapfile -t dirs < <(_dotfiles_iter_project_dirs)
+    dirs+=("$HOME/.config")
     local dir
-    local search_dirs="${PROJECTS_DIR:-$HOME/projects} $HOME/.config"
-    dir=$(find $search_dirs -maxdepth 2 -type d 2>/dev/null | fzf --preview 'ls -la {}')
+    dir=$(find "${dirs[@]}" -maxdepth 2 -type d 2>/dev/null | fzf --preview 'ls -la {}')
     [[ -n "$dir" ]] && code "$dir"
 }
 
