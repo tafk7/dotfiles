@@ -23,6 +23,7 @@ declare -A TOOL_BINARY=(
     [ripgrep]=rg
     [direnv]=direnv
     [eget]=eget
+    [sd]=sd
     [neovim]=nvim
     [tmux]=tmux
     [plantuml]=plantuml
@@ -47,6 +48,7 @@ declare -A TOOL_METHOD=(
     [ripgrep]=apt
     [direnv]=apt
     [eget]=installer
+    [sd]=eget
     [neovim]=installer
     [tmux]=installer
     [plantuml]=installer
@@ -60,7 +62,7 @@ declare -A TOOL_TIER=(
     [starship]=shell  [eza]=shell     [fzf]=shell      [zoxide]=shell
     [delta]=shell     [btop]=shell    [glow]=shell      [lazygit]=shell
     [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
-    [direnv]=shell    [eget]=shell
+    [direnv]=shell    [eget]=shell    [sd]=shell
     [neovim]=dev      [tmux]=dev      [plantuml]=dev
     [nvm]=full        [pyenv]=full    [poetry]=full
 )

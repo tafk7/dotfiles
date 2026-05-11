@@ -1,39 +1,44 @@
-# Starship Configuration - Minimal, Fast, Visual
-# Optimized for VS Code integrated terminal
+# Starship Configuration — palette-aware, dotfiles-managed
+#
+# This is a TEMPLATE. bin/theme-switcher generates generated/starship.toml
+# from this file by substituting the __DOTFILES_PALETTE__ marker with the
+# active theme name. STARSHIP_CONFIG (set in shell/env.sh) points starship
+# at the generated file.
+#
+# Palette blocks live at the bottom of this file. To add a new theme,
+# append its block below and ensure its shell.sh sets STARSHIP_PALETTE
+# matching the [palettes.<name>] key (used by env.sh fallback only —
+# the generated file pins the palette directly).
 
-# Command timeout - increased for pyenv shims
 command_timeout = 1000
+# DOTFILES_PALETTE_MARKER — substituted by theme-switcher into generated/starship.toml.
+# Do not edit: change palette by switching themes (bin/theme-switcher <name>).
+palette = "__DOTFILES_PALETTE__"
 
-# Format the prompt
 format = """
-[╭─](#9A348E) $directory$git_branch$git_status$cmd_duration
-[╰─](#DA627D) $character"""
+[╭─](bracket) $directory$git_branch$git_status$cmd_duration
+[╰─](bracket_alt) $character"""
 
-# Right prompt shows context
 right_format = """$nodejs$python$docker_context$time"""
 
-# Prompt character changes based on success/failure
 [character]
 success_symbol = "[❯](bold green)"
 error_symbol = "[❯](bold red)"
 vicmd_symbol = "[❮](bold yellow)"
 
-# Current directory
 [directory]
 format = "[$path]($style) "
-style = "cyan bold"
+style = "blue bold"
 truncation_length = 3
 truncate_to_repo = true
 truncation_symbol = "…/"
 
-# Git branch
 [git_branch]
 format = "on [$symbol$branch]($style) "
 style = "purple"
 symbol = " "
 truncation_length = 20
 
-# Git status with minimal indicators
 [git_status]
 format = '([$all_status$ahead_behind]($style) )'
 style = "red"
@@ -48,13 +53,11 @@ staged = "+"
 renamed = "»"
 deleted = "✘"
 
-# Show command duration for slow commands
 [cmd_duration]
-min_time = 2_000  # Show if command took more than 2 seconds
+min_time = 2_000
 format = "took [$duration]($style) "
 style = "yellow"
 
-# Node.js version
 [nodejs]
 format = "[$symbol($version )]($style)"
 symbol = " "
@@ -63,7 +66,6 @@ detect_extensions = ["js", "mjs", "cjs", "ts"]
 detect_files = ["package.json", ".node-version"]
 detect_folders = ["node_modules"]
 
-# Python version
 [python]
 format = "[$symbol($version )]($style)"
 symbol = " "
@@ -71,10 +73,8 @@ style = "yellow"
 detect_extensions = ["py"]
 detect_files = [".python-version", "requirements.txt", "setup.py", "pyproject.toml"]
 detect_folders = []
-# Use python_binary to avoid slow pyenv shims on every prompt
 python_binary = ["python3", "python"]
 
-# Docker context
 [docker_context]
 format = "[$symbol$context]($style) "
 symbol = " "
@@ -82,14 +82,12 @@ style = "blue"
 only_with_files = true
 detect_files = ["Dockerfile", "docker-compose.yml", "docker-compose.yaml"]
 
-# Time (optional - shows on right)
 [time]
 disabled = false
 format = "[$time]($style)"
-style = "dimmed"
-time_format = "%R"  # 24-hour format
+style = "fg_dim"
+time_format = "%R"
 
-# Disable modules we don't need
 [aws]
 disabled = true
 
@@ -116,3 +114,88 @@ disabled = true
 
 [swift]
 disabled = true
+
+# ==============================================================================
+# Palettes — one block per theme. Source of truth: themes/<name>/starship.palette.toml
+# Keep in sync (theme-switcher --init validates consistency).
+# ==============================================================================
+
+[palettes.gruvbox]
+bg          = "#282828"
+bg_dim      = "#1d2021"
+bg_alt      = "#3c3836"
+fg          = "#d4be98"
+fg_dim      = "#928374"
+red         = "#ea6962"
+orange      = "#e78a4e"
+yellow      = "#d8a657"
+green       = "#a9b665"
+aqua        = "#89b482"
+blue        = "#7daea3"
+purple      = "#d3869b"
+bracket     = "#d3869b"
+bracket_alt = "#e78a4e"
+
+[palettes.nord]
+bg          = "#2E3440"
+bg_dim      = "#242933"
+bg_alt      = "#3B4252"
+fg          = "#D8DEE9"
+fg_dim      = "#616E88"
+red         = "#BF616A"
+orange      = "#D08770"
+yellow      = "#EBCB8B"
+green       = "#A3BE8C"
+aqua        = "#88C0D0"
+blue        = "#81A1C1"
+purple      = "#B48EAD"
+bracket     = "#88C0D0"
+bracket_alt = "#81A1C1"
+
+[palettes.tokyo-night]
+bg          = "#1a1b26"
+bg_dim      = "#16161e"
+bg_alt      = "#292e42"
+fg          = "#a9b1d6"
+fg_dim      = "#565f89"
+red         = "#f7768e"
+orange      = "#ff9e64"
+yellow      = "#e0af68"
+green       = "#9ece6a"
+aqua        = "#73daca"
+blue        = "#7aa2f7"
+purple      = "#bb9af7"
+bracket     = "#bb9af7"
+bracket_alt = "#7aa2f7"
+
+[palettes.kanagawa]
+bg          = "#1f1f28"
+bg_dim      = "#16161d"
+bg_alt      = "#2a2a37"
+fg          = "#dcd7ba"
+fg_dim      = "#727169"
+red         = "#c34043"
+orange      = "#ffa066"
+yellow      = "#dca561"
+green       = "#76946a"
+aqua        = "#7fb4ca"
+blue        = "#7e9cd8"
+purple      = "#957fb8"
+bracket     = "#957fb8"
+bracket_alt = "#ffa066"
+
+[palettes.catppuccin]
+bg          = "#1e1e2e"
+bg_dim      = "#181825"
+bg_alt      = "#313244"
+fg          = "#cdd6f4"
+fg_dim      = "#6c7086"
+red         = "#f38ba8"
+orange      = "#fab387"
+yellow      = "#f9e2af"
+green       = "#a6e3a1"
+aqua        = "#94e2d5"
+blue        = "#89b4fa"
+purple      = "#cba6f7"
+bracket     = "#cba6f7"
+bracket_alt = "#f5c2e7"

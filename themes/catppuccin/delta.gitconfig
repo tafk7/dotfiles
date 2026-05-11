@@ -1,0 +1,20 @@
+# Catppuccin Mocha — delta feature
+# syntax-theme: delta-bat built-in approximation (see tokyo-night for context).
+# "OneHalfDark" gives a modern pastel feel close to Catppuccin Mocha.
+[delta "catppuccin"]
+syntax-theme = OneHalfDark
+plus-style = "syntax #28323e"
+plus-emph-style = "syntax #3e4d5e bold"
+plus-non-emph-style = "syntax #28323e"
+minus-style = "syntax #432536"
+minus-emph-style = "syntax #6f3551 bold"
+minus-non-emph-style = "syntax #432536"
+file-style = "#89b4fa bold"
+file-decoration-style = "#313244 ul"
+hunk-header-style = "syntax bold #cdd6f4"
+hunk-header-decoration-style = "#313244 box"
+line-numbers-zero-style = "#45475a"
+line-numbers-left-style = "#89b4fa"
+line-numbers-right-style = "#89b4fa"
+line-numbers-minus-style = "#f38ba8"
+line-numbers-plus-style = "#a6e3a1"

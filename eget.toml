@@ -37,3 +37,7 @@ tag = "v0.59.0"
 ["astral-sh/uv"]
 tag = "0.10.0"
 asset_filters = [".tar.gz", "gnu"]
+
+["chmln/sd"]
+tag = "v1.1.0"
+asset_filters = ["x86_64-unknown-linux-musl"]

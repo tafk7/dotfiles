@@ -1,0 +1,19 @@
+# Gruvbox Material — delta feature
+# Activated by `features = gruvbox` in [delta] (set by theme-switcher).
+[delta "gruvbox"]
+syntax-theme = gruvbox-dark
+plus-style = "syntax #2c3a2c"
+plus-emph-style = "syntax #4f6852 bold"
+plus-non-emph-style = "syntax #2c3a2c"
+minus-style = "syntax #4a2828"
+minus-emph-style = "syntax #693939 bold"
+minus-non-emph-style = "syntax #4a2828"
+file-style = "#d8a657 bold"
+file-decoration-style = "#3c3836 ul"
+hunk-header-style = "syntax bold #d4be98"
+hunk-header-decoration-style = "#3c3836 box"
+line-numbers-zero-style = "#928374"
+line-numbers-left-style = "#7daea3"
+line-numbers-right-style = "#7daea3"
+line-numbers-minus-style = "#ea6962"
+line-numbers-plus-style = "#a9b665"

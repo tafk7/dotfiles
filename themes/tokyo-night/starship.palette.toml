@@ -1,0 +1,16 @@
+# Tokyo Night — Starship palette
+[palettes.tokyo-night]
+bg          = "#1a1b26"
+bg_dim      = "#16161e"
+bg_alt      = "#292e42"
+fg          = "#a9b1d6"
+fg_dim      = "#565f89"
+red         = "#f7768e"
+orange      = "#ff9e64"
+yellow      = "#e0af68"
+green       = "#9ece6a"
+aqua        = "#73daca"
+blue        = "#7aa2f7"
+purple      = "#bb9af7"
+bracket     = "#bb9af7"
+bracket_alt = "#7aa2f7"

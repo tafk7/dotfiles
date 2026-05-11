@@ -1,0 +1,16 @@
+# Catppuccin Mocha — Starship palette
+[palettes.catppuccin]
+bg          = "#1e1e2e"
+bg_dim      = "#181825"
+bg_alt      = "#313244"
+fg          = "#cdd6f4"
+fg_dim      = "#6c7086"
+red         = "#f38ba8"
+orange      = "#fab387"
+yellow      = "#f9e2af"
+green       = "#a6e3a1"
+aqua        = "#94e2d5"
+blue        = "#89b4fa"
+purple      = "#cba6f7"
+bracket     = "#cba6f7"
+bracket_alt = "#f5c2e7"

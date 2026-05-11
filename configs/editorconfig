@@ -1,6 +1,6 @@
 # EditorConfig is awesome: https://EditorConfig.org
 # This file defines coding styles for multiple editors and IDEs
-# Part of dotfiles - https://github.com/yourusername/dotfiles
+# Part of dotfiles
 
 # Top-most EditorConfig file
 root = true

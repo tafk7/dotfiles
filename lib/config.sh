@@ -27,7 +27,9 @@ declare -A CONFIG_MAP=(
     [config/bat]="$HOME/.config/bat:symlink"
     [config/fd]="$HOME/.config/fd:symlink"
     [ssh_config]="$HOME/.ssh/config:symlink"
-    [starship.toml]="$HOME/.config/starship.toml:symlink"
+    # starship.toml: NOT a symlink. theme-switcher generates
+    # generated/starship.toml from configs/starship.toml; STARSHIP_CONFIG
+    # (set in shell/env.sh) points starship at the generated file.
 
     # Special handling
     [gitconfig]="$HOME/.gitconfig:gitconfig"
@@ -45,7 +47,7 @@ config_source_path() {
 # APT package groups
 declare -A PACKAGES=(
     [core]="git build-essential"
-    [development]="zsh direnv bison libevent-dev libncurses-dev xclip"
+    [development]="zsh direnv bison libevent-dev libncurses-dev xclip lsof psmisc"
     [modern]="bat fd-find ripgrep"
     [terminal]="htop tree"
     [languages]="python3-pip"

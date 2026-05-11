@@ -1,0 +1,20 @@
+# Kanagawa Wave — delta feature
+# syntax-theme: delta-bat built-in approximation (see tokyo-night for context).
+# "TwoDark" provides a warm, balanced dark palette that suits Kanagawa.
+[delta "kanagawa"]
+syntax-theme = TwoDark
+plus-style = "syntax #2b3328"
+plus-emph-style = "syntax #4d5a3d bold"
+plus-non-emph-style = "syntax #2b3328"
+minus-style = "syntax #43242b"
+minus-emph-style = "syntax #6f3a3e bold"
+minus-non-emph-style = "syntax #43242b"
+file-style = "#7e9cd8 bold"
+file-decoration-style = "#363646 ul"
+hunk-header-style = "syntax bold #dcd7ba"
+hunk-header-decoration-style = "#363646 box"
+line-numbers-zero-style = "#54546d"
+line-numbers-left-style = "#7e9cd8"
+line-numbers-right-style = "#7e9cd8"
+line-numbers-minus-style = "#c34043"
+line-numbers-plus-style = "#76946a"

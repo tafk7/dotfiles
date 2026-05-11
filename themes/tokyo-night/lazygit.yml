@@ -1,0 +1,30 @@
+# Tokyo Night — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#7aa2f7'
+      - bold
+    inactiveBorderColor:
+      - '#3b4261'
+    searchingActiveBorderColor:
+      - '#e0af68'
+    optionsTextColor:
+      - '#7aa2f7'
+    selectedLineBgColor:
+      - '#292e42'
+    inactiveViewSelectedLineBgColor:
+      - '#414868'
+    cherryPickedCommitFgColor:
+      - '#7aa2f7'
+    cherryPickedCommitBgColor:
+      - '#414868'
+    markedBaseCommitFgColor:
+      - '#e0af68'
+    markedBaseCommitBgColor:
+      - '#414868'
+    unstagedChangesColor:
+      - '#f7768e'
+    defaultFgColor:
+      - '#a9b1d6'
+  authorColors:
+    '*': '#bb9af7'

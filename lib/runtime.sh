@@ -14,17 +14,30 @@ export DOTFILES_DIR
     export PATH="$HOME/.local/bin:$PATH"
 
 # ==============================================================================
-# Colors
+# Colors — gated on stderr being a TTY and NO_COLOR being unset.
+# When piped, redirected, or NO_COLOR is set, these expand to empty so
+# log output stays clean for grep/awk/CI consumers.
 # ==============================================================================
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-DIM='\033[2m'
-NC='\033[0m'
+if [[ -t 2 ]] && [[ -z "${NO_COLOR:-}" ]]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    PURPLE='\033[0;35m'
+    CYAN='\033[0;36m'
+    DIM='\033[2m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    PURPLE=''
+    CYAN=''
+    DIM=''
+    NC=''
+fi
 
 # ==============================================================================
 # Logging

@@ -1,0 +1,18 @@
+# Nord — delta feature
+[delta "nord"]
+syntax-theme = Nord
+plus-style = "syntax #2e3a3f"
+plus-emph-style = "syntax #44545b bold"
+plus-non-emph-style = "syntax #2e3a3f"
+minus-style = "syntax #4b3138"
+minus-emph-style = "syntax #6a3e47 bold"
+minus-non-emph-style = "syntax #4b3138"
+file-style = "#88C0D0 bold"
+file-decoration-style = "#3B4252 ul"
+hunk-header-style = "syntax bold #ECEFF4"
+hunk-header-decoration-style = "#3B4252 box"
+line-numbers-zero-style = "#4C566A"
+line-numbers-left-style = "#81A1C1"
+line-numbers-right-style = "#81A1C1"
+line-numbers-minus-style = "#BF616A"
+line-numbers-plus-style = "#A3BE8C"
