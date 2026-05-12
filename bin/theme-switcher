@@ -995,16 +995,6 @@ preview_theme() {
     cat "$(_preview_cache_path "$theme")"
 }
 
-# Lightweight, side-effect-minimal repaint used by the picker's focus binding.
-# Touches ONLY the tmux loader + runs `tmux source-file`. No regen of
-# generated/theme.sh, no overrides changes, no log noise.
-tint_theme() {
-    local theme="$1"
-    [[ -n "$theme" ]] || return 0
-    theme_exists "$theme" || return 0
-    apply_tmux_theme "$theme" >/dev/null 2>&1 || true
-}
-
 interactive_select() {
     if ! command -v fzf >/dev/null 2>&1; then
         error "FZF is required for interactive selection"
@@ -1017,12 +1007,6 @@ interactive_select() {
     # Pre-render every theme's preview to disk (sized for current terminal).
     # After this, the fzf preview is a pure `cat` — instant per focus event.
     ensure_previews_built
-
-    # Capture the theme we should restore to if the user cancels.
-    # Belt-and-suspenders: trap on signals so Ctrl-C / window close also
-    # tries to restore. The trap uses a subshell-safe form.
-    local _tint_orig="$current_theme"
-    trap 'tint_theme "$_tint_orig"' INT TERM HUP
 
     local selected_theme
     selected_theme=$(
@@ -1040,20 +1024,12 @@ interactive_select() {
         done | sort | fzf --ansi \
             --preview 'cat '"$THEME_PREVIEW_DIR"'/$(echo {} | sed "s/^[* ]*//" | cut -d" " -f1).ansi 2>/dev/null' \
             --preview-window=right:55%:wrap \
-            --header 'enter: apply  •  esc: restore  •  preview shows themed bg' \
-            --bind 'start:execute-silent(bash '"$0"' _tint $(echo {} | sed "s/^[* ]*//" | cut -d" " -f1) > /dev/null 2>&1)' \
-            --bind 'focus:execute-silent(bash '"$0"' _tint $(echo {} | sed "s/^[* ]*//" | cut -d" " -f1) > /dev/null 2>&1)' \
+            --header 'enter: apply  •  esc: cancel  •  preview shows themed bg' \
             | sed 's/^[* ]*//' | cut -d' ' -f1
     )
 
-    trap - INT TERM HUP
-
     if [[ -n "$selected_theme" ]]; then
-        # Full apply will overwrite any tint state set during navigation.
         apply_theme "$selected_theme"
-    else
-        # User cancelled — restore tmux to whatever it was before paging.
-        tint_theme "$current_theme"
     fi
 }
 
@@ -1157,11 +1133,6 @@ main() {
             ;;
         --preview|-p)
             preview_theme "${2:-}"
-            ;;
-        _tint)
-            # Internal: lightweight tmux-only repaint used by the picker's
-            # focus binding. Not in --help; not user-facing.
-            tint_theme "${2:-}"
             ;;
         --revert|-r)
             local previous
