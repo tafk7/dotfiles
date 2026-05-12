@@ -231,7 +231,8 @@ phase_setup_configs() {
             local mapping="${CONFIG_MAP[$config]}"
             local target="${mapping%%:*}"
             local type="${mapping##*:}"
-            local source="$(config_source_path "$config")"
+            local source
+            source="$(config_source_path "$config")"
             
             case "$type" in
                 symlink)
@@ -282,7 +283,8 @@ process_symlink() {
     fi
     
     # Create parent directory if needed
-    local parent_dir="$(dirname "$target")"
+    local parent_dir
+    parent_dir="$(dirname "$target")"
     if [[ ! -d "$parent_dir" ]]; then
         mkdir -p "$parent_dir"
     fi

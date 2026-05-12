@@ -48,7 +48,7 @@ fzf-project() {
     project=$(find "${dirs[@]}" -maxdepth 2 -type d 2>/dev/null |
               fzf --preview 'eza --tree --color=always --level=1 {} | head -20' \
                   --header 'Select project directory')
-    [[ -n "$project" ]] && cd "$project"
+    [[ -n "$project" ]] && cd "$project" || return
 }
 
 # Quick-access aliases

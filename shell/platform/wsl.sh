@@ -30,8 +30,9 @@ import_windows_ssh_keys() {
 
     for key_file in "$windows_ssh_dir"/*; do
         if [[ -f "$key_file" ]]; then
-            local filename=$(basename "$key_file")
-            local target="$ssh_dir/$filename"
+            local filename target
+            filename=$(basename "$key_file")
+            target="$ssh_dir/$filename"
 
             cp "$key_file" "$target"
 
@@ -78,7 +79,8 @@ explorer() {
 
 # Copy current Windows path to clipboard
 wcd() {
-    local winpath=$(wslpath -w "$(pwd)")
+    local winpath
+    winpath=$(wslpath -w "$(pwd)")
     echo "$winpath" | clip.exe
     echo "Windows path copied to clipboard: $winpath"
 }
