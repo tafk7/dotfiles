@@ -51,6 +51,29 @@ bin/theme-switcher --preview kanagawa
 bin/theme-switcher --revert
 ```
 
+### Live Picker Preview
+
+Running `theme` (or `bin/theme-switcher`) with no args opens an FZF picker
+with a **live preview** of every theme:
+
+- The right pane renders a rich card per theme — palette swatches, an
+  accent ramp, a mock prompt line, and a small `bat`-rendered code
+  snippet using **that theme's** syntax-highlighting theme.
+- As you arrow through entries, the **tmux statusline + pane borders
+  live-tint** to the focused theme so you can see the chrome change in
+  real time.
+- Press `enter` to commit (full `apply_theme`); press `esc` to cancel
+  and the original tmux theme is restored automatically.
+
+Caveats:
+- Only the **chrome group's tmux surface** live-tints during the
+  picker. Starship and fzf can't be repainted mid-pick (starship's
+  prompt isn't visible while fzf is fullscreen; fzf's own colors are
+  fixed at startup). Vim/btop/lazygit/delta only repaint on `enter`
+  since they require restart anyway.
+- The bat code sample requires `bat` on `PATH` and falls back silently
+  otherwise.
+
 ### Per-Component Overrides
 
 Sometimes you want a mix — say, a Tokyo Night editor on a Kanagawa terminal

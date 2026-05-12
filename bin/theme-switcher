@@ -759,6 +759,52 @@ cmd_show() {
 # Interactive Functions
 # ==============================================================================
 
+# Render a single colored block using truecolor ANSI. Args: R G B [glyph]
+_swatch() {
+    local r="$1" g="$2" b="$3" glyph="${4:-███}"
+    printf '\033[38;2;%s;%s;%sm%s\033[0m' "$r" "$g" "$b" "$glyph"
+}
+
+# Print a small bat-rendered code snippet using the theme's bat theme.
+# Silently skips if bat is unavailable. Honors $FZF_PREVIEW_COLUMNS when set.
+_preview_code_sample() {
+    local theme="$1"
+    command -v bat >/dev/null 2>&1 || return 0
+
+    local bat_theme
+    bat_theme="$(_extract_export_value "$THEMES_DIR/$theme/shell.sh" BAT_THEME 2>/dev/null || true)"
+    [[ -n "$bat_theme" ]] || return 0
+
+    local width="${FZF_PREVIEW_COLUMNS:-60}"
+    [[ "$width" =~ ^[0-9]+$ ]] || width=60
+
+    # Ensure the vendored bat theme cache is visible even when this script
+    # was launched from a subshell without env.sh sourced (e.g. fzf preview
+    # under sh, or direct CLI invocation).
+    if [[ -z "${BAT_CACHE_PATH:-}" && -d "$DOTFILES_DIR/generated/bat/cache" ]]; then
+        export BAT_CACHE_PATH="$DOTFILES_DIR/generated/bat/cache"
+    fi
+
+    local snippet
+    snippet=$(cat <<'EOF'
+def greet(name: str) -> str:
+    """Return a friendly greeting."""
+    if not name:
+        return "Hello, stranger!"
+    return f"Hello, {name}!"
+
+print(greet("world"))
+EOF
+)
+    printf '%s\n' "$snippet" | bat \
+        --color=always \
+        --style=plain \
+        --paging=never \
+        --terminal-width="$width" \
+        --theme="$bat_theme" \
+        --language=python 2>/dev/null || true
+}
+
 preview_theme() {
     local theme="$1"
 
@@ -772,22 +818,83 @@ preview_theme() {
         return 1
     fi
 
-    echo "Theme Preview: $theme"
-    echo "===================="
+    # Header with name + description (description already includes both)
+    printf '\033[1m%s\033[0m\n' "$theme"
+    printf '%s\n' "$(theme_description "$theme")"
+    echo
 
     local colors_file="$THEMES_DIR/$theme/colors.sh"
     if [[ -f "$colors_file" ]]; then
-        source "$colors_file"
-        echo
-        echo "Color Palette:"
-        echo -e "  Background: \033[48;2;${THEME_BG_R};${THEME_BG_G};${THEME_BG_B}m     \033[0m #$(printf '%02x%02x%02x' "$THEME_BG_R" "$THEME_BG_G" "$THEME_BG_B")"
-        echo -e "  Foreground: \033[38;2;${THEME_FG_R};${THEME_FG_G};${THEME_FG_B}m███\033[0m #$(printf '%02x%02x%02x' "$THEME_FG_R" "$THEME_FG_G" "$THEME_FG_B")"
-        echo -e "  Primary:    \033[38;2;${THEME_PRIMARY_R};${THEME_PRIMARY_G};${THEME_PRIMARY_B}m███\033[0m #$(printf '%02x%02x%02x' "$THEME_PRIMARY_R" "$THEME_PRIMARY_G" "$THEME_PRIMARY_B")"
-        echo -e "  Secondary:  \033[38;2;${THEME_SECONDARY_R};${THEME_SECONDARY_G};${THEME_SECONDARY_B}m███\033[0m #$(printf '%02x%02x%02x' "$THEME_SECONDARY_R" "$THEME_SECONDARY_G" "$THEME_SECONDARY_B")"
+        # Run in a subshell so theme color vars don't leak between previews.
+        (
+            set +u
+            source "$colors_file"
+
+            echo "Palette:"
+            printf '  bg  %s  fg  %s\n' \
+                "$(_swatch "$THEME_BG_R" "$THEME_BG_G" "$THEME_BG_B")" \
+                "$(_swatch "$THEME_FG_R" "$THEME_FG_G" "$THEME_FG_B")"
+            printf '  pri %s  sec %s\n' \
+                "$(_swatch "$THEME_PRIMARY_R" "$THEME_PRIMARY_G" "$THEME_PRIMARY_B")" \
+                "$(_swatch "$THEME_SECONDARY_R" "$THEME_SECONDARY_G" "$THEME_SECONDARY_B")"
+            echo
+
+            # Accent ramp — print each accent only if its R/G/B vars are defined.
+            # Different themes define different accent names; show what's there.
+            echo "Accents:"
+            printf '  '
+            local name r g b
+            for name in RED PEACH ORANGE YELLOW GREEN TEAL SKY BLUE LAVENDER PURPLE; do
+                r="THEME_${name}_R"; g="THEME_${name}_G"; b="THEME_${name}_B"
+                if [[ -n "${!r:-}" && -n "${!g:-}" && -n "${!b:-}" ]]; then
+                    printf '%s ' "$(_swatch "${!r}" "${!g}" "${!b}" '▆▆')"
+                fi
+            done
+            echo
+            echo
+
+            # Mock prompt line in the theme's primary color
+            printf 'Prompt:\n  '
+            _swatch "$THEME_PRIMARY_R" "$THEME_PRIMARY_G" "$THEME_PRIMARY_B" '~/code/dotfiles'
+            printf ' '
+            _swatch "$THEME_SECONDARY_R" "$THEME_SECONDARY_G" "$THEME_SECONDARY_B" 'git:(main)'
+            printf ' '
+            if [[ -n "${THEME_GREEN_R:-}" ]]; then
+                _swatch "$THEME_GREEN_R" "$THEME_GREEN_G" "$THEME_GREEN_B" '❯'
+            else
+                _swatch "$THEME_PRIMARY_R" "$THEME_PRIMARY_G" "$THEME_PRIMARY_B" '❯'
+            fi
+            echo
+        )
     fi
 
+    # Resolved tool-native names so the user knows what'll actually be used.
+    local bat_t starship_t delta_t
+    bat_t="$(_extract_export_value "$THEMES_DIR/$theme/shell.sh" BAT_THEME 2>/dev/null || echo '?')"
+    starship_t="$(_extract_export_value "$THEMES_DIR/$theme/shell.sh" STARSHIP_PALETTE 2>/dev/null || echo '?')"
+    delta_t="$(_extract_export_value "$THEMES_DIR/$theme/shell.sh" DELTA_FEATURE 2>/dev/null || echo '?')"
     echo
-    echo "Description: $(theme_description "$theme")"
+    echo "Tools:"
+    printf '  bat: %s\n' "$bat_t"
+    printf '  starship: %s\n' "$starship_t"
+    printf '  delta: %s\n' "$delta_t"
+
+    # Live bat-rendered code sample at the bottom (skips silently if no bat).
+    if command -v bat >/dev/null 2>&1; then
+        echo
+        echo "Code:"
+        _preview_code_sample "$theme"
+    fi
+}
+
+# Lightweight, side-effect-minimal repaint used by the picker's focus binding.
+# Touches ONLY the tmux loader + runs `tmux source-file`. No regen of
+# generated/theme.sh, no overrides changes, no log noise.
+tint_theme() {
+    local theme="$1"
+    [[ -n "$theme" ]] || return 0
+    theme_exists "$theme" || return 0
+    apply_tmux_theme "$theme" >/dev/null 2>&1 || true
 }
 
 interactive_select() {
@@ -798,8 +905,14 @@ interactive_select() {
 
     local current_theme
     current_theme=$(get_current_theme)
-    local selected_theme
 
+    # Capture the theme we should restore to if the user cancels.
+    # Belt-and-suspenders: trap on signals so Ctrl-C / window close also
+    # tries to restore. The trap uses a subshell-safe form.
+    local _tint_orig="$current_theme"
+    trap 'tint_theme "$_tint_orig"' INT TERM HUP
+
+    local selected_theme
     selected_theme=$(
         for theme_dir in "$THEMES_DIR"/*/; do
             local theme
@@ -814,11 +927,21 @@ interactive_select() {
             fi
         done | sort | fzf --ansi \
             --preview 'bash '"$0"' --preview $(echo {} | sed "s/^[* ]*//" | cut -d" " -f1)' \
-            --preview-window=right:50%:wrap | sed 's/^[* ]*//' | cut -d' ' -f1
+            --preview-window=right:55%:wrap \
+            --header 'enter: apply  •  esc: restore  •  live tmux tint as you scroll' \
+            --bind 'start:execute-silent(bash '"$0"' _tint $(echo {} | sed "s/^[* ]*//" | cut -d" " -f1) > /dev/null 2>&1)' \
+            --bind 'focus:execute-silent(bash '"$0"' _tint $(echo {} | sed "s/^[* ]*//" | cut -d" " -f1) > /dev/null 2>&1)' \
+            | sed 's/^[* ]*//' | cut -d' ' -f1
     )
 
+    trap - INT TERM HUP
+
     if [[ -n "$selected_theme" ]]; then
+        # Full apply will overwrite any tint state set during navigation.
         apply_theme "$selected_theme"
+    else
+        # User cancelled — restore tmux to whatever it was before paging.
+        tint_theme "$current_theme"
     fi
 }
 
@@ -922,6 +1045,11 @@ main() {
             ;;
         --preview|-p)
             preview_theme "${2:-}"
+            ;;
+        _tint)
+            # Internal: lightweight tmux-only repaint used by the picker's
+            # focus binding. Not in --help; not user-facing.
+            tint_theme "${2:-}"
             ;;
         --revert|-r)
             local previous
