@@ -1,4 +1,6 @@
-# Zsh configuration
+# shellcheck shell=bash
+# Zsh configuration (linted as bash since shellcheck has no native zsh mode;
+# zsh-only constructs below carry per-line `shellcheck disable` directives)
 # Owns: zsh options, history, completion, keybindings
 
 # Derive DOTFILES_DIR from symlink — always works regardless of install state
@@ -56,6 +58,7 @@ autoload -Uz compinit
 compinit
 
 zstyle ':completion:*' completer _complete _ignored
+# shellcheck disable=SC2296  # zsh-specific (s.:.) parameter expansion flag
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 zstyle ':completion:*' menu select
 zstyle ':completion:*' use-cache on

@@ -25,7 +25,8 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # Remove any Windows npm from PATH to avoid conflicts
 if [[ -n "${PATH:-}" ]]; then
     # Filter out Windows paths that might contain npm
-    export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/mnt/c/' | tr '\n' ':' | sed 's/:$//')
+    PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/mnt/c/' | tr '\n' ':' | sed 's/:$//')
+    export PATH
 fi
 
 # Check if already installed

@@ -120,7 +120,8 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
     # DISPLAY: don't override if already set (WSLg sets this automatically)
     if [[ -z "${DISPLAY:-}" ]]; then
         if [[ -f /etc/resolv.conf ]] && grep -q "nameserver.*172\." /etc/resolv.conf 2>/dev/null; then
-            export DISPLAY="$(awk '/nameserver/{print $2; exit}' /etc/resolv.conf):0"
+            DISPLAY="$(awk '/nameserver/{print $2; exit}' /etc/resolv.conf):0"
+            export DISPLAY
         else
             export DISPLAY=:0
         fi
@@ -131,9 +132,10 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
 
     # Strip Windows PATH entries that shadow Linux tools
     if [[ -n "$PATH" ]]; then
-        export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E \
+        PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E \
             '/mnt/c/Windows/(System32/(Wbem|WindowsPowerShell|OpenSSH)|SysWOW64)' | \
             tr '\n' ':' | sed 's/:$//')
+        export PATH
     fi
 
     # WIN_USER set at install time in generated/bridge.sh

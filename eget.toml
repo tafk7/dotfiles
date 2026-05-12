@@ -41,3 +41,7 @@ asset_filters = [".tar.gz", "gnu"]
 ["chmln/sd"]
 tag = "v1.1.0"
 asset_filters = ["x86_64-unknown-linux-musl"]
+
+["koalaman/shellcheck"]
+tag = "v0.11.0"
+asset_filters = [".linux.x86_64.tar.xz"]

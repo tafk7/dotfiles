@@ -8,7 +8,7 @@ cdl() {
 
 # Create directory and cd into it
 mkcd() {
-    mkdir -p "$1" && cd "$1"
+    mkdir -p "$1" && cd "$1" || return
 }
 
 # Iterate over existing project search roots from $PROJECTS_DIRS (colon-sep).
@@ -37,7 +37,7 @@ proj() {
     repo=$(find "${dirs[@]}" -maxdepth 3 -type d -name .git -prune 2>/dev/null \
         | sed 's|/\.git$||' \
         | fzf --preview 'eza --tree --color=always --level=1 {} 2>/dev/null || ls -la {}')
-    [[ -n "$repo" ]] && cd "$repo"
+    [[ -n "$repo" ]] && cd "$repo" || return
 }
 
 # Add directory to PATH if it exists and isn't already in PATH

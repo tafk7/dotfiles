@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Bash configuration
 # Owns: shell options, history, completion, bash-specific settings
 

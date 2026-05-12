@@ -70,8 +70,9 @@ detect_environment() {
         return 0
     fi
 
-    local ubuntu_version=$(lsb_release -rs)
-    local ubuntu_codename=$(lsb_release -cs)
+    local ubuntu_version ubuntu_codename
+    ubuntu_version=$(lsb_release -rs)
+    ubuntu_codename=$(lsb_release -cs)
 
     log "Detected Ubuntu $ubuntu_version ($ubuntu_codename)"
 
@@ -105,7 +106,8 @@ github_latest_version() {
 # Get Windows username for WSL operations
 get_windows_username() {
     if is_wsl; then
-        local win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
+        local win_user
+        win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
 
         if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
             win_user="$USER"
@@ -179,7 +181,8 @@ EOF
 
 create_backup_dir() {
     mkdir -p "$DOTFILES_BACKUP_PREFIX"
-    local backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
+    local backup_dir
+    backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$backup_dir"
     echo "$backup_dir"
 }
@@ -244,8 +247,9 @@ process_git_config() {
     local git_name git_email
 
     if [[ -t 0 ]]; then
-        local existing_name=$(git config --global user.name 2>/dev/null || true)
-        local existing_email=$(git config --global user.email 2>/dev/null || true)
+        local existing_name existing_email
+        existing_name=$(git config --global user.name 2>/dev/null || true)
+        existing_email=$(git config --global user.email 2>/dev/null || true)
 
         if [[ -n "$existing_name" && -n "$existing_email" && "$force" != "true" ]]; then
             git_name="$existing_name"
@@ -449,7 +453,12 @@ install_eget_tools() {
 install_shell_packages() {
     log "Installing shell tier packages..."
 
+    # PACKAGES values are intentionally space-separated lists meant to be
+    # word-split into the array — the alternative (per-key arrays) would
+    # bloat the data file. shellcheck flags this as SC2206; that's expected.
+    # shellcheck disable=SC2206
     local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]})
+    # shellcheck disable=SC2206
     is_wsl && packages+=(${PACKAGES[wsl]})
 
     install_apt "shell" "${packages[@]}"

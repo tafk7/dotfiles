@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # ~/.profile: login shell baseline — locale, XDG, terminal.
 # Does NOT source bashrc/zshrc — that's the terminal's job.
 # Login bash gets bashrc via ~/.bash_profile; login zsh gets zshrc via ~/.zprofile.

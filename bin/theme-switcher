@@ -295,7 +295,8 @@ apply_bat_theme() {
     local file
     for file in "$bat_theme_dir"/*.tmTheme; do
         [[ -e "$file" ]] || continue
-        local dest="$bat_src/themes/$(basename "$file")"
+        local dest
+        dest="$bat_src/themes/$(basename "$file")"
         if [[ ! -f "$dest" ]] || ! cmp -s "$file" "$dest"; then
             cp "$file" "$dest"
             copied=1
@@ -846,6 +847,7 @@ _render_preview_content() {
             echo
 
             printf 'Prompt:\n  '
+            # shellcheck disable=SC2088  # tilde is cosmetic display text, not a path
             _swatch "$THEME_PRIMARY_R" "$THEME_PRIMARY_G" "$THEME_PRIMARY_B" '~/code/dotfiles'
             printf ' '
             _swatch "$THEME_SECONDARY_R" "$THEME_SECONDARY_G" "$THEME_SECONDARY_B" 'git:(main)'
