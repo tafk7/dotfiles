@@ -51,7 +51,7 @@ bin/theme-switcher --preview kanagawa
 bin/theme-switcher --revert
 ```
 
-### Live Picker Preview
+### Themed Picker Preview
 
 Running `theme` (or `bin/theme-switcher`) with no args opens an FZF picker
 with a **prebaked themed preview** of every theme:
@@ -62,11 +62,11 @@ with a **prebaked themed preview** of every theme:
 - The **entire preview pane content is painted with that theme's
   background color** so the right side visibly changes color per focus
   even though the surrounding fzf chrome can't recolor mid-session.
-- As you arrow through entries, the **tmux statusline + pane borders
-  also live-tint** to the focused theme so the chrome around the picker
-  shifts in real time too.
-- Press `enter` to commit (full `apply_theme`); press `esc` to cancel
-  and the original tmux theme is restored automatically.
+- Press `enter` to apply the focused theme (full `apply_theme`); press
+  `esc` to cancel without making any changes.
+
+Nothing changes outside the picker until you press `enter` — scrolling
+through the list is purely a preview operation.
 
 **How prebaking works.** On picker launch, `theme-switcher` renders
 each theme's preview to `generated/theme-previews/<theme>.ansi` (sized
@@ -77,11 +77,8 @@ theme's source files (or the renderer itself) are newer than the cache.
 Caveats:
 - The fzf overlay's own background (border, gutter, search bar) is set
   by `FZF_THEME_COLORS` at fzf launch and **cannot** be repainted
-  mid-session — only the preview pane content and the tmux chrome can.
-- Live tint is **tmux-only**. Starship and fzf can't be repainted
-  mid-pick (starship's prompt isn't visible while fzf is fullscreen;
-  fzf's own colors are fixed at startup). Vim/btop/lazygit/delta only
-  repaint on `enter` since they require restart anyway.
+  mid-session — only the preview pane content displays the focused
+  theme's color.
 - The bat code sample requires `bat` on `PATH` and falls back silently
   otherwise.
 
