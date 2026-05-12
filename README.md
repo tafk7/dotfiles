@@ -29,6 +29,10 @@ After installation, verify with `./bin/verify` and restart your shell.
 | `cd` | zoxide | `z`, `zi` |
 | `diff` | delta | (auto via git) |
 | `top` | btop | `top` |
+| `sed` | sd | (used by `fr`) |
+| `less` for md | glow | `md` |
+| `git` TUI | lazygit | `lg` |
+| pip+venv | uv | `uvs`, `uvr`, `uva` |
 
 ### Shell & Navigation
 
@@ -169,6 +173,9 @@ bat (different versions are binary-incompatible).
 
 ## Architecture
 
+> **New here?** Read [`docs/concepts.md`](docs/concepts.md) first — it explains
+> the four pillars (tiers, CONFIG_MAP, tool registry, theme cascade) on one page.
+
 ```
 setup.sh                  Entry point — 3-phase orchestrator (reads lib/config.sh)
 lib/
@@ -189,7 +196,7 @@ shell/
   lazy/nvm.sh             Lazy NVM loader
 installers/               Per-tool install scripts (run by lib/install.sh::run_installer)
 generated/                Theme artifacts + bridge.sh (gitignored)
-bin/                      User commands (theme-switcher, verify, cheatsheet, replace)
+bin/                      User commands (theme-switcher, verify, cheatsheet, replace, diff-config, check-updates, uninstall-tool)
 eget.toml                 Static binary downloads (tier=shell tools)
 ```
 
@@ -220,8 +227,18 @@ Override per-machine in `~/.shell.local`.
 ## Troubleshooting
 
 ```bash
-./bin/verify                      # Validate installation
+./bin/verify                      # Validate installation health (44+ checks)
+./bin/diff-config                 # Show drift between sources and ~ (use --diff for details)
+./bin/check-updates               # Are pinned eget tool versions stale?
 ./setup.sh --dry-run --shell      # Preview what would happen
 reload                            # Reload shell config
 ls .backups/                      # See available backups
 ```
+
+## Further reading
+
+- [`docs/concepts.md`](docs/concepts.md) — One-page mental model of the four pillars.
+- [`docs/architecture.md`](docs/architecture.md) — Boundary rules and sourcing order.
+- [`docs/customization.md`](docs/customization.md) — Recipes for adding tools, configs, aliases.
+- [`docs/theme-system.md`](docs/theme-system.md) — Cascade internals + adding themes.
+- [`docs/THEME_QUICK_START.md`](docs/THEME_QUICK_START.md) — Day-to-day theme commands.
