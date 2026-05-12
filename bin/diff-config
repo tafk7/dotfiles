@@ -1,0 +1,158 @@
+#!/bin/bash
+# Show drift between dotfiles sources and what's currently in $HOME.
+#
+# Usage:
+#   diff-config               List status for every CONFIG_MAP entry
+#   diff-config --diff        Print unified diff for any drifted file
+#   diff-config <name>        Show diff for one CONFIG_MAP key (e.g. tmux.conf)
+#
+# Status legend:
+#   ✅ linked     symlink points at dotfiles source (no drift possible)
+#   ✏️  drifted    target exists but content differs from source
+#   ⚠️  divergent  symlink exists but points elsewhere
+#   ❌ missing    target doesn't exist
+#   📝 template   gitconfig-style processed template (compared post-substitution)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+
+source "$DOTFILES_DIR/lib/runtime.sh"
+source "$DOTFILES_DIR/lib/config.sh"
+
+SHOW_DIFF=false
+FILTER_KEY=""
+
+usage() {
+    sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --diff|-d) SHOW_DIFF=true; shift ;;
+        --help|-h) usage; exit 0 ;;
+        -*)        error "Unknown flag: $1"; usage; exit 1 ;;
+        *)         FILTER_KEY="$1"; SHOW_DIFF=true; shift ;;
+    esac
+done
+
+# Pick the best available diff renderer.
+diff_cmd() {
+    if command_exists delta; then
+        delta --paging=never --line-numbers --side-by-side=false "$@"
+    else
+        diff -u --color=auto "$@" || true
+    fi
+}
+
+# For one CONFIG_MAP key, print one status line and (optionally) a diff block.
+inspect_one() {
+    local key="$1"
+    local mapping="${CONFIG_MAP[$key]}"
+    local target="${mapping%%:*}"
+    local type="${mapping##*:}"
+    local source_path
+    source_path="$(config_source_path "$key")"
+
+    local short_target="${target/#$HOME/~}"
+    local short_source="${source_path/#$DOTFILES_DIR\//}"
+
+    local status_icon="" detail=""
+    local needs_diff=false
+
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        status_icon="${RED}❌ missing${NC}"
+        printf "  %b  %-32s  ← %s\n" "$status_icon" "$short_target" "$short_source"
+        return 0
+    fi
+
+    case "$type" in
+        symlink)
+            if [[ -L "$target" ]]; then
+                local link_dest real_source
+                link_dest="$(readlink -f "$target" 2>/dev/null || true)"
+                real_source="$(readlink -f "$source_path" 2>/dev/null || true)"
+                if [[ "$link_dest" == "$real_source" ]]; then
+                    status_icon="${GREEN}✅ linked${NC}"
+                else
+                    status_icon="${YELLOW}⚠️  divergent${NC}"
+                    detail="→ ${link_dest/#$HOME/~}"
+                fi
+            elif [[ -d "$target" && -d "$source_path" ]]; then
+                # Directory configs (e.g. config/bat) — diff -r summary.
+                if diff -r -q "$source_path" "$target" >/dev/null 2>&1; then
+                    status_icon="${GREEN}✅ linked${NC}"
+                else
+                    status_icon="${YELLOW}✏️  drifted${NC}"
+                    needs_diff=true
+                fi
+            elif cmp -s "$source_path" "$target" 2>/dev/null; then
+                status_icon="${YELLOW}⚠️  copy${NC}"
+                detail="(content matches but not symlinked)"
+            else
+                status_icon="${YELLOW}✏️  drifted${NC}"
+                needs_diff=true
+            fi
+            ;;
+        gitconfig)
+            # Processed template: rendered into target with substitutions baked in.
+            # We can't compare bytewise, but we can report whether placeholders survived.
+            if grep -q '{{GIT_' "$target" 2>/dev/null; then
+                status_icon="${RED}❌ unresolved template${NC}"
+            elif [[ "$target" -nt "$source_path" ]]; then
+                status_icon="${CYAN}📝 template${NC}"
+                detail="(rendered; target newer than source)"
+            else
+                status_icon="${YELLOW}📝 template (stale)${NC}"
+                detail="(source newer than rendered target — re-run setup.sh --config)"
+            fi
+            ;;
+        *)
+            status_icon="${RED}? unknown type ($type)${NC}"
+            ;;
+    esac
+
+    printf "  %b  %-32s  ← %s" "$status_icon" "$short_target" "$short_source"
+    [[ -n "$detail" ]] && printf "  %s%s%s" "$DIM" "$detail" "$NC"
+    echo
+
+    if [[ "$needs_diff" == "true" && "$SHOW_DIFF" == "true" ]]; then
+        echo
+        echo "──── diff: $short_target ←→ $short_source ────"
+        if [[ -d "$source_path" && -d "$target" ]]; then
+            diff -r -u "$source_path" "$target" || true
+        else
+            diff_cmd "$source_path" "$target"
+        fi
+        echo
+    fi
+}
+
+main() {
+    if [[ -n "$FILTER_KEY" ]]; then
+        if [[ -z "${CONFIG_MAP[$FILTER_KEY]+x}" ]]; then
+            error "Unknown CONFIG_MAP key: $FILTER_KEY"
+            echo
+            echo "Known keys:"
+            printf '  %s\n' "${!CONFIG_MAP[@]}" | sort
+            exit 1
+        fi
+        inspect_one "$FILTER_KEY"
+        exit 0
+    fi
+
+    echo "Configuration drift report"
+    echo "─────────────────────────────────────"
+
+    local sorted_keys
+    readarray -t sorted_keys < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
+    for key in "${sorted_keys[@]}"; do
+        inspect_one "$key"
+    done
+
+    echo
+    echo "${DIM}Tip: pass --diff to print unified diffs for drifted files.${NC}"
+}
+
+main

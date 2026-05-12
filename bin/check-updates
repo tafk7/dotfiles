@@ -1,0 +1,216 @@
+#!/bin/bash
+# Compare pinned versions in eget.toml against latest GitHub releases.
+# No jq dependency — uses curl + grep/sed for the GH releases JSON.
+#
+# Usage:
+#   check-updates              Print table for all pinned tools
+#   check-updates --outdated   Only show tools that have a newer release
+#   check-updates --json       Machine-readable JSON output
+#   check-updates <tool>       Check a single tool by short name (e.g. starship)
+#
+# Auth: set GITHUB_TOKEN to avoid the 60/hr unauthenticated rate limit.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+
+source "$DOTFILES_DIR/lib/runtime.sh"
+
+readonly EGET_TOML="$DOTFILES_DIR/eget.toml"
+
+ONLY_OUTDATED=false
+JSON_OUTPUT=false
+FILTER_TOOL=""
+
+usage() {
+    sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --outdated) ONLY_OUTDATED=true; shift ;;
+        --json)     JSON_OUTPUT=true;   shift ;;
+        --help|-h)  usage; exit 0 ;;
+        -*)         error "Unknown flag: $1"; usage; exit 1 ;;
+        *)          FILTER_TOOL="$1"; shift ;;
+    esac
+done
+
+[[ -f "$EGET_TOML" ]] || { error "eget.toml not found at $EGET_TOML"; exit 1; }
+command_exists curl || { error "curl is required"; exit 1; }
+
+# Parse eget.toml into "owner/repo|tag" pairs.
+# Tracks the most recently seen [block]; emits one line per (block, tag) pair.
+parse_eget_toml() {
+    local current_repo=""
+    local line repo
+    while IFS= read -r line; do
+        # [global] is a config section, not a repo — skip it.
+        if [[ "$line" =~ ^\[\"([^\"]+/[^\"]+)\"\]$ ]]; then
+            current_repo="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^tag[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]] && [[ -n "$current_repo" ]]; then
+            printf '%s|%s\n' "$current_repo" "${BASH_REMATCH[1]}"
+            current_repo=""  # one tag per block
+        fi
+    done < "$EGET_TOML"
+}
+
+# Fetch tag_name from the GitHub releases/latest endpoint.
+# Prints just the tag (e.g. "v1.24.2") on success; prints empty on error.
+gh_latest_tag() {
+    local repo="$1"
+    local url="https://api.github.com/repos/$repo/releases/latest"
+    local auth_args=()
+    [[ -n "${GITHUB_TOKEN:-}" ]] && auth_args=(-H "Authorization: Bearer $GITHUB_TOKEN")
+
+    local response
+    response="$(curl -sS --max-time 10 \
+        -H "Accept: application/vnd.github+json" \
+        -H "User-Agent: dotfiles-check-updates" \
+        "${auth_args[@]}" \
+        "$url" 2>/dev/null || true)"
+
+    [[ -z "$response" ]] && return 1
+
+    # Detect rate-limit / not-found responses early.
+    if echo "$response" | grep -q '"message":[[:space:]]*"\(API rate limit\|Not Found\)'; then
+        return 1
+    fi
+
+    # Extract the first "tag_name": "..." occurrence.
+    echo "$response" | grep -m1 '"tag_name":' | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/'
+}
+
+# Strip leading "v" so v1.2.3 and 1.2.3 compare equal.
+normalize_tag() { echo "${1#v}"; }
+
+# Compare two tags. Echoes "ok" if equal (after normalization),
+# "outdated" if pinned < latest, "ahead" if pinned > latest.
+compare_tags() {
+    local pinned="$1" latest="$2"
+    local p l
+    p="$(normalize_tag "$pinned")"
+    l="$(normalize_tag "$latest")"
+    if [[ "$p" == "$l" ]]; then
+        echo "ok"
+    elif printf '%s\n%s\n' "$p" "$l" | sort -V -C 2>/dev/null; then
+        # Sorted ascending succeeds → pinned <= latest; not equal → outdated.
+        echo "outdated"
+    else
+        echo "ahead"
+    fi
+}
+
+# Short tool name from a "owner/repo" — used for --filter and display.
+short_name() {
+    local repo="$1"
+    case "$repo" in
+        starship/starship)         echo "starship" ;;
+        eza-community/eza)         echo "eza" ;;
+        junegunn/fzf)              echo "fzf" ;;
+        ajeetdsouza/zoxide)        echo "zoxide" ;;
+        dandavison/delta)          echo "delta" ;;
+        aristocratos/btop)         echo "btop" ;;
+        charmbracelet/glow)        echo "glow" ;;
+        jesseduffield/lazygit)     echo "lazygit" ;;
+        astral-sh/uv)              echo "uv" ;;
+        chmln/sd)                  echo "sd" ;;
+        *)                         echo "${repo##*/}" ;;
+    esac
+}
+
+# Build the rows: name|repo|pinned|latest|status
+collect_rows() {
+    local repo pinned name latest status
+    while IFS='|' read -r repo pinned; do
+        name="$(short_name "$repo")"
+        if [[ -n "$FILTER_TOOL" && "$FILTER_TOOL" != "$name" && "$FILTER_TOOL" != "$repo" ]]; then
+            continue
+        fi
+        latest="$(gh_latest_tag "$repo" || true)"
+        if [[ -z "$latest" ]]; then
+            status="error"
+            latest="?"
+        else
+            status="$(compare_tags "$pinned" "$latest")"
+        fi
+        if [[ "$ONLY_OUTDATED" == "true" && "$status" != "outdated" ]]; then
+            continue
+        fi
+        printf '%s|%s|%s|%s|%s\n' "$name" "$repo" "$pinned" "$latest" "$status"
+    done < <(parse_eget_toml)
+}
+
+emit_json() {
+    local first=true
+    local name repo pinned latest status
+    echo "["
+    while IFS='|' read -r name repo pinned latest status; do
+        [[ "$first" == "true" ]] && first=false || echo ","
+        printf '  {"name":"%s","repo":"%s","pinned":"%s","latest":"%s","status":"%s"}' \
+            "$name" "$repo" "$pinned" "$latest" "$status"
+    done
+    echo
+    echo "]"
+}
+
+emit_table() {
+    local name repo pinned latest status icon
+    local outdated_count=0 error_count=0 total=0
+    local rows
+    rows="$(cat)"
+
+    if [[ -z "$rows" ]]; then
+        if [[ "$ONLY_OUTDATED" == "true" ]]; then
+            success "All pinned tools are up to date."
+        else
+            warn "No matching tools found."
+        fi
+        return 0
+    fi
+
+    printf "%-12s  %-26s  %-12s  %-12s  %s\n" "Tool" "Repo" "Pinned" "Latest" "Status"
+    printf '%s\n' "────────────  ──────────────────────────  ────────────  ────────────  ──────"
+
+    while IFS='|' read -r name repo pinned latest status; do
+        ((total++)) || true
+        case "$status" in
+            ok)        icon="${GREEN}✅ up-to-date${NC}" ;;
+            outdated)  icon="${YELLOW}🔼 update available${NC}"; ((outdated_count++)) || true ;;
+            ahead)     icon="${CYAN}↗  ahead of release${NC}" ;;
+            error)     icon="${RED}❌ check failed${NC}";       ((error_count++))   || true ;;
+            *)         icon="$status" ;;
+        esac
+        printf "%-12s  %-26s  %-12s  %-12s  " "$name" "$repo" "$pinned" "$latest"
+        echo -e "$icon"
+    done <<< "$rows"
+
+    echo
+    if [[ "$outdated_count" -gt 0 ]]; then
+        warn "$outdated_count of $total tool(s) have updates available."
+        echo "  Bump the tag in $EGET_TOML and run: eget --download-all"
+    elif [[ "$error_count" -gt 0 ]]; then
+        warn "$error_count of $total check(s) failed (rate limit? set GITHUB_TOKEN)."
+    else
+        success "All $total checked tool(s) are up to date."
+    fi
+}
+
+main() {
+    local rows
+    rows="$(collect_rows)"
+
+    if [[ "$JSON_OUTPUT" == "true" ]]; then
+        echo "$rows" | emit_json
+    else
+        echo "$rows" | emit_table
+    fi
+
+    # Non-zero exit when --outdated finds matches (useful in CI / scripts).
+    if [[ "$ONLY_OUTDATED" == "true" && -n "$rows" ]]; then
+        exit 2
+    fi
+}
+
+main
