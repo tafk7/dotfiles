@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax check (bash -n) on every *.sh
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r -d '' f; do
+            if ! bash -n "$f"; then
+              echo "::error file=$f::bash -n syntax error"
+              fail=1
+            fi
+          done < <(find . \
+            -path ./.git -prune -o \
+            -path ./.backups -prune -o \
+            -path ./generated -prune -o \
+            -name '*.sh' -type f -print0)
+          # Entry files are sourced, not always *.sh — check them too.
+          for f in entry/bash_profile entry/bash.sh entry/zsh.sh entry/profile.sh; do
+            [[ -f "$f" ]] || continue
+            if ! bash -n "$f"; then
+              echo "::error file=$f::bash -n syntax error"
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+      - name: ShellCheck (warning+ severity)
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
+          scandir: '.'
+          ignore_paths: >-
+            .git
+            .backups
+            generated
+            .scratchpad
+            .agents
+            .claude
+
+  structure:
+    name: Structural smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Theme catalog parses
+        run: |
+          set -euo pipefail
+          # `--list` walks every themes/<name>/meta.sh and prints the catalog.
+          # If a theme dir is malformed (missing meta.sh / colors.sh / shell.sh),
+          # this fails before any installation step.
+          ./bin/theme-switcher --list
+
+      - name: --help endpoints execute cleanly
+        run: |
+          set -euo pipefail
+          ./setup.sh --help                 >/dev/null
+          ./bin/theme-switcher --help       >/dev/null
+          ./bin/check-updates --help        >/dev/null
+          ./bin/diff-config --help          >/dev/null
+          ./bin/uninstall-tool --help       >/dev/null
+
+      - name: Cheatsheet TSV is well-formed
+        run: |
+          set -euo pipefail
+          # Every non-comment, non-empty row must have exactly 4 fields
+          # separated by U+2502 (│). Bad rows would silently break preview.
+          bad=$(awk -F'│' '
+            /^#/ || NF == 0 { next }
+            NF != 4 { print FILENAME ":" NR ": expected 4 fields, got " NF; bad=1 }
+            END { exit bad ? 1 : 0 }
+          ' shell/shortcuts-index.tsv) || {
+            echo "::error::Malformed cheatsheet rows:"
+            echo "$bad"
+            exit 1
+          }
+
+      - name: CONFIG_MAP source paths exist on disk
+        run: |
+          set -euo pipefail
+          export DOTFILES_DIR="$PWD"
+          # shellcheck disable=SC1091
+          source lib/config.sh
+          fail=0
+          for key in "${!CONFIG_MAP[@]}"; do
+            src=$(config_source_path "$key")
+            if [[ ! -e "$src" ]]; then
+              echo "::error::CONFIG_MAP[$key] points at missing source: $src"
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+  theme-cycle:
+    name: Theme cycling smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cycle every theme via --init/apply
+        run: |
+          set -euo pipefail
+          export DOTFILES_DIR="$PWD"
+          # Discover themes the same way theme-switcher does: every dir
+          # under themes/ that contains a meta.sh is a valid theme.
+          themes=$(find themes -mindepth 2 -maxdepth 2 -name meta.sh \
+            | sed 's|^themes/||; s|/meta.sh$||' | sort)
+          [[ -z "$themes" ]] && { echo "no themes discovered"; exit 1; }
+          for t in $themes; do
+            echo "::group::Apply theme: $t"
+            # Apply writes generated/theme.sh + per-tool artifacts. We don't
+            # have the consumer tools (vim, btop, etc.) installed in CI, so
+            # we just check the apply itself doesn't error and that it
+            # produced a generated/theme.sh file referencing the theme.
+            ./bin/theme-switcher "$t"
+            grep -q "DOTFILES_THEME=\"$t\"" generated/theme.sh \
+              || { echo "::error::theme.sh did not pin to $t"; exit 1; }
+            echo "::endgroup::"
+          done
+          echo "All themes cycled successfully."
