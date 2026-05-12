@@ -53,7 +53,7 @@ Groups are mapped to tiers in `lib/install.sh`:
    ```
 
 3. Run `./setup.sh --shell` (or just `eget --download-all`) to install.
-4. `bin/verify` and `bin/remove` automatically pick up the new tool.
+4. `bin/verify` and `bin/uninstall-tool` automatically pick up the new tool.
 
 ## Adding a New Tool With a Custom Installer
 
@@ -68,7 +68,7 @@ For tools that need more than `eget`:
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=installer
    TOOL_TIER[mytool]=dev
-   TOOL_PATHS[mytool]="\$HOME/.local/bin/mytool"   # for bin/remove
+   TOOL_PATHS[mytool]="\$HOME/.local/bin/mytool"   # for bin/uninstall-tool
    ```
 3. Call it from the appropriate `install_*_packages` function in `lib/install.sh`:
    ```bash
