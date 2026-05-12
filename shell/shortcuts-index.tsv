@@ -172,8 +172,12 @@ shell│fgl│Fuzzy search git log│FZF git log browser
 shell│frg│Fuzzy search file contents│FZF + ripgrep
 shell│fp│Fuzzy search and open project directory│FZF project finder
 # Other tools
-shell│fr│Find and replace text across files│fr
+shell│fr│Find and replace text across files│replace
 shell│cheat│Show this interactive cheatsheet│cheatsheet
+shell│verify│Validate dotfiles installation health│verify
+shell│diff-config│Show drift between dotfiles sources and ~/│diff-config [--diff] [name]
+shell│check-updates│Compare eget.toml pins against latest GitHub releases│check-updates [--outdated] [tool]
+shell│uninstall-tool│Remove a tool installed by dotfiles (--list to inspect)│uninstall-tool <name>
 shell│da│Allow direnv in current directory│direnv allow
 shell│de│Edit .envrc for current directory│${EDITOR:-nvim} .envrc
 shell│show_path│Show PATH entries one per line│show_path

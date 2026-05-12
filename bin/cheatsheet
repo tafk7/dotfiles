@@ -105,6 +105,33 @@ show_dev() {
     done
 }
 
+# Show installed tools (auto-generated from lib/registry.sh — never drifts).
+# Reports each tool's tier, install method, and live presence on PATH.
+show_tools() {
+    print_header "INSTALLED TOOLS (from lib/registry.sh)"
+
+    # Sourcing registry on demand keeps cheatsheet snappy when this isn't asked for.
+    # shellcheck source=../lib/registry.sh
+    source "$DOTFILES_DIR/lib/registry.sh"
+
+    local tier_label
+    for tier_label in shell dev full; do
+        echo
+        echo "${BOLD}Tier: ${tier_label}${RESET}"
+        local name verify_cmd status
+        # Sort tools alphabetically within each tier
+        while IFS= read -r name; do
+            verify_cmd="$(tool_verify_command "$name")"
+            if eval "$verify_cmd" >/dev/null 2>&1; then
+                status="${YELLOW}${TOOL_BINARY[$name]}${RESET} ${DIM}(${TOOL_METHOD[$name]}, installed)${RESET}"
+            else
+                status="${YELLOW}${TOOL_BINARY[$name]}${RESET} ${DIM}(${TOOL_METHOD[$name]}, not installed)${RESET}"
+            fi
+            printf "    %-18s %s\n" "$name" "$status"
+        done < <(tools_for_tier "$tier_label")
+    done
+}
+
 # Show all cheatsheets
 show_all() {
     show_vim
@@ -112,6 +139,7 @@ show_all() {
     show_git
     show_shell
     show_dev
+    show_tools
 }
 
 # Build comprehensive searchable index of all shortcuts
@@ -135,11 +163,13 @@ show_shortcut_detail() {
     local shortcut="$2"
 
     # Get the full line from the index
-    local detail=$(build_shortcut_index | grep "^${category}│${shortcut}│")
+    local detail
+    detail=$(build_shortcut_index | grep "^${category}│${shortcut}│")
 
     if [[ -n "$detail" ]]; then
-        local desc=$(echo "$detail" | cut -d'│' -f3)
-        local cmd=$(echo "$detail" | cut -d'│' -f4)
+        local desc cmd
+        desc=$(echo "$detail" | cut -d'│' -f3)
+        cmd=$(echo "$detail" | cut -d'│' -f4)
 
         echo ""
         echo "${BOLD}${YELLOW}${shortcut}${RESET}"
@@ -181,26 +211,28 @@ show_interactive() {
     fi
 
     # Color definitions for preview
+    local PREVIEW_BOLD PREVIEW_CYAN PREVIEW_YELLOW PREVIEW_DIM PREVIEW_RESET
     if command -v tput >/dev/null 2>&1; then
-        local PREVIEW_BOLD=$(tput bold)
-        local PREVIEW_CYAN=$(tput setaf 6)
-        local PREVIEW_YELLOW=$(tput setaf 3)
-        local PREVIEW_DIM=$(tput dim)
-        local PREVIEW_RESET=$(tput sgr0)
+        PREVIEW_BOLD=$(tput bold)
+        PREVIEW_CYAN=$(tput setaf 6)
+        PREVIEW_YELLOW=$(tput setaf 3)
+        PREVIEW_DIM=$(tput dim)
+        PREVIEW_RESET=$(tput sgr0)
     else
-        local PREVIEW_BOLD=""
-        local PREVIEW_CYAN=""
-        local PREVIEW_YELLOW=""
-        local PREVIEW_DIM=""
-        local PREVIEW_RESET=""
+        PREVIEW_BOLD=""
+        PREVIEW_CYAN=""
+        PREVIEW_YELLOW=""
+        PREVIEW_DIM=""
+        PREVIEW_RESET=""
     fi
 
     # Create temporary index file for preview to read
-    local index_file=$(mktemp)
+    local index_file preview_script
+    index_file=$(mktemp)
     build_shortcut_index > "$index_file"
 
     # Create temporary file for preview script
-    local preview_script=$(mktemp)
+    preview_script=$(mktemp)
     cat > "$preview_script" <<PREVIEW_EOF
 #!/bin/bash
 # Self-contained preview script - receives original TSV line via stdin
@@ -255,7 +287,8 @@ PREVIEW_EOF
     chmod +x "$preview_script"
 
     # Build searchable index with visible delimiters for display
-    local selected=$({
+    local selected
+    selected=$({
         # Add column headers with visible delimiters (3 columns: category, shortcut, command)
         printf "${BOLD}%-10s │ %-15s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "COMMAND"
         # Add separator line
@@ -285,8 +318,9 @@ PREVIEW_EOF
 
     # If user selected something, extract the original TSV data (after tab) and get command
     if [[ -n "$selected" ]]; then
-        local original=$(echo "$selected" | cut -f2)
-        local command=$(echo "$original" | awk -F'│' '{print $4}')
+        local original command
+        original=$(echo "$selected" | cut -f2)
+        command=$(echo "$original" | awk -F'│' '{print $4}')
         echo ""
         echo "${BOLD}${CYAN}Command:${RESET} ${YELLOW}${command}${RESET}"
         echo ""
@@ -313,6 +347,9 @@ main() {
         dev)
             show_dev
             ;;
+        tools)
+            show_tools
+            ;;
         all)
             show_all
             ;;
@@ -321,7 +358,7 @@ main() {
             show_interactive
             ;;
         *)
-            echo "Usage: cheat [vim|tmux|git|shell|dev|all]"
+            echo "Usage: cheat [vim|tmux|git|shell|dev|tools|all]"
             echo "Show keybindings and shortcuts for dotfiles tools"
             echo ""
             echo "Run 'cheat' with no arguments for interactive mode"
