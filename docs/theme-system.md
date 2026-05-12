@@ -101,7 +101,6 @@ bin/theme-switcher set code tokyo-night
 
 # Surface override — flip just one surface
 bin/theme-switcher set starship nord
-bin/theme-switcher set chrome.starship nord   # equivalent qualified form
 
 # See what's effective everywhere
 bin/theme-switcher show

@@ -563,32 +563,11 @@ apply_theme() {
 # ==============================================================================
 
 # Parse a target string into "<group> <surface>" (surface "" for whole groups).
-# Accepts: <group> | <surface> | <group>.<surface>
+# Accepts: <group> | <surface>
 # Returns: 0 + "<group> <surface>" on stdout. 1 on parse error (with error log).
 _parse_target() {
     local raw="$1"
-    local g s
-
-    if [[ "$raw" == *.* ]]; then
-        g="${raw%%.*}"
-        s="${raw#*.}"
-        if ! is_group "$g"; then
-            error "Unknown group '$g' (try: $(list_all_groups | tr '\n' ' '))"
-            return 1
-        fi
-        if ! is_surface "$s"; then
-            error "Unknown surface '$s' (try: $(list_all_surfaces | tr '\n' ' '))"
-            return 1
-        fi
-        local sg
-        sg="$(group_for_surface "$s")"
-        if [[ "$sg" != "$g" ]]; then
-            error "Surface '$s' is in group '$sg', not '$g'. Use '${sg}.${s}' or just '${s}'."
-            return 1
-        fi
-        printf '%s %s\n' "$g" "$s"
-        return 0
-    fi
+    local g
 
     if is_group "$raw"; then
         printf '%s \n' "$raw"
@@ -1087,7 +1066,6 @@ EXAMPLES:
     theme-switcher catppuccin                   # global → catppuccin
     theme-switcher set code tokyo-night         # editor group → tokyo-night
     theme-switcher set starship nord            # just starship → nord
-    theme-switcher set chrome.fzf catppuccin    # qualified surface form
     theme-switcher unset starship               # back to chrome group/global
     theme-switcher reset                        # clear all overrides
     theme-switcher show                         # see the cascade tree
