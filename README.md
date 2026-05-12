@@ -137,7 +137,6 @@ and lazygit.
 ```bash
 ./bin/theme-switcher set code tokyo-night       # editor group → tokyo-night
 ./bin/theme-switcher set starship nord          # just starship → nord
-./bin/theme-switcher set chrome.starship nord   # qualified form, same thing
 ./bin/theme-switcher show                       # see the full cascade tree
 ./bin/theme-switcher unset starship             # back to chrome group/global
 ./bin/theme-switcher reset                      # clear all overrides
