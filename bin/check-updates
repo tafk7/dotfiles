@@ -8,7 +8,9 @@
 #   check-updates --json       Machine-readable JSON output
 #   check-updates <tool>       Check a single tool by short name (e.g. starship)
 #
-# Auth: set GITHUB_TOKEN to avoid the 60/hr unauthenticated rate limit.
+# Auth: GITHUB_TOKEN if set; else `gh auth token` if gh is installed and
+# logged in; else unauthenticated (60 req/hr cap). The auth method used
+# is shown in the summary footer and via an up-front hint when none.
 
 set -euo pipefail
 
@@ -23,8 +25,32 @@ ONLY_OUTDATED=false
 JSON_OUTPUT=false
 FILTER_TOOL=""
 
+# Resolved at startup: the bearer token to use (may be empty) and a
+# label describing where it came from ("GITHUB_TOKEN" / "gh" / "none").
+GH_AUTH_TOKEN=""
+GH_AUTH_SOURCE="none"
+
+resolve_github_auth() {
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        GH_AUTH_TOKEN="$GITHUB_TOKEN"
+        GH_AUTH_SOURCE="GITHUB_TOKEN"
+        return
+    fi
+    if command_exists gh; then
+        local tok
+        tok="$(gh auth token 2>/dev/null || true)"
+        if [[ -n "$tok" ]]; then
+            GH_AUTH_TOKEN="$tok"
+            GH_AUTH_SOURCE="gh"
+            return
+        fi
+    fi
+    GH_AUTH_TOKEN=""
+    GH_AUTH_SOURCE="none"
+}
+
 usage() {
-    sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+    sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -62,7 +88,7 @@ gh_latest_tag() {
     local repo="$1"
     local url="https://api.github.com/repos/$repo/releases/latest"
     local auth_args=()
-    [[ -n "${GITHUB_TOKEN:-}" ]] && auth_args=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    [[ -n "$GH_AUTH_TOKEN" ]] && auth_args=(-H "Authorization: Bearer $GH_AUTH_TOKEN")
 
     local response
     response="$(curl -sS --max-time 10 \
@@ -170,6 +196,11 @@ emit_table() {
         return 0
     fi
 
+    if [[ "$GH_AUTH_SOURCE" == "none" ]]; then
+        echo -e "${DIM}💡 Running unauthenticated (60 req/hr limit). Set GITHUB_TOKEN or install gh to raise the cap.${NC}"
+        echo
+    fi
+
     printf "%-12s  %-26s  %-12s  %-12s  %s\n" "Tool" "Repo" "Pinned" "Latest" "Status"
     printf '%s\n' "────────────  ──────────────────────────  ────────────  ────────────  ──────"
 
@@ -187,17 +218,20 @@ emit_table() {
     done <<< "$rows"
 
     echo
+    local auth_note=" (auth: $GH_AUTH_SOURCE)"
     if [[ "$outdated_count" -gt 0 ]]; then
-        warn "$outdated_count of $total tool(s) have updates available."
+        warn "$outdated_count of $total tool(s) have updates available.${auth_note}"
         echo "  Bump the tag in $EGET_TOML and run: eget --download-all"
     elif [[ "$error_count" -gt 0 ]]; then
-        warn "$error_count of $total check(s) failed (rate limit? set GITHUB_TOKEN)."
+        warn "$error_count of $total check(s) failed.${auth_note}"
+        [[ "$GH_AUTH_SOURCE" == "none" ]] && echo "  Likely rate-limited. Set GITHUB_TOKEN or install gh."
     else
-        success "All $total checked tool(s) are up to date."
+        success "All $total checked tool(s) are up to date.${auth_note}"
     fi
 }
 
 main() {
+    resolve_github_auth
     local rows
     rows="$(collect_rows)"
 
