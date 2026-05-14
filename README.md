@@ -10,6 +10,7 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --dev                 # + neovim, lazygit, tmux
 ./setup.sh --full                # + NVM, pyenv, uv, poetry, Docker, Azure CLI
 ./setup.sh --shell --dry-run     # Preview without changes
+./setup.sh --shell --no-hooks    # Skip the pre-commit lint hook (default: installed)
 ```
 
 Each tier includes all previous tiers. Use `--force` to overwrite without prompting.
@@ -196,7 +197,7 @@ shell/
   lazy/nvm.sh             Lazy NVM loader
 installers/               Per-tool install scripts (run by lib/install.sh::run_installer)
 generated/                Theme artifacts + bridge.sh (gitignored)
-bin/                      User commands (theme-switcher, verify, cheatsheet, replace, diff-config, check-updates, uninstall-tool)
+bin/                      User commands (theme-switcher, verify, cheatsheet, replace, diff-config, check-updates, uninstall-tool, install-git-hooks)
 eget.toml                 Static binary downloads (tier=shell tools)
 ```
 
@@ -231,9 +232,15 @@ Override per-machine in `~/.shell.local`.
 ./bin/diff-config                 # Show drift between sources and ~ (use --diff for details)
 ./bin/check-updates               # Are pinned eget tool versions stale?
 ./setup.sh --dry-run --shell      # Preview what would happen
+./bin/install-git-hooks --check   # Are dotfiles git hooks installed in this clone?
 reload                            # Reload shell config
 ls .backups/                      # See available backups
 ```
+
+`bin/check-updates` uses the GitHub releases API. It auto-detects auth from
+`GITHUB_TOKEN` or, if `gh` is installed and authenticated, from `gh auth token`;
+otherwise it runs unauthenticated (60 req/hr). The summary line shows which
+auth method was used.
 
 ## Further reading
 

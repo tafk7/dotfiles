@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Pre-commit hook: fast safety net mirroring CI's lint job.
+# Scoped to staged files only. Silent on success; verbose on failure.
+#
+# Checks:
+#   1. bash -n on staged shell files
+#   2. shellcheck --severity=warning (skipped with info note if not installed)
+#   3. shell/shortcuts-index.tsv: every non-comment row has 4 │-separated fields
+#
+# Bypass: git commit --no-verify
+#
+# Installed by bin/install-git-hooks (default symlink → ../../hooks/pre-commit).
+
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT" || exit 1
+
+if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
+    RED=$'\033[0;31m'; YELLOW=$'\033[1;33m'; DIM=$'\033[2m'; NC=$'\033[0m'
+else
+    RED=''; YELLOW=''; DIM=''; NC=''
+fi
+
+fail() { echo "${RED}✗ pre-commit:${NC} $*" >&2; }
+note() { echo "${DIM}  $*${NC}" >&2; }
+
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR)
+[[ ${#STAGED[@]} -eq 0 ]] && exit 0
+
+is_shell_file() {
+    case "$1" in
+        *.sh|*.bash|entry/bash_profile|hooks/*) return 0 ;;
+    esac
+    [[ -f "$1" ]] && head -n1 -- "$1" 2>/dev/null | grep -qE '^#!.*\b(bash|sh|zsh)\b' && return 0
+    return 1
+}
+
+SHELL_FILES=()
+TSV_STAGED=false
+for f in "${STAGED[@]}"; do
+    [[ ! -f "$f" ]] && continue
+    if is_shell_file "$f"; then
+        SHELL_FILES+=("$f")
+    fi
+    [[ "$f" == "shell/shortcuts-index.tsv" ]] && TSV_STAGED=true
+done
+
+errors=0
+
+# Check 1: bash -n syntax
+for f in "${SHELL_FILES[@]}"; do
+    if ! bash -n "$f" 2>/tmp/precommit-bashn.$$; then
+        fail "syntax error in $f"
+        sed 's/^/    /' /tmp/precommit-bashn.$$ >&2
+        ((errors++))
+    fi
+done
+rm -f /tmp/precommit-bashn.$$
+
+# Check 2: shellcheck (soft-skip if missing)
+if [[ ${#SHELL_FILES[@]} -gt 0 ]]; then
+    if command -v shellcheck >/dev/null 2>&1; then
+        if ! shellcheck --severity=warning "${SHELL_FILES[@]}" >/tmp/precommit-sc.$$ 2>&1; then
+            fail "shellcheck warnings (severity=warning):"
+            sed 's/^/    /' /tmp/precommit-sc.$$ >&2
+            ((errors++))
+        fi
+        rm -f /tmp/precommit-sc.$$
+    elif [[ -z "${PRECOMMIT_QUIET:-}" ]]; then
+        note "shellcheck not on PATH — skipping (install via: setup.sh --tools dev)"
+    fi
+fi
+
+# Check 3: TSV well-formed
+if [[ "$TSV_STAGED" == "true" ]]; then
+    bad_lines=$(awk -F'│' '!/^[[:space:]]*#/ && NF>0 && NF!=4 {printf "    line %d: %d fields (want 4)\n", NR, NF}' shell/shortcuts-index.tsv)
+    if [[ -n "$bad_lines" ]]; then
+        fail "shell/shortcuts-index.tsv has malformed rows (separator is │ U+2502):"
+        echo "$bad_lines" >&2
+        ((errors++))
+    fi
+fi
+
+if [[ $errors -gt 0 ]]; then
+    echo >&2
+    echo "${YELLOW}commit blocked.${NC} Fix the issues above, or bypass with: ${DIM}git commit --no-verify${NC}" >&2
+    exit 1
+fi
+
+exit 0

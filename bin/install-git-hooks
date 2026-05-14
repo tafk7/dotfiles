@@ -1,0 +1,139 @@
+#!/bin/bash
+# Install (or remove) the dotfiles git hooks into .git/hooks/.
+# Default: symlink so updates to hooks/* propagate without re-install.
+#
+# Usage:
+#   install-git-hooks              Install hooks (symlink). Idempotent.
+#   install-git-hooks --copy       Install via cp instead of symlink.
+#   install-git-hooks --uninstall  Remove dotfiles-managed hooks only.
+#   install-git-hooks --check      Report state. Exits 0 if installed, 1 if not.
+#   install-git-hooks --force      Overwrite an unrelated existing hook.
+#   install-git-hooks --quiet      Suppress info output (still prints errors).
+#
+# Bypass any hook for a single commit with: git commit --no-verify
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+
+source "$DOTFILES_DIR/lib/runtime.sh"
+
+readonly HOOKS_SRC_DIR="$DOTFILES_DIR/hooks"
+readonly GIT_HOOKS_DIR="$DOTFILES_DIR/.git/hooks"
+# All hook names we manage. Add new entries here when adding hooks/<name>.
+readonly MANAGED_HOOKS=(pre-commit)
+
+MODE="install"
+USE_COPY=false
+FORCE=false
+QUIET=false
+
+usage() { sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }
+
+info_msg() { [[ "$QUIET" == "true" ]] || echo "$@"; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --copy)      USE_COPY=true; shift ;;
+        --uninstall) MODE="uninstall"; shift ;;
+        --check)     MODE="check"; shift ;;
+        --force)     FORCE=true; shift ;;
+        --quiet|-q)  QUIET=true; shift ;;
+        --help|-h)   usage; exit 0 ;;
+        *)           error "Unknown flag: $1"; usage; exit 1 ;;
+    esac
+done
+
+[[ -d "$DOTFILES_DIR/.git" ]] || { error ".git directory not found at $DOTFILES_DIR/.git"; exit 1; }
+mkdir -p "$GIT_HOOKS_DIR"
+
+# True if the file at $1 is one of ours (symlink into hooks/, or a copy
+# whose first comment line matches our marker).
+is_dotfiles_hook() {
+    local target="$1"
+    [[ ! -e "$target" ]] && return 1
+    if [[ -L "$target" ]]; then
+        local resolved
+        resolved="$(readlink -f -- "$target" 2>/dev/null || true)"
+        [[ "$resolved" == "$HOOKS_SRC_DIR"/* ]] && return 0
+    fi
+    head -n4 -- "$target" 2>/dev/null | grep -q "Installed by bin/install-git-hooks" && return 0
+    return 1
+}
+
+install_one() {
+    local name="$1"
+    local src="$HOOKS_SRC_DIR/$name"
+    local dst="$GIT_HOOKS_DIR/$name"
+
+    [[ -f "$src" ]] || { error "missing source hook: $src"; return 1; }
+
+    if [[ -e "$dst" || -L "$dst" ]]; then
+        if is_dotfiles_hook "$dst"; then
+            info_msg "  ↻ $name already installed"
+            return 0
+        fi
+        if [[ "$FORCE" != "true" ]]; then
+            warn "  ⚠ $name exists and is not managed by us — skipping (use --force to overwrite)"
+            return 0
+        fi
+        rm -f "$dst"
+    fi
+
+    if [[ "$USE_COPY" == "true" ]]; then
+        cp "$src" "$dst"
+        # Marker so we recognize the copy on uninstall.
+        sed -i '2i# Installed by bin/install-git-hooks (copy mode)' "$dst"
+        chmod +x "$dst"
+        info_msg "  ✓ $name installed (copy)"
+    else
+        local rel="../../hooks/$name"
+        ln -s "$rel" "$dst"
+        info_msg "  ✓ $name installed (symlink → $rel)"
+    fi
+}
+
+uninstall_one() {
+    local name="$1"
+    local dst="$GIT_HOOKS_DIR/$name"
+    [[ -e "$dst" || -L "$dst" ]] || { info_msg "  ↻ $name not present"; return 0; }
+    if is_dotfiles_hook "$dst"; then
+        rm -f "$dst"
+        info_msg "  ✓ $name removed"
+    else
+        warn "  ⚠ $name is not managed by us — leaving in place"
+    fi
+}
+
+check_one() {
+    local name="$1"
+    local dst="$GIT_HOOKS_DIR/$name"
+    if is_dotfiles_hook "$dst"; then
+        echo "  ✓ $name installed"
+        return 0
+    fi
+    if [[ -e "$dst" ]]; then
+        echo "  ✗ $name exists but not managed by dotfiles"
+    else
+        echo "  ✗ $name not installed"
+    fi
+    return 1
+}
+
+case "$MODE" in
+    install)
+        info_msg "Installing dotfiles git hooks into $GIT_HOOKS_DIR"
+        for h in "${MANAGED_HOOKS[@]}"; do install_one "$h"; done
+        ;;
+    uninstall)
+        info_msg "Removing dotfiles-managed hooks from $GIT_HOOKS_DIR"
+        for h in "${MANAGED_HOOKS[@]}"; do uninstall_one "$h"; done
+        ;;
+    check)
+        echo "Hook status in $GIT_HOOKS_DIR:"
+        rc=0
+        for h in "${MANAGED_HOOKS[@]}"; do check_one "$h" || rc=1; done
+        exit "$rc"
+        ;;
+esac

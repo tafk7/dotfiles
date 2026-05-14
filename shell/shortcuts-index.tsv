@@ -178,6 +178,7 @@ shell│verify│Validate dotfiles installation health│verify
 shell│diff-config│Show drift between dotfiles sources and ~/│diff-config [--diff] [name]
 shell│check-updates│Compare eget.toml pins against latest GitHub releases│check-updates [--outdated] [tool]
 shell│uninstall-tool│Remove a tool installed by dotfiles (--list to inspect)│uninstall-tool <name>
+shell│install-git-hooks│Install dotfiles pre-commit lint hook in this clone│install-git-hooks [--check] [--uninstall]
 shell│da│Allow direnv in current directory│direnv allow
 shell│de│Edit .envrc for current directory│${EDITOR:-nvim} .envrc
 shell│show_path│Show PATH entries one per line│show_path

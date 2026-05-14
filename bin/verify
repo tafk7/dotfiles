@@ -113,6 +113,23 @@ else
     check_warn "user not configured"
 fi
 
+# Pre-commit hook (info-level — never fail verify if absent).
+hook_path="$DOTFILES_DIR/.git/hooks/pre-commit"
+if [[ -L "$hook_path" ]]; then
+    resolved="$(readlink -f "$hook_path" 2>/dev/null || true)"
+    if [[ "$resolved" == "$DOTFILES_DIR/hooks/"* ]]; then
+        check_pass "pre-commit hook installed (symlink → hooks/pre-commit)"
+    else
+        check_warn "pre-commit hook present but not from this repo"
+    fi
+elif [[ -f "$hook_path" ]] && head -n4 "$hook_path" 2>/dev/null | grep -q "Installed by bin/install-git-hooks"; then
+    check_pass "pre-commit hook installed (copy)"
+elif [[ -f "$hook_path" ]]; then
+    check_warn "pre-commit hook present but not from this repo"
+else
+    check_warn "pre-commit hook not installed (run: bin/install-git-hooks)"
+fi
+
 # ==============================================================================
 # 4. Docker
 # ==============================================================================

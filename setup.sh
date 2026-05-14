@@ -20,6 +20,7 @@ FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
 SHOW_HELP=false
 DRY_RUN=false
+NO_HOOKS=false
 
 # Parse command line arguments
 parse_arguments() {
@@ -48,6 +49,10 @@ parse_arguments() {
                 ;;
             --dry-run)
                 DRY_RUN=true
+                shift
+                ;;
+            --no-hooks)
+                NO_HOOKS=true
                 shift
                 ;;
             --help)
@@ -100,6 +105,7 @@ TIERS (cumulative - each tier includes all previous tiers):
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
     --dry-run           Preview actions without making changes
+    --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --help              Show this help message
 
 EXAMPLES:
@@ -262,6 +268,16 @@ phase_setup_configs() {
         fi
     else
         "$DOTFILES_DIR/bin/theme-switcher" --init
+    fi
+
+    # Install pre-commit git hooks (default: on; opt out with --no-hooks).
+    # Idempotent and safe — refuses to clobber an unrelated existing hook.
+    if [[ "$NO_HOOKS" == "true" ]]; then
+        log "Skipping git hooks install (--no-hooks)"
+    elif [[ "$DRY_RUN" == "true" ]]; then
+        log "[DRY RUN] Would install git hooks (use --no-hooks to skip)"
+    else
+        "$DOTFILES_DIR/bin/install-git-hooks" --quiet || warn "git hooks install failed"
     fi
 
     # Write install-time environment to generated/bridge.sh
