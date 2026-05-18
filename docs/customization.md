@@ -126,7 +126,10 @@ For WSL-specific code, use `shell/platform/wsl.sh` (only sourced when
 
 Keep machine-specific tweaks out of git via `*.local`:
 
-- `~/.bashrc.local`, `~/.zshrc.local` — sourced at the end of `shell/init.sh`.
+- `~/.shell.local` — sourced at the end of `shell/init.sh` for both bash and
+  zsh. The single override hook for aliases, exports, secrets, and tweaks.
+  Gate shell-specific syntax with `[[ -n "$ZSH_VERSION" ]]` /
+  `[[ -n "$BASH_VERSION" ]]` blocks if needed.
 - `~/.gitconfig.local` — included by the templated `~/.gitconfig`.
 
 These are gitignored.

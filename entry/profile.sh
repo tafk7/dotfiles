@@ -31,5 +31,6 @@ export LESS='-F -g -i -M -R -S -w -X -z-4'
 # Layer 2: bash/zsh get the rich environment (env.sh uses [[ extensively)
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
     DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+    [ -f "$DOTFILES_DIR/shell/env-runtime.sh" ] && . "$DOTFILES_DIR/shell/env-runtime.sh"
     [ -f "$DOTFILES_DIR/shell/env.sh" ] && . "$DOTFILES_DIR/shell/env.sh"
 fi

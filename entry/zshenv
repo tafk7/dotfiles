@@ -1,0 +1,21 @@
+# shellcheck shell=bash
+# ~/.zshenv: every zsh context — login, interactive, AND non-interactive.
+# Sourced FIRST by zsh, before .zprofile or .zshrc.
+#
+# Establishes DOTFILES_DIR + the managed env (env-runtime + env via
+# ~/.profile). This gives zsh non-interactive subprocesses (e.g.,
+# `zsh -c "command"`, `#!/usr/bin/env zsh` scripts, tools that exec zsh
+# directly) the same PATH and environment that interactive zsh and bash
+# get — closing the long-standing gap where zsh -c saw an empty env.
+#
+# Idempotency-safe: ~/.profile guards via _PROFILE_LOADED, env.sh guards
+# via _DOTFILES_ENV_LOADED. Re-sourcing from .zprofile or .zshrc later is
+# a no-op (env-runtime.sh re-runs intentionally — it must, for `reload`).
+
+DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshenv 2>/dev/null)")")"
+export DOTFILES_DIR
+
+[[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
+
+# POSIX baseline + env (mirrors the bash entry chain via ~/.bashrc → ~/.profile)
+[[ -f "$HOME/.profile" ]] && source "$HOME/.profile"

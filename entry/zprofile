@@ -1,0 +1,9 @@
+# shellcheck shell=bash
+# ~/.zprofile: login zsh.
+#
+# .zshenv has already established DOTFILES_DIR and sourced env. This file
+# is reserved for login-only setup (e.g., starting an ssh-agent, one-shot
+# session-init logging) — empty today but kept as a managed file so
+# future login concerns have a clear home that won't conflict with
+# .zshenv (every-shell) or .zshrc (interactive).
+:

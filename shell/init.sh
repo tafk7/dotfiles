@@ -8,7 +8,11 @@ if [[ -z "${DOTFILES_DIR:-}" ]]; then
     return 0
 fi
 
-# Static exports (fast, no evals)
+# Always-fresh exports (point at generated/; intentionally un-guarded so
+# `reload` re-evaluates them after a theme switch)
+source "$DOTFILES_DIR/shell/env-runtime.sh"
+
+# Static exports (guarded by _DOTFILES_ENV_LOADED)
 source "$DOTFILES_DIR/shell/env.sh"
 
 # Tool initialization (interactive only — evals)
