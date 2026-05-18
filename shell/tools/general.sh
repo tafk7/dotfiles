@@ -54,12 +54,27 @@ alias ducks='du -cks * | sort -rn | head'
 alias h='history'
 alias hgrep='history | grep'
 
-# Reload shell (works for both bash and zsh)
+# Reload shell config. Unsets idempotency guards so the guarded portion of
+# env.sh + profile.sh actually re-runs (alias-based 'source ~/.bashrc' would
+# skip them entirely — leaving stale PATH/env state).
+# Note: stale aliases/functions from removed tool modules persist across a
+# `reload`; use `exec $SHELL -l` for a true clean slate.
+# `unalias` is defensive for users upgrading from the previous version of
+# this file (which defined `reload` as an alias); zsh refuses to define a
+# function whose name is an existing alias.
+unalias reload 2>/dev/null
+reload() {
+    unset _DOTFILES_ENV_LOADED _PROFILE_LOADED
+    if [[ -n "$ZSH_VERSION" ]]; then
+        source ~/.zshrc
+    else
+        source ~/.bashrc
+    fi
+}
+
 if [[ -n "$ZSH_VERSION" ]]; then
-    alias reload='source ~/.zshrc'
     alias zshrc='nvim ~/.zshrc'
 elif [[ -n "$BASH_VERSION" ]]; then
-    alias reload='source ~/.bashrc'
     alias bashrc='nvim ~/.bashrc'
 fi
 

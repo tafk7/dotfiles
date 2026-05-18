@@ -5,46 +5,28 @@
 # Sourced by:
 #   - entry/profile.sh (login shells, non-interactive subshells)
 #   - shell/init.sh (interactive shells)
-# Safe to source multiple times — idempotency guard below.
+# Always AFTER shell/env-runtime.sh, which holds the always-fresh exports
+# (STARSHIP_CONFIG, BAT_CACHE_PATH, theme-overrides) that point at
+# generated/ files and must re-evaluate on `reload`.
+#
+# Safe to source multiple times — guarded by _DOTFILES_ENV_LOADED below.
+# `reload` (in shell/tools/general.sh) unsets the guard so guarded exports
+# actually re-run after PATH/env edits.
+#
+# The guard is EXPORTED so child processes inherit it and skip the PATH
+# composition that the parent already performed. Without this, every
+# `zsh -c "cmd"` subprocess (and any other shell that re-sources this
+# file) would re-prepend ~/bin, ~/.local/bin, $DOTFILES_DIR/bin, NVM,
+# pyenv, etc. onto the inherited PATH, producing unbounded duplication
+# across nested subprocesses.
 #
 # Interactive-only tool init (pyenv eval, direnv hook, completions)
-# lives in shell/tool-init.sh. The one exception is the direnv export
-# at the bottom of this file: non-interactive subprocesses (Claude
-# Code's `bash -c`, scripts) need .envrc activation too, and the
-# PROMPT_COMMAND-based hook only fires for interactive shells.
-
-# ==============================================================================
-# Always-evaluate exports — these point at generated files that may be
-# created/updated AFTER env.sh first runs (e.g., `theme-switcher` → `reload`).
-# Putting them above the idempotency guard ensures `reload` picks up new
-# generated artifacts instead of cached-empty values from the first sourcing.
-# ==============================================================================
-
-if [[ -n "${DOTFILES_DIR:-}" ]]; then
-    if [[ -f "$DOTFILES_DIR/generated/starship.toml" ]]; then
-        export STARSHIP_CONFIG="$DOTFILES_DIR/generated/starship.toml"
-    elif [[ -f "$DOTFILES_DIR/configs/starship.toml" ]] \
-         && ! grep -q '__DOTFILES_PALETTE__' "$DOTFILES_DIR/configs/starship.toml" 2>/dev/null; then
-        # Only fall back to the base config if it doesn't contain the
-        # placeholder marker (would otherwise cause starship warnings).
-        export STARSHIP_CONFIG="$DOTFILES_DIR/configs/starship.toml"
-    fi
-
-    if [[ -d "$DOTFILES_DIR/generated/bat/cache" ]]; then
-        export BAT_CACHE_PATH="$DOTFILES_DIR/generated/bat/cache"
-    fi
-
-    # Per-component theme overrides — sourced after generated/theme.sh emits
-    # the global DOTFILES_THEME, so DOTFILES_THEME_<GROUP|SURFACE>=... overrides
-    # the global default. Cascade applied at apply-time by bin/theme-switcher.
-    # Read by lib/theme-resolve.sh and consumed by tools (BAT_THEME etc.) that
-    # generated/theme.sh emits per-surface based on the cascade.
-    [[ -f "$DOTFILES_DIR/generated/theme-overrides.sh" ]] \
-        && source "$DOTFILES_DIR/generated/theme-overrides.sh"
-fi
+# lives in shell/tool-init.sh. CWD-sensitive exports that must re-fire
+# in every subprocess (notably `direnv export`) live in
+# shell/env-runtime.sh, which is intentionally un-guarded.
 
 [[ -n "${_DOTFILES_ENV_LOADED:-}" ]] && return 0
-_DOTFILES_ENV_LOADED=1
+export _DOTFILES_ENV_LOADED=1
 
 # ==============================================================================
 # PATH Composition
@@ -102,9 +84,9 @@ export BAT_THEME="${BAT_THEME:-gruvbox-dark}"
 export STARSHIP_PALETTE="${STARSHIP_PALETTE:-gruvbox}"
 export DELTA_FEATURE="${DELTA_FEATURE:-gruvbox}"
 
-# Note: STARSHIP_CONFIG and BAT_CACHE_PATH are set above the idempotency
-# guard at the top of this file so they re-resolve on `reload` after a
-# theme switch. Don't duplicate them here.
+# Note: STARSHIP_CONFIG and BAT_CACHE_PATH are set in shell/env-runtime.sh
+# (the un-guarded sibling) so they re-resolve on `reload` after a theme
+# switch and so subprocesses see fresh values. Don't duplicate them here.
 
 export PROJECTS_DIR="$HOME/projects"
 
@@ -154,30 +136,6 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
     fi
 fi
 
-# ==============================================================================
-# direnv .envrc activation (non-interactive shells)
-# ==============================================================================
-#
-# `direnv hook` only fires before each interactive prompt, so non-
-# interactive subprocesses (Claude Code's `bash -c`, scripts) never get
-# their project venv activated. `direnv export <shell>` is the standalone
-# equivalent — walks up from $PWD, honors the shared allow-list, and
-# emits the .envrc's exports immediately. Safe no-op when no .envrc
-# applies. `|| true` avoids aborting startup under `set -e` if an
-# .envrc errors. Quiet log format keeps Bash-tool output clean.
-#
-# Shell-aware: zsh and bash use different export syntax (zsh's `typeset`
-# vs bash's `declare`/plain assignment); using the wrong one silently
-# leaks malformed quoting into the parent shell. Detect via the version
-# vars each shell sets natively. Default to bash for POSIX `sh`.
-#
-# Interactive shells still get the hook from tool-init.sh on top —
-# that handles the `cd into another project` case mid-session.
-if command -v direnv >/dev/null 2>&1; then
-    export DIRENV_LOG_FORMAT=""
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        eval "$(direnv export zsh 2>/dev/null)" || true
-    else
-        eval "$(direnv export bash 2>/dev/null)" || true
-    fi
-fi
+# Note: `direnv export` lives in shell/env-runtime.sh — it must re-fire
+# in every subprocess (it's CWD-sensitive), and the exported guard on
+# this file would skip it here in child shells.

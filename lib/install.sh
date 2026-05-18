@@ -287,9 +287,15 @@ process_git_config() {
         rm "$target"
     fi
 
-    git_name_escaped=$(printf '%s' "$git_name" | sed 's/[][\\.*^$()+?{}|]/\\&/g')
-    git_email_escaped=$(printf '%s' "$git_email" | sed 's/[][\\.*^$()+?{}|]/\\&/g')
-    dotfiles_dir_escaped=$(printf '%s' "$DOTFILES_DIR" | sed 's/[][\\.*^$()+?{}|]/\\&/g')
+    # First clause: escape regex metachars so the value is safe as-is on the
+    # search side. Second clause: escape `&`, which means "matched text" on the
+    # *replacement* side of sed. Without the second pass, a name like
+    # "Smith & Co" would expand to "Smith {{GIT_NAME}} Co" in the output.
+    # Order matters — the first clause uses `\&` as a backreference, so adding
+    # `&` to its character class would break that escape.
+    git_name_escaped=$(printf '%s' "$git_name" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
+    git_email_escaped=$(printf '%s' "$git_email" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
+    dotfiles_dir_escaped=$(printf '%s' "$DOTFILES_DIR" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
 
     sed -e "s|{{GIT_NAME}}|$git_name_escaped|g" \
         -e "s|{{GIT_EMAIL}}|$git_email_escaped|g" \

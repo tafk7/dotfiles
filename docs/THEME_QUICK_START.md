@@ -48,7 +48,7 @@ Most surfaces update on next launch, but some need a nudge:
 
 ## 🚀 Pro Tips
 
-1. **Quick aliases** in `~/.zshrc.local` or `~/.bashrc.local`:
+1. **Quick aliases** in `~/.shell.local` (sourced by both bash and zsh):
    ```bash
    alias nord='bin/theme-switcher nord'
    alias tokyo='bin/theme-switcher tokyo-night'

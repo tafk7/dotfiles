@@ -16,6 +16,8 @@ declare -A CONFIG_MAP=(
     # Shell RC files (source: entry/)
     [bash.sh]="$HOME/.bashrc:symlink"
     [zsh.sh]="$HOME/.zshrc:symlink"
+    [zshenv]="$HOME/.zshenv:symlink"
+    [zprofile]="$HOME/.zprofile:symlink"
     [profile.sh]="$HOME/.profile:symlink"
     [bash_profile]="$HOME/.bash_profile:symlink"
 
@@ -39,7 +41,7 @@ declare -A CONFIG_MAP=(
 config_source_path() {
     local key="$1"
     case "$key" in
-        bash.sh|zsh.sh|profile.sh|bash_profile) echo "$ENTRY_DIR/$key" ;;
+        bash.sh|zsh.sh|zshenv|zprofile|profile.sh|bash_profile) echo "$ENTRY_DIR/$key" ;;
         *)                                       echo "$CONFIGS_DIR/$key" ;;
     esac
 }

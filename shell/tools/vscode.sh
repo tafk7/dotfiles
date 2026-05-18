@@ -52,7 +52,7 @@ cdiff() {
 }
 
 # Note: EDITOR is set in shell/env.sh (nvim by default)
-# To use VS Code as your default editor, add to ~/.zshrc.local:
+# To use VS Code as your default editor, add to ~/.shell.local:
 #   export EDITOR='code --wait'
 #   export VISUAL='code --wait'
 #   export GIT_EDITOR='code --wait'

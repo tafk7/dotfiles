@@ -223,7 +223,19 @@ Override per-machine in `~/.shell.local`.
 
 **New theme:** Create `themes/<name>/` with the required files (`meta.sh`, `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`) — themes are auto-discovered from disk. Add per-tool palette files (`starship.palette.toml`, `delta.gitconfig`, `btop.theme`, `lazygit.yml`, optional `bat/<name>.tmTheme`) for full surface coverage.
 
-**Local overrides:** `~/.shell.local` (sourced last by both shells) and `~/.bashrc.local` / `~/.zshrc.local` are sourced after dotfiles config and not tracked. Use them for machine-specific `PROJECTS_DIRS`, secrets, and personal aliases.
+**Local overrides:** `~/.shell.local` is sourced last by both shells, after all dotfiles config. Not tracked. Use it for machine-specific `PROJECTS_DIRS`, secrets, and personal aliases. For shell-specific tweaks (`setopt`, `bindkey`, `shopt`), gate the block:
+
+```bash
+# ~/.shell.local
+export PROJECTS_DIRS="$HOME/work/acme:$HOME/projects"
+alias work='cd ~/work/acme'
+
+if [[ -n "$ZSH_VERSION" ]]; then
+    setopt HIST_FIND_NO_DUPS
+elif [[ -n "$BASH_VERSION" ]]; then
+    shopt -s autocd
+fi
+```
 
 ## Troubleshooting
 

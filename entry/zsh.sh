@@ -3,13 +3,16 @@
 # zsh-only constructs below carry per-line `shellcheck disable` directives)
 # Owns: zsh options, history, completion, keybindings
 
-# Derive DOTFILES_DIR from symlink — always works regardless of install state
-DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
-export DOTFILES_DIR
-[[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
-
-# PATH baseline for non-login interactive
-[[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+# DOTFILES_DIR + env are normally established by ~/.zshenv (entry/zshenv).
+# This block is a defensive fallback for installs where .zshenv was opted
+# out of or symlinked manually but .zshrc wasn't. Profile sourcing is
+# idempotent via _PROFILE_LOADED.
+if [[ -z "${DOTFILES_DIR:-}" ]]; then
+    DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
+    export DOTFILES_DIR
+    [[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
+    [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+fi
 
 # ==============================================================================
 # Zsh Options
