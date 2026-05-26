@@ -52,3 +52,8 @@ alias clp='claude --print'       # One-off command (non-interactive)
 alias cll='claude --setting-sources project,local'
 alias cllc='claude --setting-sources project,local --continue'
 alias cllp='claude --setting-sources project,local --print'
+
+# Clara: alternate global config dir at ~/.clara (CLAUDE_CONFIG_DIR override)
+alias clara='CLAUDE_CONFIG_DIR="$HOME/.clara" claude'
+alias clarac='CLAUDE_CONFIG_DIR="$HOME/.clara" claude --continue'
+alias clarap='CLAUDE_CONFIG_DIR="$HOME/.clara" claude --print'
