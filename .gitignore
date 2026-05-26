@@ -4,6 +4,7 @@ generated/
 # Development artifacts
 docs/archive/
 _archive/
+.agents/tmp
 .scratchpad/
 CLAUDE.md
 
