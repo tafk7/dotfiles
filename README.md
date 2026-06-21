@@ -17,6 +17,19 @@ Each tier includes all previous tiers. Use `--force` to overwrite without prompt
 
 After installation, verify with `./bin/verify` and restart your shell.
 
+### Fresh machine (one-liner)
+
+No clone step needed — `bootstrap.sh` installs git, clones this repo, and runs
+`setup.sh`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh | bash -s -- --dev
+```
+
+The repo lands in `~/dev/dotfiles` (override with `DOTFILES_DIR`). Defaults to the
+`--shell` tier; pass any tier flag after `--`.
+
 ## What You Get
 
 ### Modern CLI Replacements
