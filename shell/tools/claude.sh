@@ -1,36 +1,39 @@
 #!/bin/bash
 
-# Claude Code: prefer VS Code extension binary, fall back to standalone CLI
-_claude_resolve_bin() {
-    # VS Code extension (WSL or remote SSH)
-    local vscode_bin
-    local vscode_root="$HOME/.vscode-server/extensions"
-    if [[ -d "$vscode_root" ]]; then
-        vscode_bin=$(find "$vscode_root" \
-            -path "*/anthropic.claude-code-*-linux-x64/resources/native-binary/claude" \
-            -type f -perm -111 2>/dev/null | sort -V | tail -1)
-    fi
-    if [[ -n "$vscode_bin" ]]; then
-        echo "$vscode_bin"
-        return
-    fi
+# Claude Code resolution: prefer the standalone native CLI (~/.local/bin/claude),
+# fall back to the VS Code extension's bundled binary. Both are discovered once at
+# init; the active one is chosen at call time. Set CLAUDE_USE_VSCODE=1 (exported,
+# or inline as `CLAUDE_USE_VSCODE=1 claude ...`) to make the extension binary
+# primary, or call `claude-vsc` to invoke it explicitly regardless of the default.
 
-    # Standalone CLI on PATH
-    local standalone
-    standalone=$(type -P claude 2>/dev/null)
-    if [[ -n "$standalone" && -x "$standalone" ]]; then
-        echo "$standalone"
-        return
-    fi
+# Standalone `claude` on PATH (native install). `type -P` ignores the claude()
+# function defined below and searches PATH only.
+_CLAUDE_STANDALONE=$(type -P claude 2>/dev/null)
 
-    return 1
-}
+# VS Code "Claude Code" extension binary (WSL / remote SSH)
+_CLAUDE_VSCODE=""
+if [[ -d "$HOME/.vscode-server/extensions" ]]; then
+    _CLAUDE_VSCODE=$(find "$HOME/.vscode-server/extensions" \
+        -path "*/anthropic.claude-code-*-linux-x64/resources/native-binary/claude" \
+        -type f -perm -111 2>/dev/null | sort -V | tail -1)
+fi
 
-# Resolve once at shell init, define function that all aliases call through
-_CLAUDE_BIN=$(_claude_resolve_bin)
-if [[ -n "$_CLAUDE_BIN" ]]; then
-    # CLAUDE_FLAGS intentionally unquoted — allows multiple space-separated flags
-    claude() { "$_CLAUDE_BIN" ${CLAUDE_FLAGS:-} "$@"; }
+# Default = native when present, else the extension binary.
+if [[ -n "$_CLAUDE_STANDALONE" ]]; then
+    _CLAUDE_DEFAULT="$_CLAUDE_STANDALONE"
+else
+    _CLAUDE_DEFAULT="$_CLAUDE_VSCODE"
+fi
+unset _CLAUDE_STANDALONE
+
+if [[ -n "$_CLAUDE_DEFAULT" ]]; then
+    # Choose at call time so CLAUDE_USE_VSCODE works inline, without re-scanning.
+    claude() {
+        local bin="$_CLAUDE_DEFAULT"
+        [[ "${CLAUDE_USE_VSCODE:-0}" == "1" && -n "$_CLAUDE_VSCODE" ]] && bin="$_CLAUDE_VSCODE"
+        # CLAUDE_FLAGS intentionally unquoted — allows multiple space-separated flags
+        "$bin" ${CLAUDE_FLAGS:-} "$@"
+    }
 else
     claude() {
         echo "Claude Code not found." >&2
@@ -39,7 +42,12 @@ else
         return 1
     }
 fi
-unset -f _claude_resolve_bin
+
+# Explicit handle to the VS Code extension binary, independent of the default.
+# Defined only when that binary is present.
+if [[ -n "$_CLAUDE_VSCODE" ]]; then
+    claude-vsc() { "$_CLAUDE_VSCODE" ${CLAUDE_FLAGS:-} "$@"; }
+fi
 
 # Clean Claude Code shell snapshots (fixes zoxide issues)
 alias clean-claude-snapshots='rm -rf ~/.claude/shell-snapshots/ ~/.zcompdump* && echo "Cleaned Claude snapshots and zsh cache"'
