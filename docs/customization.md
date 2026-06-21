@@ -12,7 +12,7 @@ machinery picks it up.
 | Declarative data | `lib/config.sh`, `lib/registry.sh`       | `PACKAGES`, `CONFIG_MAP`, `TOOL_*` arrays. No side effects. Read by every other layer. |
 | Runtime helpers  | `lib/runtime.sh`                         | `log`, `success`, `warn`, `error`, `is_wsl`, `command_exists`. Safe everywhere.      |
 | Install helpers  | `lib/install.sh`                         | `install_apt`, `safe_sudo`, `run_installer`, `track_install`. Sourced ONLY by `setup.sh` and installers. |
-| Tool installers  | `installers/install-<tool>.sh`           | One script per non-apt tool (neovim, tmux, nvm, pyenv, …). Exit 0 = installed, 2 = up-to-date, 1 = failed. |
+| Tool installers  | `installers/install-<tool>.sh`           | One script per non-apt tool (neovim, tmux, nvm, …). Exit 0 = installed, 2 = up-to-date, 1 = failed. |
 | Shell entrypoints | `entry/{bash.sh,zsh.sh,profile.sh}`     | Symlinked to `~/.bashrc`, `~/.zshrc`, `~/.profile`. Source `generated/bridge.sh` then `shell/init.sh`. |
 | Shell startup    | `shell/env.sh`, `shell/init.sh`, `shell/tools/*.sh`, `shell/platform/*.sh` | PATH composition, tool-init, domain-grouped functions/aliases. |
 | Themes           | `themes/<name>/`                         | One directory per theme. `bin/theme-switcher` writes runtime files.                  |

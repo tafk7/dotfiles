@@ -29,8 +29,6 @@ declare -A TOOL_BINARY=(
     [tmux]=tmux
     [plantuml]=plantuml
     [nvm]=nvm
-    [pyenv]=pyenv
-    [poetry]=poetry
 )
 
 # TOOL_METHOD: tool name → install method (eget|apt|installer|external)
@@ -55,8 +53,6 @@ declare -A TOOL_METHOD=(
     [tmux]=installer
     [plantuml]=installer
     [nvm]=installer
-    [pyenv]=installer
-    [poetry]=installer
 )
 
 # TOOL_TIER: tool name → minimum tier (shell|dev|full)
@@ -66,14 +62,13 @@ declare -A TOOL_TIER=(
     [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
     [direnv]=shell    [eget]=shell    [sd]=shell
     [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
-    [nvm]=full        [pyenv]=full    [poetry]=full
+    [nvm]=full
 )
 
 # TOOL_VERIFY: tool name → verification command (exit 0 = pass)
 # Empty = use "command -v TOOL_BINARY[name]"
 declare -A TOOL_VERIFY=(
     [nvm]='test -s "$HOME/.nvm/nvm.sh"'
-    [pyenv]='test -d "$HOME/.pyenv"'
 )
 
 # TOOL_PATHS: tool name → space-separated paths to remove on uninstall
@@ -81,8 +76,6 @@ declare -A TOOL_VERIFY=(
 declare -A TOOL_PATHS=(
     [neovim]="\$HOME/.local/bin/nvim \$HOME/.local/nvim"
     [nvm]="\$HOME/.nvm"
-    [pyenv]="\$HOME/.pyenv"
-    [poetry]="\$HOME/.local/bin/poetry \$HOME/.local/share/pypoetry"
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
 )
 
@@ -90,7 +83,6 @@ declare -A TOOL_PATHS=(
 # Only for tools that need manual steps beyond path deletion.
 declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
-    [pyenv]="rm -rf \$HOME/.pyenv  # then restart shell"
 )
 
 # ==============================================================================

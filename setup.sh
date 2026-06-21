@@ -113,7 +113,7 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Adds: neovim, tmux
 
     --full              Dev + full environment. Requires sudo.
-                        Adds: NVM, pyenv, poetry, Docker, Azure CLI
+                        Adds: NVM, Docker, Azure CLI
 
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
@@ -143,7 +143,7 @@ TIER SUMMARY:
     │ shell    │ + eget, starship, eza, fzf, zoxide, delta,      │ Yes       │
     │          │   btop, glow, lazygit, uv, bat, fd, ripgrep     │           │
     │ dev      │ + neovim, tmux                                │ Yes       │
-    │ full     │ + NVM, pyenv, poetry, Docker, Azure CLI         │ Yes       │
+    │ full     │ + NVM, Docker, Azure CLI                        │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
 
 The script will:

@@ -8,7 +8,7 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --config              # Symlinks only (no sudo)
 ./setup.sh --shell               # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
 ./setup.sh --dev                 # + neovim, lazygit, tmux
-./setup.sh --full                # + NVM, pyenv, uv, poetry, Docker, Azure CLI
+./setup.sh --full                # + NVM, Docker, Azure CLI
 ./setup.sh --shell --dry-run     # Preview without changes
 ./setup.sh --shell --no-hooks    # Skip the pre-commit lint hook (default: installed)
 ```
@@ -64,17 +64,17 @@ frg                       # Interactive ripgrep search
 ### Python
 
 ```bash
-pyset 3.11.9              # Set project Python + create .venv
-pyset --default 3.11.9    # Set global default
-vactivate                 # Manual venv activation
-pyinfo                    # Show environment info
-pylist                    # List installed versions
+# uv owns Python: interpreters, venvs, dependencies, and tools
+uv python install 3.11   # Install an interpreter
+uv venv --python 3.11    # Create .venv on a specific version
+uv python pin 3.11       # Write .python-version for the project
+vactivate                # Activate .venv (or just use `uv run`)
 
 # uv shortcuts
 uvs / uvr / uva / uvpi    # sync / run / add / pip install
 
 # direnv auto-activation (recommended)
-echo 'layout pyenv 3.11.9' > .envrc && direnv allow
+uv venv && echo 'source .venv/bin/activate' > .envrc && direnv allow
 ```
 
 ### VS Code

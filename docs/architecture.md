@@ -30,7 +30,7 @@ bin/*     ──── source → lib/runtime.sh
 - `lib/runtime.sh` — safe for all contexts (bin/, shell startup).
 - `lib/config.sh` — declarative data (CONFIG_MAP, PACKAGES). No functions, no side effects.
 - `shell/env.sh` — static exports and PATH composition. The one `eval` here is `direnv export bash` at the bottom (see Claude Code compatibility below).
-- `shell/tool-init.sh` — interactive-only `eval` calls (pyenv, direnv hook, completions).
+- `shell/tool-init.sh` — interactive-only `eval` calls (direnv hook, completions).
 - `shell/tools/*.sh` — domain-split functions and aliases (one file per tool domain).
 
 ## Directory Layout
@@ -60,7 +60,7 @@ dotfiles/
 ├── shell/
 │   ├── init.sh               ← shared sourcing sequence for bash + zsh
 │   ├── env.sh                ← PATH composition + static exports (single source of truth)
-│   ├── tool-init.sh          ← eval-based init (pyenv, direnv, completions)
+│   ├── tool-init.sh          ← eval-based init (direnv, completions)
 │   ├── fzf.sh                ← FZF configuration
 │   ├── lazy/nvm.sh           ← lazy NVM loader for both shells
 │   ├── tools/                ← domain-split functions and aliases
@@ -81,17 +81,15 @@ dotfiles/
 ### Single source of truth: `shell/env.sh`
 
 All PATH composition and static exports live in one file: `shell/env.sh`.
-No other file modifies PATH (except `shell/tool-init.sh` which re-prepends
-pyenv shims via `eval` in interactive shells).
+No other file modifies PATH.
 
 ```
 shell/env.sh owns:
   PATH additions     ~/bin, ~/.local/bin, /usr/local/bin
                      $NVM_DIR/default/bin
-                     $PYENV_ROOT/bin
                      $GOPATH/bin, $CARGO_HOME/bin
 
-  Static exports     NVM_DIR, PYENV_ROOT, GOPATH, CARGO_HOME
+  Static exports     NVM_DIR, GOPATH, CARGO_HOME
                      EDITOR, VISUAL, PYTHONDONTWRITEBYTECODE
                      NODE_OPTIONS, DOCKER_BUILDKIT, BAT_THEME
 
@@ -170,7 +168,7 @@ because we don't blanket-redirect stderr at the eval site.
 | config | Symlinks only (zero installs)                      | No    |
 | shell  | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
 | dev    | + neovim, tmux                                     | Yes   |
-| full   | + NVM, pyenv, poetry, Docker, Azure CLI            | Yes   |
+| full   | + NVM, Docker, Azure CLI                           | Yes   |
 
 ## Key Design Decisions
 
