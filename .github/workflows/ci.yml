@@ -175,10 +175,15 @@ jobs:
 
       - name: Assert configs linked and shell-tier tools on PATH
         run: |
-          su - test <<'EOSU'
+          # Write the assertion to a file and run it via sudo, which propagates
+          # the exit code faithfully (a `su -` login/logout session does not).
+          # PATH mirrors what env.sh gives a login shell so the tool checks see
+          # eget binaries in ~/.local/bin.
+          cat > /home/test/assert.sh <<'EOS'
           set -euo pipefail
-          cd ~/dotfiles
+          cd "$HOME/dotfiles"
           export DOTFILES_DIR="$PWD"
+          export PATH="$HOME/.local/bin:$PATH"
           # shellcheck disable=SC1091
           source lib/runtime.sh
           source lib/config.sh
@@ -205,7 +210,9 @@ jobs:
           done
           [[ $fail -eq 0 ]] && echo "Install assertions passed."
           exit $fail
-          EOSU
+          EOS
+          chown test:test /home/test/assert.sh
+          sudo -u test -H bash /home/test/assert.sh
 
       - name: bin/verify (informational — full verify expects dev+ tiers)
         continue-on-error: true
