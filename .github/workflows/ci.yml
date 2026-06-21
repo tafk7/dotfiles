@@ -231,9 +231,11 @@ jobs:
           set -euo pipefail
           # The architecture is tuned for fast startup (lazy nvm, interactive-only
           # sourcing). Measure it so a regression (e.g. un-lazying nvm) is visible.
+          # Force `exit 0`: a bare `exit` inherits the last init command's status
+          # (and shell startup is what we're timing, not its exit code).
           hyperfine --warmup 5 --runs 50 --export-json /tmp/bench.json \
-            --command-name 'bash -i' 'bash -i -c exit' \
-            --command-name 'zsh -i'  'zsh -i -c exit'
+            --command-name 'bash -i' "bash -i -c 'exit 0'" \
+            --command-name 'zsh -i'  "zsh -i -c 'exit 0'"
           # Catastrophic-regression guard. Fine-grained history tracking would use
           # benchmark-action/github-action-benchmark (see yutkat/dotfiles); this
           # generous ceiling just keeps the job honest without runner-variance flakes.
