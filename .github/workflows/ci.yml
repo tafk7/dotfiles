@@ -76,6 +76,7 @@ jobs:
           ./bin/check-updates --help        >/dev/null
           ./bin/diff-config --help          >/dev/null
           ./bin/uninstall-tool --help       >/dev/null
+          ./bin/ssh-bridge --help           >/dev/null
 
       - name: Cheatsheet TSV is well-formed
         run: |

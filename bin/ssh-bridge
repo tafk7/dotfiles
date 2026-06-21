@@ -1,0 +1,126 @@
+#!/bin/bash
+# Enable/inspect the WSL->Windows SSH agent bridge (Bitwarden/1Password).
+#
+# Usage:
+#   ssh-bridge status     Report bridge prerequisites and live state (default)
+#   ssh-bridge enable     Install the bridge, set the marker, verify (personal only)
+#   ssh-bridge disable    Remove the marker (revert to local on-disk keys)
+#
+# The bridge forwards the Windows ssh-agent — which Bitwarden (or 1Password)
+# serves on the standard openssh-ssh-agent pipe — into WSL, so SSH keys live in
+# the vault and never touch disk. It is opt-in per machine: run `enable` ONLY on
+# personal machines. Work machines that use local on-disk keys must leave it
+# disabled (the default) so their SSH_AUTH_SOCK and ~/.ssh keys stay untouched.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+# shellcheck source=../lib/runtime.sh
+source "$DOTFILES_DIR/lib/runtime.sh"
+
+MARKER="$HOME/.ssh/use-windows-agent"
+
+usage() { sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }
+
+# Run the Windows ssh-add.exe (to inspect the Windows-side agent from WSL).
+win_ssh_add() {
+    local p
+    for p in ssh-add.exe /mnt/c/Windows/System32/OpenSSH/ssh-add.exe; do
+        if command -v "$p" >/dev/null 2>&1; then "$p" "$@"; return; fi
+    done
+    return 127
+}
+
+# pass/fail line:  _check <0|1> "label" ["detail"]
+_check() {
+    local ok="$1" label="$2" detail="${3:-}"
+    if [[ "$ok" == "0" ]]; then
+        echo -e "  ${GREEN}✓${NC} ${label}${detail:+ ${DIM}${detail}${NC}}"
+    else
+        echo -e "  ${RED}✗${NC} ${label}${detail:+ ${DIM}${detail}${NC}}"
+    fi
+}
+
+cmd_status() {
+    echo "SSH agent bridge — status"
+    echo "─────────────────────────────────────"
+
+    if is_wsl; then _check 0 "running under WSL"
+    else _check 1 "running under WSL" "(the bridge only applies in WSL)"; fi
+
+    if command -v wsl2-ssh-agent >/dev/null 2>&1; then
+        _check 0 "wsl2-ssh-agent installed"
+    else
+        _check 1 "wsl2-ssh-agent installed" "(run: ssh-bridge enable, or ./setup.sh --shell)"
+    fi
+
+    if [[ -f "$MARKER" ]]; then _check 0 "bridge enabled" "(marker: $MARKER)"
+    else _check 1 "bridge enabled" "(run: ssh-bridge enable)"; fi
+
+    local win_keys
+    if win_keys=$(win_ssh_add -L 2>/dev/null) && [[ -n "$win_keys" ]]; then
+        _check 0 "Windows agent reachable" "($(printf '%s\n' "$win_keys" | grep -c .) key(s), e.g. Bitwarden)"
+    else
+        _check 1 "Windows agent reachable" "(is Bitwarden Desktop running and unlocked?)"
+    fi
+
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]] && ssh-add -l >/dev/null 2>&1; then
+        _check 0 "bridge live in this shell" "(SSH_AUTH_SOCK set, agent responds)"
+    else
+        _check 1 "bridge live in this shell" "(after enabling: open a new shell or 'reload')"
+    fi
+}
+
+cmd_enable() {
+    is_wsl || { error "ssh-bridge enable only applies under WSL"; exit 1; }
+
+    if ! command -v wsl2-ssh-agent >/dev/null 2>&1; then
+        if command -v eget >/dev/null 2>&1; then
+            log "Installing wsl2-ssh-agent via eget..."
+            EGET_CONFIG="$DOTFILES_DIR/eget.toml" eget mame/wsl2-ssh-agent
+        else
+            error "eget not found — run ./setup.sh --shell first, then retry"
+            exit 1
+        fi
+    fi
+
+    mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
+    touch "$MARKER"
+    success "Bridge enabled (marker: $MARKER)"
+
+    # Activate in this subprocess to verify end to end (the parent shell still
+    # needs a reload to inherit SSH_AUTH_SOCK).
+    eval "$(wsl2-ssh-agent 2>/dev/null || true)"
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]] && ssh-add -l >/dev/null 2>&1; then
+        success "Agent reachable from WSL:"
+        ssh-add -l | sed 's/^/    /'
+        echo
+        log "Open a new shell or run 'reload' so your interactive shell picks it up."
+    else
+        warn "Marker set, but the agent returned no keys yet."
+        warn "Check that Bitwarden Desktop is running and unlocked on Windows, then 'reload'."
+    fi
+}
+
+cmd_disable() {
+    if [[ -f "$MARKER" ]]; then
+        rm -f "$MARKER"
+        success "Bridge disabled (removed $MARKER)"
+        log "Run 'reload' or open a new shell to drop the bridged agent."
+    else
+        log "Bridge already disabled (no marker at $MARKER)"
+    fi
+}
+
+main() {
+    case "${1:-status}" in
+        status)         cmd_status ;;
+        enable)         cmd_enable ;;
+        disable)        cmd_disable ;;
+        -h|--help|help) usage ;;
+        *)              error "Unknown command: $1"; echo; usage; exit 1 ;;
+    esac
+}
+
+main "$@"

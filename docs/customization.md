@@ -122,6 +122,44 @@ All `*.sh` in `shell/tools/` are sourced automatically by `shell/init.sh`.
 For WSL-specific code, use `shell/platform/wsl.sh` (only sourced when
 `is_wsl` is true). For Linux-specific (non-WSL), use `shell/platform/linux.sh`.
 
+## Adding a `bin/` Utility Command
+
+The small maintainer/runtime commands in `bin/` (`verify`, `diff-config`,
+`check-updates`, `ssh-bridge`, …) follow one convention so they stay
+**self-documenting and self-cataloging** — there is no hand-maintained list to
+keep in sync.
+
+Every `bin/` script:
+
+1. **Line 2 is a one-line `# description`** (right after the shebang). This is
+   the single source of truth for "what does this do".
+2. **Prints its own header as `--help`** via `usage() { sed -n '2,Np' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }`.
+3. **Sources `lib/runtime.sh`** for `log`/`success`/`warn`/`error`, colors, and
+   helpers (`is_wsl`, `command_exists`, `verify_binary`).
+4. Is committed executable (`git update-index --chmod=+x bin/<name>`).
+
+Skeleton:
+
+```bash
+#!/bin/bash
+# One-line description of what this command does.   # <- line 2, the catalog entry
+#
+# Usage:
+#   <name> [args]    ...
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+source "$DOTFILES_DIR/lib/runtime.sh"
+usage() { sed -n '2,5p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }
+# ...
+```
+
+**Tracking — it's automatic.** `bin/cheatsheet commands` scans `bin/` and prints
+every script with its line-2 description, so a new utility shows up the moment
+it lands — no registry edit, no doc edit. `cheat commands` (and the interactive
+`cheat`) surface the same list. That's the catalog; this section is just the
+recipe.
+
 ## Local Overrides (Per-Machine, Untracked)
 
 Keep machine-specific tweaks out of git via `*.local`:
