@@ -172,6 +172,46 @@ for encrypted files, or a password manager (1Password, Bitwarden, `pass`) fetche
 at shell-init time into `~/.shell.local`. Managers like `chezmoi`/`yadm` exist
 largely to solve this; the untracked-override model here sidesteps it by design.
 
+### SSH keys across machines (personal vs work)
+
+The repo supports two SSH key models per machine, switched without editing any
+tracked file:
+
+**Personal machine — vault-backed key via the Windows agent (no keys on disk).**
+A password manager (e.g. Bitwarden) holds the key and serves the standard
+`\\.\pipe\openssh-ssh-agent` Windows pipe; `wsl2-ssh-agent` bridges that pipe into
+WSL. One agent then serves Windows, WSL, and VS Code.
+
+1. Windows: enable the SSH agent in Bitwarden, disable the Windows *"OpenSSH
+   Authentication Agent"* service (so Bitwarden owns the pipe), store/generate
+   your key. Verify with `ssh-add.exe -l`.
+2. WSL: `./setup.sh --shell` installs `wsl2-ssh-agent` (eget). Enable the bridge
+   with the marker file, then reload:
+   ```bash
+   touch ~/.ssh/use-windows-agent && reload
+   ssh-add -l            # should list your Bitwarden key
+   ```
+3. Git signing (optional): paste Bitwarden's WSL signing snippet into
+   `~/.gitconfig.local`.
+
+**Work machine — local on-disk keys (the bridge stays off).** Leave the
+`~/.ssh/use-windows-agent` marker absent (the default): `shell/platform/wsl.sh`
+skips the bridge and leaves `SSH_AUTH_SOCK` alone, so the local `ssh-agent` and
+your work's `~/.ssh` key files work normally.
+
+- Put work-specific host config in **`~/.ssh/config.local`** (untracked, included
+  first by `ssh_config` so it wins):
+  ```
+  # ~/.ssh/config.local
+  Host github.com
+      IdentityFile ~/.ssh/work_ed25519
+      IdentitiesOnly yes
+  ```
+- Put work git identity/signing in `~/.gitconfig.local`.
+
+The two markers are independent and untracked, so the same dotfiles checkout
+behaves correctly on both machines with zero per-pull edits.
+
 ## Framework Helpers Available
 
 In `installers/install-*.sh` and `lib/install.sh`-context only:

@@ -213,6 +213,9 @@ jobs:
           # shell tier too. Assert it to validate the eget asset-filter + rename.
           command -v codex >/dev/null 2>&1 \
             || { echo "::error::codex not installed/renamed by eget"; fail=1; }
+          # Same for wsl2-ssh-agent (bare-binary asset) — validate its filter.
+          command -v wsl2-ssh-agent >/dev/null 2>&1 \
+            || { echo "::error::wsl2-ssh-agent not installed by eget"; fail=1; }
           [[ $fail -eq 0 ]] && echo "Install assertions passed."
           exit $fail
           EOS

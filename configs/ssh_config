@@ -1,3 +1,9 @@
+# Per-machine SSH config (untracked): work Host blocks, IdentityFile, agent
+# overrides, etc. Listed first so its values win (ssh takes the first value seen
+# for each keyword). A missing file is silently ignored, so this is a no-op on
+# machines that don't have one. See docs/customization.md.
+Include ~/.ssh/config.local
+
 Host *
     ControlMaster auto
     ControlPath ~/.ssh/sockets/%C

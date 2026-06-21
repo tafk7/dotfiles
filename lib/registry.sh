@@ -31,6 +31,7 @@ declare -A TOOL_BINARY=(
     [nvm]=nvm
     [claude]=claude
     [codex]=codex
+    [wsl2-ssh-agent]=wsl2-ssh-agent
 )
 
 # TOOL_METHOD: tool name → install method (eget|apt|installer|external)
@@ -57,6 +58,7 @@ declare -A TOOL_METHOD=(
     [nvm]=installer
     [claude]=installer
     [codex]=eget
+    [wsl2-ssh-agent]=eget
 )
 
 # TOOL_TIER: tool name → minimum tier (shell|dev|full)
@@ -66,7 +68,7 @@ declare -A TOOL_TIER=(
     [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
     [direnv]=shell    [eget]=shell    [sd]=shell
     [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
-    [claude]=dev      [codex]=dev
+    [claude]=dev      [codex]=dev      [wsl2-ssh-agent]=dev
     [nvm]=full
 )
 
