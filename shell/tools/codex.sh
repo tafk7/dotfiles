@@ -7,9 +7,14 @@
 # CODEX_USE_VSCODE=1 (exported, or inline) to make the extension binary primary,
 # or call `codex-vsc` to invoke it explicitly regardless of the default.
 
-# Standalone `codex` on PATH (native install). `type -P` ignores the codex()
-# function defined below and searches PATH only.
-_CODEX_STANDALONE=$(type -P codex 2>/dev/null)
+# Re-source safety: drop our own functions so `command -v` resolves the PATH
+# binary, not the wrapper. `command -v` is portable across bash and zsh; `type -P`
+# is bash-only (zsh errors "bad option: -P", silently yielding no match).
+unset -f codex codex-vsc 2>/dev/null
+
+# Standalone `codex` on PATH (native install at ~/.local/bin/codex).
+_CODEX_STANDALONE=$(command -v codex 2>/dev/null || true)
+[[ -n "$_CODEX_STANDALONE" && -x "$_CODEX_STANDALONE" ]] || _CODEX_STANDALONE=""
 
 # VS Code "ChatGPT - Codex" extension binary (WSL / remote SSH)
 _CODEX_VSCODE=""
