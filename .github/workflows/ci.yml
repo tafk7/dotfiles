@@ -15,7 +15,7 @@ jobs:
     name: Lint shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Bash syntax check (bash -n) on every *.sh
         run: |
@@ -58,7 +58,7 @@ jobs:
     name: Structural smoke tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Theme catalog parses
         run: |
@@ -112,7 +112,7 @@ jobs:
     name: Theme cycling smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cycle every theme via --init/apply
         run: |
@@ -135,3 +135,128 @@ jobs:
             echo "::endgroup::"
           done
           echo "All themes cycled successfully."
+
+  install-test:
+    name: Containerized install (--shell)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+    steps:
+      # The structural jobs above never execute lib/install.sh. This one runs
+      # the real installer in a clean container as a non-root sudo user — the
+      # only job that exercises apt + eget + symlink + theme-init paths.
+      - name: Bootstrap container (git, sudo, locales, non-root user)
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl wget git sudo locales lsb-release
+          # setup.sh refuses to run as root, so install as an unprivileged user.
+          useradd -m -s /bin/bash test
+          echo 'test ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/test
+          chmod 0440 /etc/sudoers.d/test
+
+      - uses: actions/checkout@v5
+
+      - name: Stage repo for the test user
+        run: |
+          set -euo pipefail
+          cp -a "$GITHUB_WORKSPACE" /home/test/dotfiles
+          chown -R test:test /home/test/dotfiles
+
+      - name: Run the installer (--shell tier)
+        run: |
+          su - test <<'EOSU'
+          set -euo pipefail
+          cd ~/dotfiles
+          ./setup.sh --shell --force --git-name "CI Bot" --git-email ci@example.com
+          EOSU
+
+      - name: Assert configs linked and shell-tier tools on PATH
+        run: |
+          # Write the assertion to a file and run it via sudo, which propagates
+          # the exit code faithfully (a `su -` login/logout session does not).
+          # PATH mirrors what env.sh gives a login shell so the tool checks see
+          # eget binaries in ~/.local/bin.
+          cat > /home/test/assert.sh <<'EOS'
+          set -euo pipefail
+          cd "$HOME/dotfiles"
+          export DOTFILES_DIR="$PWD"
+          export PATH="$HOME/.local/bin:$PATH"
+          # shellcheck disable=SC1091
+          source lib/runtime.sh
+          source lib/config.sh
+          fail=0
+          # Every CONFIG_MAP entry must resolve (reuses the repo's own data).
+          for key in "${!CONFIG_MAP[@]}"; do
+              mapping="${CONFIG_MAP[$key]}"
+              target="${mapping%%:*}"
+              type="${mapping##*:}"
+              case "$type" in
+                  symlink)
+                      [[ -L "$target" ]] || { echo "::error::missing symlink: $target"; fail=1; } ;;
+                  gitconfig)
+                      if [[ ! -f "$target" ]] || grep -q "{{GIT_" "$target"; then
+                          echo "::error::gitconfig not processed: $target"; fail=1
+                      fi ;;
+              esac
+          done
+          # Every shell-tier tool must be on PATH after install.
+          for name in $(tools_for_tier shell); do
+              bin="${TOOL_BINARY[$name]}"
+              command -v "$bin" >/dev/null 2>&1 \
+                || { echo "::error::shell-tier tool missing: $name ($bin)"; fail=1; }
+          done
+          [[ $fail -eq 0 ]] && echo "Install assertions passed."
+          exit $fail
+          EOS
+          chown test:test /home/test/assert.sh
+          sudo -u test -H bash /home/test/assert.sh
+
+      - name: bin/verify (informational — full verify expects dev+ tiers)
+        continue-on-error: true
+        run: su - test -c 'cd ~/dotfiles && ./bin/verify'
+
+  startup-benchmark:
+    name: Shell startup benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install hyperfine + zsh
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y hyperfine zsh
+
+      - name: Install dotfiles (--shell, so tool-init runs realistically)
+        run: ./setup.sh --shell --force --git-name "CI Bot" --git-email ci@example.com
+
+      - name: Benchmark interactive startup
+        run: |
+          set -euo pipefail
+          # The architecture is tuned for fast startup (lazy nvm, interactive-only
+          # sourcing). Measure it so a regression (e.g. un-lazying nvm) is visible.
+          # Force `exit 0`: a bare `exit` inherits the last init command's status
+          # (and shell startup is what we're timing, not its exit code).
+          hyperfine --warmup 5 --runs 50 --export-json /tmp/bench.json \
+            --command-name 'bash -i' "bash -i -c 'exit 0'" \
+            --command-name 'zsh -i'  "zsh -i -c 'exit 0'"
+          # Catastrophic-regression guard. Fine-grained history tracking would use
+          # benchmark-action/github-action-benchmark (see yutkat/dotfiles); this
+          # generous ceiling just keeps the job honest without runner-variance flakes.
+          python3 - <<'PY'
+          import json, sys
+          ceiling = 1.0  # seconds
+          status = 0
+          for r in json.load(open('/tmp/bench.json'))['results']:
+              mean = r['mean']
+              print(f"{r['command']}: {mean*1000:.1f} ms "
+                    f"(min {r['min']*1000:.1f}, max {r['max']*1000:.1f})")
+              if mean > ceiling:
+                  print(f"::error::{r['command']} mean {mean*1000:.0f} ms "
+                        f"exceeds {ceiling*1000:.0f} ms ceiling")
+                  status = 1
+          sys.exit(status)
+          PY
