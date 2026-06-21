@@ -82,7 +82,7 @@ declare -A TOOL_PATHS=(
     [neovim]="\$HOME/.local/bin/nvim \$HOME/.local/nvim"
     [nvm]="\$HOME/.nvm"
     [pyenv]="\$HOME/.pyenv"
-    [poetry]="\$HOME/.local/bin/poetry"
+    [poetry]="\$HOME/.local/bin/poetry \$HOME/.local/share/pypoetry"
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
 )
 

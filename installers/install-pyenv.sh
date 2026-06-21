@@ -58,9 +58,16 @@ safe_sudo apt-get install -y \
 
 success "Build dependencies installed!"
 
-# Download and install pyenv
-log "Downloading pyenv installer..."
-curl -fsSL https://pyenv.run | bash
+# Download and run the pyenv installer.
+# Note: pyenv.run is upstream and version-unpinned. We download it to a file
+# first so it isn't executed straight from the network pipe — the script lands
+# on disk (inspectable) and the path is logged, rather than `curl | bash`.
+log "Downloading pyenv installer (pyenv.run)..."
+pyenv_installer="$(mktemp)"
+curl -fsSL https://pyenv.run -o "$pyenv_installer"
+log "Running pyenv installer from $pyenv_installer"
+bash "$pyenv_installer"
+rm -f "$pyenv_installer"
 
 # Verify installation
 if [[ ! -x "$PYENV_ROOT/bin/pyenv" ]]; then

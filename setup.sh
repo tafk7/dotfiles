@@ -22,6 +22,11 @@ SHOW_HELP=false
 DRY_RUN=false
 NO_HOOKS=false
 
+# Git identity (optional; falls back to existing config or interactive prompt).
+# Read by process_git_config() in lib/install.sh.
+DOTFILES_GIT_NAME="${DOTFILES_GIT_NAME:-}"
+DOTFILES_GIT_EMAIL="${DOTFILES_GIT_EMAIL:-}"
+
 # Parse command line arguments
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
@@ -54,6 +59,14 @@ parse_arguments() {
             --no-hooks)
                 NO_HOOKS=true
                 shift
+                ;;
+            --git-name)
+                DOTFILES_GIT_NAME="$2"
+                shift 2
+                ;;
+            --git-email)
+                DOTFILES_GIT_EMAIL="$2"
+                shift 2
                 ;;
             --help)
                 SHOW_HELP=true
@@ -106,7 +119,13 @@ OPTIONS:
     --force             Force overwrite configs and reinstall tools
     --dry-run           Preview actions without making changes
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
+    --git-name NAME     Set git user.name (for non-interactive installs)
+    --git-email EMAIL   Set git user.email (for non-interactive installs)
     --help              Show this help message
+
+ENVIRONMENT:
+    DOTFILES_GIT_NAME   Same as --git-name
+    DOTFILES_GIT_EMAIL  Same as --git-email
 
 EXAMPLES:
     ./setup.sh                       # Default: config tier (symlinks only)
@@ -230,7 +249,7 @@ phase_setup_configs() {
                 log "  ✓ $target (would create $type)"
             fi
         done
-        is_wsl && log "[DRY RUN] Would setup WSL clipboard integration and SSH keys"
+        is_wsl && log "[DRY RUN] Would setup WSL clipboard integration"
     else
         readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
         for config in "${sorted_configs[@]}"; do
@@ -257,8 +276,6 @@ phase_setup_configs() {
     # WSL-specific setup
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
         setup_wsl_clipboard
-        source "$DOTFILES_DIR/shell/platform/wsl.sh"
-        import_windows_ssh_keys
     fi
 
     # Initialize default theme if none is set (theme-switcher owns the default)
@@ -393,6 +410,16 @@ run_installation() {
 
 # Main entry point
 main() {
+    # Refuse to run as root. The installer writes throughout $HOME, configures
+    # the invoking user's group membership (docker), and calls sudo only where
+    # a step genuinely needs it. Running as root would target /root and grant
+    # root's groups instead.
+    if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+        echo "Error: do not run setup.sh as root." >&2
+        echo "Run it as your normal user; the script invokes sudo only where required." >&2
+        exit 1
+    fi
+
     # Parse command line arguments
     parse_arguments "$@"
     

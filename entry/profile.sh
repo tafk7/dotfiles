@@ -16,9 +16,12 @@ _PROFILE_LOADED=1
 
 # Layer 1: POSIX baseline (works in dash, sh, ash, bash, zsh)
 export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
 export LANGUAGE=en_US.UTF-8
-[ -z "$TZ" ] && export TZ="UTC"
+# LC_ALL is intentionally NOT set — it's a temporary override that forces every
+# locale category and prevents tools/child shells from selecting their own.
+# LANG provides the default; set per-category LC_* vars if you need finer control.
+# TZ is intentionally NOT forced — the OS timezone applies. Set TZ in
+# ~/.shell.local (or configure the OS) if you want a fixed zone such as UTC.
 
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"

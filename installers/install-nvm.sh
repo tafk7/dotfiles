@@ -48,9 +48,14 @@ else
     # Create NVM directory
     mkdir -p "$NVM_DIR"
 
-    # Download and install NVM
-    log "Downloading NVM installer..."
-    run_nvm_command bash -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash"
+    # Download the installer to a file first (inspectable, logged) rather than
+    # piping the network straight into bash. The version tag is pinned upstream.
+    log "Downloading NVM installer (v0.40.4)..."
+    nvm_installer="$(mktemp)"
+    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh" -o "$nvm_installer"
+    log "Running NVM installer from $nvm_installer"
+    run_nvm_command bash "$nvm_installer"
+    rm -f "$nvm_installer"
 
     # Verify installation
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then

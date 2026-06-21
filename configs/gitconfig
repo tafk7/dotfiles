@@ -98,7 +98,7 @@
     overview = log --all --oneline --no-merges
     
     # Today's work
-    today = log --since=midnight --author='$(git config user.name)' --oneline
+    today = "!git log --since=midnight --author=\"$(git config user.name)\" --oneline"
     
     # List aliases
     aliases = config --get-regexp alias
