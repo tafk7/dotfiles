@@ -154,3 +154,9 @@
 
 [credential "https://dev.azure.com"]
     helper = azdo
+
+[include]
+    # Per-machine overrides (untracked): identity, work email, signing key.
+    # Listed last so its values win over everything above. Git silently
+    # ignores this line when the file is absent. See docs/customization.md.
+    path = ~/.gitconfig.local

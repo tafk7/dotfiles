@@ -582,7 +582,17 @@ install_eget_tools() {
         done
     fi
 
-    if EGET_CONFIG="$config" eget --download-all; then
+    # eget was just installed to ~/.local/bin, which is not necessarily on PATH
+    # yet on a fresh machine — resolve the binary explicitly rather than relying
+    # on PATH. Otherwise every tool download silently fails on the first run.
+    local eget_bin="$HOME/.local/bin/eget"
+    command -v eget >/dev/null 2>&1 && eget_bin="$(command -v eget)"
+    if [[ ! -x "$eget_bin" ]]; then
+        error "eget not found at $eget_bin after install"
+        return 1
+    fi
+
+    if EGET_CONFIG="$config" "$eget_bin" --download-all; then
         for name in "${eget_tools[@]}"; do
             track_install "$name" ok
         done

@@ -59,3 +59,8 @@ source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
 # Local overrides (not tracked)
 [[ -f ~/.shell.local ]] && source ~/.shell.local
+
+# Leave a clean exit status. A missing ~/.shell.local (or a non-zero last
+# command inside it) would otherwise leave $?=1 after startup, which a status-
+# aware prompt (e.g. starship) renders as an error on the very first prompt.
+true
