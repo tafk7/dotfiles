@@ -15,7 +15,7 @@ jobs:
     name: Lint shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Bash syntax check (bash -n) on every *.sh
         run: |
@@ -58,7 +58,7 @@ jobs:
     name: Structural smoke tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Theme catalog parses
         run: |
@@ -112,7 +112,7 @@ jobs:
     name: Theme cycling smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cycle every theme via --init/apply
         run: |
@@ -157,7 +157,7 @@ jobs:
           echo 'test ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/test
           chmod 0440 /etc/sudoers.d/test
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Stage repo for the test user
         run: |
@@ -222,7 +222,7 @@ jobs:
     name: Shell startup benchmark
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install hyperfine + zsh
         run: |
