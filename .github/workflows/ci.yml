@@ -208,6 +208,11 @@ jobs:
               command -v "$bin" >/dev/null 2>&1 \
                 || { echo "::error::shell-tier tool missing: $name ($bin)"; fail=1; }
           done
+          # codex is labelled dev-tier, but install_eget_tools' --download-all
+          # pulls every eget.toml entry in whenever eget runs, so it lands at the
+          # shell tier too. Assert it to validate the eget asset-filter + rename.
+          command -v codex >/dev/null 2>&1 \
+            || { echo "::error::codex not installed/renamed by eget"; fail=1; }
           [[ $fail -eq 0 ]] && echo "Install assertions passed."
           exit $fail
           EOS

@@ -110,7 +110,7 @@ TIERS (cumulative - each tier includes all previous tiers):
                         packages (bat, fd, ripgrep, direnv).
 
     --dev               Shell + development tools. Requires sudo.
-                        Adds: neovim, tmux
+                        Adds: neovim, tmux, Claude Code, Codex
 
     --full              Dev + full environment. Requires sudo.
                         Adds: NVM, Docker, Azure CLI
@@ -142,7 +142,7 @@ TIER SUMMARY:
     │ config   │ Symlinks only (zero installs)                   │ No        │
     │ shell    │ + eget, starship, eza, fzf, zoxide, delta,      │ Yes       │
     │          │   btop, glow, lazygit, uv, bat, fd, ripgrep     │           │
-    │ dev      │ + neovim, tmux                                │ Yes       │
+    │ dev      │ + neovim, tmux, Claude Code, Codex              │ Yes       │
     │ full     │ + NVM, Docker, Azure CLI                        │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
 

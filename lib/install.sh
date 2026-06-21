@@ -649,6 +649,7 @@ install_dev_packages() {
     run_installer "tmux"
     run_installer "neovim"
     run_installer "plantuml"
+    run_installer "claude"
 
     success "Dev tier installation complete"
 }
