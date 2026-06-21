@@ -50,7 +50,7 @@ tier includes everything from the previous tier:
 |------|--------------|-------|
 | `config` | Symlinks only | No |
 | `shell`  | Modern CLI tools (eget + apt: starship, eza, fzf, zoxide, delta, btop, glow, lazygit, uv, bat, fd, ripgrep, direnv, sd) | Yes |
-| `dev`    | neovim, tmux, plantuml | Yes |
+| `dev`    | neovim, tmux, plantuml, Claude Code, Codex | Yes |
 | `full`   | NVM, Docker, Azure CLI | Yes |
 
 Tier membership is data, not code. Each tool's tier lives in
