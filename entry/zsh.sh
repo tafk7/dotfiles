@@ -74,9 +74,6 @@ zstyle ':completion:*:*:docker-*:*' option-stacking yes
 if command -v uv >/dev/null 2>&1; then
     eval "$(uv generate-shell-completion zsh 2>/dev/null || true)"
 fi
-if command -v poetry >/dev/null 2>&1; then
-    eval "$(poetry completions zsh 2>/dev/null | sed '/_poetry_[a-f0-9]*_complete "\$@"/d' || true)"
-fi
 
 # ==============================================================================
 # Key Bindings

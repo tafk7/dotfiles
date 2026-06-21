@@ -17,10 +17,10 @@
 # composition that the parent already performed. Without this, every
 # `zsh -c "cmd"` subprocess (and any other shell that re-sources this
 # file) would re-prepend ~/bin, ~/.local/bin, $DOTFILES_DIR/bin, NVM,
-# pyenv, etc. onto the inherited PATH, producing unbounded duplication
+# etc. onto the inherited PATH, producing unbounded duplication
 # across nested subprocesses.
 #
-# Interactive-only tool init (pyenv eval, direnv hook, completions)
+# Interactive-only tool init (direnv hook, completions)
 # lives in shell/tool-init.sh. CWD-sensitive exports that must re-fire
 # in every subprocess (notably `direnv export`) live in
 # shell/env-runtime.sh, which is intentionally un-guarded.
@@ -43,10 +43,6 @@ export _DOTFILES_ENV_LOADED=1
 # NVM (stable symlink to active version — no nvm.sh sourcing needed)
 export NVM_DIR="$HOME/.nvm"
 [[ -d "$NVM_DIR/default/bin" ]] && PATH="$NVM_DIR/default/bin:$PATH"
-
-# pyenv
-export PYENV_ROOT="$HOME/.pyenv"
-[[ -d "$PYENV_ROOT/bin" ]] && PATH="$PYENV_ROOT/bin:$PATH"
 
 # Go
 if [[ -d "$HOME/go" ]]; then

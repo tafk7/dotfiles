@@ -222,14 +222,7 @@ docker│dstopall│Stop all running containers│docker stop $(docker ps -q)
 # Python shortcuts
 python│py│Python 3 interpreter│python3
 python│ipy│IPython interpreter│ipython
-python│pyset│Set Python version for project (configures pyenv + venv)│pyset <version>
-python│vactivate│Activate virtual environment│vactivate
-python│pyinfo│Show current Python environment│pyinfo
-python│pylist│List installed and available Python versions│pylist
-python│pyenv install│Install a Python version│pyenv install <version>
-python│pyenv versions│List installed Python versions│pyenv versions
-python│pyenv local│Pin Python version for current directory│pyenv local <version>
-python│pyenv global│Set default Python version│pyenv global <version>
+python│vactivate│Activate virtual environment (.venv)│vactivate
 # Testing and code quality
 python│pytest│Run tests│python -m pytest
 python│pyt│Run tests with verbose output│python -m pytest -v
@@ -240,10 +233,6 @@ python│lintf│Auto-fix ruff issues│ruff check . --fix
 python│venv│Create .venv (uses uv if available)│uv venv .venv / python3 -m venv .venv
 python│pipreqs│Install from requirements.txt│pip install -r requirements.txt
 python│pyserver│Start HTTP server in current directory│python -m http.server
-# Poetry
-python│poetry install│Install project dependencies│poetry install
-python│poetry add│Add package to project│poetry add <package>
-python│poetry env info│Show environment details│poetry env info
 python│pip install -e│Install package in editable/dev mode│pip install -e .
 # uv shortcuts
 python│uvs│Sync project dependencies│uv sync
@@ -251,6 +240,10 @@ python│uvr│Run command in project environment│uv run <command>
 python│uvt│Install CLI tool globally│uv tool install <tool>
 python│uva│Add dependency to project│uv add <package>
 python│uvpi│Install package with uv pip│uv pip install <package>
+python│uv python list│List installed and available Python versions│uv python list
+python│uv python install│Install a Python version│uv python install <version>
+python│uv python pin│Pin Python version for current project│uv python pin <version>
+python│uv venv│Create venv with a specific Python│uv venv --python <version>
 
 # Node.js shortcuts
 node│ni│Install dependencies│npm install

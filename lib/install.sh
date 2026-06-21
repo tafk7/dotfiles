@@ -689,10 +689,8 @@ install_full_packages() {
         fi
     fi
 
-    # Version managers
+    # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" true
-    run_installer "pyenv" true
-    run_installer "poetry"
 
     success "Full tier installation complete"
 }
