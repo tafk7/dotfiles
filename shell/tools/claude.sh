@@ -6,9 +6,14 @@
 # or inline as `CLAUDE_USE_VSCODE=1 claude ...`) to make the extension binary
 # primary, or call `claude-vsc` to invoke it explicitly regardless of the default.
 
-# Standalone `claude` on PATH (native install). `type -P` ignores the claude()
-# function defined below and searches PATH only.
-_CLAUDE_STANDALONE=$(type -P claude 2>/dev/null)
+# Re-source safety: drop our own functions so `command -v` resolves the PATH
+# binary, not the wrapper. `command -v` is portable across bash and zsh; `type -P`
+# is bash-only (zsh errors "bad option: -P", silently yielding no match).
+unset -f claude claude-vsc 2>/dev/null
+
+# Standalone `claude` on PATH (native install at ~/.local/bin/claude).
+_CLAUDE_STANDALONE=$(command -v claude 2>/dev/null || true)
+[[ -n "$_CLAUDE_STANDALONE" && -x "$_CLAUDE_STANDALONE" ]] || _CLAUDE_STANDALONE=""
 
 # VS Code "Claude Code" extension binary (WSL / remote SSH)
 _CLAUDE_VSCODE=""
