@@ -130,9 +130,47 @@ Keep machine-specific tweaks out of git via `*.local`:
   zsh. The single override hook for aliases, exports, secrets, and tweaks.
   Gate shell-specific syntax with `[[ -n "$ZSH_VERSION" ]]` /
   `[[ -n "$BASH_VERSION" ]]` blocks if needed.
-- `~/.gitconfig.local` — included by the templated `~/.gitconfig`.
+- `~/.gitconfig.local` — included last by the templated `~/.gitconfig`, so its
+  values override everything in the tracked config. Use it for per-machine git
+  identity (e.g. a work email) and commit signing — neither belongs in the repo.
 
 These are gitignored.
+
+### Per-machine git identity and commit signing
+
+The tracked `~/.gitconfig` sets a baseline; layer machine-specific identity and
+signing on top via `~/.gitconfig.local`. Example (SSH signing):
+
+```ini
+# ~/.gitconfig.local
+[user]
+    email = you@work.example          # override the baseline identity per machine
+    signingkey = ~/.ssh/id_ed25519.pub
+[gpg]
+    format = ssh
+[commit]
+    gpgsign = true
+[tag]
+    gpgsign = true
+```
+
+Signing lives here — not in the tracked config — because it only works on
+machines that actually hold the key. Enabling `gpgsign` globally would break
+commits anywhere the key is missing.
+
+### Secrets: keep them out of the repo
+
+This repo deliberately tracks **no secrets** and provides no in-repo encryption.
+Tokens, keys, and credentials go in the untracked override files above
+(`~/.shell.local`, `~/.gitconfig.local`), which are gitignored and never leave
+the machine.
+
+If you ever need to *sync* secrets across machines, do **not** commit them here —
+even encrypted blobs invite mistakes. Reach for a purpose-built tool instead:
+[`age`](https://github.com/FiloSottile/age)/[`sops`](https://github.com/getsops/sops)
+for encrypted files, or a password manager (1Password, Bitwarden, `pass`) fetched
+at shell-init time into `~/.shell.local`. Managers like `chezmoi`/`yadm` exist
+largely to solve this; the untracked-override model here sidesteps it by design.
 
 ## Framework Helpers Available
 
