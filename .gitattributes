@@ -1,0 +1,30 @@
+# Normalize line endings. This repo targets Ubuntu/WSL: shell scripts and
+# config files MUST be LF or they break (a CRLF in `#!/bin/bash` yields a
+# "bad interpreter" error, and stray \r corrupts string comparisons).
+#
+# `text=auto eol=lf` means: git auto-detects text files, stores them as LF in
+# the repo, AND checks them out as LF everywhere — including Windows. That
+# keeps the working tree safe even when the repo is accessed from /mnt/c.
+
+* text=auto eol=lf
+
+# Be explicit for the files most likely to be run, including the
+# extensionless scripts that text-detection could otherwise misjudge.
+*.sh        text eol=lf
+*.tsv       text eol=lf
+*.toml      text eol=lf
+*.conf      text eol=lf
+*.vim       text eol=lf
+*.tmTheme   text eol=lf
+bin/*       text eol=lf
+hooks/*     text eol=lf
+entry/*     text eol=lf
+
+# Treat genuine binaries as binary if any are added later (no-op today).
+*.png       binary
+*.jpg       binary
+*.gif       binary
+*.ico       binary
+*.gz        binary
+*.xz        binary
+*.zip       binary
