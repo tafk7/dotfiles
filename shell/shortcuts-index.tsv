@@ -189,6 +189,7 @@ shell│clp│Run one-off Claude prompt│claude --print
 shell│cll│Claude local (no global settings)│claude --setting-sources project,local
 shell│cllc│Continue Claude local session│claude --setting-sources project,local --continue
 shell│cllp│One-off Claude local prompt│claude --setting-sources project,local --print
+shell│claude-vsc│Run Claude via the VS Code extension binary (CLAUDE_USE_VSCODE=1 to make primary)│claude-vsc
 
 # Codex
 shell│cx│Start new Codex session│codex
@@ -199,6 +200,7 @@ shell│cxh│Codex with alt config dir (~/.codex-alt)│CODEX_HOME=~/.codex-alt
 shell│cxhr│Resume Codex (alt dir, picker)│CODEX_HOME=~/.codex-alt codex resume
 shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex resume --last
 shell│cxhp│One-off Codex prompt (alt dir)│CODEX_HOME=~/.codex-alt codex exec
+shell│codex-vsc│Run Codex via the VS Code extension binary (CODEX_USE_VSCODE=1 to make primary)│codex-vsc
 
 # Docker shortcuts
 docker│dps│List running containers│docker ps
