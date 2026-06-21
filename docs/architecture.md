@@ -167,7 +167,7 @@ because we don't blanket-redirect stderr at the eval site.
 |--------|---------------------------------------------------|-------|
 | config | Symlinks only (zero installs)                      | No    |
 | shell  | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
-| dev    | + neovim, tmux                                     | Yes   |
+| dev    | + neovim, tmux, Claude Code, Codex                 | Yes   |
 | full   | + NVM, Docker, Azure CLI                           | Yes   |
 
 ## Key Design Decisions
