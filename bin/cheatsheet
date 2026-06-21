@@ -132,6 +132,20 @@ show_tools() {
     done
 }
 
+# Show bin/ utility scripts (auto-generated — each script's line 2 is its
+# one-line description, so new utilities appear here with zero manual upkeep).
+show_commands() {
+    print_header "UTILITY COMMANDS (bin/)"
+
+    local f name desc
+    while IFS= read -r f; do
+        name="$(basename "$f")"
+        # Convention: line 2 of every bin/ script is "# <one-line description>".
+        desc="$(sed -n '2p' "$f" | sed -n 's/^# \{0,1\}//p')"
+        [[ -n "$desc" ]] && printf "    ${YELLOW}%-18s${RESET} %s\n" "$name" "$desc"
+    done < <(find "$DOTFILES_DIR/bin" -maxdepth 1 -type f | sort)
+}
+
 # Show all cheatsheets
 show_all() {
     show_vim
@@ -140,6 +154,7 @@ show_all() {
     show_shell
     show_dev
     show_tools
+    show_commands
 }
 
 # Build comprehensive searchable index of all shortcuts
@@ -350,6 +365,9 @@ main() {
         tools)
             show_tools
             ;;
+        commands)
+            show_commands
+            ;;
         all)
             show_all
             ;;
@@ -358,7 +376,7 @@ main() {
             show_interactive
             ;;
         *)
-            echo "Usage: cheat [vim|tmux|git|shell|dev|tools|all]"
+            echo "Usage: cheat [vim|tmux|git|shell|dev|tools|commands|all]"
             echo "Show keybindings and shortcuts for dotfiles tools"
             echo ""
             echo "Run 'cheat' with no arguments for interactive mode"

@@ -394,6 +394,15 @@ run_installation() {
     echo
     ((step++))
 
+    # WSL personal machines: nudge toward the Windows SSH agent bridge.
+    if is_wsl && tier_includes "shell"; then
+        echo "$step. (Personal WSL) Use your Windows SSH agent (Bitwarden/1Password):"
+        echo "   ./bin/ssh-bridge enable     # bridges vault keys into WSL, then reload"
+        echo "   (Work machines using local keys: skip — leave it disabled.)"
+        echo
+        ((step++))
+    fi
+
     if [[ "$nvm_installed" == "true" ]]; then
         echo "$step. Test Node.js/npm:"
         echo "   node --version && npm --version"

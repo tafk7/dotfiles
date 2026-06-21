@@ -255,6 +255,7 @@ fi
 ./bin/verify                      # Validate installation health (44+ checks)
 ./bin/diff-config                 # Show drift between sources and ~ (use --diff for details)
 ./bin/check-updates               # Are pinned eget tool versions stale?
+./bin/cheatsheet commands         # List all bin/ utilities (auto-generated from headers)
 ./setup.sh --dry-run --shell      # Preview what would happen
 ./bin/install-git-hooks --check   # Are dotfiles git hooks installed in this clone?
 reload                            # Reload shell config
