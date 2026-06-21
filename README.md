@@ -7,7 +7,7 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ```bash
 ./setup.sh --config              # Symlinks only (no sudo)
 ./setup.sh --shell               # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
-./setup.sh --dev                 # + neovim, lazygit, tmux
+./setup.sh --dev                 # + neovim, tmux, Claude Code, Codex
 ./setup.sh --full                # + NVM, Docker, Azure CLI
 ./setup.sh --shell --dry-run     # Preview without changes
 ./setup.sh --shell --no-hooks    # Skip the pre-commit lint hook (default: installed)

@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # OpenAI Codex CLI: prefer the bundled binary from the openai.chatgpt VS Code
-# extension, fall back to a standalone `codex` on PATH. Codex isn't installed
-# by setup.sh — install via the VS Code extension or `npm i -g @openai/codex`.
+# extension, fall back to a standalone `codex` on PATH. The standalone binary is
+# installed by `./setup.sh --dev` (native musl build via eget, pinned in
+# eget.toml); the VS Code extension binary takes precedence when present.
 _codex_resolve_bin() {
     # VS Code "ChatGPT - Codex" extension (WSL or remote SSH)
     local vscode_bin
@@ -34,8 +35,8 @@ if [[ -n "$_CODEX_BIN" ]]; then
 else
     codex() {
         echo "Codex CLI not found." >&2
+        echo "  CLI:     ./setup.sh --dev  (native binary via eget)" >&2
         echo "  VS Code: install the 'openai.chatgpt' extension" >&2
-        echo "  CLI: npm i -g @openai/codex" >&2
         return 1
     }
 fi
