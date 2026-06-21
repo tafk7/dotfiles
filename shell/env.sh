@@ -73,7 +73,10 @@ export PYTHONDONTWRITEBYTECODE=1
 export PIP_REQUIRE_VIRTUALENV=false
 
 # Node.js
-export NODE_OPTIONS="--max-old-space-size=4096"
+# NODE_OPTIONS is intentionally NOT set globally — forcing
+# --max-old-space-size onto every node process affects small CLIs and tools
+# that may mis-handle inherited options. Set it per-project (e.g. in an
+# .envrc) or in ~/.shell.local if a specific tool needs a larger heap.
 
 # Docker
 export DOCKER_BUILDKIT=1

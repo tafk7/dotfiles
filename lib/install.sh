@@ -107,7 +107,9 @@ github_latest_version() {
 get_windows_username() {
     if is_wsl; then
         local win_user
-        win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n' | tr -d ' ')
+        # Strip only the trailing CR/LF from cmd.exe — NOT internal spaces, which
+        # are valid in Windows usernames (e.g. "First Last").
+        win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r\n')
 
         if [[ -z "$win_user" ]] || [[ "$win_user" == "SYSTEM" ]] || [[ "$win_user" == "Administrator" ]]; then
             win_user="$USER"
@@ -137,9 +139,16 @@ setup_wsl_clipboard() {
 clip.exe
 EOF
 
+    # Call PowerShell by absolute path: shell/env.sh strips the Windows
+    # PowerShell directory from PATH, so `powershell.exe` by name won't resolve.
+    # Prefer PowerShell 7 when present, otherwise Windows PowerShell 5.
     cat > "$bin_dir/pbpaste" << 'EOF'
 #!/bin/bash
-powershell.exe -command "Get-Clipboard" | sed 's/\r$//'
+if [[ -x "/mnt/c/Program Files/PowerShell/7/pwsh.exe" ]]; then
+    "/mnt/c/Program Files/PowerShell/7/pwsh.exe" -NoProfile -Command "Get-Clipboard" | sed 's/\r$//'
+else
+    /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "Get-Clipboard" | sed 's/\r$//'
+fi
 EOF
 
     chmod +x "$bin_dir/pbcopy" "$bin_dir/pbpaste"
@@ -187,6 +196,48 @@ create_backup_dir() {
     echo "$backup_dir"
 }
 
+# Compute a backup destination that preserves the target's path structure
+# relative to $HOME (e.g. ~/.ssh/config -> <backup>/.ssh/config). Preserving
+# the path avoids basename collisions between distinct files that share a name,
+# such as .ssh/config and .config/bat/config.
+backup_dest() {
+    local target="$1" backup_dir="$2" rel
+    if [[ "$target" == "$HOME/"* ]]; then
+        rel="${target#"$HOME"/}"
+    else
+        rel="${target#/}"
+    fi
+    printf '%s/%s' "$backup_dir" "$rel"
+}
+
+# Guard against catastrophic deletion. Targets come from the declarative
+# CONFIG_MAP, but a malformed mapping must never be able to remove anything
+# that is not strictly inside the invoking user's $HOME.
+assert_safe_home_target() {
+    local target="$1"
+    if [[ -z "$target" ]]; then
+        error "Refusing destructive operation on empty target path"
+        exit 1
+    fi
+
+    local home_canon parent_canon canon
+    home_canon="$(cd "$HOME" 2>/dev/null && pwd -P)" || { error "Cannot resolve \$HOME"; exit 1; }
+    parent_canon="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || {
+        error "Cannot resolve parent of target: $target"
+        exit 1
+    }
+    canon="$parent_canon/$(basename "$target")"
+
+    if [[ "$canon" == "$home_canon" ]]; then
+        error "Refusing to delete \$HOME itself: $canon"
+        exit 1
+    fi
+    if [[ "$canon" != "$home_canon"/* ]]; then
+        error "Refusing to delete target outside \$HOME: $canon"
+        exit 1
+    fi
+}
+
 safe_symlink() {
     local source="$1"
     local target="$2"
@@ -198,17 +249,33 @@ safe_symlink() {
     fi
 
     if [[ "${FORCE_OVERWRITE:-false}" == "true" && -e "$target" ]]; then
-        log "Force overwrite enabled, removing $target"
-        rm -rf "$target"
+        assert_safe_home_target "$target"
+        if [[ -L "$target" ]]; then
+            rm -f "$target"
+        else
+            # Even under --force, preserve real files/dirs in the backup rather
+            # than destroying them with rm -rf.
+            local dest
+            dest="$(backup_dest "$target" "$backup_dir")"
+            mkdir -p "$(dirname "$dest")"
+            log "Force overwrite: backing up $target -> $dest"
+            mv "$target" "$dest"
+        fi
     elif [[ -e "$target" && ! -L "$target" ]]; then
-        log "Backing up existing $target"
-        mv "$target" "$backup_dir/$(basename "$target")"
+        local dest
+        dest="$(backup_dest "$target" "$backup_dir")"
+        mkdir -p "$(dirname "$dest")"
+        log "Backing up existing $target -> $dest"
+        mv "$target" "$dest"
     elif [[ -L "$target" ]]; then
         local link_target
         link_target="$(readlink -f "$target" 2>/dev/null || true)"
         if [[ -n "$link_target" && -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
+            local dest
+            dest="$(backup_dest "$target" "$backup_dir")"
+            mkdir -p "$(dirname "$dest")"
             log "Backing up symlink target $target -> $link_target"
-            cp "$link_target" "$backup_dir/$(basename "$target")"
+            cp "$link_target" "$dest"
         fi
         rm "$target"
     fi
@@ -227,11 +294,27 @@ cleanup_old_backups() {
 
     log "Cleaning up old backups (keeping last $keep_count)..."
 
+    # Backups are named backup-YYYYMMDD-HHMMSS, so a lexical glob sort is also
+    # chronological (oldest first). Collect into an array instead of parsing
+    # `ls` and piping to `xargs rm -rf`, which would word-split on any path
+    # containing spaces (e.g. a DOTFILES_DIR under a spaced parent directory).
+    shopt -s nullglob
+    local -a backups
     if [[ -n "$backup_type" ]]; then
-        ls -dt "$DOTFILES_BACKUP_PREFIX"/*"$backup_type"* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs rm -rf 2>/dev/null || true
+        backups=("$DOTFILES_BACKUP_PREFIX"/*"$backup_type"*)
     else
-        ls -dt "$DOTFILES_BACKUP_PREFIX"/* 2>/dev/null | tail -n +$((keep_count + 1)) | xargs rm -rf 2>/dev/null || true
+        backups=("$DOTFILES_BACKUP_PREFIX"/*)
     fi
+    shopt -u nullglob
+
+    local total=${#backups[@]}
+    (( total > keep_count )) || return 0
+
+    # Glob expands ascending (oldest first); remove all but the last keep_count.
+    local i
+    for (( i = 0; i < total - keep_count; i++ )); do
+        rm -rf "${backups[i]}"
+    done
 }
 
 # ==============================================================================
@@ -245,44 +328,62 @@ process_git_config() {
     local force="${4:-false}"
 
     local git_name git_email
+    # Explicit identity via --git-name/--git-email or DOTFILES_GIT_NAME/EMAIL
+    # takes precedence over everything else.
+    git_name="${DOTFILES_GIT_NAME:-}"
+    git_email="${DOTFILES_GIT_EMAIL:-}"
+
+    local existing_name existing_email
+    existing_name=$(git config --global user.name 2>/dev/null || true)
+    existing_email=$(git config --global user.email 2>/dev/null || true)
 
     if [[ -t 0 ]]; then
-        local existing_name existing_email
-        existing_name=$(git config --global user.name 2>/dev/null || true)
-        existing_email=$(git config --global user.email 2>/dev/null || true)
-
-        if [[ -n "$existing_name" && -n "$existing_email" && "$force" != "true" ]]; then
+        if [[ -n "$git_name" && -n "$git_email" ]]; then
+            success "Using provided git config (user.name: $git_name, user.email: $git_email)"
+        elif [[ -n "$existing_name" && -n "$existing_email" && "$force" != "true" ]]; then
             git_name="$existing_name"
             git_email="$existing_email"
             success "Using existing git config (user.name: $git_name, user.email: $git_email)"
         else
-            if [[ -n "$existing_name" ]]; then
-                read -p "Enter your git name [$existing_name]: " git_name
-                git_name="${git_name:-$existing_name}"
+            local def_name="${git_name:-$existing_name}"
+            local def_email="${git_email:-$existing_email}"
+            if [[ -n "$def_name" ]]; then
+                read -p "Enter your git name [$def_name]: " git_name
+                git_name="${git_name:-$def_name}"
             else
                 read -p "Enter your git name: " git_name
             fi
 
-            if [[ -n "$existing_email" ]]; then
-                read -p "Enter your git email [$existing_email]: " git_email
-                git_email="${git_email:-$existing_email}"
+            if [[ -n "$def_email" ]]; then
+                read -p "Enter your git email [$def_email]: " git_email
+                git_email="${git_email:-$def_email}"
             else
                 read -p "Enter your git email: " git_email
             fi
-
-            if [[ ! "$git_email" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
-                warn "Email format looks incorrect: $git_email"
-            fi
         fi
     else
-        git_name="${USER:-dotfiles}"
-        git_email="${USER:-dotfiles}@${HOSTNAME:-localhost}"
-        warn "Non-interactive mode: using default git config ($git_name, $git_email)"
+        # Non-interactive: explicit values, then existing config, else fail.
+        # Never silently fabricate $USER@$HOSTNAME — that produces bogus commits.
+        [[ -z "$git_name" ]] && git_name="$existing_name"
+        [[ -z "$git_email" ]] && git_email="$existing_email"
+        if [[ -z "$git_name" || -z "$git_email" ]]; then
+            error "Git identity required but not provided in non-interactive mode."
+            error "Pass --git-name/--git-email or set DOTFILES_GIT_NAME/DOTFILES_GIT_EMAIL."
+            exit 1
+        fi
+        log "Using git identity: $git_name <$git_email>"
+    fi
+
+    if [[ ! "$git_email" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
+        warn "Email format looks incorrect: $git_email"
     fi
 
     if [[ -f "$target" && ! -L "$target" ]]; then
-        log "Backing up existing git config"
-        mv "$target" "$backup_dir/"
+        local dest
+        dest="$(backup_dest "$target" "$backup_dir")"
+        mkdir -p "$(dirname "$dest")"
+        log "Backing up existing git config -> $dest"
+        mv "$target" "$dest"
     elif [[ -L "$target" ]]; then
         rm "$target"
     fi
@@ -354,6 +455,17 @@ ensure_docker_repo() {
     fi
 
     log "Adding Docker official apt repository..."
+
+    # Remove conflicting distro packages that shadow Docker CE (per Docker's
+    # official install guidance). Only removes packages that are present.
+    local pkg
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+        if dpkg -s "$pkg" &>/dev/null; then
+            log "Removing conflicting package: $pkg"
+            safe_sudo apt-get remove -y "$pkg" || warn "Could not remove $pkg"
+        fi
+    done
+
     safe_sudo apt-get install -y ca-certificates curl gnupg
 
     safe_sudo install -m 0755 -d /etc/apt/keyrings
@@ -369,6 +481,40 @@ ensure_docker_repo() {
 
     update_packages
     success "Docker apt repository configured"
+}
+
+# Install Azure CLI from Microsoft's signed apt repository.
+# Replaces the previous `curl https://aka.ms/InstallAzureCLIDeb | sudo bash`,
+# which executed an unpinned remote script as root.
+install_azure_cli() {
+    if command -v az >/dev/null 2>&1; then
+        log "Azure CLI already installed"
+        return 0
+    fi
+
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log "[DRY RUN] Would add Microsoft apt repo and install azure-cli"
+        return 0
+    fi
+
+    log "Installing Azure CLI from Microsoft's signed apt repository..."
+    safe_sudo apt-get install -y ca-certificates curl gnupg
+    safe_sudo install -m 0755 -d /etc/apt/keyrings
+
+    if [[ ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
+        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+            | gpg --dearmor \
+            | safe_sudo tee /etc/apt/keyrings/microsoft.gpg > /dev/null
+        safe_sudo chmod a+r /etc/apt/keyrings/microsoft.gpg
+    fi
+
+    local codename
+    codename=$(lsb_release -cs)
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $codename main" | \
+        safe_sudo tee /etc/apt/sources.list.d/azure-cli.list > /dev/null
+
+    update_packages
+    install_apt "azure-cli" azure-cli
 }
 
 # ==============================================================================
@@ -501,16 +647,7 @@ install_full_packages() {
     log "Installing full tier packages..."
 
     # Azure CLI
-    if ! command -v az >/dev/null 2>&1; then
-        log "Installing Azure CLI..."
-        if [[ "${DRY_RUN:-false}" == "true" ]]; then
-            log "[DRY RUN] Would install Azure CLI"
-        else
-            curl -sL https://aka.ms/InstallAzureCLIDeb | safe_sudo bash
-        fi
-    else
-        log "Azure CLI already installed"
-    fi
+    install_azure_cli
 
     # Azure DevOps git credential helper
     if [[ -f "$DOTFILES_DIR/bin/git-credential-azdo" ]]; then
@@ -527,8 +664,28 @@ install_full_packages() {
         log "Adding $USER to docker group..."
         if safe_sudo usermod -aG docker "$USER"; then
             success "Added to docker group (restart shell to activate)"
+            # Security disclosure: the docker group is root-equivalent — its
+            # members can mount the host filesystem and run privileged containers.
+            warn "Note: membership in the 'docker' group grants root-equivalent access to this host."
         else
             warn "Could not add to docker group (try: sudo usermod -aG docker $USER)"
+        fi
+    fi
+
+    # Enable and start the daemon when systemd is managing the system (native
+    # Linux, or WSL with systemd=true). No-op when systemd isn't running.
+    if command -v docker >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+        safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
+    fi
+
+    # Verify the daemon is reachable. Non-fatal: docker group membership only
+    # takes effect on a new login, and WSL without systemd may need
+    # `sudo service docker start`.
+    if command -v docker >/dev/null 2>&1 && [[ "${DRY_RUN:-false}" != "true" ]]; then
+        if docker info >/dev/null 2>&1; then
+            success "Docker daemon is running"
+        else
+            warn "Docker installed but 'docker info' failed — start the daemon and re-login for group access"
         fi
     fi
 

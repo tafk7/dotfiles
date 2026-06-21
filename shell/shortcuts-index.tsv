@@ -285,7 +285,6 @@ wsl│cwd│Copy current path to clipboard│pwd | clip.exe
 wsl│wcd│Copy Windows-format path to clipboard│wslpath -w $(pwd) | clip.exe
 wsl│wpath│Convert Linux path to Windows format│wslpath -w
 wsl│lpath│Convert Windows path to Linux format│wslpath -u
-wsl│sync-ssh│Import SSH keys from Windows│import_windows_ssh_keys
 
 # Diagramming shortcuts
 diagramming│plantuml│Generate diagrams from text (UML, sequence, etc.)│plantuml <file.puml>

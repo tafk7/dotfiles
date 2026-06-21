@@ -47,13 +47,20 @@ elif command -v nvim >/dev/null 2>&1; then
     warn "Existing nvim binary is broken — reinstalling"
 fi
 
-# Download and install
+# Download and install.
+# get_arch() returns aarch64, but upstream Neovim names its ARM asset
+# nvim-linux-arm64.tar.gz (and the dir inside likewise). Map accordingly.
 ARCH=$(get_arch)
+case "$ARCH" in
+    x86_64)  NVIM_ARCH="x86_64" ;;
+    aarch64) NVIM_ARCH="arm64" ;;
+    *)       error "Unsupported architecture for Neovim: $ARCH"; exit 1 ;;
+esac
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
-TARBALL="nvim-linux-${ARCH}.tar.gz"
+TARBALL="nvim-linux-${NVIM_ARCH}.tar.gz"
 DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${VERSION}/${TARBALL}"
 
 log "Downloading Neovim v${VERSION}..."
@@ -66,7 +73,7 @@ mkdir -p "$HOME/.local/bin" "$HOME/.local"
 
 log "Extracting to ~/.local/nvim..."
 tar -C "$HOME/.local" -xzf "$TARBALL"
-mv "$HOME/.local/nvim-linux-${ARCH}" "$HOME/.local/nvim"
+mv "$HOME/.local/nvim-linux-${NVIM_ARCH}" "$HOME/.local/nvim"
 ln -sf "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
 
 # Verify

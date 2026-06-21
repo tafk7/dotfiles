@@ -117,7 +117,6 @@ Clipboard: copy-mode `y` and `<prefix> P` auto-detect WSL (`clip.exe` /
 
 ```bash
 pbcopy / pbpaste          # Clipboard integration
-sync-ssh                  # Import SSH keys from Windows
 cdwin / cddesk / cddl     # Navigate to Windows directories
 open / explorer           # Open in Windows Explorer
 ```
@@ -193,7 +192,7 @@ shell/
   env.sh                  Environment: PATH, EDITOR, PROJECTS_DIRS, BAT_CACHE_PATH, STARSHIP_CONFIG, theme exports
   fzf.sh / tool-init.sh   Tool initializers (zoxide, starship, fzf keybinds)
   tools/*.sh              Domain-split functions + aliases (nav, process, python, fzf, vscode, claude, docker, git, node, tmux, vim, general)
-  platform/wsl.sh         WSL-only helpers (pbcopy/pbpaste, sync-ssh, cdwin)
+  platform/wsl.sh         WSL-only helpers (pbcopy/pbpaste, cdwin)
   lazy/nvm.sh             Lazy NVM loader
 installers/               Per-tool install scripts (run by lib/install.sh::run_installer)
 generated/                Theme artifacts + bridge.sh (gitignored)
