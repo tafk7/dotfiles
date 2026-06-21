@@ -4,6 +4,26 @@
 # No WSL guard needed here — init.sh handles the check.
 
 # ==============================================================================
+# SSH agent bridge — OPT-IN per machine
+# ==============================================================================
+#
+# Forward the Windows ssh-agent (e.g. Bitwarden serving the standard
+# \\.\pipe\openssh-ssh-agent pipe) into WSL, so SSH keys live in the vault and
+# never touch disk — one agent then serves Windows, WSL, and VS Code.
+#
+# Enable on a PERSONAL machine by creating the marker file:
+#     touch ~/.ssh/use-windows-agent
+# (A marker file, not an env var: this runs before ~/.shell.local is sourced.)
+#
+# WORK machines that must use local on-disk keys: leave the marker ABSENT. This
+# block is skipped, SSH_AUTH_SOCK is untouched, and ssh uses the local agent /
+# ~/.ssh key files. Put work-specific Host/IdentityFile blocks in
+# ~/.ssh/config.local (included by ssh_config). See docs/customization.md.
+if [[ -f "$HOME/.ssh/use-windows-agent" ]] && command -v wsl2-ssh-agent >/dev/null 2>&1; then
+    eval "$(wsl2-ssh-agent)"
+fi
+
+# ==============================================================================
 # Functions
 # ==============================================================================
 
