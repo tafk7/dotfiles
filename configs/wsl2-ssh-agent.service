@@ -1,0 +1,16 @@
+[Unit]
+Description=Bridge the Windows ssh-agent (Bitwarden) into WSL2
+Documentation=https://github.com/mame/wsl2-ssh-agent
+# Per-machine opt-in: the SAME marker the shell bridge (shell/platform/wsl.sh) uses.
+# Absent on work machines -> the service is installed but stays inert (no relay).
+ConditionPathExists=%h/.ssh/use-windows-agent
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wsl2-ssh-agent -foreground -socket %h/.ssh/wsl2-ssh-agent.sock
+ExecStop=%h/.local/bin/wsl2-ssh-agent -stop
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

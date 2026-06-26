@@ -160,6 +160,50 @@ EOF
     success "WSL clipboard integration setup complete"
 }
 
+# Install + enable the systemd user service that bridges the Windows ssh-agent
+# (Bitwarden) into WSL2. The relay then runs at BOOT — visible to every shell,
+# tmux pane, and captured environment (Claude Code's shell snapshot, etc.), and
+# survives reboots — instead of only being (re)started at interactive shell
+# startup by shell/platform/wsl.sh. No sudo (a --user service); linger is
+# best-effort. OPT-IN per machine via the same marker the shell bridge uses:
+# leave ~/.ssh/use-windows-agent absent on work machines and this is a no-op.
+setup_wsl_ssh_agent() {
+    is_wsl || return 0
+
+    # Opt-in gate — only personal machines that asked for the Windows-agent bridge.
+    if [[ ! -f "$HOME/.ssh/use-windows-agent" ]]; then
+        wsl_log "ssh-agent bridge: marker ~/.ssh/use-windows-agent absent — skipping (work machine / not opted in)"
+        return 0
+    fi
+
+    # Needs a reachable systemd user instance and the relay binary (shell tier).
+    if ! command -v systemctl >/dev/null 2>&1 || ! systemctl --user show-environment >/dev/null 2>&1; then
+        wsl_log "ssh-agent bridge: no systemd user instance — leaning on the shell-startup fallback in wsl.sh"
+        return 0
+    fi
+    if ! command -v wsl2-ssh-agent >/dev/null 2>&1; then
+        warn "ssh-agent bridge: wsl2-ssh-agent not installed (run ./setup.sh --bash) — skipping service"
+        return 0
+    fi
+
+    local unit_src="$DOTFILES_DIR/configs/wsl2-ssh-agent.service"
+    local unit_dir="$HOME/.config/systemd/user"
+
+    mkdir -p "$unit_dir"
+    ln -sfn "$unit_src" "$unit_dir/wsl2-ssh-agent.service"
+
+    systemctl --user daemon-reload
+    if systemctl --user enable --now wsl2-ssh-agent.service >/dev/null 2>&1; then
+        success "WSL ssh-agent bridge service installed + started (wsl2-ssh-agent.service)"
+    else
+        warn "ssh-agent bridge: 'systemctl --user enable --now' failed — is Bitwarden's SSH agent enabled + unlocked on Windows?"
+    fi
+
+    # Start at boot even with no interactive login. May require polkit/sudo.
+    loginctl enable-linger "$USER" 2>/dev/null \
+        || wsl_log "ssh-agent bridge: for boot-start without a login, run:  sudo loginctl enable-linger $USER"
+}
+
 # Write install-time environment to generated/bridge.sh
 write_dotfiles_env() {
     local bridge_file="$DOTFILES_DIR/generated/bridge.sh"
