@@ -248,22 +248,34 @@ A password manager (e.g. Bitwarden) holds the key and serves the standard
 `\\.\pipe\openssh-ssh-agent` Windows pipe; `wsl2-ssh-agent` bridges that pipe into
 WSL. One agent then serves Windows, WSL, and VS Code.
 
+The relay runs as a **systemd user service** (`wsl2-ssh-agent.service`, installed by
+`setup.sh` on opt-in WSL machines) so it is up at **boot** — visible to every shell,
+tmux pane, and captured environment (e.g. an editor/agent that snapshots the shell),
+and it survives reboots. The old shell-startup `eval` remains only as a *fallback* in
+`shell/platform/wsl.sh`, for hosts without systemd or when the marker is added after
+install.
+
 1. Windows: enable the SSH agent in Bitwarden, disable the Windows *"OpenSSH
    Authentication Agent"* service (so Bitwarden owns the pipe), store/generate
    your key. Verify with `ssh-add.exe -l`.
-2. WSL: `./setup.sh --bash` installs `wsl2-ssh-agent` (eget). Enable the bridge
-   with the marker file, then reload:
+2. WSL: opt in with the marker, then run setup — it installs `wsl2-ssh-agent` (eget)
+   **and** the boot-time service (`systemctl --user enable --now` + linger):
    ```bash
-   touch ~/.ssh/use-windows-agent && reload
-   ssh-add -l            # should list your Bitwarden key
+   touch ~/.ssh/use-windows-agent
+   ./setup.sh --bash        # installs the relay + enables wsl2-ssh-agent.service
+   ssh-add -l                # should list your Bitwarden key
    ```
+   The unit carries `ConditionPathExists=%h/.ssh/use-windows-agent`, so removing the
+   marker disables it cleanly. If the relay ever drops mid-session (e.g. Bitwarden was
+   locked), run **`ssh-bridge`** to restart it.
 3. Git signing (optional): paste Bitwarden's WSL signing snippet into
    `~/.gitconfig.local`.
 
 **Work machine — local on-disk keys (the bridge stays off).** Leave the
-`~/.ssh/use-windows-agent` marker absent (the default): `shell/platform/wsl.sh`
-skips the bridge and leaves `SSH_AUTH_SOCK` alone, so the local `ssh-agent` and
-your work's `~/.ssh` key files work normally.
+`~/.ssh/use-windows-agent` marker absent (the default): `setup.sh` does not install
+the `wsl2-ssh-agent.service`, `shell/platform/wsl.sh` skips the bridge, and
+`SSH_AUTH_SOCK` is left alone — so the local `ssh-agent` and your work's `~/.ssh`
+key files work normally.
 
 - Put work-specific host config in **`~/.ssh/config.local`** (untracked, included
   first by `ssh_config` so it wins):

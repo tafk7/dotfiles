@@ -15,13 +15,37 @@
 #     touch ~/.ssh/use-windows-agent
 # (A marker file, not an env var: this runs before ~/.shell.local is sourced.)
 #
+# The relay DAEMON is owned by the systemd user service `wsl2-ssh-agent.service`
+# (installed by setup.sh on opt-in WSL machines) so it is up at BOOT — visible to
+# every shell, tmux pane, and captured environment, surviving reboots. This block
+# is now just the fallback: point SSH_AUTH_SOCK at the socket the service serves,
+# and start the relay inline ONLY if that socket is dead (no service yet: marker
+# added after setup, or a host without systemd).
+#
 # WORK machines that must use local on-disk keys: leave the marker ABSENT. This
 # block is skipped, SSH_AUTH_SOCK is untouched, and ssh uses the local agent /
 # ~/.ssh key files. Put work-specific Host/IdentityFile blocks in
 # ~/.ssh/config.local (included by ssh_config). See docs/customization.md.
-if [[ -f "$HOME/.ssh/use-windows-agent" ]] && command -v wsl2-ssh-agent >/dev/null 2>&1; then
-    eval "$(wsl2-ssh-agent)"
+if [[ -f "$HOME/.ssh/use-windows-agent" ]]; then
+    export SSH_AUTH_SOCK="$HOME/.ssh/wsl2-ssh-agent.sock"
+    # exit 2 from ssh-add = "can't connect" (dead socket) -> revive inline.
+    ssh-add -l >/dev/null 2>&1
+    if [[ $? -eq 2 ]] && command -v wsl2-ssh-agent >/dev/null 2>&1; then
+        eval "$(wsl2-ssh-agent)" >/dev/null 2>&1
+    fi
 fi
+
+# Manual recovery if the relay ever dies mid-session (also callable from tooling):
+# prefers the systemd service, falls back to an inline relay.
+ssh-bridge() {
+    if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 \
+       && systemctl --user list-unit-files wsl2-ssh-agent.service >/dev/null 2>&1; then
+        systemctl --user restart wsl2-ssh-agent.service 2>/dev/null
+    elif command -v wsl2-ssh-agent >/dev/null 2>&1; then
+        eval "$(wsl2-ssh-agent)"
+    fi
+    ssh-add -l
+}
 
 # ==============================================================================
 # Functions

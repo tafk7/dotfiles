@@ -364,6 +364,7 @@ phase_setup_configs() {
             fi
         done
         is_wsl && log "[DRY RUN] Would setup WSL clipboard integration"
+        is_wsl && [[ -f "$HOME/.ssh/use-windows-agent" ]] && log "[DRY RUN] Would install the WSL ssh-agent bridge service (marker present)"
     else
         readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
         for config in "${sorted_configs[@]}"; do
@@ -402,6 +403,7 @@ phase_setup_configs() {
     # WSL-specific setup
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
         setup_wsl_clipboard
+        setup_wsl_ssh_agent
     fi
 
     # Initialize default theme if none is set (theme-switcher owns the default)
