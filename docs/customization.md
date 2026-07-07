@@ -36,6 +36,7 @@ Groups are mapped to tiers in `lib/install.sh`:
 - `install_dev_packages`   → diagramming
 - `install_work_packages`  → docker
 - `install_ai_packages`    → (no apt packages; runs the claude + codex installers)
+- `install_rdp_packages`   → rdp (then runs the xrdp config installer)
 
 ## Adding a New Binary Tool (eget)
 
@@ -50,7 +51,7 @@ Groups are mapped to tiers in `lib/install.sh`:
    ```bash
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=eget
-   TOOL_TIER[mytool]=shell      # shell|dev|work|ai
+   TOOL_TIER[mytool]=shell      # shell|dev|work|ai|rdp
    ```
 
 3. Run `./setup.sh --shell` (or just `eget --download-all`) to install.

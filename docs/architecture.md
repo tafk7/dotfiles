@@ -171,11 +171,15 @@ because we don't blanket-redirect stderr at the eval site.
 | dev          | + neovim, tmux                                     | Yes   |
 | work         | + NVM, Docker, Azure CLI                           | Yes   |
 | `--ai`       | + Claude Code, Codex (orthogonal flag)             | No    |
-| `--full`     | = work + ai (everything)                           | Yes   |
+| `--rdp`      | + xrdp server + XFCE desktop (orthogonal flag)     | Yes   |
+| `--full`     | = work + ai (everything except `--rdp`)            | Yes   |
 
-`config → shell → dev → work` are cumulative. `--ai` is orthogonal to the
-chain — it installs the AI CLIs and can be combined with any tier (leave it
-off when an org manages the Claude/Codex install). `--full` = `--work --ai`.
+`config → shell → dev → work` are cumulative. `--ai` and `--rdp` are
+orthogonal to the chain — each installs only under its own flag and combines
+with any tier. `--ai` covers the AI CLIs (leave it off when an org manages the
+Claude/Codex install); `--rdp` installs the xrdp RDP server and is deliberately
+NOT implied by `--full`, since no tier should silently open a network listener.
+`--full` = `--work --ai`.
 
 ## Key Design Decisions
 

@@ -1,6 +1,7 @@
 # Spec: xrdp layer — RDP into the dotfiles environment
 
-**Status:** speced, not yet implemented.
+**Status:** implemented — `./setup.sh --rdp` (see `installers/install-xrdp.sh`).
+This document is retained as the design rationale.
 **Primary use case:** the work machine — RDP from the Windows host into a full
 Linux desktop session running in WSL2 Ubuntu (where these dotfiles live).
 **Secondary use case:** the same installer on a native Ubuntu box for remote
@@ -154,17 +155,31 @@ mstsc anyway.
 - Native/remote case: document Tailscale/VPN as the transport;
   `address=127.0.0.1` + SSH tunnel as the zero-extra-infra fallback.
 
-## 7. Open questions (decide at implementation time)
+## 7. Open questions — resolved at implementation
 
-1. **DE choice** — spec assumes XFCE. If the target machine already runs GNOME,
-   skip the xfce4 packages and point `~/.xsession` at the existing session?
-   (Adds detection complexity; XFCE-always is simpler and known-good with xrdp.)
-2. **Bind default on native installs** — `address=127.0.0.1` (safe, requires
-   tunnel) vs all-interfaces + warning (convenient on trusted LAN/VPN). WSL: all
-   interfaces is fine.
-3. **Flag name** — `--rdp` (concrete) vs `--remote` (roomier if the
-   moonlight/sunshine layer lands later; that would likely be `--stream`
-   anyway, so `--rdp` is probably right).
-4. **`--full` scope** — confirmed *not* to imply `--rdp` (opening a network
-   listener should never be a side effect). Revisit only if muscle memory says
-   otherwise.
+1. **DE choice** — XFCE always. Simpler, known-good with xrdp; a machine with
+   GNOME can hand-edit `~/.xsession` afterwards (the installer backs up any
+   existing file rather than clobbering it).
+2. **Bind default on native installs** — all interfaces + loud warning at the
+   end of the install (VPN/Tailscale or `address=127.0.0.1` + SSH tunnel).
+   WSL: all interfaces (effectively private behind WSL2 NAT).
+3. **Flag name** — `--rdp`. A future moonlight/sunshine layer would be
+   `--stream`, so no name collision.
+4. **`--full` scope** — does *not* imply `--rdp`; enforced in
+   `phase_install_packages` and documented in help/README.
+
+## 8. Implementation notes (deltas from the spec above)
+
+- apt install uses a dedicated `env DEBIAN_FRONTEND=noninteractive apt-get`
+  call rather than `install_apt`: xfce4's Recommends pulls a display manager
+  whose debconf dialog would block an interactive install. xrdp doesn't use a
+  display manager, so the noninteractive default answer is irrelevant. `env`
+  is required because sudo strips `DEBIAN_FRONTEND`.
+- Dry-run is honored in-process by `install_rdp_packages` (setup.sh does not
+  export `DRY_RUN`, so installer subprocesses can't see it).
+- If `xrdp.ini` has a port that is neither the package default (3389) nor our
+  target, the installer warns and leaves it alone instead of clobbering a
+  manual customization.
+- polkit backend detection: version `0.x` (`pkaction --version`) → `.pkla`
+  localauthority file (Ubuntu ≤ 22.04); otherwise a JS rule in `rules.d`
+  (Ubuntu 24.04+, duktape ES5 — hence `indexOf`, not `startsWith`).

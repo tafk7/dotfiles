@@ -17,6 +17,7 @@ source "$SCRIPT_DIR/lib/install.sh"
 # Installation options
 INSTALL_TIER="config"  # Default tier: config, shell, dev, work
 INSTALL_AI=false       # Orthogonal: install AI CLIs (claude, codex). Off by default.
+INSTALL_RDP=false      # Orthogonal: xrdp RDP server. Off by default; NOT implied by --full.
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
 SHOW_HELP=false
@@ -57,6 +58,12 @@ parse_arguments() {
             --ai)
                 # Orthogonal opt-in; combines with any tier.
                 INSTALL_AI=true
+                shift
+                ;;
+            --rdp)
+                # Orthogonal opt-in; combines with any tier. Never implied by
+                # --full — installing it opens a network listener.
+                INSTALL_RDP=true
                 shift
                 ;;
             --force)
@@ -140,6 +147,14 @@ AI TOOLING (orthogonal - combines with any tier):
                         install; the shell aliases/shortcuts load either way and
                         resolve whatever 'claude'/'codex' is on PATH.
 
+RDP SERVER (orthogonal - combines with any tier):
+    --rdp               Install + configure the xrdp RDP server with an XFCE
+                        session. Requires sudo. NOT implied by --full (opens a
+                        network listener, so it is always an explicit opt-in).
+                        WSL: listens on localhost:3390 for the Windows host
+                        (connect with mstsc). Native: port 3389 — keep it
+                        behind a VPN/firewall. See issues/xrdp-remote-desktop.md.
+
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
     --dry-run           Preview actions without making changes
@@ -160,6 +175,7 @@ EXAMPLES:
     ./setup.sh --dev --ai            # Development setup + self-managed AI CLIs
     ./setup.sh --work                # Full environment, org manages AI
     ./setup.sh --full                # Absolutely everything (--work --ai)
+    ./setup.sh --dev --rdp           # Dev setup + RDP into this machine's desktop
     ./setup.sh --shell --dry-run     # Preview shell tier installation
 
 TIER SUMMARY:
@@ -173,7 +189,8 @@ TIER SUMMARY:
     │ work     │ + NVM, Docker, Azure CLI                        │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
     │ --ai     │ + Claude Code, Codex (orthogonal flag)          │ No*       │
-    │ --full   │ = work + ai (everything)                        │ Yes       │
+    │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
+    │ --full   │ = work + ai (everything except --rdp)           │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
     * --ai installs into ~/.local/bin and needs no sudo on its own.
 
@@ -235,8 +252,8 @@ phase_verify_system() {
 phase_install_packages() {
     log "Phase 2: Package Installation"
 
-    # Nothing to install for a bare config tier with no --ai.
-    if ! tier_includes "shell" && [[ "$INSTALL_AI" != "true" ]]; then
+    # Nothing to install for a bare config tier with no orthogonal flags.
+    if ! tier_includes "shell" && [[ "$INSTALL_AI" != "true" && "$INSTALL_RDP" != "true" ]]; then
         log "Config tier: skipping package installation"
         return 0
     fi
@@ -256,6 +273,11 @@ phase_install_packages() {
     # AI CLIs are orthogonal to the tier chain (--ai, or --full which implies it).
     if [[ "$INSTALL_AI" == "true" ]]; then
         install_ai_packages
+    fi
+
+    # RDP server is orthogonal too, and NOT implied by --full.
+    if [[ "$INSTALL_RDP" == "true" ]]; then
+        install_rdp_packages
     fi
 
     success "Package installation complete"
@@ -382,7 +404,7 @@ run_installation() {
 
     # Success message
     echo
-    success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == "true" ]] && echo " +ai"))"
+    success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == "true" ]] && echo " +ai")$([[ "$INSTALL_RDP" == "true" ]] && echo " +rdp"))"
     echo
 
     # Post-installation instructions
@@ -432,6 +454,18 @@ run_installation() {
     echo "   ./bin/verify"
     echo
     ((step++))
+
+    # RDP connect instructions (port/security depend on WSL vs native).
+    if [[ "$INSTALL_RDP" == "true" ]]; then
+        echo "$step. Connect to the RDP desktop:"
+        if is_wsl; then
+            echo "   From this machine's Windows host: mstsc -> localhost:3390"
+        else
+            echo "   mstsc -> $(hostname):3389  (keep behind VPN/Tailscale — never expose to the internet)"
+        fi
+        echo
+        ((step++))
+    fi
 
     # WSL personal machines: nudge toward the Windows SSH agent bridge.
     if is_wsl && tier_includes "shell"; then
@@ -483,6 +517,7 @@ main() {
     echo "Target: Ubuntu (including WSL)"
     echo "Tier: $INSTALL_TIER"
     echo "AI CLIs (claude, codex): $([[ "$INSTALL_AI" == "true" ]] && echo "yes (--ai)" || echo "no")"
+    [[ "$INSTALL_RDP" == "true" ]] && echo "RDP server (xrdp): yes (--rdp)"
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     
