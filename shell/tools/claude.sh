@@ -42,7 +42,7 @@ if [[ -n "$_CLAUDE_DEFAULT" ]]; then
 else
     claude() {
         echo "Claude Code not found." >&2
-        echo "  CLI:     ./setup.sh --dev  (native installer)" >&2
+        echo "  CLI:     ./setup.sh --ai  (native installer)" >&2
         echo "  VS Code: install the 'anthropic.claude-code' extension" >&2
         return 1
     }
