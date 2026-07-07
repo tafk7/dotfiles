@@ -22,6 +22,18 @@ if [[ "$FORCE" != true && -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/n
     exit 2
 fi
 
+# Don't shadow an externally-managed Claude. On org-managed machines the AI CLI
+# is provided elsewhere on PATH; installing our own copy at ~/.local/bin/claude
+# would silently override it (shell/env.sh prepends ~/.local/bin). Skip unless
+# forced. The shell wrapper resolves whatever `claude` is on PATH either way.
+EXTERNAL_CLAUDE="$(command -v claude 2>/dev/null || true)"
+if [[ "$FORCE" != true && -n "$EXTERNAL_CLAUDE" && "$EXTERNAL_CLAUDE" != "$CLAUDE_BIN" ]]; then
+    warn "Found an externally-managed claude on PATH: $EXTERNAL_CLAUDE"
+    warn "Skipping install to avoid a shadow copy at $CLAUDE_BIN."
+    warn "Re-run with --force to install the dotfiles-managed copy anyway."
+    exit 2
+fi
+
 log "Installing Claude Code via claude.ai/install.sh..."
 
 # ~/.local/bin is already on PATH (shell/env.sh), so the installer should detect

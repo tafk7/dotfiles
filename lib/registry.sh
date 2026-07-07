@@ -57,19 +57,22 @@ declare -A TOOL_METHOD=(
     [plantuml]=installer
     [nvm]=installer
     [claude]=installer
-    [codex]=eget
+    [codex]=installer
     [wsl2-ssh-agent]=eget
 )
 
-# TOOL_TIER: tool name → minimum tier (shell|dev|full)
+# TOOL_TIER: tool name → tier (shell|dev|work|ai)
+# "ai" is orthogonal to the cumulative shell→dev→work chain: those tools install
+# only under --ai (or --full), never as a side effect of a higher tier.
 declare -A TOOL_TIER=(
     [starship]=shell  [eza]=shell     [fzf]=shell      [zoxide]=shell
     [delta]=shell     [btop]=shell    [glow]=shell      [lazygit]=shell
     [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
     [direnv]=shell    [eget]=shell    [sd]=shell
     [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
-    [claude]=dev      [codex]=dev      [wsl2-ssh-agent]=dev
-    [nvm]=full
+    [wsl2-ssh-agent]=dev
+    [claude]=ai       [codex]=ai
+    [nvm]=work
 )
 
 # TOOL_VERIFY: tool name → verification command (exit 0 = pass)
@@ -85,6 +88,7 @@ declare -A TOOL_PATHS=(
     [nvm]="\$HOME/.nvm"
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
     [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
+    [codex]="\$HOME/.local/bin/codex"
 )
 
 # TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
@@ -92,6 +96,7 @@ declare -A TOOL_PATHS=(
 declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
     [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
+    [codex]="rm -f \$HOME/.local/bin/codex  # ~/.codex config/sessions are preserved"
 )
 
 # ==============================================================================

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # OpenAI Codex CLI resolution: prefer the standalone native binary (installed by
-# `./setup.sh --dev` — native musl build via eget, pinned in eget.toml), fall
+# `./setup.sh --ai` — native musl build via eget, pinned in eget-ai.toml), fall
 # back to the bundled binary from the openai.chatgpt VS Code extension. Both are
 # discovered once at init; the active one is chosen at call time. Set
 # CODEX_USE_VSCODE=1 (exported, or inline) to make the extension binary primary,
@@ -43,7 +43,7 @@ if [[ -n "$_CODEX_DEFAULT" ]]; then
 else
     codex() {
         echo "Codex CLI not found." >&2
-        echo "  CLI:     ./setup.sh --dev  (native binary via eget)" >&2
+        echo "  CLI:     ./setup.sh --ai  (native binary via eget)" >&2
         echo "  VS Code: install the 'openai.chatgpt' extension" >&2
         return 1
     }
