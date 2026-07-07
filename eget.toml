@@ -1,10 +1,17 @@
 # eget.toml — declarative binary tool management
-# Versions pinned to known-good releases. Update with: eget --download-all
-# To bump versions, update the tag values below.
+# Versions pinned to known-good releases.
+#
+# upgrade_only=true makes `eget --download-all` idempotent: a tool already
+# present at its pinned tag is skipped (eget compares the pinned release's date
+# against the installed binary's mtime), so re-running setup.sh no longer
+# re-downloads everything. To move to a newer release, bump its `tag` and
+# re-run — the newer release date triggers the download. To force a clean
+# re-download (repair or downgrade), use `./setup.sh --shell --force`, which
+# clears the binaries first so eget fetches them fresh.
 
 [global]
 target = "~/.local/bin"
-upgrade_only = false
+upgrade_only = true
 
 ["starship/starship"]
 tag = "v1.24.2"

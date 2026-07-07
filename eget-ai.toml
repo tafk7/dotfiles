@@ -4,11 +4,13 @@
 # at the shell tier, and the AI CLIs must install only under --ai / --full. This
 # file is consumed exclusively by installers/install-codex.sh.
 #
-# To bump the version, update the tag below and re-run: ./setup.sh --ai --force
+# To bump the version, update the tag below and re-run: ./setup.sh --ai
+# (upgrade_only makes eget fetch only when the pinned release is newer than the
+# installed binary; use ./setup.sh --ai --force to force a clean re-download).
 
 [global]
 target = "~/.local/bin"
-upgrade_only = false
+upgrade_only = true
 
 ["openai/codex"]
 tag = "rust-v0.141.0"
