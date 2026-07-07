@@ -7,13 +7,21 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ```bash
 ./setup.sh --config              # Symlinks only (no sudo)
 ./setup.sh --shell               # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
-./setup.sh --dev                 # + neovim, tmux, Claude Code, Codex
-./setup.sh --full                # + NVM, Docker, Azure CLI
+./setup.sh --dev                 # + neovim, tmux
+./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
+./setup.sh --ai                  # + Claude Code, Codex (orthogonal flag; combines with any tier)
+./setup.sh --full                # Everything: --work plus --ai
+./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
 ./setup.sh --shell --dry-run     # Preview without changes
 ./setup.sh --shell --no-hooks    # Skip the pre-commit lint hook (default: installed)
 ```
 
-Each tier includes all previous tiers. Use `--force` to overwrite without prompting.
+The tiers `config → shell → dev → work` are cumulative (each includes the
+previous). `--ai` is **orthogonal**: it installs the Claude Code and Codex CLIs
+and can be added to any tier. Leave it off when your org manages the AI
+install — the shell aliases/shortcuts load regardless and resolve whatever
+`claude`/`codex` is on your `PATH`. `--full` is shorthand for `--work --ai`.
+Use `--force` to overwrite without prompting.
 
 After installation, verify with `./bin/verify` and restart your shell.
 

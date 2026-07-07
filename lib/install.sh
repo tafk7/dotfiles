@@ -649,13 +649,24 @@ install_dev_packages() {
     run_installer "tmux"
     run_installer "neovim"
     run_installer "plantuml"
-    run_installer "claude"
 
     success "Dev tier installation complete"
 }
 
-install_full_packages() {
-    log "Installing full tier packages..."
+# AI CLIs (Claude Code, Codex). Orthogonal to the tier chain — installed only
+# when --ai (or --full) is passed. Kept separate so an org-managed install can
+# be left untouched; the installers refuse to shadow an external binary on PATH.
+install_ai_packages() {
+    log "Installing AI CLIs (claude, codex)..."
+
+    run_installer "claude"
+    run_installer "codex"
+
+    success "AI CLIs installation complete"
+}
+
+install_work_packages() {
+    log "Installing work tier packages..."
 
     # Azure CLI
     install_azure_cli
@@ -703,5 +714,5 @@ install_full_packages() {
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" true
 
-    success "Full tier installation complete"
+    success "Work tier installation complete"
 }

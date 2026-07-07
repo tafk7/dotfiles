@@ -3,7 +3,8 @@
 ## Overview
 
 This dotfiles system manages an Ubuntu/WSL development environment through a tiered
-installation system (`--config`, `--shell`, `--dev`, `--full`) with declarative
+installation system (`--config`, `--shell`, `--dev`, `--work`, plus the
+orthogonal `--ai` flag and the `--full` = work+ai shorthand) with declarative
 configuration, domain-split shell modules, and unified theme management.
 
 ## System Architecture
@@ -163,12 +164,18 @@ because we don't blanket-redirect stderr at the eval site.
 
 ## Installation Tiers
 
-| Tier   | What It Installs                                   | Sudo? |
-|--------|---------------------------------------------------|-------|
-| config | Symlinks only (zero installs)                      | No    |
-| shell  | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
-| dev    | + neovim, tmux, Claude Code, Codex                 | Yes   |
-| full   | + NVM, Docker, Azure CLI                           | Yes   |
+| Tier         | What It Installs                                   | Sudo? |
+|--------------|---------------------------------------------------|-------|
+| config       | Symlinks only (zero installs)                      | No    |
+| shell        | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
+| dev          | + neovim, tmux                                     | Yes   |
+| work         | + NVM, Docker, Azure CLI                           | Yes   |
+| `--ai`       | + Claude Code, Codex (orthogonal flag)             | No    |
+| `--full`     | = work + ai (everything)                           | Yes   |
+
+`config → shell → dev → work` are cumulative. `--ai` is orthogonal to the
+chain — it installs the AI CLIs and can be combined with any tier (leave it
+off when an org manages the Claude/Codex install). `--full` = `--work --ai`.
 
 ## Key Design Decisions
 

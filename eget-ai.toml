@@ -1,0 +1,20 @@
+# eget-ai.toml — declarative pinning for the AI CLIs (the "ai" tier).
+#
+# Kept OUT of eget.toml on purpose: eget.toml is consumed by `eget --download-all`
+# at the shell tier, and the AI CLIs must install only under --ai / --full. This
+# file is consumed exclusively by installers/install-codex.sh.
+#
+# To bump the version, update the tag below and re-run: ./setup.sh --ai --force
+
+[global]
+target = "~/.local/bin"
+upgrade_only = false
+
+["openai/codex"]
+tag = "rust-v0.141.0"
+# "codex-x86_64" is NOT a substring of "codex-app-server-x86_64", so this pair
+# uniquely selects the main CLI tarball among the release's many musl binaries.
+asset_filters = ["codex-x86_64-unknown-linux-musl", ".tar.gz"]
+# The archive's binary is named codex-x86_64-unknown-linux-musl; a file-path
+# target renames it to plain `codex` on install.
+target = "~/.local/bin/codex"

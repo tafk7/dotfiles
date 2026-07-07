@@ -46,14 +46,9 @@ asset_filters = ["x86_64-unknown-linux-musl"]
 tag = "v0.11.0"
 asset_filters = [".linux.x86_64.tar.xz"]
 
-["openai/codex"]
-tag = "rust-v0.141.0"
-# "codex-x86_64" is NOT a substring of "codex-app-server-x86_64", so this pair
-# uniquely selects the main CLI tarball among the release's many musl binaries.
-asset_filters = ["codex-x86_64-unknown-linux-musl", ".tar.gz"]
-# The archive's binary is named codex-x86_64-unknown-linux-musl; a file-path
-# target renames it to plain `codex` on install.
-target = "~/.local/bin/codex"
+# NOTE: Codex is an "ai" tier tool and is intentionally NOT listed here. It is
+# managed by installers/install-codex.sh (via eget-ai.toml) so that `--shell`'s
+# `eget --download-all` never pulls it in — AI CLIs install only under --ai/--full.
 
 ["mame/wsl2-ssh-agent"]
 tag = "v0.9.7"

@@ -70,7 +70,7 @@ done
 # 2. Managed tools — single loop over registry, grouped by tier
 # ==============================================================================
 
-for tier in shell dev full; do
+for tier in shell dev work ai; do
     readarray -t tier_tools < <(tools_for_tier "$tier")
     [[ ${#tier_tools[@]} -eq 0 ]] && continue
 
@@ -87,8 +87,12 @@ for tier in shell dev full; do
         if eval "$verify_cmd"; then
             check_pass "$label"
         else
-            # Version managers and full-tier tools are optional — warn, not fail
-            if [[ "$tier" == "full" ]] || [[ "${TOOL_METHOD[$name]}" == "installer" && "$tier" != "shell" ]]; then
+            # Optional tools — warn, not fail:
+            #   - work tier (nvm/docker/azure) is opt-in
+            #   - ai tier (claude/codex) is opt-in and may be org-managed
+            #   - installer-based tools above the shell tier
+            if [[ "$tier" == "work" || "$tier" == "ai" ]] \
+               || [[ "${TOOL_METHOD[$name]}" == "installer" && "$tier" != "shell" ]]; then
                 check_warn "$label (not installed)"
             else
                 check_fail "$label (not found)"
