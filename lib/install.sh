@@ -592,20 +592,23 @@ install_eget_tools() {
         return 1
     fi
 
-    if EGET_CONFIG="$config" "$eget_bin" --download-all; then
-        for name in "${eget_tools[@]}"; do
+    # upgrade_only (eget.toml) makes eget skip tools already at their pinned
+    # version, so a re-run downloads nothing — the point of this whole function
+    # being idempotent. eget's batch exit code doesn't cleanly separate "skipped
+    # because up to date" from "failed", so don't trust it: run eget, then judge
+    # each tool by whether its binary is actually present on disk.
+    EGET_CONFIG="$config" "$eget_bin" --download-all || true
+
+    local any_missing=false
+    for name in "${eget_tools[@]}"; do
+        if verify_binary "${TOOL_BINARY[$name]}"; then
             track_install "$name" ok
-        done
-    else
-        warn "Some eget tools may have failed"
-        for name in "${eget_tools[@]}"; do
-            if verify_binary "${TOOL_BINARY[$name]}"; then
-                track_install "$name" ok
-            else
-                track_install "$name" fail
-            fi
-        done
-    fi
+        else
+            track_install "$name" fail
+            any_missing=true
+        fi
+    done
+    [[ "$any_missing" == true ]] && warn "Some eget tools are missing after install (see summary)"
 }
 
 # ==============================================================================
