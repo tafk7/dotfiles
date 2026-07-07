@@ -656,14 +656,33 @@ install_dev_packages() {
     success "Dev tier installation complete"
 }
 
-# AI CLIs (Claude Code, Codex). Orthogonal to the tier chain — installed only
-# when --ai (or --full) is passed. Kept separate so an org-managed install can
-# be left untouched; the installers refuse to shadow an external binary on PATH.
+# AI CLIs (Claude Code, Codex, opencode). Orthogonal to the tier chain —
+# installed only when --ai/--full or a per-tool flag (--claude/--codex/
+# --opencode) is passed. Which tools run is driven by setup.sh's AI_ALL /
+# AI_TOOLS globals; AI_ALL expands to every ai-tier tool in the registry, so a
+# new AI CLI is picked up automatically once registered. Kept separate so an
+# org-managed install can be left untouched — each installer refuses to shadow
+# an external binary already on PATH.
 install_ai_packages() {
-    log "Installing AI CLIs (claude, codex)..."
+    local -a tools=()
+    if [[ "${AI_ALL:-false}" == "true" ]]; then
+        readarray -t tools < <(tools_for_tier ai)
+    else
+        # Individual selections, de-duplicated while preserving order.
+        local t
+        for t in "${AI_TOOLS[@]:-}"; do
+            [[ -z "$t" ]] && continue
+            [[ " ${tools[*]-} " == *" $t "* ]] || tools+=("$t")
+        done
+    fi
 
-    run_installer "claude"
-    run_installer "codex"
+    [[ ${#tools[@]} -eq 0 ]] && return 0
+
+    log "Installing AI CLIs: ${tools[*]}"
+    local t
+    for t in "${tools[@]}"; do
+        run_installer "$t"
+    done
 
     success "AI CLIs installation complete"
 }

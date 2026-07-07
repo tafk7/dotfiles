@@ -16,7 +16,9 @@ source "$SCRIPT_DIR/lib/install.sh"
 
 # Installation options
 INSTALL_TIER="config"  # Default tier: config, shell, dev, work
-INSTALL_AI=false       # Orthogonal: install AI CLIs (claude, codex). Off by default.
+INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool flag).
+AI_ALL=false           # --ai / --full: install every ai-tier tool.
+declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode.
 INSTALL_RDP=false      # Orthogonal: xrdp RDP server. Off by default; NOT implied by --full.
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
@@ -53,11 +55,20 @@ parse_arguments() {
                 # Convenience: everything. Equivalent to --work --ai.
                 INSTALL_TIER="work"
                 INSTALL_AI=true
+                AI_ALL=true
                 shift
                 ;;
             --ai)
-                # Orthogonal opt-in; combines with any tier.
+                # Orthogonal opt-in; combines with any tier. Installs every
+                # ai-tier tool; use the per-tool flags below to pick individually.
                 INSTALL_AI=true
+                AI_ALL=true
+                shift
+                ;;
+            --claude|--codex|--opencode)
+                # Per-tool AI selection (orthogonal; composes with any tier).
+                INSTALL_AI=true
+                AI_TOOLS+=("${1#--}")
                 shift
                 ;;
             --rdp)
@@ -142,10 +153,15 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Equivalent to: --work --ai
 
 AI TOOLING (orthogonal - combines with any tier):
-    --ai                Install the AI CLIs (Claude Code, Codex) into
+    --ai                Install ALL AI CLIs (Claude Code, Codex, opencode) into
                         ~/.local/bin. Leave this off when your org manages the
                         install; the shell aliases/shortcuts load either way and
-                        resolve whatever 'claude'/'codex' is on PATH.
+                        resolve whatever binary is on PATH.
+    --claude            Install only Claude Code.
+    --codex             Install only Codex.
+    --opencode          Install only opencode.
+                        (Per-tool flags combine: --claude --opencode installs
+                        just those two. --ai / --full install all of them.)
 
 RDP SERVER (orthogonal - combines with any tier):
     --rdp               Install + configure the xrdp RDP server with an XFCE
@@ -172,7 +188,9 @@ EXAMPLES:
     ./setup.sh --config              # Explicit config tier
     ./setup.sh --shell               # Modern shell experience
     ./setup.sh --dev                 # Development setup (no AI CLIs)
-    ./setup.sh --dev --ai            # Development setup + self-managed AI CLIs
+    ./setup.sh --dev --ai            # Development setup + all AI CLIs
+    ./setup.sh --dev --claude        # Development setup + only Claude Code
+    ./setup.sh --claude --opencode   # Config + just those two AI CLIs
     ./setup.sh --work                # Full environment, org manages AI
     ./setup.sh --full                # Absolutely everything (--work --ai)
     ./setup.sh --dev --rdp           # Dev setup + RDP into this machine's desktop
@@ -188,7 +206,8 @@ TIER SUMMARY:
     │ dev      │ + neovim, tmux                                  │ Yes       │
     │ work     │ + NVM, Docker, Azure CLI                        │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ --ai     │ + Claude Code, Codex (orthogonal flag)          │ No*       │
+    │ --ai     │ + Claude Code, Codex, opencode (orthogonal)     │ No*       │
+    │          │   (or --claude / --codex / --opencode singly)   │           │
     │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
     │ --full   │ = work + ai (everything except --rdp)           │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
@@ -516,7 +535,15 @@ main() {
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
     echo "Tier: $INSTALL_TIER"
-    echo "AI CLIs (claude, codex): $([[ "$INSTALL_AI" == "true" ]] && echo "yes (--ai)" || echo "no")"
+    if [[ "$INSTALL_AI" == "true" ]]; then
+        if [[ "$AI_ALL" == "true" ]]; then
+            echo "AI CLIs: all (claude, codex, opencode)"
+        else
+            echo "AI CLIs: ${AI_TOOLS[*]}"
+        fi
+    else
+        echo "AI CLIs: none"
+    fi
     [[ "$INSTALL_RDP" == "true" ]] && echo "RDP server (xrdp): yes (--rdp)"
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo

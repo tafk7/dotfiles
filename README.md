@@ -9,7 +9,8 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --shell               # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
 ./setup.sh --dev                 # + neovim, tmux
 ./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
-./setup.sh --ai                  # + Claude Code, Codex (orthogonal flag; combines with any tier)
+./setup.sh --ai                  # + all AI CLIs: Claude Code, Codex, opencode (orthogonal)
+./setup.sh --claude --opencode   # + only the AI CLIs you name (--claude / --codex / --opencode)
 ./setup.sh --rdp                 # + xrdp RDP server + XFCE desktop (orthogonal flag; combines with any tier)
 ./setup.sh --full                # Everything: --work plus --ai (but NOT --rdp)
 ./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
@@ -18,11 +19,13 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ```
 
 The tiers `config → shell → dev → work` are cumulative (each includes the
-previous). `--ai` is **orthogonal**: it installs the Claude Code and Codex CLIs
-and can be added to any tier. Leave it off when your org manages the AI
+previous). `--ai` is **orthogonal**: it installs the AI CLIs (Claude Code,
+Codex, opencode) and can be added to any tier. Install them individually with
+`--claude`, `--codex`, and/or `--opencode` (they compose: `--claude --opencode`
+installs just those two). Leave AI off entirely when your org manages the
 install — the shell aliases/shortcuts load regardless and resolve whatever
-`claude`/`codex` is on your `PATH`. `--full` is shorthand for `--work --ai`.
-Use `--force` to overwrite without prompting.
+`claude`/`codex`/`opencode` is on your `PATH`. `--full` is shorthand for
+`--work --ai`. Use `--force` to overwrite without prompting.
 
 `--rdp` is a second orthogonal flag: it installs and configures the xrdp RDP
 server with an XFCE session so you can remote into this machine's desktop

@@ -170,16 +170,18 @@ because we don't blanket-redirect stderr at the eval site.
 | shell        | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
 | dev          | + neovim, tmux                                     | Yes   |
 | work         | + NVM, Docker, Azure CLI                           | Yes   |
-| `--ai`       | + Claude Code, Codex (orthogonal flag)             | No    |
+| `--ai`       | + Claude Code, Codex, opencode (orthogonal)        | No    |
+| `--claude` / `--codex` / `--opencode` | + that one AI CLI (compose freely) | No |
 | `--rdp`      | + xrdp server + XFCE desktop (orthogonal flag)     | Yes   |
 | `--full`     | = work + ai (everything except `--rdp`)            | Yes   |
 
 `config → shell → dev → work` are cumulative. `--ai` and `--rdp` are
 orthogonal to the chain — each installs only under its own flag and combines
-with any tier. `--ai` covers the AI CLIs (leave it off when an org manages the
-Claude/Codex install); `--rdp` installs the xrdp RDP server and is deliberately
-NOT implied by `--full`, since no tier should silently open a network listener.
-`--full` = `--work --ai`.
+with any tier. `--ai` covers all AI CLIs (Claude Code, Codex, opencode); pick
+individually with `--claude` / `--codex` / `--opencode` (they compose). Leave
+AI off when an org manages the install. `--rdp` installs the xrdp RDP server
+and is deliberately NOT implied by `--full`, since no tier should silently open
+a network listener. `--full` = `--work --ai`.
 
 ## Key Design Decisions
 
