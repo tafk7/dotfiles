@@ -31,6 +31,7 @@ declare -A TOOL_BINARY=(
     [nvm]=nvm
     [claude]=claude
     [codex]=codex
+    [opencode]=opencode
     [wsl2-ssh-agent]=wsl2-ssh-agent
     [xrdp]=xrdp
 )
@@ -59,6 +60,7 @@ declare -A TOOL_METHOD=(
     [nvm]=installer
     [claude]=installer
     [codex]=installer
+    [opencode]=installer
     [wsl2-ssh-agent]=eget
     [xrdp]=installer
 )
@@ -74,7 +76,7 @@ declare -A TOOL_TIER=(
     [direnv]=shell    [eget]=shell    [sd]=shell
     [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
     [wsl2-ssh-agent]=dev
-    [claude]=ai       [codex]=ai
+    [claude]=ai       [codex]=ai       [opencode]=ai
     [xrdp]=rdp
     [nvm]=work
 )
@@ -95,6 +97,7 @@ declare -A TOOL_PATHS=(
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
     [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
     [codex]="\$HOME/.local/bin/codex"
+    [opencode]="\$HOME/.local/bin/opencode"
 )
 
 # TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
@@ -103,6 +106,7 @@ declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
     [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
     [codex]="rm -f \$HOME/.local/bin/codex  # ~/.codex config/sessions are preserved"
+    [opencode]="rm -f \$HOME/.local/bin/opencode  # ~/.config/opencode config is preserved"
     [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
 )
 

@@ -56,9 +56,11 @@ tier includes everything from the previous tier:
 Three extras sit outside the cumulative chain:
 
 - `--ai` — an **orthogonal** flag that installs the AI CLIs (Claude Code,
-  Codex) into `~/.local/bin`. It combines with any tier and is off by default,
-  so a machine whose org manages the AI install can run `--work` (or any tier)
-  without a competing copy. The shell aliases load regardless of this flag.
+  Codex, opencode) into `~/.local/bin`. Pick individual tools with `--claude`,
+  `--codex`, and/or `--opencode` (they compose; `--ai` is the "all" shortcut).
+  It combines with any tier and is off by default, so a machine whose org
+  manages the AI install can run `--work` (or any tier) without a competing
+  copy. The shell aliases load regardless of these flags.
 - `--rdp` — an **orthogonal** flag that installs and configures the xrdp RDP
   server with an XFCE session (see `issues/xrdp-remote-desktop.md`). Opt-in per
   machine and deliberately NOT implied by `--full`: no tier should silently
