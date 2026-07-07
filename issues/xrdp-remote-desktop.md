@@ -168,6 +168,31 @@ mstsc anyway.
 4. **`--full` scope** — does *not* imply `--rdp`; enforced in
    `phase_install_packages` and documented in help/README.
 
+## 9. Coexistence with an existing display/RDP stack
+
+Installing onto a machine that already has some of the desktop/RDP stack is the
+common work-VM case. How each pre-existing condition is handled (all in
+`install_rdp_packages` / `installers/install-xrdp.sh`):
+
+| Pre-existing condition | Handling |
+|---|---|
+| A display manager (gdm3) | Preseed `shared/default-x-display-manager` to the current DM before apt — no prompt, no switch (§8 / `preserve_default_display_manager`). |
+| xrdp already fully configured | Idempotent: desired-state checks pass → exit 2, nothing rewritten. |
+| Custom `port=` in `xrdp.ini` | Left alone with a warning (only the package default 3389 is rewritten). |
+| Something else on the target port | Preflight `ss` check: if the port is held and xrdp isn't the listener, fail early with the diagnosing command instead of an opaque bind error at service start. |
+| A hand-written `~/.xsession` | Respected — not overwritten. `--force` (or `RDP_XSESSION`) replaces it, backing up first. |
+| A full desktop already installed (GNOME/KDE) | Still defaults to XFCE for the RDP session, but detects it and prints how to reuse it: `RDP_XSESSION="gnome-session" ./setup.sh --rdp --force`. |
+| Customized `/etc/xrdp/startwm.sh` | Warn that it may bypass `~/.xsession`, so the session source isn't a mystery. |
+| `ssl-cert` group absent | Skip the group step with a warning instead of erroring on `adduser`. |
+| ufw active (native) | Print the `ufw allow` hint (don't auto-open — security). |
+| Same user logged in on the console | Note the xorgxrdp single-session-per-user limitation (black screen / instant disconnect otherwise). Not fixable in the installer. |
+
+`RDP_XSESSION` (env) overrides the session command written to `~/.xsession`
+(default `startxfce4`).
+
+Not special-cased (benign): a Wayland console session — xrdp always spins up
+its own Xorg session via `xorgxrdp`, independent of the console's display server.
+
 ## 8. Implementation notes (deltas from the spec above)
 
 - apt install uses a dedicated `env DEBIAN_FRONTEND=noninteractive apt-get`
