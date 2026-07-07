@@ -43,19 +43,27 @@ Read this first — every other doc assumes you understand these primitives.
 
 ### 1. Tiers — *how much* gets installed
 
-Defined by the `--config | --shell | --dev | --full` flag to `setup.sh`. Each
+Defined by the `--config | --shell | --dev | --work` flag to `setup.sh`. Each
 tier includes everything from the previous tier:
 
 | Tier | What it adds | Sudo? |
 |------|--------------|-------|
 | `config` | Symlinks only | No |
 | `shell`  | Modern CLI tools (eget + apt: starship, eza, fzf, zoxide, delta, btop, glow, lazygit, uv, bat, fd, ripgrep, direnv, sd) | Yes |
-| `dev`    | neovim, tmux, plantuml, Claude Code, Codex | Yes |
-| `full`   | NVM, Docker, Azure CLI | Yes |
+| `dev`    | neovim, tmux, plantuml | Yes |
+| `work`   | NVM, Docker, Azure CLI | Yes |
+
+Two extras sit outside the cumulative chain:
+
+- `--ai` — an **orthogonal** flag that installs the AI CLIs (Claude Code,
+  Codex) into `~/.local/bin`. It combines with any tier and is off by default,
+  so a machine whose org manages the AI install can run `--work` (or any tier)
+  without a competing copy. The shell aliases load regardless of this flag.
+- `--full` — shorthand for `--work --ai` (installs everything).
 
 Tier membership is data, not code. Each tool's tier lives in
-`TOOL_TIER` in `lib/registry.sh`. To move a tool between tiers, edit that
-table — no other change required.
+`TOOL_TIER` in `lib/registry.sh` (the AI CLIs use the `ai` tier value). To move
+a tool between tiers, edit that table — no other change required.
 
 ### 2. CONFIG_MAP — *what* gets symlinked
 

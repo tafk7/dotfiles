@@ -34,7 +34,8 @@ Groups are mapped to tiers in `lib/install.sh`:
 
 - `install_shell_packages` → core + development + modern + languages + terminal (+ wsl on WSL)
 - `install_dev_packages`   → diagramming
-- `install_full_packages`  → docker
+- `install_work_packages`  → docker
+- `install_ai_packages`    → (no apt packages; runs the claude + codex installers)
 
 ## Adding a New Binary Tool (eget)
 
@@ -49,7 +50,7 @@ Groups are mapped to tiers in `lib/install.sh`:
    ```bash
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=eget
-   TOOL_TIER[mytool]=shell      # shell|dev|full
+   TOOL_TIER[mytool]=shell      # shell|dev|work|ai
    ```
 
 3. Run `./setup.sh --shell` (or just `eget --download-all`) to install.

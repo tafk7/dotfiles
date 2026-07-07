@@ -209,12 +209,13 @@ jobs:
               command -v "$bin" >/dev/null 2>&1 \
                 || { echo "::error::shell-tier tool missing: $name ($bin)"; fail=1; }
           done
-          # codex is labelled dev-tier, but install_eget_tools' --download-all
-          # pulls every eget.toml entry in whenever eget runs, so it lands at the
-          # shell tier too. Assert it to validate the eget asset-filter + rename.
-          command -v codex >/dev/null 2>&1 \
-            || { echo "::error::codex not installed/renamed by eget"; fail=1; }
-          # Same for wsl2-ssh-agent (bare-binary asset) — validate its filter.
+          # AI CLIs (claude, codex) are --ai-gated and must NOT ride the shell
+          # tier's `eget --download-all`. Assert codex is absent here; a dedicated
+          # step below installs it via install-codex.sh to validate that path.
+          if command -v codex >/dev/null 2>&1; then
+              echo "::error::codex must not be installed at the shell tier (--ai only)"; fail=1
+          fi
+          # wsl2-ssh-agent (bare-binary asset) still installs at the shell tier — validate its filter.
           command -v wsl2-ssh-agent >/dev/null 2>&1 \
             || { echo "::error::wsl2-ssh-agent not installed by eget"; fail=1; }
           [[ $fail -eq 0 ]] && echo "Install assertions passed."
@@ -222,6 +223,24 @@ jobs:
           EOS
           chown test:test /home/test/assert.sh
           sudo -u test -H bash /home/test/assert.sh
+
+      - name: Codex installs via its --ai installer (asset-filter + rename)
+        run: |
+          # Exercises eget-ai.toml + install-codex.sh and the rename to plain
+          # `codex`. Reuses the eget binary installed by the --shell step above;
+          # network is GitHub-only (no claude.ai), so this stays deterministic.
+          cat > /home/test/assert-ai.sh <<'EOS'
+          set -euo pipefail
+          cd "$HOME/dotfiles"
+          export DOTFILES_DIR="$PWD"
+          export PATH="$HOME/.local/bin:$PATH"
+          ./installers/install-codex.sh
+          command -v codex >/dev/null 2>&1 \
+            || { echo "::error::codex not installed/renamed by install-codex.sh"; exit 1; }
+          echo "Codex --ai install assertion passed."
+          EOS
+          chown test:test /home/test/assert-ai.sh
+          sudo -u test -H bash /home/test/assert-ai.sh
 
       - name: bin/verify (informational — full verify expects dev+ tiers)
         continue-on-error: true

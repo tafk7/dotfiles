@@ -15,7 +15,8 @@ export DOTFILES_DIR
 source "$SCRIPT_DIR/lib/install.sh"
 
 # Installation options
-INSTALL_TIER="config"  # Default tier: config, shell, dev, full
+INSTALL_TIER="config"  # Default tier: config, shell, dev, work
+INSTALL_AI=false       # Orthogonal: install AI CLIs (claude, codex). Off by default.
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
 SHOW_HELP=false
@@ -43,8 +44,19 @@ parse_arguments() {
                 INSTALL_TIER="dev"
                 shift
                 ;;
+            --work)
+                INSTALL_TIER="work"
+                shift
+                ;;
             --full)
-                INSTALL_TIER="full"
+                # Convenience: everything. Equivalent to --work --ai.
+                INSTALL_TIER="work"
+                INSTALL_AI=true
+                shift
+                ;;
+            --ai)
+                # Orthogonal opt-in; combines with any tier.
+                INSTALL_AI=true
                 shift
                 ;;
             --force)
@@ -82,11 +94,13 @@ parse_arguments() {
 }
 
 # Check if current tier includes the required tier level
+# AI tooling (claude, codex) is NOT part of this chain — it is gated by the
+# orthogonal INSTALL_AI flag so an org-managed AI install can be left alone.
 tier_includes() {
     local required="$1"
     case "$INSTALL_TIER" in
-        full) return 0 ;;
-        dev) [[ "$required" != "full" ]] ;;
+        work) return 0 ;;
+        dev) [[ "$required" != "work" ]] ;;
         shell) [[ "$required" == "config" || "$required" == "shell" ]] ;;
         config) [[ "$required" == "config" ]] ;;
     esac
@@ -110,10 +124,21 @@ TIERS (cumulative - each tier includes all previous tiers):
                         packages (bat, fd, ripgrep, direnv).
 
     --dev               Shell + development tools. Requires sudo.
-                        Adds: neovim, tmux, Claude Code, Codex
+                        Adds: neovim, tmux
 
-    --full              Dev + full environment. Requires sudo.
+    --work              Dev + heavier environment tooling. Requires sudo.
                         Adds: NVM, Docker, Azure CLI
+                        (Everything except the AI CLIs — for machines where an
+                        org manages the Claude/Codex install.)
+
+    --full              Everything: --work plus the AI CLIs. Requires sudo.
+                        Equivalent to: --work --ai
+
+AI TOOLING (orthogonal - combines with any tier):
+    --ai                Install the AI CLIs (Claude Code, Codex) into
+                        ~/.local/bin. Leave this off when your org manages the
+                        install; the shell aliases/shortcuts load either way and
+                        resolve whatever 'claude'/'codex' is on PATH.
 
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
@@ -131,8 +156,10 @@ EXAMPLES:
     ./setup.sh                       # Default: config tier (symlinks only)
     ./setup.sh --config              # Explicit config tier
     ./setup.sh --shell               # Modern shell experience
-    ./setup.sh --dev                 # Full development setup
-    ./setup.sh --full                # Complete work environment
+    ./setup.sh --dev                 # Development setup (no AI CLIs)
+    ./setup.sh --dev --ai            # Development setup + self-managed AI CLIs
+    ./setup.sh --work                # Full environment, org manages AI
+    ./setup.sh --full                # Absolutely everything (--work --ai)
     ./setup.sh --shell --dry-run     # Preview shell tier installation
 
 TIER SUMMARY:
@@ -142,9 +169,13 @@ TIER SUMMARY:
     │ config   │ Symlinks only (zero installs)                   │ No        │
     │ shell    │ + eget, starship, eza, fzf, zoxide, delta,      │ Yes       │
     │          │   btop, glow, lazygit, uv, bat, fd, ripgrep     │           │
-    │ dev      │ + neovim, tmux, Claude Code, Codex              │ Yes       │
-    │ full     │ + NVM, Docker, Azure CLI                        │ Yes       │
+    │ dev      │ + neovim, tmux                                  │ Yes       │
+    │ work     │ + NVM, Docker, Azure CLI                        │ Yes       │
+    ├──────────┼─────────────────────────────────────────────────┼───────────┤
+    │ --ai     │ + Claude Code, Codex (orthogonal flag)          │ No*       │
+    │ --full   │ = work + ai (everything)                        │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
+    * --ai installs into ~/.local/bin and needs no sudo on its own.
 
 The script will:
 1. Verify system requirements
@@ -204,19 +235,27 @@ phase_verify_system() {
 phase_install_packages() {
     log "Phase 2: Package Installation"
 
-    if ! tier_includes "shell"; then
+    # Nothing to install for a bare config tier with no --ai.
+    if ! tier_includes "shell" && [[ "$INSTALL_AI" != "true" ]]; then
         log "Config tier: skipping package installation"
         return 0
     fi
 
-    install_shell_packages
+    if tier_includes "shell"; then
+        install_shell_packages
+    fi
 
     if tier_includes "dev"; then
         install_dev_packages
     fi
 
-    if tier_includes "full"; then
-        install_full_packages
+    if tier_includes "work"; then
+        install_work_packages
+    fi
+
+    # AI CLIs are orthogonal to the tier chain (--ai, or --full which implies it).
+    if [[ "$INSTALL_AI" == "true" ]]; then
+        install_ai_packages
     fi
 
     success "Package installation complete"
@@ -343,7 +382,7 @@ run_installation() {
 
     # Success message
     echo
-    success "Dotfiles installation complete! (tier: $INSTALL_TIER)"
+    success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == "true" ]] && echo " +ai"))"
     echo
 
     # Post-installation instructions
@@ -354,8 +393,8 @@ run_installation() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
 
-    # Check if Docker group was added (full tier only)
-    if tier_includes "full" && command -v docker >/dev/null 2>&1; then
+    # Check if Docker group was added (work tier only)
+    if tier_includes "work" && command -v docker >/dev/null 2>&1; then
         if grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
             if ! groups | grep -q docker; then
                 echo "* Docker group membership requires restart"
@@ -364,9 +403,9 @@ run_installation() {
         fi
     fi
 
-    # Check if NVM was installed (full tier only)
+    # Check if NVM was installed (work tier only)
     local nvm_installed=false
-    if tier_includes "full" && [[ -d "$HOME/.nvm" ]]; then
+    if tier_includes "work" && [[ -d "$HOME/.nvm" ]]; then
         nvm_installed=true
     fi
 
@@ -443,6 +482,7 @@ main() {
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
     echo "Tier: $INSTALL_TIER"
+    echo "AI CLIs (claude, codex): $([[ "$INSTALL_AI" == "true" ]] && echo "yes (--ai)" || echo "no")"
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     
