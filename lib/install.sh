@@ -668,6 +668,30 @@ install_ai_packages() {
     success "AI CLIs installation complete"
 }
 
+# xfce4 pulls in a display manager (e.g. lightdm). On a machine that already
+# runs one, that DM's postinst asks — via debconf — which should be the system
+# default. Two hazards: the dialog blocks a scripted install, and answering it
+# (even silently, under noninteractive) can switch the console login manager
+# away from the one already in use. xrdp needs no DM at all (it starts its own
+# X session via ~/.xsession), so the safe move is to pin the answer to whatever
+# is already configured, changing nothing. No-op when no DM is configured yet
+# (single-DM and headless installs never raise the question).
+preserve_default_display_manager() {
+    command -v debconf-set-selections >/dev/null 2>&1 || return 0
+    local dmfile=/etc/X11/default-display-manager
+    [[ -r "$dmfile" ]] || return 0
+
+    local dm_path dm
+    dm_path="$(cat "$dmfile" 2>/dev/null || true)"
+    [[ -n "$dm_path" ]] || return 0
+    dm="$(basename "$dm_path")"
+    [[ -n "$dm" && "$dm" != "." ]] || return 0
+
+    log "Preserving current display manager ($dm) across the xfce4 install"
+    printf '%s shared/default-x-display-manager select %s\n' "$dm" "$dm" \
+        | safe_sudo debconf-set-selections
+}
+
 # RDP server (xrdp + XFCE session). Orthogonal to the tier chain — installed
 # only when --rdp is passed, and deliberately NOT implied by --full: no tier
 # should silently open a network listener. See issues/xrdp-remote-desktop.md.
@@ -680,14 +704,17 @@ install_rdp_packages() {
         return 0
     fi
 
-    # Deliberately not install_apt: xfce4's Recommends pulls a display manager,
-    # whose debconf "choose default display manager" dialog would block an
-    # interactive install. Force noninteractive via env — xrdp starts sessions
-    # itself, so the display-manager choice is irrelevant here. env is required
-    # because sudo strips DEBIAN_FRONTEND from the environment.
+    # Pin the display-manager answer before apt can ask (see helper above).
+    preserve_default_display_manager
+
+    # Deliberately not install_apt: we need a preseeded, fully non-interactive
+    # apt run. DEBIAN_FRONTEND=noninteractive suppresses the dialog; DEBIAN_PRIORITY
+    # =critical is a second guard so only critical questions could ever surface.
+    # env, not a bare assignment, because sudo resets the environment.
     update_packages
     # shellcheck disable=SC2086
-    if safe_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y ${PACKAGES[rdp]}; then
+    if safe_sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
+        apt-get install -y ${PACKAGES[rdp]}; then
         success "rdp APT packages installed"
     else
         error "rdp APT package installation failed"
