@@ -32,6 +32,7 @@ declare -A TOOL_BINARY=(
     [claude]=claude
     [codex]=codex
     [wsl2-ssh-agent]=wsl2-ssh-agent
+    [xrdp]=xrdp
 )
 
 # TOOL_METHOD: tool name → install method (eget|apt|installer|external)
@@ -59,11 +60,13 @@ declare -A TOOL_METHOD=(
     [claude]=installer
     [codex]=installer
     [wsl2-ssh-agent]=eget
+    [xrdp]=installer
 )
 
-# TOOL_TIER: tool name → tier (shell|dev|work|ai)
-# "ai" is orthogonal to the cumulative shell→dev→work chain: those tools install
-# only under --ai (or --full), never as a side effect of a higher tier.
+# TOOL_TIER: tool name → tier (shell|dev|work|ai|rdp)
+# "ai" and "rdp" are orthogonal to the cumulative shell→dev→work chain: those
+# tools install only under their own flag, never as a side effect of a tier.
+# --full implies ai but NOT rdp (a tier must never silently open a listener).
 declare -A TOOL_TIER=(
     [starship]=shell  [eza]=shell     [fzf]=shell      [zoxide]=shell
     [delta]=shell     [btop]=shell    [glow]=shell      [lazygit]=shell
@@ -72,6 +75,7 @@ declare -A TOOL_TIER=(
     [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
     [wsl2-ssh-agent]=dev
     [claude]=ai       [codex]=ai
+    [xrdp]=rdp
     [nvm]=work
 )
 
@@ -79,6 +83,8 @@ declare -A TOOL_TIER=(
 # Empty = use "command -v TOOL_BINARY[name]"
 declare -A TOOL_VERIFY=(
     [nvm]='test -s "$HOME/.nvm/nvm.sh"'
+    # Binary present isn't success for a service — it must be running.
+    [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
 )
 
 # TOOL_PATHS: tool name → space-separated paths to remove on uninstall
@@ -97,6 +103,7 @@ declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
     [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
     [codex]="rm -f \$HOME/.local/bin/codex  # ~/.codex config/sessions are preserved"
+    [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
 )
 
 # ==============================================================================

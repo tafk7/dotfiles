@@ -665,6 +665,39 @@ install_ai_packages() {
     success "AI CLIs installation complete"
 }
 
+# RDP server (xrdp + XFCE session). Orthogonal to the tier chain — installed
+# only when --rdp is passed, and deliberately NOT implied by --full: no tier
+# should silently open a network listener. See issues/xrdp-remote-desktop.md.
+install_rdp_packages() {
+    log "Installing RDP server (xrdp + XFCE session)..."
+
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log "[DRY RUN] Would install rdp APT packages: ${PACKAGES[rdp]}"
+        log "[DRY RUN] Would configure xrdp (installers/install-xrdp.sh)"
+        return 0
+    fi
+
+    # Deliberately not install_apt: xfce4's Recommends pulls a display manager,
+    # whose debconf "choose default display manager" dialog would block an
+    # interactive install. Force noninteractive via env — xrdp starts sessions
+    # itself, so the display-manager choice is irrelevant here. env is required
+    # because sudo strips DEBIAN_FRONTEND from the environment.
+    update_packages
+    # shellcheck disable=SC2086
+    if safe_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y ${PACKAGES[rdp]}; then
+        success "rdp APT packages installed"
+    else
+        error "rdp APT package installation failed"
+        track_install "xrdp" fail
+        return 1
+    fi
+
+    # System config + service enablement (idempotent; owns /etc/xrdp edits)
+    run_installer "xrdp"
+
+    success "RDP server installation complete"
+}
+
 install_work_packages() {
     log "Installing work tier packages..."
 

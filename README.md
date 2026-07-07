@@ -10,7 +10,8 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --dev                 # + neovim, tmux
 ./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
 ./setup.sh --ai                  # + Claude Code, Codex (orthogonal flag; combines with any tier)
-./setup.sh --full                # Everything: --work plus --ai
+./setup.sh --rdp                 # + xrdp RDP server + XFCE desktop (orthogonal flag; combines with any tier)
+./setup.sh --full                # Everything: --work plus --ai (but NOT --rdp)
 ./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
 ./setup.sh --shell --dry-run     # Preview without changes
 ./setup.sh --shell --no-hooks    # Skip the pre-commit lint hook (default: installed)
@@ -22,6 +23,12 @@ and can be added to any tier. Leave it off when your org manages the AI
 install — the shell aliases/shortcuts load regardless and resolve whatever
 `claude`/`codex` is on your `PATH`. `--full` is shorthand for `--work --ai`.
 Use `--force` to overwrite without prompting.
+
+`--rdp` is a second orthogonal flag: it installs and configures the xrdp RDP
+server with an XFCE session so you can remote into this machine's desktop
+(WSL: `mstsc -> localhost:3390` from the Windows host). It is deliberately
+**not** part of `--full` — opening a network listener is always an explicit
+opt-in. Details: `issues/xrdp-remote-desktop.md`.
 
 After installation, verify with `./bin/verify` and restart your shell.
 

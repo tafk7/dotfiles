@@ -53,17 +53,22 @@ tier includes everything from the previous tier:
 | `dev`    | neovim, tmux, plantuml | Yes |
 | `work`   | NVM, Docker, Azure CLI | Yes |
 
-Two extras sit outside the cumulative chain:
+Three extras sit outside the cumulative chain:
 
 - `--ai` — an **orthogonal** flag that installs the AI CLIs (Claude Code,
   Codex) into `~/.local/bin`. It combines with any tier and is off by default,
   so a machine whose org manages the AI install can run `--work` (or any tier)
   without a competing copy. The shell aliases load regardless of this flag.
-- `--full` — shorthand for `--work --ai` (installs everything).
+- `--rdp` — an **orthogonal** flag that installs and configures the xrdp RDP
+  server with an XFCE session (see `issues/xrdp-remote-desktop.md`). Opt-in per
+  machine and deliberately NOT implied by `--full`: no tier should silently
+  open a network listener.
+- `--full` — shorthand for `--work --ai` (everything except `--rdp`).
 
 Tier membership is data, not code. Each tool's tier lives in
-`TOOL_TIER` in `lib/registry.sh` (the AI CLIs use the `ai` tier value). To move
-a tool between tiers, edit that table — no other change required.
+`TOOL_TIER` in `lib/registry.sh` (the AI CLIs use the `ai` tier value; xrdp
+uses `rdp`). To move a tool between tiers, edit that table — no other change
+required.
 
 ### 2. CONFIG_MAP — *what* gets symlinked
 
