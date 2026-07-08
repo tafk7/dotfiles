@@ -13,9 +13,11 @@
 # a silent surprise the next time we write opencode integration code.
 #
 # Usage:
-#   bin/opencode-contract capture   # (re)write the baseline; commit the result
-#   bin/opencode-contract check     # diff live contract vs baseline; exit 1 on drift
-#   bin/opencode-contract show      # print the stored baseline manifest
+#   bin/opencode-contract capture      # (re)write the baseline; commit the result
+#   bin/opencode-contract check        # diff live contract vs baseline; exit 1 on drift
+#   bin/opencode-contract show         # print the stored baseline manifest
+#   bin/opencode-contract docs [dir]   # mirror the full docs tree locally for reading
+#                                      # (default: generated/opencode-docs, gitignored)
 #
 # Needs network (opencode.ai, api.github.com, raw.githubusercontent.com). The
 # runtime section also needs opencode on PATH; it is skipped (with a warning) if
@@ -40,6 +42,17 @@ SRC_FILES=(
     cli/cmd/agent.ts cli/cmd/auth.ts cli/cmd/mcp.ts cli/cmd/models.ts
     cli/cmd/stats.ts cli/cmd/github.ts cli/cmd/acp.ts
 )
+# The prose docs are Astro Starlight markdown in the repo. The rendered
+# opencode.ai/docs site blocks automated fetchers, but the .mdx source doesn't —
+# so the docs ARE reachable/pinnable here. cli.mdx + config.mdx carry the
+# flag/config surface, so they belong in the drift snapshot; `docs` (below)
+# mirrors the full tree for reading.
+DOCS_SRC_DIR="packages/web/src/content/docs"
+DOC_FILES=(cli.mdx config.mdx)
+# (The runtime REST API contract — OpenAPI 3.1 for `opencode serve` — lives at
+# raw .../packages/sdk/openapi.json. It's ~1 MB and churns a lot, and we don't
+# use the server API, so it's intentionally NOT in the drift baseline. Fetch it
+# directly if you ever need it — see docs/opencode-contract.md.)
 # Overridable for testing; the committed baseline lives under docs/.
 BASELINE_DIR="${OPENCODE_CONTRACT_DIR:-$DOTFILES_DIR/docs/opencode-contract}"
 
@@ -80,6 +93,12 @@ fetch_into() {
         out="src.${f//\//.}"
         curl -fsSL --max-time 30 "$base/$f" -o "$dest/$out" \
             || warn "could not fetch src $f @ $tag"
+    done
+
+    local d
+    for d in "${DOC_FILES[@]}"; do
+        curl -fsSL --max-time 30 "https://raw.githubusercontent.com/$REPO/$tag/$DOCS_SRC_DIR/$d" \
+            -o "$dest/doc.$d" || warn "could not fetch doc $d @ $tag"
     done
 
     if command -v opencode >/dev/null 2>&1; then
@@ -141,6 +160,48 @@ cmd_check() {
     fi
 }
 
+# Enumerate every docs .md/.mdx path via the GitHub tree API (needs a token to
+# dodge the 60 req/hr anonymous limit). Empty output => couldn't enumerate.
+list_doc_paths() {
+    local tag="$1"
+    local -a hdr=()
+    [[ -n "${GITHUB_TOKEN:-}" ]] && hdr=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    curl -fsS --max-time 30 "${hdr[@]}" \
+        "https://api.github.com/repos/$REPO/git/trees/$tag?recursive=1" 2>/dev/null \
+        | grep -oE "\"path\"[[:space:]]*:[[:space:]]*\"$DOCS_SRC_DIR/[^\"]*\.mdx?\"" \
+        | cut -d'"' -f4
+}
+
+# Mirror the full docs tree locally for reading/grepping (into gitignored
+# generated/ by default). This is the "docs as an endpoint" — the source the
+# rendered site is built from, pinned to a release tag.
+cmd_docs() {
+    local outdir="${1:-$DOTFILES_DIR/generated/opencode-docs}"
+    local tag; tag="$(resolve_tag)"
+    log "Mirroring opencode docs ($DOCS_SRC_DIR @ $tag) -> $outdir"
+
+    local -a paths=()
+    readarray -t paths < <(list_doc_paths "$tag")
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        error "Could not enumerate docs via the GitHub tree API (rate limit? set GITHUB_TOKEN)."
+        error "Single page on demand: curl -fsSL https://raw.githubusercontent.com/$REPO/$tag/$DOCS_SRC_DIR/<page>.mdx"
+        exit 1
+    fi
+
+    rm -rf "$outdir"; mkdir -p "$outdir"
+    local p rel n=0
+    for p in "${paths[@]}"; do
+        rel="${p#"$DOCS_SRC_DIR"/}"
+        mkdir -p "$outdir/$(dirname "$rel")"
+        if curl -fsSL --max-time 30 "https://raw.githubusercontent.com/$REPO/$tag/$p" -o "$outdir/$rel"; then
+            n=$((n + 1))
+        else
+            warn "fetch failed: $p"
+        fi
+    done
+    success "Mirrored $n/${#paths[@]} doc files to ${outdir#"$DOTFILES_DIR"/} (tag $tag)."
+}
+
 cmd_show() {
     if [[ -f "$BASELINE_DIR/MANIFEST" ]]; then
         cat "$BASELINE_DIR/MANIFEST"
@@ -155,12 +216,13 @@ main() {
         capture) cmd_capture ;;
         check)   cmd_check ;;
         show)    cmd_show ;;
+        docs)    cmd_docs "${2:-}" ;;
         ""|-h|--help)
             sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             ;;
         *)
             error "Unknown command: $1"
-            echo "Usage: opencode-contract [capture|check|show]" >&2
+            echo "Usage: opencode-contract [capture|check|show|docs [outdir]]" >&2
             exit 1
             ;;
     esac
