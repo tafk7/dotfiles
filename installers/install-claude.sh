@@ -17,6 +17,30 @@ FORCE=false
 # PATH (the same reason install_eget_tools resolves eget by absolute path).
 CLAUDE_BIN="$HOME/.local/bin/claude"
 
+# Provision ~/.claude/settings.json with content-safe telemetry defaults
+# (DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING). ONLY when absent — settings.json
+# is a rich, user-owned file (model, permissions, hooks), so we never overwrite
+# it; for an existing file we point at the keys to add. Note: org-managed
+# settings override user settings.json (by design). Auto-update is intentionally
+# NOT disabled here. See configs/claude-settings.json and docs/ai-tools-egress.md.
+provision_claude_settings() {
+    local src="$DOTFILES_DIR/configs/claude-settings.json"
+    local dest="$HOME/.claude/settings.json"
+    [[ -f "$src" ]] || return 0
+    mkdir -p "$(dirname "$dest")"
+
+    if [[ -e "$dest" ]]; then
+        log "Existing $dest left untouched."
+        log "  To harden telemetry, merge the \"env\" keys from configs/claude-settings.json"
+        log "  (see docs/ai-tools-egress.md)."
+        return 0
+    fi
+    cp "$src" "$dest"
+    success "Provisioned ~/.claude/settings.json (telemetry + error reporting off)."
+}
+
+provision_claude_settings
+
 if [[ "$FORCE" != true && -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
     success "Claude Code already installed ($("$CLAUDE_BIN" --version 2>/dev/null | head -n1)); it self-updates."
     exit 2

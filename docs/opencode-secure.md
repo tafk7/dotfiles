@@ -40,9 +40,11 @@ The config:
   exporter to `localhost` (see Layer 2 note);
 - `autoupdate: true` — **kept on** (see allowlist below).
 
-The `shell/tools/opencode.sh` wrapper sets `OTEL_EXPORTER_OTLP_ENDPOINT` to
-`http://localhost:4318` for the opencode process only (overridable) — so OTEL is
-useful locally but never exports off-box. No local collector? It just no-ops.
+OTEL stays useful locally without exporting off-box: opencode's OTLP-HTTP
+exporter **already defaults to `http://localhost:4318`** when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is unset, so with no collector it simply no-ops
+(zero egress). To send traces to an internal collector, set that env var in
+`~/.shell.local`.
 
 ## Layer 2 — the guarantee: enforce at the network
 
