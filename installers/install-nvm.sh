@@ -54,7 +54,12 @@ else
     nvm_installer="$(mktemp)"
     curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh" -o "$nvm_installer"
     log "Running NVM installer from $nvm_installer"
-    run_nvm_command bash "$nvm_installer"
+    # PROFILE=/dev/null tells nvm's installer not to edit any shell rc file.
+    # Our rc files are dotfiles symlinks — editing them writes through into the
+    # tracked repo — and nvm is already wired up by shell/lazy/nvm.sh (lazy load)
+    # plus the $NVM_DIR/default symlink below, so the block nvm would append is
+    # unwanted and redundant (it also eagerly loads nvm, defeating lazy startup).
+    run_nvm_command env PROFILE=/dev/null bash "$nvm_installer"
     rm -f "$nvm_installer"
 
     # Verify installation
