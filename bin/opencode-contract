@@ -18,6 +18,7 @@
 #   bin/opencode-contract show         # print the stored baseline manifest
 #   bin/opencode-contract docs [dir]   # mirror the full docs tree locally for reading
 #                                      # (default: generated/opencode-docs, gitignored)
+#   bin/opencode-contract egress       # list outbound hosts referenced in the source
 #
 # Needs network (opencode.ai, api.github.com, raw.githubusercontent.com). The
 # runtime section also needs opencode on PATH; it is skipped (with a warning) if
@@ -49,6 +50,9 @@ SRC_FILES=(
 # mirrors the full tree for reading.
 DOCS_SRC_DIR="packages/web/src/content/docs"
 DOC_FILES=(cli.mdx config.mdx)
+# Root of the CLI source tree — `egress` scans all *.ts under here when a token
+# lets it enumerate via the tree API.
+SRC_TREE_DIR="packages/opencode/src"
 # (The runtime REST API contract — OpenAPI 3.1 for `opencode serve` — lives at
 # raw .../packages/sdk/openapi.json. It's ~1 MB and churns a lot, and we don't
 # use the server API, so it's intentionally NOT in the drift baseline. Fetch it
@@ -211,18 +215,69 @@ cmd_show() {
     fi
 }
 
+# Enumerate every *.ts under the CLI source tree (needs a token for the tree API).
+list_source_paths() {
+    local tag="$1"
+    local -a hdr=()
+    [[ -n "${GITHUB_TOKEN:-}" ]] && hdr=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    curl -fsS --max-time 30 "${hdr[@]}" \
+        "https://api.github.com/repos/$REPO/git/trees/$tag?recursive=1" 2>/dev/null \
+        | grep -oE "\"path\"[[:space:]]*:[[:space:]]*\"$SRC_TREE_DIR/[^\"]*\.ts\"" \
+        | cut -d'"' -f4
+}
+
+# List the external hosts referenced in the source — the egress surface. NOT a
+# runtime capture: enforce no-egress at the network layer and verify with
+# tcpdump. Value here is (a) a full-tree scan when a token is available, and
+# (b) drift — a self-update that introduces a NEW outbound host shows up so you
+# can decide whether to allowlist or block it.
+cmd_egress() {
+    local tag; tag="$(resolve_tag)"
+    _OC_TMP="$(mktemp -d)"
+
+    local scope
+    local -a paths=()
+    readarray -t paths < <(list_source_paths "$tag")
+    if [[ ${#paths[@]} -gt 0 ]]; then
+        log "Scanning all ${#paths[@]} source files under $SRC_TREE_DIR (tag $tag)..."
+        local p n=0
+        for p in "${paths[@]}"; do
+            if curl -fsSL --max-time 20 "https://raw.githubusercontent.com/$REPO/$tag/$p" \
+                -o "$_OC_TMP/${p//\//.}" 2>/dev/null; then n=$((n + 1)); fi
+        done
+        scope="full source tree ($n/${#paths[@]} files, tag $tag)"
+    else
+        warn "Full source enumeration unavailable (GitHub tree API rate-limited)."
+        warn "Set GITHUB_TOKEN for a complete scan. Falling back to the ${#SRC_FILES[@]} tracked CLI files."
+        fetch_into "$_OC_TMP" "$tag"
+        scope="tracked CLI files only — PARTIAL (set GITHUB_TOKEN for a full scan)"
+    fi
+
+    echo
+    echo "Outbound hosts referenced in the $scope:"
+    # Only *.ts (source) — doc .mdx files are full of example URLs that are noise.
+    grep -rhoE 'https?://[A-Za-z0-9._-]+' "$_OC_TMP" --include='*.ts' 2>/dev/null \
+        | sed -E 's#^https?://##' \
+        | grep -viE '^(localhost|127\.0\.0\.1|0\.0\.0\.0|example\.(com|org|net))$' \
+        | sort -u | sed 's/^/  /'
+    echo
+    echo "Not a runtime capture. For a hard no-egress guarantee, allowlist at the"
+    echo "network layer and verify with tcpdump — see docs/opencode-secure.md."
+}
+
 main() {
     case "${1:-}" in
         capture) cmd_capture ;;
         check)   cmd_check ;;
         show)    cmd_show ;;
         docs)    cmd_docs "${2:-}" ;;
+        egress)  cmd_egress ;;
         ""|-h|--help)
             sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             ;;
         *)
             error "Unknown command: $1"
-            echo "Usage: opencode-contract [capture|check|show|docs [outdir]]" >&2
+            echo "Usage: opencode-contract [capture|check|show|docs [outdir]|egress]" >&2
             exit 1
             ;;
     esac

@@ -15,6 +15,17 @@
 # into the tracked repo, then symlink the binary into ~/.local/bin — already on
 # PATH via shell/env.sh, and where the registry/verify/uninstall expect it (the
 # same approach used for bat/fd).
+#
+# WHY THE OFFICIAL SCRIPT, NOT eget: opencode ships CPU/libc VARIANT builds
+# (opencode-linux-x64, -x64-baseline for CPUs without AVX2, -musl for Alpine).
+# The upstream installer probes /proc/cpuinfo + ldd and picks the right one. A
+# fixed eget asset filter would always grab the AVX2 glibc build and SIGILL on
+# an older work VM (or fail on musl). Do NOT "pin it with eget" without
+# replicating that detection.
+#
+# This script also provisions a hardened, env-driven ~/.config/opencode config
+# (local-endpoint only, share disabled, OTEL local) when OPENCODE_ENDPOINT is
+# set — see configs/opencode.json and docs/opencode-secure.md.
 set -euo pipefail
 
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
@@ -24,6 +35,47 @@ FORCE=false
 
 OPENCODE_REAL="$HOME/.opencode/bin/opencode"   # hardcoded install location
 OPENCODE_LINK="$HOME/.local/bin/opencode"      # our PATH-visible symlink
+
+# Provision the hardened, env-driven config (configs/opencode.json) into
+# ~/.config/opencode. Gated on OPENCODE_ENDPOINT so we never touch a personal
+# machine's opencode config — setting that env var is the "I have a local secure
+# endpoint" signal. Idempotent: won't clobber an existing config without --force.
+# The config uses opencode's {env:VAR} substitution, so it reads OPENCODE_ENDPOINT
+# / OPENCODE_MODEL live at runtime — no re-provisioning needed when they change.
+provision_opencode_config() {
+    local src="$DOTFILES_DIR/configs/opencode.json"
+    local dest="$HOME/.config/opencode/opencode.json"
+
+    if [[ -z "${OPENCODE_ENDPOINT:-}" ]]; then
+        log "OPENCODE_ENDPOINT unset — skipping opencode config provisioning."
+        log "  For a hardened local-endpoint config: set OPENCODE_ENDPOINT (and"
+        log "  OPENCODE_MODEL) in ~/.shell.local, then re-run. See docs/opencode-secure.md."
+        return 0
+    fi
+    if [[ ! -f "$src" ]]; then
+        warn "configs/opencode.json not found — skipping config provisioning."
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$dest")"
+    if [[ -e "$dest" && "$FORCE" != true ]]; then
+        log "opencode config already at $dest — leaving it (use --force to replace)."
+        return 0
+    fi
+    if [[ -e "$dest" ]]; then
+        local bak
+        bak="$dest.dotfiles-bak-$(date +%Y%m%d-%H%M%S)"
+        log "Backing up existing opencode config -> $bak"
+        mv "$dest" "$bak"
+    fi
+    cp "$src" "$dest"
+    success "Provisioned hardened opencode config -> $dest"
+    log "  (reads OPENCODE_ENDPOINT/OPENCODE_MODEL at runtime; providers locked to 'local')"
+}
+
+# Config is independent of the binary install state — provision on every run so
+# it lands even when the binary is already present (the early exits below).
+provision_opencode_config
 
 # Verify by absolute path: on a fresh machine ~/.local/bin is not guaranteed to
 # be on the installer process's PATH.
