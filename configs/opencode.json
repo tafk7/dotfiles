@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
+  "share": "disabled",
+  "experimental": {
+    "openTelemetry": true
+  },
+  "provider": {
+    "local": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "{env:OPENCODE_ENDPOINT}"
+      },
+      "models": {
+        "default": {
+          "name": "Secure local LLM",
+          "id": "{env:OPENCODE_MODEL}"
+        }
+      }
+    }
+  },
+  "model": "local/default",
+  "disabled_providers": ["openai", "anthropic", "google", "openrouter", "azure", "bedrock"]
+}
