@@ -27,6 +27,10 @@ else
 fi
 unset _OPENCODE_BIN
 
-# opencode shortcuts
-alias oc='opencode'          # Launch the TUI
-alias ocr='opencode run'     # One-off prompt (non-interactive)
+# opencode shortcuts. Note: opencode's interactive "continue last session" is an
+# in-TUI command (/continue or /sessions), NOT a top-level CLI flag — so there's
+# no `occ` peer to claude's `clc`. --continue exists only on subcommands (run,
+# attach), hence the run-continue alias below.
+alias oc='opencode'                    # Launch the TUI (new session)
+alias ocr='opencode run'               # One-off prompt (non-interactive)
+alias ocrc='opencode run --continue'   # One-off prompt, continuing the last session
