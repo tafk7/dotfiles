@@ -65,6 +65,13 @@ For tools that need more than `eget`:
    - `set -euo pipefail`
    - Source `lib/install.sh` if needed
    - Exit `0` on install/update, `2` if already up-to-date, `1` on failure
+   - **Never let a vendor installer edit shell rc files.** `~/.bashrc`/`~/.zshrc`
+     are dotfiles symlinks, so an installer that appends a PATH/init block writes
+     straight through into the tracked repo. Suppress it and manage PATH yourself
+     (`~/.local/bin` is already on PATH via `shell/env.sh`, or symlink the binary
+     there like `bat`/`fd`/`opencode`). Suppression varies by tool:
+     `--no-modify-path` (opencode), `PROFILE=/dev/null` (nvm), or install to a
+     dir already on PATH so the installer skips the edit (claude).
 2. Register in `lib/registry.sh`:
    ```bash
    TOOL_BINARY[mytool]=mytool
