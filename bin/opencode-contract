@@ -1,0 +1,169 @@
+#!/bin/bash
+# opencode-contract — snapshot and drift-check opencode's machine-readable contract.
+#
+# Why this exists: opencode self-updates silently and ships patch releases
+# constantly, with no versioned docs and no llms.txt. The pinnable sources of
+# truth are:
+#   1. the installed binary's --help / --version (exact for the running version)
+#   2. the config JSON schema at opencode.ai/config.json + tui.json ("latest")
+#   3. the CLI command source in the repo, pinnable by release tag
+#      (repo moved sst/opencode -> anomalyco/opencode)
+# This tool captures those into a committed baseline, then diffs a fresh capture
+# against it — so a contract change surfaces as a reviewable git diff instead of
+# a silent surprise the next time we write opencode integration code.
+#
+# Usage:
+#   bin/opencode-contract capture   # (re)write the baseline; commit the result
+#   bin/opencode-contract check     # diff live contract vs baseline; exit 1 on drift
+#   bin/opencode-contract show      # print the stored baseline manifest
+#
+# Needs network (opencode.ai, api.github.com, raw.githubusercontent.com). The
+# runtime section also needs opencode on PATH; it is skipped (with a warning) if
+# absent, and unreachable sources warn rather than abort. Export GITHUB_TOKEN to
+# avoid GitHub's 60 req/hr anonymous rate limit (HTTP 403).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+source "$DOTFILES_DIR/lib/runtime.sh"
+
+# Repo is anomalyco/opencode since the SST->Anomaly rename (sst/opencode still
+# redirects for now). config.json/tui.json live on the opencode.ai domain.
+REPO="anomalyco/opencode"
+SCHEMA_URLS=(https://opencode.ai/config.json https://opencode.ai/tui.json)
+# Pinnable CLI/config source (relative to packages/opencode/src). Files absent at
+# a given tag just warn — the diff stays consistent as long as capture and check
+# resolve the same set.
+SRC_FILES=(
+    index.ts
+    cli/cmd/run.ts cli/cmd/serve.ts cli/cmd/upgrade.ts cli/upgrade.ts
+    cli/cmd/agent.ts cli/cmd/auth.ts cli/cmd/mcp.ts cli/cmd/models.ts
+    cli/cmd/stats.ts cli/cmd/github.ts cli/cmd/acp.ts
+)
+# Overridable for testing; the committed baseline lives under docs/.
+BASELINE_DIR="${OPENCODE_CONTRACT_DIR:-$DOTFILES_DIR/docs/opencode-contract}"
+
+# Temp dir for `check`. Script-global (not a function local) so the EXIT trap can
+# clean it up without tripping `set -u` after the function returns.
+_OC_TMP=""
+cleanup() { [[ -n "${_OC_TMP:-}" ]] && rm -rf "$_OC_TMP"; }
+trap cleanup EXIT
+
+# Resolve the latest release tag; fall back to the dev branch on any failure
+# (rate limit, network, lagging /releases/latest pointer).
+resolve_tag() {
+    local -a hdr=()
+    [[ -n "${GITHUB_TOKEN:-}" ]] && hdr=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    local tag
+    tag="$(curl -fsS --max-time 20 "${hdr[@]}" \
+        "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
+        | cut -d'"' -f4 || true)"
+    printf '%s' "${tag:-dev}"
+}
+
+# Fetch every contract artifact into $1, pinning source to tag $2.
+fetch_into() {
+    local dest="$1" tag="$2"
+    mkdir -p "$dest"
+
+    local url name
+    for url in "${SCHEMA_URLS[@]}"; do
+        name="schema.$(basename "$url")"
+        curl -fsSL --max-time 30 "$url" -o "$dest/$name" \
+            || warn "could not fetch $url (schema)"
+    done
+
+    local base="https://raw.githubusercontent.com/$REPO/$tag/packages/opencode/src"
+    local f out
+    for f in "${SRC_FILES[@]}"; do
+        out="src.${f//\//.}"
+        curl -fsSL --max-time 30 "$base/$f" -o "$dest/$out" \
+            || warn "could not fetch src $f @ $tag"
+    done
+
+    if command -v opencode >/dev/null 2>&1; then
+        opencode --version    > "$dest/runtime.version.txt"  2>/dev/null || true
+        opencode --help       > "$dest/runtime.help.txt"     2>&1        || true
+        opencode run --help   > "$dest/runtime.run.help.txt" 2>&1        || true
+    else
+        warn "opencode not on PATH — skipping runtime --help capture"
+    fi
+}
+
+write_manifest() {
+    local dest="$1" tag="$2"
+    {
+        echo "repo: $REPO"
+        echo "release_tag: $tag"
+        echo "captured_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        if command -v opencode >/dev/null 2>&1; then
+            echo "opencode_version: $(opencode --version 2>/dev/null | head -1)"
+        else
+            echo "opencode_version: (not installed at capture)"
+        fi
+    } > "$dest/MANIFEST"
+}
+
+cmd_capture() {
+    local tag; tag="$(resolve_tag)"
+    log "Capturing opencode contract (repo $REPO, tag $tag)..."
+    rm -rf "$BASELINE_DIR"
+    fetch_into "$BASELINE_DIR" "$tag"
+    write_manifest "$BASELINE_DIR" "$tag"
+    success "Baseline written to ${BASELINE_DIR#"$DOTFILES_DIR"/} — review and commit it."
+}
+
+cmd_check() {
+    [[ -d "$BASELINE_DIR" ]] || {
+        error "No baseline found at $BASELINE_DIR"
+        error "Create one first: bin/opencode-contract capture"
+        exit 1
+    }
+    local tag; tag="$(resolve_tag)"
+    log "Checking live opencode contract (tag $tag) against baseline..."
+
+    _OC_TMP="$(mktemp -d)"
+    fetch_into "$_OC_TMP" "$tag"
+
+    # MANIFEST carries the tag/date/version and always differs — exclude it; the
+    # content artifacts are the contract.
+    local report
+    if report="$(diff -rq -x MANIFEST "$BASELINE_DIR" "$_OC_TMP" 2>&1)"; then
+        success "opencode contract UNCHANGED vs baseline (tag $tag)"
+    else
+        warn "DRIFT DETECTED — the opencode contract moved:"
+        printf '%s\n' "$report" | sed 's/^/  /'
+        echo
+        echo "Inspect the diffs, update any affected installer/wrapper/aliases,"
+        echo "then re-baseline: bin/opencode-contract capture"
+        exit 1
+    fi
+}
+
+cmd_show() {
+    if [[ -f "$BASELINE_DIR/MANIFEST" ]]; then
+        cat "$BASELINE_DIR/MANIFEST"
+    else
+        error "No baseline manifest at $BASELINE_DIR — run: bin/opencode-contract capture"
+        exit 1
+    fi
+}
+
+main() {
+    case "${1:-}" in
+        capture) cmd_capture ;;
+        check)   cmd_check ;;
+        show)    cmd_show ;;
+        ""|-h|--help)
+            sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+            ;;
+        *)
+            error "Unknown command: $1"
+            echo "Usage: opencode-contract [capture|check|show]" >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
