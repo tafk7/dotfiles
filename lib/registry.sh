@@ -97,7 +97,7 @@ declare -A TOOL_PATHS=(
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
     [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
     [codex]="\$HOME/.local/bin/codex"
-    [opencode]="\$HOME/.local/bin/opencode"
+    [opencode]="\$HOME/.local/bin/opencode \$HOME/.opencode"
 )
 
 # TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
