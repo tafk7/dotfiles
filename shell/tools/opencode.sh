@@ -15,13 +15,8 @@ _OPENCODE_BIN=$(command -v opencode 2>/dev/null || true)
 
 if [[ -n "$_OPENCODE_BIN" ]]; then
     opencode() {
-        # opencode's OpenTelemetry (experimental.openTelemetry) exports via OTLP-HTTP.
-        # Pin the exporter to localhost — scoped to this process, not the global env —
-        # so traces never leave the box unless you deliberately point it at an internal
-        # collector. No collector listening? It just no-ops (refused/dropped), zero egress.
         # OPENCODE_FLAGS intentionally unquoted — allows multiple space-separated flags
-        OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}" \
-            "$_OPENCODE_BIN" ${OPENCODE_FLAGS:-} "$@"
+        "$_OPENCODE_BIN" ${OPENCODE_FLAGS:-} "$@"
     }
 else
     opencode() {

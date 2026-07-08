@@ -18,6 +18,34 @@ FORCE=false
 CODEX_BIN="$HOME/.local/bin/codex"
 AI_CONFIG="${DOTFILES_DIR:-$HOME/dotfiles}/eget-ai.toml"
 
+# Provision a hardened ~/.codex/config.toml — chiefly to disable Codex's default
+# metrics export to OpenAI's Statsig endpoint (ab.chatgpt.com). Only when absent
+# (never clobber an existing config, which holds auth/model/providers); for an
+# existing config that lacks the setting, warn with the fix instead of silently
+# skipping. See configs/codex.toml and docs/ai-tools-egress.md.
+provision_codex_config() {
+    local src="$DOTFILES_DIR/configs/codex.toml"
+    local dest="$HOME/.codex/config.toml"
+    [[ -f "$src" ]] || return 0
+    mkdir -p "$(dirname "$dest")"
+
+    if [[ -e "$dest" ]]; then
+        if ! grep -q 'metrics_exporter' "$dest" 2>/dev/null; then
+            warn "Existing $dest has no [otel] metrics_exporter."
+            warn "Stock Codex exports metrics to ab.chatgpt.com by default. To disable, add:"
+            warn "    [otel]"
+            warn "    metrics_exporter = \"none\""
+        fi
+        return 0
+    fi
+    cp "$src" "$dest"
+    success "Provisioned hardened ~/.codex/config.toml (metrics export disabled)."
+}
+
+# Config is independent of the binary — provision on every run so it lands even
+# when the binary is already present (the early exits below).
+provision_codex_config
+
 if [[ "$FORCE" != true && -x "$CODEX_BIN" ]] && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex already installed ($("$CODEX_BIN" --version 2>/dev/null | head -n1))."
     exit 2

@@ -1,0 +1,27 @@
+# Codex config — dotfiles-provisioned hardening (~/.codex/config.toml).
+# Written by installers/install-codex.sh ONLY when no config exists yet; it never
+# clobbers an existing one. Edit freely — add your auth/model/providers here.
+
+# Disable Codex's default-on metrics export. In release builds, stock Codex sends
+# OpenTelemetry METRICS to OpenAI's Statsig endpoint (https://ab.chatgpt.com/
+# otlp/v1/metrics) by default — metrics only, no prompt/code content, but still a
+# third-party call. "none" turns it off. Traces and logs are already off by
+# default; log_user_prompt = false keeps prompt text out of any traces you enable.
+[otel]
+metrics_exporter = "none"
+log_user_prompt = false
+
+# ── Routing Codex at a local/secure endpoint (optional; fill in and uncomment) ──
+# NOTE: Codex requires the OpenAI *Responses* API — wire_api = "chat" was removed,
+# so the endpoint must implement /v1/responses, not just chat/completions.
+# base_url is a literal (no env substitution); the API key is read from the env
+# var named by env_key. See docs/ai-tools-egress.md.
+#
+# model_provider = "local"
+# model = "your-model-id"
+#
+# [model_providers.local]
+# name = "Secure local LLM"
+# base_url = "https://your-internal-llm.example/v1"
+# wire_api = "responses"
+# env_key = "CODEX_API_KEY"
