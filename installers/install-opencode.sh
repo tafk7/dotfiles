@@ -32,6 +32,16 @@ if [[ "$FORCE" != true && -x "$OPENCODE_LINK" ]] && "$OPENCODE_LINK" --version >
     exit 2
 fi
 
+# opencode already present at its real location but not yet linked (a prior
+# install, or the installer's own default PATH setup) — just adopt it by
+# (re)creating our symlink, no re-download needed.
+if [[ "$FORCE" != true && -x "$OPENCODE_REAL" ]] && "$OPENCODE_REAL" --version >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$OPENCODE_REAL" "$OPENCODE_LINK"
+    success "opencode already installed at $OPENCODE_REAL; linked into ~/.local/bin."
+    exit 0
+fi
+
 # Don't shadow an externally-managed opencode. On org-managed machines the CLI
 # is provided elsewhere on PATH; installing our own copy would silently override
 # it (shell/env.sh prepends ~/.local/bin). Our own symlink and opencode's own
