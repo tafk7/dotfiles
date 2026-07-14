@@ -3,11 +3,16 @@
 # Scoped to staged files only. Silent on success; verbose on failure.
 #
 # Checks:
-#   1. bash -n on staged shell files
-#   2. shellcheck --severity=warning (skipped with info note if not installed)
-#   3. shell/shortcuts-index.tsv: every non-comment row has 4 │-separated fields
+#   1. Protected paths — core files deployed as $HOME symlinks are subject to
+#      write-through from external installers (rustup, nvm, …) and manual edits.
+#      Staging one is blocked unless acknowledged, so a stray change (e.g. a
+#      leaked SSH key path) can't ride along in an unrelated `git add`.
+#   2. bash -n on staged shell files
+#   3. shellcheck --severity=warning (skipped with info note if not installed)
+#   4. shell/shortcuts-index.tsv: every non-comment row has 4 │-separated fields
 #
-# Bypass: git commit --no-verify
+# Bypass: ALLOW_PROTECTED=1 git commit   (protected-paths gate only)
+#         git commit --no-verify         (all checks)
 #
 # Installed by bin/install-git-hooks (default symlink → ../../hooks/pre-commit).
 
@@ -27,6 +32,23 @@ note() { echo "${DIM}  $*${NC}" >&2; }
 
 mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR)
 [[ ${#STAGED[@]} -eq 0 ]] && exit 0
+
+# Core files deployed as symlinks into $HOME (see CONFIG_MAP in lib/config.sh).
+# Because the target is a symlink, any installer or manual edit writes straight
+# through into the tracked file, and a broad `git add` then stages it silently.
+# These rarely change on purpose — require an explicit ack so accidental edits
+# surface instead of riding along. Add a path here when a new symlinked config
+# should be guarded.
+PROTECTED_PATHS=(
+    configs/ssh_config
+    configs/gitconfig
+    entry/bash.sh
+    entry/bash_profile
+    entry/profile.sh
+    entry/zsh.sh
+    entry/zprofile
+    entry/zshenv
+)
 
 is_shell_file() {
     case "$1" in
@@ -48,7 +70,27 @@ done
 
 errors=0
 
-# Check 1: bash -n syntax
+# Check 1: protected paths (skip the gate if explicitly acknowledged)
+if [[ -z "${ALLOW_PROTECTED:-}" ]]; then
+    HIT=()
+    for f in "${STAGED[@]}"; do
+        for p in "${PROTECTED_PATHS[@]}"; do
+            [[ "$f" == "$p" ]] && HIT+=("$f")
+        done
+    done
+    if [[ ${#HIT[@]} -gt 0 ]]; then
+        fail "staged change to protected file(s):"
+        for f in "${HIT[@]}"; do note "$f"; done
+        note ""
+        note "These deploy as \$HOME symlinks; edits (incl. installer write-through)"
+        note "should be intentional. Review the diff:"
+        note "  git diff --cached ${HIT[*]}"
+        note "Then re-commit with: ALLOW_PROTECTED=1 git commit ..."
+        ((errors++))
+    fi
+fi
+
+# Check 2: bash -n syntax
 for f in "${SHELL_FILES[@]}"; do
     if ! bash -n "$f" 2>/tmp/precommit-bashn.$$; then
         fail "syntax error in $f"
@@ -58,7 +100,7 @@ for f in "${SHELL_FILES[@]}"; do
 done
 rm -f /tmp/precommit-bashn.$$
 
-# Check 2: shellcheck (soft-skip if missing)
+# Check 3: shellcheck (soft-skip if missing)
 if [[ ${#SHELL_FILES[@]} -gt 0 ]]; then
     if command -v shellcheck >/dev/null 2>&1; then
         if ! shellcheck --severity=warning "${SHELL_FILES[@]}" >/tmp/precommit-sc.$$ 2>&1; then
@@ -72,7 +114,7 @@ if [[ ${#SHELL_FILES[@]} -gt 0 ]]; then
     fi
 fi
 
-# Check 3: TSV well-formed
+# Check 4: TSV well-formed
 if [[ "$TSV_STAGED" == "true" ]]; then
     bad_lines=$(awk -F'│' '!/^[[:space:]]*#/ && NF>0 && NF!=4 {printf "    line %d: %d fields (want 4)\n", NR, NF}' shell/shortcuts-index.tsv)
     if [[ -n "$bad_lines" ]]; then
