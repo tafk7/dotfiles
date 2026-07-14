@@ -12,10 +12,17 @@
 # via _DOTFILES_ENV_LOADED. Re-sourcing from .zprofile or .zshrc later is
 # a no-op (env-runtime.sh re-runs intentionally — it must, for `reload`).
 
+# Symlink derivation locates the repo for a fresh clone, but a bind-mount/copy
+# (containers, WSL, rsync) flattens the symlink so readlink resolves to the file
+# itself → a wrong dir. generated/bridge.sh holds the install-time truth, so let
+# it OVERRIDE the guess: try the derived path, then the conventional location.
 DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshenv 2>/dev/null)")")"
 export DOTFILES_DIR
 
-[[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
+for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dotfiles/generated/bridge.sh"; do
+    [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
+done
+unset _bridge
 
 # POSIX baseline + env (mirrors the bash entry chain via ~/.bashrc → ~/.profile)
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
