@@ -29,6 +29,7 @@ declare -A TOOL_BINARY=(
     [tmux]=tmux
     [plantuml]=plantuml
     [nvm]=nvm
+    [rust]=rustc
     [claude]=claude
     [codex]=codex
     [opencode]=opencode
@@ -58,6 +59,7 @@ declare -A TOOL_METHOD=(
     [tmux]=installer
     [plantuml]=installer
     [nvm]=installer
+    [rust]=installer
     [claude]=installer
     [codex]=installer
     [opencode]=installer
@@ -78,13 +80,14 @@ declare -A TOOL_TIER=(
     [wsl2-ssh-agent]=dev
     [claude]=ai       [codex]=ai       [opencode]=ai
     [xrdp]=rdp
-    [nvm]=work
+    [nvm]=work        [rust]=work
 )
 
 # TOOL_VERIFY: tool name → verification command (exit 0 = pass)
 # Empty = use "command -v TOOL_BINARY[name]"
 declare -A TOOL_VERIFY=(
     [nvm]='test -s "$HOME/.nvm/nvm.sh"'
+    [rust]='command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1'
     # Binary present isn't success for a service — it must be running.
     [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
 )
@@ -94,6 +97,7 @@ declare -A TOOL_VERIFY=(
 declare -A TOOL_PATHS=(
     [neovim]="\$HOME/.local/bin/nvim \$HOME/.local/nvim"
     [nvm]="\$HOME/.nvm"
+    [rust]="\$HOME/.cargo \$HOME/.rustup"
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
     [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
     [codex]="\$HOME/.local/bin/codex"
@@ -104,6 +108,7 @@ declare -A TOOL_PATHS=(
 # Only for tools that need manual steps beyond path deletion.
 declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
+    [rust]="rustup self uninstall -y  # removes \$HOME/.cargo and \$HOME/.rustup"
     [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
     [codex]="rm -f \$HOME/.local/bin/codex  # ~/.codex config/sessions are preserved"
     [opencode]="rm -f \$HOME/.local/bin/opencode  # ~/.config/opencode config is preserved"

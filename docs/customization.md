@@ -34,7 +34,7 @@ Groups are mapped to tiers in `lib/install.sh`:
 
 - `install_shell_packages` → core + development + modern + languages + terminal (+ wsl on WSL)
 - `install_dev_packages`   → diagramming
-- `install_work_packages`  → docker
+- `install_work_packages`  → docker (+ nvm/node and the rust toolchain via installers)
 - `install_ai_packages`    → (no apt packages; runs the claude + codex installers)
 - `install_rdp_packages`   → rdp (then runs the xrdp config installer)
 
