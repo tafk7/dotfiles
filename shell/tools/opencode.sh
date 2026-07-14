@@ -15,8 +15,11 @@ _OPENCODE_BIN=$(command -v opencode 2>/dev/null || true)
 
 if [[ -n "$_OPENCODE_BIN" ]]; then
     opencode() {
+        # Resolve via PATH at call time (`command` bypasses this function) rather
+        # than capturing $_OPENCODE_BIN — it's unset just below, so a captured
+        # reference would expand to "" and try to run the empty string.
         # OPENCODE_FLAGS intentionally unquoted — allows multiple space-separated flags
-        "$_OPENCODE_BIN" ${OPENCODE_FLAGS:-} "$@"
+        command opencode ${OPENCODE_FLAGS:-} "$@"
     }
 else
     opencode() {
