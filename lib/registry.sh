@@ -15,6 +15,7 @@ declare -A TOOL_BINARY=(
     [zoxide]=zoxide
     [delta]=delta
     [btop]=btop
+    [gdu]=gdu
     [glow]=glow
     [lazygit]=lazygit
     [uv]=uv
@@ -45,6 +46,7 @@ declare -A TOOL_METHOD=(
     [zoxide]=eget
     [delta]=eget
     [btop]=eget
+    [gdu]=eget
     [glow]=eget
     [lazygit]=eget
     [uv]=eget
@@ -75,7 +77,7 @@ declare -A TOOL_TIER=(
     [starship]=shell  [eza]=shell     [fzf]=shell      [zoxide]=shell
     [delta]=shell     [btop]=shell    [glow]=shell      [lazygit]=shell
     [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
-    [direnv]=shell    [eget]=shell    [sd]=shell
+    [direnv]=shell    [eget]=shell    [sd]=shell       [gdu]=shell
     [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
     [wsl2-ssh-agent]=dev
     [claude]=ai       [codex]=ai       [opencode]=ai
