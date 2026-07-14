@@ -2,10 +2,17 @@
 # Bash configuration
 # Owns: shell options, history, completion, bash-specific settings
 
-# Derive DOTFILES_DIR from symlink — always works regardless of install state
+# Establish DOTFILES_DIR. Symlink derivation locates the repo for a fresh clone,
+# but a bind-mount/copy (containers, WSL, rsync) flattens the symlink so
+# readlink resolves to the file itself → a wrong dir. generated/bridge.sh holds
+# the install-time truth, so let it OVERRIDE the guess: try the derived path,
+# then the conventional location; bridge.sh's `export` wins either way.
 DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 export DOTFILES_DIR
-[[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
+for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dotfiles/generated/bridge.sh"; do
+    [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
+done
+unset _bridge
 
 # Non-interactive: just set PATH baseline and stop
 if [[ $- != *i* ]]; then

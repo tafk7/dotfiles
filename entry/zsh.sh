@@ -8,9 +8,15 @@
 # out of or symlinked manually but .zshrc wasn't. Profile sourcing is
 # idempotent via _PROFILE_LOADED.
 if [[ -z "${DOTFILES_DIR:-}" ]]; then
+    # readlink locates the repo, but a flattened symlink (bind-mount/copy) makes
+    # it resolve wrong; let generated/bridge.sh override with the install-time
+    # truth — try the derived path, then the conventional location.
     DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
     export DOTFILES_DIR
-    [[ -f "$DOTFILES_DIR/generated/bridge.sh" ]] && source "$DOTFILES_DIR/generated/bridge.sh"
+    for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dotfiles/generated/bridge.sh"; do
+        [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
+    done
+    unset _bridge
     [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
 fi
 
