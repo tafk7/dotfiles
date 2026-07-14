@@ -144,12 +144,17 @@ if command -v docker >/dev/null 2>&1; then
     echo "Docker"
     echo "─────────────────────────────────────"
 
-    if grep "^docker:" /etc/group 2>/dev/null | grep -q "\b$USER\b"; then
-        if groups | grep -q docker; then
-            check_pass "docker group (active)"
-        else
-            check_warn "docker group (added — restart shell to activate)"
-        fi
+    # Ground truth for "can I use docker now" is the current process's groups
+    # (id -nG with no arg), which reflects login-time membership resolved via
+    # nsswitch. Don't grep /etc/group or do a fresh `id -nG "$USER"` lookup:
+    # directory-backed setups (LDAP/SSS/AD) supply docker membership outside the
+    # local file, and a by-name lookup can even return a different set than the
+    # live session, so both false-negative. getent catches the "added but not yet
+    # active in this session" case (membership exists but login predates it).
+    if id -nG 2>/dev/null | grep -qw docker; then
+        check_pass "docker group (active)"
+    elif getent group docker 2>/dev/null | grep -qw "$USER"; then
+        check_warn "docker group (added — restart shell to activate)"
     else
         check_fail "not in docker group (sudo usermod -aG docker $USER)"
     fi

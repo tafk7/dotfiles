@@ -34,6 +34,15 @@ asset_filters = [".tar.gz", "gnu"]
 ["aristocratos/btop"]
 tag = "v1.4.6"
 
+["dundee/gdu"]
+tag = "v5.36.1"
+# The release ships one binary per platform, each named for its target. The
+# amd64 static build's name is a unique substring among the assets.
+asset_filters = ["gdu_linux_amd64_static"]
+# The archive's binary is named gdu_linux_amd64_static; a file-path target
+# renames it to plain `gdu` on install.
+target = "~/.local/bin/gdu"
+
 ["charmbracelet/glow"]
 tag = "v2.1.1"
 asset_filters = [".tar.gz", "^sbom"]
