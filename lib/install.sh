@@ -795,6 +795,9 @@ install_work_packages() {
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" true
+    # Rust toolchain (userspace, no sudo). Non-critical: unlike node (which
+    # underpins the AI CLIs), nothing else in setup depends on it.
+    run_installer "rust"
 
     success "Work tier installation complete"
 }
