@@ -651,7 +651,6 @@ install_dev_packages() {
     log "Installing dev tier tools via scripts..."
     run_installer "tmux"
     run_installer "neovim"
-    run_installer "plantuml"
 
     success "Dev tier installation complete"
 }

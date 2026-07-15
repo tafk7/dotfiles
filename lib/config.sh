@@ -55,6 +55,6 @@ declare -A PACKAGES=(
     [languages]="python3-pip"
     [wsl]="socat wslu sox libsox-fmt-pulse"  # sox + pulse backend: mic capture for Claude Code /voice via WSLg (plain sox pulls ALSA, which has no /dev/snd in WSL)
     [docker]="docker-ce docker-ce-cli containerd.io docker-compose-plugin"
-    [diagramming]="default-jre graphviz"
+    [diagramming]="graphviz"
     [rdp]="xrdp xorgxrdp xfce4 xfce4-goodies"  # RDP server + Xorg backend + XFCE session (xrdp ships no desktop)
 )

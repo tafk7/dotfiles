@@ -282,5 +282,4 @@ wsl│wpath│Convert Linux path to Windows format│wslpath -w
 wsl│lpath│Convert Windows path to Linux format│wslpath -u
 
 # Diagramming shortcuts
-diagramming│plantuml│Generate diagrams from text (UML, sequence, etc.)│plantuml <file.puml>
 diagramming│dot│Render Graphviz DOT graph to image│dot -Tpng input.dot -o output.png
