@@ -28,7 +28,6 @@ declare -A TOOL_BINARY=(
     [shellcheck]=shellcheck
     [neovim]=nvim
     [tmux]=tmux
-    [plantuml]=plantuml
     [nvm]=nvm
     [rust]=rustc
     [claude]=claude
@@ -59,7 +58,6 @@ declare -A TOOL_METHOD=(
     [shellcheck]=eget
     [neovim]=installer
     [tmux]=installer
-    [plantuml]=installer
     [nvm]=installer
     [rust]=installer
     [claude]=installer
@@ -78,7 +76,7 @@ declare -A TOOL_TIER=(
     [delta]=shell     [btop]=shell    [glow]=shell      [lazygit]=shell
     [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
     [direnv]=shell    [eget]=shell    [sd]=shell       [gdu]=shell
-    [neovim]=dev      [tmux]=dev      [plantuml]=dev   [shellcheck]=dev
+    [neovim]=dev      [tmux]=dev      [shellcheck]=dev
     [wsl2-ssh-agent]=dev
     [claude]=ai       [codex]=ai       [opencode]=ai
     [xrdp]=rdp
