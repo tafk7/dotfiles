@@ -25,6 +25,7 @@ FORCE_REINSTALL=false
 SHOW_HELP=false
 DRY_RUN=false
 NO_HOOKS=false
+NO_GIT=false          # --no-git: skip ~/.gitconfig entirely (no prompt, no write).
 
 # Git identity (optional; falls back to existing config or interactive prompt).
 # Read by process_git_config() in lib/install.sh.
@@ -90,6 +91,10 @@ parse_arguments() {
                 ;;
             --no-hooks)
                 NO_HOOKS=true
+                shift
+                ;;
+            --no-git)
+                NO_GIT=true
                 shift
                 ;;
             --git-name)
@@ -187,6 +192,8 @@ OPTIONS:
     --force             Force overwrite configs and reinstall tools
     --dry-run           Preview actions without making changes
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
+    --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
+                        one alone). Also skips the delta pager wiring.
     --git-name NAME     Set git user.name (for non-interactive installs)
     --git-email EMAIL   Set git user.email (for non-interactive installs)
     --help              Show this help message
@@ -338,6 +345,10 @@ phase_setup_configs() {
                 log "  ⊘ $target (skipped — $owner not installed)"
                 continue
             fi
+            if [[ "$type" == "gitconfig" && "$NO_GIT" == "true" ]]; then
+                log "  ⊘ $target (skipped — --no-git)"
+                continue
+            fi
             if [[ -e "$target" ]]; then
                 if [[ -L "$target" ]]; then
                     log "  ↻ $target (symlink exists - would update)"
@@ -371,7 +382,11 @@ phase_setup_configs() {
                     process_symlink "$source" "$target" "$backup_dir"
                     ;;
                 gitconfig)
-                    process_git_config "$source" "$target" "$backup_dir" "$FORCE_OVERWRITE"
+                    if [[ "$NO_GIT" == "true" ]]; then
+                        log "Skipping $target (--no-git)"
+                    else
+                        process_git_config "$source" "$target" "$backup_dir" "$FORCE_OVERWRITE"
+                    fi
                     ;;
                 *)
                     error "Unknown config type: $type for $config"
