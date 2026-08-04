@@ -15,8 +15,22 @@
 _PROFILE_LOADED=1
 
 # Layer 1: POSIX baseline (works in dash, sh, ash, bash, zsh)
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
+# Only claim a UTF-8 locale that's actually generated. On a managed box where the
+# bash tier can't sudo locale-gen, forcing LANG to a missing locale makes every
+# tool spew `setlocale: LC_*: cannot change locale` warnings. Prefer en_US.UTF-8,
+# fall back to C.UTF-8 (always UTF-8, no region), else leave LANG as the OS set it
+# — a working, if non-UTF-8, default. `locale -a` is POSIX; guard on availability
+# so this stays dash-safe on minimal systems.
+if command -v locale >/dev/null 2>&1; then
+    _locales=$(locale -a 2>/dev/null)
+    if printf '%s\n' "$_locales" | grep -qiE '^en_US\.utf-?8$'; then
+        export LANG=en_US.UTF-8
+        export LANGUAGE=en_US.UTF-8
+    elif printf '%s\n' "$_locales" | grep -qiE '^C\.utf-?8$'; then
+        export LANG=C.UTF-8
+    fi
+    unset _locales
+fi
 # LC_ALL is intentionally NOT set — it's a temporary override that forces every
 # locale category and prevents tools/child shells from selecting their own.
 # LANG provides the default; set per-category LC_* vars if you need finer control.
