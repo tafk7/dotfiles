@@ -87,13 +87,15 @@ for tier in bash dev work ai rdp; do
         if eval "$verify_cmd"; then
             check_pass "$label"
         else
-            # Optional tools — warn, not fail:
+            # Only the bash tier is the guaranteed baseline (its eget binaries
+            # install with no sudo, so any --bash+ run should have them). Every
+            # tier above bash is opt-in — verify can't know which tier you chose —
+            # so a missing dev/work/ai/rdp tool warns rather than fails:
+            #   - dev tier (neovim/tmux/shellcheck) only present with --dev+
             #   - work tier (nvm/docker/azure) is opt-in
             #   - ai tier (claude/codex) is opt-in and may be org-managed
             #   - rdp tier (xrdp) is opt-in per machine
-            #   - installer-based tools above the bash tier
-            if [[ "$tier" == "work" || "$tier" == "ai" || "$tier" == "rdp" ]] \
-               || [[ "${TOOL_METHOD[$name]}" == "installer" && "$tier" != "bash" ]]; then
+            if [[ "$tier" != "bash" ]]; then
                 check_warn "$label (not installed)"
             else
                 check_fail "$label (not found)"

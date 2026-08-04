@@ -80,7 +80,7 @@ declare -A TOOL_TIER=(
     [uv]=bash         [bat]=bash      [fd]=bash        [ripgrep]=bash
     [direnv]=bash     [eget]=bash     [sd]=bash        [gdu]=bash
     [neovim]=dev      [tmux]=dev      [shellcheck]=dev
-    [wsl2-ssh-agent]=dev
+    [wsl2-ssh-agent]=bash
     [claude]=ai       [codex]=ai       [opencode]=ai
     [xrdp]=rdp
     [nvm]=work        [rust]=work
