@@ -678,7 +678,12 @@ install_eget_tools() {
             continue
         fi
         EGET_CONFIG="$config" "$eget_bin" "$slug" || true
-        if verify_binary "${TOOL_BINARY[$name]}"; then
+        # Judge by the binary on disk at our prefix, NOT command -v: on a fresh
+        # machine ~/.local/bin isn't on PATH yet, so a PATH lookup would report
+        # every just-installed tool as failed. eget lands each tool at
+        # ~/.local/bin/<binary> (the global target, or the per-tool file-path
+        # target which renames to that same path).
+        if [[ -x "$HOME/.local/bin/${TOOL_BINARY[$name]}" ]]; then
             track_install "$name" ok
         else
             track_install "$name" fail

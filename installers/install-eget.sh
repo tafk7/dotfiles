@@ -42,9 +42,14 @@ tar xf eget.tar.gz
 mkdir -p "$HOME/.local/bin"
 install -D "eget-${EGET_VERSION}-linux_${EGET_ARCH}/eget" "$HOME/.local/bin/eget"
 
-if verify_binary eget; then
+# Verify the binary we just wrote, by absolute path — NOT via command -v. On a
+# fresh machine ~/.local/bin isn't on PATH yet (Ubuntu's ~/.profile only adds it
+# if it existed at login, and the dotfiles shell configs aren't loaded in this
+# session), so a PATH lookup would report a false failure for a perfectly good
+# install. Same reason install_eget_tools resolves eget by absolute path.
+if "$HOME/.local/bin/eget" --version >/dev/null 2>&1; then
     success "eget v${EGET_VERSION} installed"
 else
-    error "eget installation failed"
+    error "eget installation failed — binary at \$HOME/.local/bin/eget does not run"
     exit 1
 fi
