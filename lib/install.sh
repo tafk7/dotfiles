@@ -690,7 +690,10 @@ install_eget_tools() {
             any_missing=true
         fi
     done
-    [[ "$any_missing" == true ]] && warn "Some eget tools are missing after install (see summary)"
+    if [[ "$any_missing" == true ]]; then
+        warn "Some eget tools are missing after install (see summary)"
+    fi
+    return 0
 }
 
 # ==============================================================================
