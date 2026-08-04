@@ -362,14 +362,20 @@ process_git_config() {
             fi
         fi
     else
-        # Non-interactive: explicit values, then existing config, else fail.
+        # Non-interactive: explicit values, then existing config, else skip.
         # Never silently fabricate $USER@$HOSTNAME — that produces bogus commits.
         [[ -z "$git_name" ]] && git_name="$existing_name"
         [[ -z "$git_email" ]] && git_email="$existing_email"
         if [[ -z "$git_name" || -z "$git_email" ]]; then
-            error "Git identity required but not provided in non-interactive mode."
-            error "Pass --git-name/--git-email or set DOTFILES_GIT_NAME/DOTFILES_GIT_EMAIL."
-            exit 1
+            # Skip rather than abort. The rest of the gitconfig (delta pager,
+            # aliases, colors) is worth having, but we won't write a template
+            # with unresolved {{GIT_NAME}} placeholders. A no-sudo bootstrap on a
+            # managed box (curl | bash, no tty, no identity yet) must not hard-fail
+            # the whole install over this — leave any existing ~/.gitconfig intact
+            # and let the user set identity, then re-run.
+            warn "Git identity not provided — skipping ~/.gitconfig."
+            warn "Set it with --git-name/--git-email (or DOTFILES_GIT_NAME/DOTFILES_GIT_EMAIL) and re-run."
+            return 0
         fi
         log "Using git identity: $git_name <$git_email>"
     fi
