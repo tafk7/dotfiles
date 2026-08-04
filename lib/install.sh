@@ -572,11 +572,20 @@ install_eget_tools() {
         return 1
     fi
 
-    # Collect eget tool names from registry
+    # Collect eget tool names from registry, honoring the selected tier. This
+    # function runs from install_bash_packages, which fires at bash tier and up
+    # (cumulative chain), so gating each tool on tier_includes its own tier keeps
+    # a dev-tier eget tool (e.g. shellcheck) out of a --bash run but pulls it in
+    # at --dev. tier_includes lives in setup.sh; if this is ever called with it
+    # undefined (installer sourcing lib standalone), fall back to installing all.
     local -a eget_tools=()
     local name
     for name in "${!TOOL_METHOD[@]}"; do
-        [[ "${TOOL_METHOD[$name]}" == "eget" ]] && eget_tools+=("$name")
+        [[ "${TOOL_METHOD[$name]}" == "eget" ]] || continue
+        if declare -F tier_includes >/dev/null 2>&1; then
+            tier_includes "${TOOL_TIER[$name]}" || continue
+        fi
+        eget_tools+=("$name")
     done
 
     # Respect system-managed copies. A binary already on PATH outside our prefix
