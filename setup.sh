@@ -15,7 +15,7 @@ export DOTFILES_DIR
 source "$SCRIPT_DIR/lib/install.sh"
 
 # Installation options
-INSTALL_TIER="config"  # Default tier: config, shell, dev, work
+INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool flag).
 AI_ALL=false           # --ai / --full: install every ai-tier tool.
 declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode.
@@ -36,11 +36,13 @@ parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --config)
+                # Reconcile action: lay down base configs + configs for whatever
+                # tools are currently installed. No package installs, no sudo.
                 INSTALL_TIER="config"
                 shift
                 ;;
-            --shell)
-                INSTALL_TIER="shell"
+            --bash)
+                INSTALL_TIER="bash"
                 shift
                 ;;
             --dev)
@@ -111,41 +113,51 @@ parse_arguments() {
     done
 }
 
-# Check if current tier includes the required tier level
-# AI tooling (claude, codex) is NOT part of this chain — it is gated by the
-# orthogonal INSTALL_AI flag so an org-managed AI install can be left alone.
+# Check if current tier includes the required tier level.
+# Cumulative chain: config → bash → dev → work. The sudo boundary sits at dev
+# (bash is eget-only, no root). AI tooling (claude, codex) is NOT part of this
+# chain — it is gated by the orthogonal INSTALL_AI flag so an org-managed AI
+# install can be left alone.
 tier_includes() {
     local required="$1"
     case "$INSTALL_TIER" in
         work) return 0 ;;
         dev) [[ "$required" != "work" ]] ;;
-        shell) [[ "$required" == "config" || "$required" == "shell" ]] ;;
+        bash) [[ "$required" == "config" || "$required" == "bash" ]] ;;
         config) [[ "$required" == "config" ]] ;;
     esac
 }
 
 # Show help information
 show_help() {
-    cat << EOF
+    cat << 'EOF'
 Dotfiles Installation Script - Tiered Installation System
 
 USAGE:
-    ./setup.sh [TIER] [OPTIONS]
+    ./setup.sh <TIER|ACTION> [OPTIONS]
+
+    Bare `./setup.sh` (no arguments) prints this help and changes nothing —
+    installing packages and rewriting $HOME configs must always be explicit.
+
+    --config            Reconcile action: (re)create symlinks for base configs
+                        plus configs for whatever tools are already installed.
+                        Zero package installs. No sudo. Safe to re-run anytime —
+                        it syncs your symlinks to what's actually on the system.
 
 TIERS (cumulative - each tier includes all previous tiers):
-    --config            Symlinks only. Zero installs. No sudo required.
-                        Creates symlinks for all configuration files.
+    --bash              Config + modern CLI tools. NO SUDO — every tool installs
+                        to ~/.local/bin via eget: starship, eza, fzf, zoxide,
+                        delta, btop, gdu, glow, lazygit, uv, sd, bat, fd,
+                        ripgrep, direnv. The non-sudo base for managed systems.
+                        (git is assumed present; a tool already installed
+                        system-wide is left alone unless --force.)
 
-    --shell             Config + modern CLI tools. Requires sudo.
-                        Installs binary tools via eget (starship, eza, fzf,
-                        zoxide, delta, btop, glow, lazygit, uv) plus APT
-                        packages (bat, fd, ripgrep, direnv).
-
-    --dev               Shell + development tools. Requires sudo.
+    --dev               Bash + development tools. Requires sudo (first APT layer).
+                        Adds APT: zsh, build tools, clipboard, graphviz, etc.
                         Adds: neovim, tmux
 
     --work              Dev + heavier environment tooling. Requires sudo.
-                        Adds: NVM, Docker, Azure CLI
+                        Adds: NVM, Docker, Azure CLI, Rust
                         (Everything except the AI CLIs — for machines where an
                         org manages the Claude/Codex install.)
 
@@ -184,9 +196,9 @@ ENVIRONMENT:
     DOTFILES_GIT_EMAIL  Same as --git-email
 
 EXAMPLES:
-    ./setup.sh                       # Default: config tier (symlinks only)
-    ./setup.sh --config              # Explicit config tier
-    ./setup.sh --shell               # Modern shell experience
+    ./setup.sh                       # Prints this help; changes nothing
+    ./setup.sh --config              # Reconcile symlinks to installed tools
+    ./setup.sh --bash                # Modern shell experience, NO sudo
     ./setup.sh --dev                 # Development setup (no AI CLIs)
     ./setup.sh --dev --ai            # Development setup + all AI CLIs
     ./setup.sh --dev --claude        # Development setup + only Claude Code
@@ -194,24 +206,25 @@ EXAMPLES:
     ./setup.sh --work                # Full environment, org manages AI
     ./setup.sh --full                # Absolutely everything (--work --ai)
     ./setup.sh --dev --rdp           # Dev setup + RDP into this machine's desktop
-    ./setup.sh --shell --dry-run     # Preview shell tier installation
+    ./setup.sh --bash --dry-run      # Preview bash tier installation
 
 TIER SUMMARY:
     ┌──────────┬─────────────────────────────────────────────────┬───────────┐
     │ Tier     │ What It Installs                                │ Sudo?     │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ config   │ Symlinks only (zero installs)                   │ No        │
-    │ shell    │ + eget, starship, eza, fzf, zoxide, delta,      │ Yes       │
-    │          │   btop, glow, lazygit, uv, bat, fd, ripgrep     │           │
-    │ dev      │ + neovim, tmux                                  │ Yes       │
-    │ work     │ + NVM, Docker, Azure CLI                        │ Yes       │
+    │ config   │ Symlinks only (reconcile to installed tools)    │ No        │
+    │ bash     │ + eget: starship, eza, fzf, zoxide, delta, btop,│ No        │
+    │          │   gdu, glow, lazygit, uv, sd, bat, fd, ripgrep, │           │
+    │          │   direnv  (all to ~/.local/bin)                 │           │
+    │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
+    │ work     │ + NVM, Docker, Azure CLI, Rust                  │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ --ai     │ + Claude Code, Codex, opencode (orthogonal)     │ No*       │
+    │ --ai     │ + Claude Code, Codex, opencode (orthogonal)     │ No        │
     │          │   (or --claude / --codex / --opencode singly)   │           │
     │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
     │ --full   │ = work + ai (everything except --rdp)           │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
-    * --ai installs into ~/.local/bin and needs no sudo on its own.
+    The sudo boundary is at dev: config + bash need no root; dev + work do.
 
 The script will:
 1. Verify system requirements
@@ -230,18 +243,19 @@ phase_verify_system() {
 
     # Check Ubuntu - soft requirement for config tier, hard for others
     if ! command -v lsb_release >/dev/null 2>&1; then
-        if tier_includes "shell"; then
-            error "This script requires Ubuntu for package installation"
+        if tier_includes "dev"; then
+            error "This script requires Ubuntu for APT package installation (dev tier and up)"
             exit 1
         else
-            warn "Not running on Ubuntu - proceeding with config-only mode"
+            warn "Not running on Ubuntu - APT installs unavailable (bash tier is eget-only, so this is usually fine)"
         fi
     fi
 
-    # Check basic tools that should exist
+    # Check basic tools that should exist. The bash tier needs curl (eget
+    # bootstrap + downloads) and git; apt is not involved until the dev tier.
     for cmd in curl wget git; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            if tier_includes "shell"; then
+            if tier_includes "bash"; then
                 error "Required command not found: $cmd"
                 exit 1
             else
@@ -252,8 +266,9 @@ phase_verify_system() {
 
     detect_environment
 
-    # Generate locale if not present (skip for config tier - requires sudo)
-    if tier_includes "shell" && [[ "$DRY_RUN" != "true" ]]; then
+    # Generate locale if not present. Requires sudo, so only at the dev tier and
+    # up — the bash tier is deliberately sudo-free.
+    if tier_includes "dev" && [[ "$DRY_RUN" != "true" ]]; then
         if ! locale -a | grep -qi "en_US.utf8"; then
             log "Generating en_US.UTF-8 locale..."
             if safe_sudo locale-gen en_US.UTF-8 && safe_sudo update-locale LANG=en_US.UTF-8; then
@@ -272,13 +287,13 @@ phase_install_packages() {
     log "Phase 2: Package Installation"
 
     # Nothing to install for a bare config tier with no orthogonal flags.
-    if ! tier_includes "shell" && [[ "$INSTALL_AI" != "true" && "$INSTALL_RDP" != "true" ]]; then
+    if ! tier_includes "bash" && [[ "$INSTALL_AI" != "true" && "$INSTALL_RDP" != "true" ]]; then
         log "Config tier: skipping package installation"
         return 0
     fi
 
-    if tier_includes "shell"; then
-        install_shell_packages
+    if tier_includes "bash"; then
+        install_bash_packages
     fi
 
     if tier_includes "dev"; then
@@ -317,8 +332,12 @@ phase_setup_configs() {
         readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
         for config in "${sorted_configs[@]}"; do
             local mapping="${CONFIG_MAP[$config]}"
-            local target="${mapping%%:*}"
-            local type="${mapping##*:}"
+            local target type owner
+            IFS=: read -r target type owner <<< "$mapping"
+            if ! config_owner_present "$owner"; then
+                log "  ⊘ $target (skipped — $owner not installed)"
+                continue
+            fi
             if [[ -e "$target" ]]; then
                 if [[ -L "$target" ]]; then
                     log "  ↻ $target (symlink exists - would update)"
@@ -334,11 +353,19 @@ phase_setup_configs() {
         readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
         for config in "${sorted_configs[@]}"; do
             local mapping="${CONFIG_MAP[$config]}"
-            local target="${mapping%%:*}"
-            local type="${mapping##*:}"
+            local target type owner
+            IFS=: read -r target type owner <<< "$mapping"
+
+            # Skip configs whose owning tool isn't present, so a bare/partial
+            # install never lays down orphaned configs (see config_owner_present).
+            if ! config_owner_present "$owner"; then
+                log "Skipping $target — $owner not installed"
+                continue
+            fi
+
             local source
             source="$(config_source_path "$config")"
-            
+
             case "$type" in
                 symlink)
                     process_symlink "$source" "$target" "$backup_dir"
@@ -452,7 +479,7 @@ run_installation() {
 
     # Restart recommendation based on tier
     local step=1
-    if tier_includes "shell"; then
+    if tier_includes "bash"; then
         echo "$step. Restart your shell session:"
         if is_wsl; then
             echo "   - Type 'exit' then reopen WSL, OR"
@@ -487,7 +514,7 @@ run_installation() {
     fi
 
     # WSL personal machines: nudge toward the Windows SSH agent bridge.
-    if is_wsl && tier_includes "shell"; then
+    if is_wsl && tier_includes "bash"; then
         echo "$step. (Personal WSL) Use your Windows SSH agent (Bitwarden/1Password):"
         echo "   ./bin/ssh-bridge enable     # bridges vault keys into WSL, then reload"
         echo "   (Work machines using local keys: skip — leave it disabled.)"
@@ -521,9 +548,17 @@ main() {
         exit 1
     fi
 
+    # Bare invocation shows help and mutates nothing. setup.sh installs packages
+    # and rewrites $HOME configs, so it must never run by accident — an explicit
+    # tier/action flag is required. Use --config to just reconcile symlinks.
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+
     # Parse command line arguments
     parse_arguments "$@"
-    
+
     # Show help if requested
     if [[ "$SHOW_HELP" == "true" ]]; then
         show_help

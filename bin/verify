@@ -70,7 +70,7 @@ done
 # 2. Managed tools — single loop over registry, grouped by tier
 # ==============================================================================
 
-for tier in shell dev work ai rdp; do
+for tier in bash dev work ai rdp; do
     readarray -t tier_tools < <(tools_for_tier "$tier")
     [[ ${#tier_tools[@]} -eq 0 ]] && continue
 
@@ -91,9 +91,9 @@ for tier in shell dev work ai rdp; do
             #   - work tier (nvm/docker/azure) is opt-in
             #   - ai tier (claude/codex) is opt-in and may be org-managed
             #   - rdp tier (xrdp) is opt-in per machine
-            #   - installer-based tools above the shell tier
+            #   - installer-based tools above the bash tier
             if [[ "$tier" == "work" || "$tier" == "ai" || "$tier" == "rdp" ]] \
-               || [[ "${TOOL_METHOD[$name]}" == "installer" && "$tier" != "shell" ]]; then
+               || [[ "${TOOL_METHOD[$name]}" == "installer" && "$tier" != "bash" ]]; then
                 check_warn "$label (not installed)"
             else
                 check_fail "$label (not found)"

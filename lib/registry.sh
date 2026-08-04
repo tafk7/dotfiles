@@ -19,8 +19,8 @@ declare -A TOOL_BINARY=(
     [glow]=glow
     [lazygit]=lazygit
     [uv]=uv
-    [bat]=batcat
-    [fd]=fdfind
+    [bat]=bat
+    [fd]=fd
     [ripgrep]=rg
     [direnv]=direnv
     [eget]=eget
@@ -49,10 +49,10 @@ declare -A TOOL_METHOD=(
     [glow]=eget
     [lazygit]=eget
     [uv]=eget
-    [bat]=apt
-    [fd]=apt
-    [ripgrep]=apt
-    [direnv]=apt
+    [bat]=eget
+    [fd]=eget
+    [ripgrep]=eget
+    [direnv]=eget
     [eget]=installer
     [sd]=eget
     [shellcheck]=eget
@@ -67,15 +67,18 @@ declare -A TOOL_METHOD=(
     [xrdp]=installer
 )
 
-# TOOL_TIER: tool name → tier (shell|dev|work|ai|rdp)
-# "ai" and "rdp" are orthogonal to the cumulative shell→dev→work chain: those
-# tools install only under their own flag, never as a side effect of a tier.
-# --full implies ai but NOT rdp (a tier must never silently open a listener).
+# TOOL_TIER: tool name → tier (bash|dev|work|ai|rdp)
+# The cumulative chain is bash→dev→work. The "bash" tier is the non-sudo base:
+# every tool in it installs to ~/.local/bin via eget (no root). The sudo boundary
+# starts at dev (apt packages: zsh, build tools, clipboard). "ai" and "rdp" are
+# orthogonal to the chain: those tools install only under their own flag, never as
+# a side effect of a tier. --full implies ai but NOT rdp (a tier must never
+# silently open a listener).
 declare -A TOOL_TIER=(
-    [starship]=shell  [eza]=shell     [fzf]=shell      [zoxide]=shell
-    [delta]=shell     [btop]=shell    [glow]=shell      [lazygit]=shell
-    [uv]=shell        [bat]=shell     [fd]=shell        [ripgrep]=shell
-    [direnv]=shell    [eget]=shell    [sd]=shell       [gdu]=shell
+    [starship]=bash   [eza]=bash      [fzf]=bash       [zoxide]=bash
+    [delta]=bash      [btop]=bash     [glow]=bash       [lazygit]=bash
+    [uv]=bash         [bat]=bash      [fd]=bash        [ripgrep]=bash
+    [direnv]=bash     [eget]=bash     [sd]=bash        [gdu]=bash
     [neovim]=dev      [tmux]=dev      [shellcheck]=dev
     [wsl2-ssh-agent]=dev
     [claude]=ai       [codex]=ai       [opencode]=ai
@@ -120,7 +123,7 @@ declare -A TOOL_REMOVAL_INSTRUCTIONS=(
 # ==============================================================================
 
 # List tool names for a given tier, sorted.
-# Usage: tools_for_tier "shell"  →  prints one tool name per line
+# Usage: tools_for_tier "bash"  →  prints one tool name per line
 tools_for_tier() {
     local tier="$1"
     local name

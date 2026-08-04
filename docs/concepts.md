@@ -43,15 +43,17 @@ Read this first — every other doc assumes you understand these primitives.
 
 ### 1. Tiers — *how much* gets installed
 
-Defined by the `--config | --shell | --dev | --work` flag to `setup.sh`. Each
-tier includes everything from the previous tier:
+Defined by the `--config | --bash | --dev | --work` flag to `setup.sh`. Each
+tier includes everything from the previous tier. The sudo boundary is at `dev`:
+`config` and `bash` need no root (bash installs eget binaries to `~/.local/bin`),
+so the modern shell works on managed machines you can't `sudo` on.
 
 | Tier | What it adds | Sudo? |
 |------|--------------|-------|
-| `config` | Symlinks only | No |
-| `shell`  | Modern CLI tools (eget + apt: starship, eza, fzf, zoxide, delta, btop, glow, lazygit, uv, bat, fd, ripgrep, direnv, sd) | Yes |
-| `dev`    | neovim, tmux, shellcheck | Yes |
-| `work`   | NVM, Docker, Azure CLI | Yes |
+| `config` | Symlinks only (reconciled to installed tools) | No |
+| `bash`   | Modern CLI tools via eget → `~/.local/bin`: starship, eza, fzf, zoxide, delta, btop, gdu, glow, lazygit, uv, bat, fd, ripgrep, direnv, sd | No |
+| `dev`    | zsh, build tools, clipboard, neovim, tmux, shellcheck | Yes |
+| `work`   | NVM, Docker, Azure CLI, Rust | Yes |
 
 Three extras sit outside the cumulative chain:
 

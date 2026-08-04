@@ -65,8 +65,8 @@ if [[ ! -f "$AI_CONFIG" ]]; then
     exit 1
 fi
 
-# Codex is fetched with eget. eget lives in the shell tier, but --ai can run
-# without --shell, so ensure it is present first.
+# Codex is fetched with eget. eget lives in the bash tier, but --ai can run
+# without --bash, so ensure it is present first.
 eget_bin="$HOME/.local/bin/eget"
 command -v eget >/dev/null 2>&1 && eget_bin="$(command -v eget)"
 if [[ ! -x "$eget_bin" ]]; then
