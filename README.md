@@ -5,20 +5,21 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ## Quick Start
 
 ```bash
-./setup.sh --config              # Symlinks only (no sudo)
-./setup.sh --shell               # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv
-./setup.sh --dev                 # + neovim, tmux
+./setup.sh                       # No args: prints help, changes nothing
+./setup.sh --config              # Reconcile symlinks to installed tools (no sudo)
+./setup.sh --bash                # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv (NO sudo — eget)
+./setup.sh --dev                 # + zsh, build tools, neovim, tmux (first sudo tier)
 ./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
 ./setup.sh --ai                  # + all AI CLIs: Claude Code, Codex, opencode (orthogonal)
 ./setup.sh --claude --opencode   # + only the AI CLIs you name (--claude / --codex / --opencode)
 ./setup.sh --rdp                 # + xrdp RDP server + XFCE desktop (orthogonal flag; combines with any tier)
 ./setup.sh --full                # Everything: --work plus --ai (but NOT --rdp)
 ./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
-./setup.sh --shell --dry-run     # Preview without changes
-./setup.sh --shell --no-hooks    # Skip the pre-commit lint hook (default: installed)
+./setup.sh --bash --dry-run      # Preview without changes
+./setup.sh --bash --no-hooks     # Skip the pre-commit lint hook (default: installed)
 ```
 
-The tiers `config → shell → dev → work` are cumulative (each includes the
+The tiers `config → bash → dev → work` are cumulative (each includes the
 previous). `--ai` is **orthogonal**: it installs the AI CLIs (Claude Code,
 Codex, opencode) and can be added to any tier. Install them individually with
 `--claude`, `--codex`, and/or `--opencode` (they compose: `--claude --opencode`
@@ -26,6 +27,13 @@ installs just those two). Leave AI off entirely when your org manages the
 install — the shell aliases/shortcuts load regardless and resolve whatever
 `claude`/`codex`/`opencode` is on your `PATH`. `--full` is shorthand for
 `--work --ai`. Use `--force` to overwrite without prompting.
+
+The **sudo boundary sits at `dev`**: `config` and `bash` need no root — every
+bash-tier tool installs to `~/.local/bin` via eget — so the full modern shell
+experience works on a managed machine where you can't `sudo`. `dev` and up add
+the APT layer (zsh, build tools, clipboard) and require sudo. On the bash tier a
+tool already installed system-wide is left in place (use `--force` to install our
+pinned copy over it).
 
 `--rdp` is a second orthogonal flag: it installs and configures the xrdp RDP
 server with an XFCE session so you can remote into this machine's desktop
@@ -46,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh | 
 ```
 
 The repo lands in `~/dev/dotfiles` (override with `DOTFILES_DIR`). Defaults to the
-`--shell` tier; pass any tier flag after `--`.
+`--bash` tier; pass any tier flag after `--`.
 
 ## What You Get
 
@@ -274,7 +282,7 @@ fi
 ./bin/diff-config                 # Show drift between sources and ~ (use --diff for details)
 ./bin/check-updates               # Are pinned eget tool versions stale?
 ./bin/cheatsheet commands         # List all bin/ utilities (auto-generated from headers)
-./setup.sh --dry-run --shell      # Preview what would happen
+./setup.sh --dry-run --bash       # Preview what would happen
 ./bin/install-git-hooks --check   # Are dotfiles git hooks installed in this clone?
 reload                            # Reload shell config
 ls .backups/                      # See available backups

@@ -115,7 +115,7 @@ show_tools() {
     source "$DOTFILES_DIR/lib/registry.sh"
 
     local tier_label
-    for tier_label in shell dev full; do
+    for tier_label in bash dev work; do
         echo
         echo "${BOLD}Tier: ${tier_label}${RESET}"
         local name verify_cmd status

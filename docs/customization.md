@@ -24,16 +24,16 @@ Edit `lib/config.sh` and add the package to the appropriate `PACKAGES` group:
 ```bash
 declare -A PACKAGES=(
     [core]="git build-essential"
-    [development]="zsh direnv ... lsof psmisc your-package"  # add here
-    [modern]="bat fd-find ripgrep"
+    [development]="zsh ... lsof psmisc your-package"  # add here
     ...
 )
 ```
 
-Groups are mapped to tiers in `lib/install.sh`:
+All APT packages install at the dev tier or above — the bash tier is sudo-free
+(eget only). Groups are mapped to tiers in `lib/install.sh`:
 
-- `install_shell_packages` → core + development + modern + languages + terminal (+ wsl on WSL)
-- `install_dev_packages`   → diagramming
+- `install_bash_packages`  → (no apt; eget binaries only, plus a git-present check)
+- `install_dev_packages`   → core + development + languages + terminal + diagramming (+ wsl on WSL); then tmux + neovim installers
 - `install_work_packages`  → docker (+ nvm/node and the rust toolchain via installers)
 - `install_ai_packages`    → (no apt packages; runs the claude + codex installers)
 - `install_rdp_packages`   → rdp (then runs the xrdp config installer)
@@ -51,10 +51,10 @@ Groups are mapped to tiers in `lib/install.sh`:
    ```bash
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=eget
-   TOOL_TIER[mytool]=shell      # shell|dev|work|ai|rdp
+   TOOL_TIER[mytool]=bash      # bash|dev|work|ai|rdp
    ```
 
-3. Run `./setup.sh --shell` (or just `eget --download-all`) to install.
+3. Run `./setup.sh --bash` (or just `eget --download-all`) to install.
 4. `bin/verify` and `bin/uninstall-tool` automatically pick up the new tool.
 
 ## Adding a New Tool With a Custom Installer
@@ -232,7 +232,7 @@ WSL. One agent then serves Windows, WSL, and VS Code.
 1. Windows: enable the SSH agent in Bitwarden, disable the Windows *"OpenSSH
    Authentication Agent"* service (so Bitwarden owns the pipe), store/generate
    your key. Verify with `ssh-add.exe -l`.
-2. WSL: `./setup.sh --shell` installs `wsl2-ssh-agent` (eget). Enable the bridge
+2. WSL: `./setup.sh --bash` installs `wsl2-ssh-agent` (eget). Enable the bridge
    with the marker file, then reload:
    ```bash
    touch ~/.ssh/use-windows-agent && reload
@@ -300,7 +300,7 @@ on next `bin/theme-switcher` invocation.
 ```bash
 ./bin/verify              # reports configs / tools / env health
 bash -n shell/env.sh      # syntax check any modified shell script
-./setup.sh --dry-run --shell    # preview install without making changes
+./setup.sh --dry-run --bash     # preview install without making changes
 ```
 
 For theme changes, cycle every theme to make sure your wiring works:

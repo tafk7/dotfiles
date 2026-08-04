@@ -6,7 +6,8 @@
 #   DOTFILES_DIR=~/.dotfiles bash bootstrap.sh --full     # custom clone location
 #
 # Installs git if missing, clones (or fast-forwards) the repo, then hands off to
-# setup.sh. Defaults to the --shell tier when no flag is given.
+# setup.sh. Defaults to the --bash tier (no-sudo eget toolchain) when no flag is
+# given — bootstrap needs a sensible default since bare setup.sh only prints help.
 set -euo pipefail
 
 REPO="${DOTFILES_REPO:-https://github.com/tafk7/dotfiles.git}"
@@ -35,7 +36,7 @@ else
     git clone "$REPO" "$DEST"
 fi
 
-# 3. Hand off to the tiered installer (default tier: --shell).
+# 3. Hand off to the tiered installer (default tier: --bash).
 cd "$DEST"
-log "running ./setup.sh ${*:---shell}"
-exec ./setup.sh "${@:---shell}"
+log "running ./setup.sh ${*:---bash}"
+exec ./setup.sh "${@:---bash}"

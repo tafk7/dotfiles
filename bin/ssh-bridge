@@ -52,7 +52,7 @@ cmd_status() {
     if command -v wsl2-ssh-agent >/dev/null 2>&1; then
         _check 0 "wsl2-ssh-agent installed"
     else
-        _check 1 "wsl2-ssh-agent installed" "(run: ssh-bridge enable, or ./setup.sh --shell)"
+        _check 1 "wsl2-ssh-agent installed" "(run: ssh-bridge enable, or ./setup.sh --bash)"
     fi
 
     if [[ -f "$MARKER" ]]; then _check 0 "bridge enabled" "(marker: $MARKER)"
@@ -80,7 +80,7 @@ cmd_enable() {
             log "Installing wsl2-ssh-agent via eget..."
             EGET_CONFIG="$DOTFILES_DIR/eget.toml" eget mame/wsl2-ssh-agent
         else
-            error "eget not found — run ./setup.sh --shell first, then retry"
+            error "eget not found — run ./setup.sh --bash first, then retry"
             exit 1
         fi
     fi

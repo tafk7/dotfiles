@@ -3,7 +3,7 @@
 ## Overview
 
 This dotfiles system manages an Ubuntu/WSL development environment through a tiered
-installation system (`--config`, `--shell`, `--dev`, `--work`, plus the
+installation system (`--config`, `--bash`, `--dev`, `--work`, plus the
 orthogonal `--ai` flag and the `--full` = work+ai shorthand) with declarative
 configuration, domain-split shell modules, and unified theme management.
 

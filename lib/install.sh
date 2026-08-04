@@ -535,6 +535,14 @@ run_installer() {
         return 1
     fi
 
+    # DRY RUN: don't execute the installer. The per-tool scripts download and
+    # write to disk (and only some self-guard on an existing install), so running
+    # them would mutate the system — exactly what a dry run must not do.
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log "[DRY RUN] Would run installer: $name"
+        return 0
+    fi
+
     local args=()
     [[ "${FORCE_REINSTALL:-false}" == "true" ]] && args+=(--force)
 
@@ -558,15 +566,11 @@ run_installer() {
 
 # Install all binary tools declared in eget.toml
 install_eget_tools() {
-    run_installer "eget" true
-
     local config="$DOTFILES_DIR/eget.toml"
     if [[ ! -f "$config" ]]; then
         error "eget.toml not found at $config"
         return 1
     fi
-
-    log "Installing binary tools via eget..."
 
     # Collect eget tool names from registry
     local -a eget_tools=()
@@ -575,11 +579,52 @@ install_eget_tools() {
         [[ "${TOOL_METHOD[$name]}" == "eget" ]] && eget_tools+=("$name")
     done
 
+    # Respect system-managed copies. A binary already on PATH outside our prefix
+    # (~/.local/bin) is one the admin/apt installed — downloading our pinned copy
+    # would shadow it (~/.local/bin sorts earlier on PATH) for no gain. Skip those
+    # here so eget only fetches tools we actually own; --force overrides to install
+    # the pinned version regardless. Same courtesy the AI installers extend to an
+    # org-managed binary on PATH.
+    if [[ "${FORCE_REINSTALL:-false}" != "true" ]]; then
+        local -a to_download=() existing binary
+        for name in "${eget_tools[@]}"; do
+            binary="${TOOL_BINARY[$name]}"
+            existing="$(command -v "$binary" 2>/dev/null || true)"
+            if [[ -n "$existing" && "$existing" != "$HOME/.local/bin/"* ]]; then
+                log "Skipping $name — system copy at $existing (use --force to override)"
+                [[ "${DRY_RUN:-false}" != "true" ]] && track_install "$name" skip
+            else
+                to_download+=("$name")
+            fi
+        done
+        eget_tools=("${to_download[@]}")
+    fi
+
+    # DRY RUN: report what would be fetched, then stop before touching disk. This
+    # must come before the eget bootstrap and any download — the whole function is
+    # otherwise a mutation.
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        if [[ ${#eget_tools[@]} -eq 0 ]]; then
+            log "[DRY RUN] All eget tools already provided by the system — nothing to download"
+        else
+            log "[DRY RUN] Would install eget + download: ${eget_tools[*]}"
+        fi
+        return 0
+    fi
+
+    run_installer "eget" true
+    log "Installing binary tools via eget..."
+
     if [[ "${FORCE_REINSTALL:-false}" == "true" ]]; then
         log "Force reinstall: clearing eget-managed binaries..."
         for name in "${eget_tools[@]}"; do
             rm -f "$HOME/.local/bin/${TOOL_BINARY[$name]}"
         done
+    fi
+
+    if [[ ${#eget_tools[@]} -eq 0 ]]; then
+        log "All eget tools already provided by the system — nothing to download"
+        return 0
     fi
 
     # eget was just installed to ~/.local/bin, which is not necessarily on PATH
@@ -592,15 +637,32 @@ install_eget_tools() {
         return 1
     fi
 
-    # upgrade_only (eget.toml) makes eget skip tools already at their pinned
-    # version, so a re-run downloads nothing — the point of this whole function
-    # being idempotent. eget's batch exit code doesn't cleanly separate "skipped
-    # because up to date" from "failed", so don't trust it: run eget, then judge
-    # each tool by whether its binary is actually present on disk.
-    EGET_CONFIG="$config" "$eget_bin" --download-all || true
+    # Map each tool name to its eget repo slug by parsing the config headers
+    # (["owner/repo"]). eget.toml stays the single source of truth for slugs; the
+    # repo basename always equals the registry tool name, so we key on that.
+    local -A tool_slug=()
+    local slug
+    while IFS= read -r slug; do
+        tool_slug["${slug##*/}"]="$slug"
+    done < <(grep -Po '^\["\K[^"]+' "$config")
 
+    # Drive eget per surviving tool rather than --download-all: the guard above
+    # dropped system-provided tools from eget_tools, and a per-target invocation
+    # (eget applies this repo's TOML config — tag, asset_filters, target) ensures
+    # those are never fetched. upgrade_only (eget.toml) still makes each call a
+    # no-op when the pinned version is already present, so re-runs download nothing.
+    # eget's exit code doesn't cleanly separate "skipped, up to date" from "failed",
+    # so don't trust it: judge each tool by whether its binary lands on disk.
     local any_missing=false
     for name in "${eget_tools[@]}"; do
+        slug="${tool_slug[$name]:-}"
+        if [[ -z "$slug" ]]; then
+            warn "No eget.toml entry for $name — skipping"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        EGET_CONFIG="$config" "$eget_bin" "$slug" || true
         if verify_binary "${TOOL_BINARY[$name]}"; then
             track_install "$name" ok
         else
@@ -615,38 +677,36 @@ install_eget_tools() {
 # Tiered Installation Functions
 # ==============================================================================
 
-install_shell_packages() {
-    log "Installing shell tier packages..."
+# bash tier: the non-sudo base. eget binaries to ~/.local/bin only — no apt,
+# no root. git is assumed present (needed to clone this repo in the first place);
+# we warn rather than install it, since installing would require the sudo this
+# tier deliberately avoids.
+install_bash_packages() {
+    log "Installing bash tier packages..."
+
+    command -v git >/dev/null 2>&1 || \
+        warn "git not found — install it (sudo apt install git) for full functionality"
+
+    install_eget_tools
+
+    success "Bash tier installation complete"
+}
+
+# dev tier: first apt layer (sudo). Everything that needs root lives here or
+# above — zsh, build toolchain, clipboard, and the tmux build deps that
+# install-tmux.sh compiles against.
+install_dev_packages() {
+    log "Installing dev tier packages..."
 
     # PACKAGES values are intentionally space-separated lists meant to be
     # word-split into the array — the alternative (per-key arrays) would
     # bloat the data file. shellcheck flags this as SC2206; that's expected.
     # shellcheck disable=SC2206
-    local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[modern]} ${PACKAGES[languages]} ${PACKAGES[terminal]})
+    local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[languages]} ${PACKAGES[terminal]} ${PACKAGES[diagramming]})
     # shellcheck disable=SC2206
     is_wsl && packages+=(${PACKAGES[wsl]})
 
-    install_apt "shell" "${packages[@]}"
-
-    # bat/fd symlinks for Ubuntu renames
-    if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
-        mkdir -p "$HOME/.local/bin"
-        ln -sf "$(which batcat)" "$HOME/.local/bin/bat"
-    fi
-    if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
-        mkdir -p "$HOME/.local/bin"
-        ln -sf "$(which fdfind)" "$HOME/.local/bin/fd"
-    fi
-
-    install_eget_tools
-
-    success "Shell tier installation complete"
-}
-
-install_dev_packages() {
-    log "Installing dev tier packages..."
-
-    install_apt "dev" ${PACKAGES[diagramming]}
+    install_apt "dev" "${packages[@]}"
 
     log "Installing dev tier tools via scripts..."
     run_installer "tmux"
