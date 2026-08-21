@@ -35,12 +35,14 @@ git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 # No-prefix bindings (instant, left-hand optimized)
 tmux│Alt+Shift+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
+tmux│Alt+w / Alt+r│Previous / next window (no prefix, repeatable)│previous-window / next-window
 tmux│Alt+Shift+Q│Toggle back to last active window│last-window
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+A│Zoom pane toggle│resize-pane -Z
 tmux│Alt+Shift+T│New window (inherits current path)│new-window -c #{pane_current_path}
 tmux│Alt+Shift+X│Kill pane (with confirmation)│confirm-before kill-pane
 tmux│Alt+Shift+G│Toggle synchronized input to all panes│setw synchronize-panes
+tmux│Prefix+Alt+,│Revert window to automatic naming│setw automatic-rename on
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
 tmux│Ctrl+a Shift+↑↓←→│Resize pane 5 lines in direction (repeatable)│resize-pane -U/-D/-L/-R 5
