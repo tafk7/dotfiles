@@ -115,7 +115,10 @@
 
 [merge]
     tool = nvimdiff
-    conflictstyle = zdiff3
+    # zdiff3 on git 2.35+, diff3 below it — resolved by process_git_config().
+    # git has no version conditional, and an unknown style is fatal to every
+    # git command, not just merges.
+    conflictstyle = {{CONFLICT_STYLE}}
 
 [diff]
     tool = nvimdiff
