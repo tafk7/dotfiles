@@ -404,9 +404,21 @@ process_git_config() {
     git_email_escaped=$(printf '%s' "$git_email" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
     dotfiles_dir_escaped=$(printf '%s' "$DOTFILES_DIR" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
 
+    # merge.conflictstyle=zdiff3 needs git 2.35+ (Ubuntu 22.04 ships 2.34.1).
+    # An unrecognised style makes *every* git command exit with
+    #   fatal: unknown style 'zdiff3' given for 'merge.conflictstyle'
+    # so this can't be left to fail at merge time. Fall back to diff3, which
+    # is the same three-way view minus the common-line hoisting.
+    local git_version conflict_style="diff3"
+    git_version=$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)
+    if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
+        conflict_style="zdiff3"
+    fi
+
     sed -e "s|{{GIT_NAME}}|$git_name_escaped|g" \
         -e "s|{{GIT_EMAIL}}|$git_email_escaped|g" \
         -e "s|{{DOTFILES_DIR}}|$dotfiles_dir_escaped|g" \
+        -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" \
         "$source" > "$target"
 
     success "Git config created: $target"
