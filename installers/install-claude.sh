@@ -18,7 +18,18 @@ FORCE=false
 CLAUDE_BIN="$HOME/.local/bin/claude"
 
 # Provision ~/.claude/settings.json with content-safe telemetry defaults
-# (DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING). ONLY when absent — settings.json
+# (DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING) plus CLAUDE_CODE_DISABLE_MOUSE.
+#
+# The mouse flag is a usability fix, not a privacy one: Claude Code is a
+# fullscreen TUI that grabs mouse tracking, and under tmux every drag-select has
+# to be arbitrated with tmux's own mouse handling, forcing a full repaint of a
+# large Ink surface. That stalls the terminal for seconds on every highlight --
+# reproducible on a brand-new session, so it is not the known scrollback bug.
+# Disabling mouse capture hands selection back to the terminal natively. The
+# trade-off is that the wheel scrolls tmux's scrollback rather than Claude's
+# viewport, which under tmux is usually what you wanted anyway.
+#
+# ONLY when absent — settings.json
 # is a rich, user-owned file (model, permissions, hooks), so we never overwrite
 # it; for an existing file we point at the keys to add. Note: org-managed
 # settings override user settings.json (by design). Auto-update is intentionally
