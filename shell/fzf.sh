@@ -9,6 +9,9 @@ export FZF_DEFAULT_OPTS="
     --preview-window=right:60%:wrap
     --bind 'ctrl-/:change-preview-window(down|hidden|)'
     --bind 'ctrl-p:toggle-preview'
+    --bind 'ctrl-right:forward-word'
+    --bind 'ctrl-backspace:backward-kill-word'
+    --bind 'ctrl-delete:kill-word'
     ${FZF_THEME_COLORS:-}"
 
 # Use fd for better file/directory listing

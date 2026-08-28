@@ -33,7 +33,7 @@ git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 
 # Tmux shortcuts (prefix is Ctrl+a)
 # No-prefix bindings (instant, left-hand optimized)
-tmux│Alt+Shift+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
+tmux│Alt+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+w / Alt+r│Previous / next window (no prefix, repeatable)│previous-window / next-window
 tmux│Alt+Shift+Q│Toggle back to last active window│last-window
@@ -45,6 +45,7 @@ tmux│Alt+Shift+G│Toggle synchronized input to all panes│setw synchronize-p
 tmux│Prefix+Alt+,│Revert window to automatic naming│setw automatic-rename on
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
+tmux│Ctrl+a Alt+ESDF│Send the original Meta key to the application│send-keys M-e/M-s/M-d/M-f
 tmux│Ctrl+a Shift+↑↓←→│Resize pane 5 lines in direction (repeatable)│resize-pane -U/-D/-L/-R 5
 tmux│Ctrl+a a│Zoom pane toggle│resize-pane -Z
 tmux│Ctrl+a q│Show pane numbers (3s) — type number to jump│display-panes -d 3000
@@ -59,7 +60,8 @@ tmux│Ctrl+a -│Split top/bottom (horizontal divider)│split-window -v
 # Prefix — Windows
 tmux│Ctrl+a t│New window (inherits current path)│new-window -c #{pane_current_path}
 tmux│Ctrl+a w│Window picker tree view│choose-tree -Zw
-tmux│Ctrl+a x│Kill window and all its panes│kill-window
+tmux│Ctrl+a x│Kill pane (with confirmation)│confirm-before kill-pane
+tmux│Ctrl+a X│Kill window and all its panes (with confirmation)│confirm-before kill-window
 tmux│Ctrl+a c│Rename current window│command-prompt rename-window
 # Prefix — Sessions
 tmux│Ctrl+a C│Create new session│new-session
@@ -117,6 +119,10 @@ vim│,af│Auto-fix linting issues│:ALEFix
 vim│,an│Jump to next lint error│:ALENext
 
 # Shell shortcuts
+# Line editing
+shell│Ctrl+Backspace│Delete from the cursor back through the previous word│backward-kill-word
+shell│Ctrl+Delete│Delete from the cursor through the next word│kill-word
+shell│Shift+Tab│Spell-correct the word at the cursor (zsh)│spell-word
 # Navigation
 shell│..│Go up one directory│cd ..
 shell│...│Go up two directories│cd ../..
