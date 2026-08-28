@@ -59,21 +59,21 @@ claude plugin install agent-badge@tafk7
 
 **Codex CLI**
 
-Codex has a plugin system, and `.codex-plugin/plugin.json` here is ready for it,
-but plugin-provided hooks sit behind the `plugin_hooks` feature flag and do not
-execute as of 0.150.1 — verified with a throwaway probe plugin that installed
-and cached cleanly, hooks.json and all, yet never ran its hook, with or without
-`--enable plugin_hooks` and `-c bypass_hook_trust=true`. Until that ships, the
-hooks go into `~/.codex/config.toml`:
-
 ```bash
-plugins/agent-badge/codex/install.sh          # --dry-run to preview
+codex plugin marketplace add tafk7/dotfiles     # or a local path
+codex plugin add agent-badge@tafk7
 ```
 
-That manages one delimited block and leaves the rest of the file byte-for-byte
-alone. It is idempotent; re-run it after moving or updating the plugin. Codex
-will ask you to re-trust the hooks afterwards, because their command paths
-changed and `trusted_hash` is content-addressed.
+Then **run `/hooks` inside Codex once and trust them**. Codex gates hooks behind
+human review, and an untrusted hook is skipped *silently* — no error, no badges,
+indistinguishable from a broken install. This is the single most likely reason
+the badge does not appear.
+
+Both harnesses load the same `hooks/hooks.json`: Codex picks it up by convention
+and expands `${CLAUDE_PLUGIN_ROOT}` in the commands, so one file serves both.
+`UserPromptSubmit` resolves to `working` rather than Codex's `thinking`, which is
+deliberate — they render identically, since the glyph and colour come from the
+pane's own command.
 
 **tmux**
 
@@ -92,12 +92,20 @@ agent session, and the wiring stays greppable from the config file. Requires
 tmux 3.2+ for `#{E:...}`; below that the plugin no-ops rather than printing the
 placeholder across every window.
 
+Prefer this line when you have the dotfiles, for a reason beyond taste. Plugin
+caches are version-pinned (`cache/<marketplace>/<plugin>/<version>/`) and the old
+directory is swept on update, so hooks the plugin wires from a cache copy point
+at a path that will eventually vanish. `wire` re-points stale entries when it
+next runs, but the config line sidesteps it entirely by pinning tmux to the
+working tree, which is never swept. Self-wiring stays the fallback for machines
+that have the plugin and nothing else.
+
 ## Uninstall
 
 ```bash
 plugins/agent-badge/agent-badge.tmux unwire    # tmux hooks, formats, options
-plugins/agent-badge/codex/install.sh --uninstall
 claude plugin uninstall agent-badge@tafk7
+codex plugin remove agent-badge@tafk7
 ```
 
 `unwire` has to be run by hand: neither harness fires a hook on plugin removal,
@@ -150,14 +158,16 @@ A badge stuck on "working" is worse than no badge.
 
 - `waiting` is Claude-only. Codex's `SubagentStop` does not reliably fire —
   stranded ids pinned a pane to `waiting` for 26 minutes in practice.
-- Codex hooks are trusted by content hash, per event. Re-running
-  `codex/install.sh` changes every command path and so un-trusts all of them,
-  and **an untrusted hook is skipped silently** — indistinguishable from a broken
-  config. Start Codex interactively once and approve them.
-- Codex's `Interrupt` hook is wired but has not been observed firing on a real
-  Esc interrupt, only verified to load. Until it is confirmed, assume an
-  interrupted Codex turn can strand on "working": it fires no `Stop` and has no
-  session file to reconcile against. Claude recovers from this on its own.
+- Codex hooks are trusted by content hash and are skipped **silently** until
+  reviewed via `/hooks`. Anything that changes a command's text — including a
+  plugin update moving the cache path — un-trusts them again.
+- An Esc-interrupted Codex turn strands on "working" until that pane's agent does
+  something else. Codex fires no `Stop` there and has no session file to
+  reconcile against, and its `Interrupt` event cannot be delivered from this
+  plugin: `.codex-plugin/plugin.json` declaring `hooks` silently stops *all*
+  hooks loading, and putting `Interrupt` in the shared `hooks/hooks.json` makes
+  Claude reject the whole file (`Hooks (0)`, validation fails). Both verified.
+  Claude recovers from the equivalent on its own via the reconciler.
 - Two harnesses in the *same pane* clobber each other's state. Two in the same
   *window*, in different panes, is fine and shows both glyphs.
 - Badges update on hook activity or on focus, not continuously. There is no
