@@ -134,9 +134,6 @@ A badge stuck on "working" is worse than no badge.
   carries an authoritative busy/idle status and the owning pane id. When a hook
   is *missed* — an errored turn, a killed process — that file is what unsticks
   the badge. Demotion-only, and Claude-only: Codex ships no equivalent.
-- **Codex's `Interrupt` event** covers the Esc-interrupted turn, which fires no
-  `Stop`. Without it a Codex pane could strand indefinitely, since it has no
-  session file to reconcile against.
 - **Compaction is an interlude, not a state.** `PreCompact` stashes the prior
   state and `PostCompact` restores it, so a compaction running *after* a turn
   ends doesn't flip a settled pane back to working.
@@ -153,6 +150,11 @@ A badge stuck on "working" is worse than no badge.
 
 - `waiting` is Claude-only. Codex's `SubagentStop` does not reliably fire —
   stranded ids pinned a pane to `waiting` for 26 minutes in practice.
+- An Esc-interrupted Codex turn can still strand on "working". Codex fires no
+  `Stop` there and has no session file to reconcile against, and its `Interrupt`
+  event is not usable from `config.toml` — adding `[[hooks.Interrupt]]` silently
+  disables *every* hook (see `codex/hooks.toml`). Claude recovers from this on
+  its own via the reconciler.
 - Two harnesses in the *same pane* clobber each other's state. Two in the same
   *window*, in different panes, is fine and shows both glyphs.
 - Badges update on hook activity or on focus, not continuously. There is no
