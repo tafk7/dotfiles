@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "tafk7",
+  "description": "Personal Claude Code plugins living alongside the dotfiles they were extracted from.",
+  "owner": {
+    "name": "tkeller"
+  },
+  "plugins": [
+    {
+      "name": "agent-badge",
+      "description": "Per-window tmux status badges showing what every Claude Code and Codex session in your tmux server is doing: working, finished, blocked on permission, or compacting.",
+      "author": {
+        "name": "tkeller"
+      },
+      "category": "productivity",
+      "source": "./plugins/agent-badge"
+    }
+  ]
+}

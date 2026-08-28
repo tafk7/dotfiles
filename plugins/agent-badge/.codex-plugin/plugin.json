@@ -1,0 +1,29 @@
+{
+  "name": "agent-badge",
+  "version": "1.0.0",
+  "description": "Per-window tmux status badges showing what every Claude Code and Codex session in your tmux server is doing.",
+  "author": {
+    "name": "tkeller",
+    "url": "https://github.com/tafk7"
+  },
+  "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/agent-badge",
+  "repository": "https://github.com/tafk7/dotfiles",
+  "license": "MIT",
+  "keywords": [
+    "tmux",
+    "status",
+    "badge",
+    "hooks"
+  ],
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Agent Badge",
+    "shortDescription": "tmux window badges for agent sessions",
+    "longDescription": "Adds a per-window badge to the tmux status bar showing what every Claude Code and Codex session is doing -- working, finished, blocked on a permission decision, or compacting -- so you can tell at a glance which window wants you.",
+    "developerName": "tkeller",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ]
+  }
+}
