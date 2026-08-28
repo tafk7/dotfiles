@@ -42,42 +42,46 @@ provision_codex_config() {
     success "Provisioned hardened ~/.codex/config.toml (metrics export disabled)."
 }
 
-# Install the agent-badge tmux hooks into ~/.codex/config.toml.
+# Install the agent-badge plugin (plugins/agent-badge) from this repo, which
+# doubles as a plugin marketplace via .agents/plugins/marketplace.json.
 #
-# The Claude side of this plugin installs through the plugin marketplace
-# (install-claude.sh). Codex could too -- its plugin-bundled hooks do load and
-# fire, contrary to an earlier reading here -- but config.toml is what carries
-# the Interrupt hook, which has no Claude equivalent and so is not in the
-# plugin's shared hooks/hooks.json. Interrupt is the only thing that clears a
-# badge after an Esc-interrupted turn: Codex fires no Stop there and has no
-# session-state file to reconcile against.
+# Same mechanism as the Claude side in install-claude.sh, and the same shared
+# hooks/hooks.json: Codex auto-loads it by convention and expands
+# ${CLAUDE_PLUGIN_ROOT} in the commands, so one file serves both harnesses.
 #
-# Not fatal, and idempotent: the script manages one delimited block and exits 0
-# when the file is already current.
-provision_agent_badge_hooks() {
-    local installer="$DOTFILES_DIR/plugins/agent-badge/codex/install.sh"
-    [[ -x "$installer" ]] || return 0
+# Registered as a local directory rather than tafk7/dotfiles so it tracks the
+# working tree and needs no network. Both commands are idempotent.
+#
+# Never fatal: a badge is a convenience, not a reason to fail the Codex install.
+provision_agent_badge_plugin() {
+    local codex_cmd="${1:-}"
+    [[ -n "$codex_cmd" && -x "$codex_cmd" ]] || codex_cmd="$(command -v codex 2>/dev/null || true)"
+    [[ -n "$codex_cmd" ]] || return 0
+    [[ -f "$DOTFILES_DIR/.agents/plugins/marketplace.json" ]] || return 0
 
-    if ! "$installer" >/dev/null 2>&1; then
-        warn "Could not install the agent-badge hooks into ~/.codex/config.toml."
-        warn "  Run manually: $installer"
+    if ! "$codex_cmd" plugin marketplace add "$DOTFILES_DIR" >/dev/null 2>&1; then
+        warn "Could not register $DOTFILES_DIR as a Codex plugin marketplace."
         return 0
     fi
-    success "agent-badge hooks installed (tmux window badges for agent sessions)."
-    # Worth stating every run. Codex trusts hooks by content hash, so a changed
-    # path un-trusts them, and an untrusted hook is skipped in silence -- which
-    # looks exactly like a broken config.
-    log "  Run /hooks inside Codex once to review and trust them."
-    log "  Until you do, they are skipped silently and no badges appear."
+    if "$codex_cmd" plugin add agent-badge@tafk7 >/dev/null 2>&1; then
+        success "Plugin agent-badge installed (tmux window badges for agent sessions)."
+        # Worth stating on every run. Codex gates hooks behind human review, and
+        # an untrusted hook is skipped in SILENCE -- indistinguishable from a
+        # broken config, and it has already caused one wrong diagnosis here.
+        log "  Run /hooks inside Codex once to review and trust them."
+        log "  Until you do, they are skipped silently and no badges appear."
+    else
+        warn "Could not install the agent-badge plugin; see plugins/agent-badge/README.md."
+    fi
 }
 
 # Config is independent of the binary — provision on every run so it lands even
 # when the binary is already present (the early exits below).
 provision_codex_config
-provision_agent_badge_hooks
 
 if [[ "$FORCE" != true && -x "$CODEX_BIN" ]] && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex already installed ($("$CODEX_BIN" --version 2>/dev/null | head -n1))."
+    provision_agent_badge_plugin "$CODEX_BIN"
     exit 2
 fi
 
@@ -87,6 +91,8 @@ if [[ "$FORCE" != true && -n "$EXTERNAL_CODEX" && "$EXTERNAL_CODEX" != "$CODEX_B
     warn "Found an externally-managed codex on PATH: $EXTERNAL_CODEX"
     warn "Skipping install to avoid a shadow copy at $CODEX_BIN."
     warn "Re-run with --force to install the dotfiles-managed copy anyway."
+    # Still a working Codex, so still worth the plugin.
+    provision_agent_badge_plugin "$EXTERNAL_CODEX"
     exit 2
 fi
 
@@ -126,6 +132,7 @@ fi
 
 if [[ -x "$CODEX_BIN" ]] && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex installed: $("$CODEX_BIN" --version 2>/dev/null | head -n1)"
+    provision_agent_badge_plugin "$CODEX_BIN"
     exit 0
 fi
 
