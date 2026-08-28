@@ -39,10 +39,40 @@ provision_claude_settings() {
     success "Provisioned ~/.claude/settings.json (telemetry + error reporting off)."
 }
 
+# Install the agent-badge plugin (plugins/agent-badge) from this repo, which
+# doubles as a plugin marketplace via .claude-plugin/marketplace.json.
+#
+# Registered as a *directory* marketplace rather than tafk7/dotfiles, so it
+# tracks the working tree instead of whatever is pushed to GitHub, and needs no
+# network. Both commands are idempotent and exit 0 when the marketplace or the
+# plugin is already present, so this is safe on every re-run.
+#
+# Never fatal: a badge is a convenience, and the plugin failing to install is not
+# a reason for the Claude installer to report failure.
+provision_agent_badge_plugin() {
+    local claude_cmd="${1:-}"
+    [[ -n "$claude_cmd" && -x "$claude_cmd" ]] || claude_cmd="$(command -v claude 2>/dev/null || true)"
+    [[ -n "$claude_cmd" ]] || return 0
+    [[ -f "$DOTFILES_DIR/.claude-plugin/marketplace.json" ]] || return 0
+
+    if ! "$claude_cmd" plugin marketplace add "$DOTFILES_DIR" >/dev/null 2>&1; then
+        warn "Could not register $DOTFILES_DIR as a plugin marketplace; skipping agent-badge."
+        return 0
+    fi
+    if "$claude_cmd" plugin install agent-badge@tafk7 >/dev/null 2>&1; then
+        success "Plugin agent-badge installed (tmux window badges for agent sessions)."
+        log "  Takes effect in new Claude sessions. Codex hooks are separate:"
+        log "  $DOTFILES_DIR/plugins/agent-badge/codex/install.sh"
+    else
+        warn "Could not install the agent-badge plugin; see plugins/agent-badge/README.md."
+    fi
+}
+
 provision_claude_settings
 
 if [[ "$FORCE" != true && -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
     success "Claude Code already installed ($("$CLAUDE_BIN" --version 2>/dev/null | head -n1)); it self-updates."
+    provision_agent_badge_plugin "$CLAUDE_BIN"
     exit 2
 fi
 
@@ -55,6 +85,8 @@ if [[ "$FORCE" != true && -n "$EXTERNAL_CLAUDE" && "$EXTERNAL_CLAUDE" != "$CLAUD
     warn "Found an externally-managed claude on PATH: $EXTERNAL_CLAUDE"
     warn "Skipping install to avoid a shadow copy at $CLAUDE_BIN."
     warn "Re-run with --force to install the dotfiles-managed copy anyway."
+    # Still a working Claude, so still worth the plugin.
+    provision_agent_badge_plugin "$EXTERNAL_CLAUDE"
     exit 2
 fi
 
@@ -75,6 +107,7 @@ fi
 
 if [[ -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
     success "Claude Code installed: $("$CLAUDE_BIN" --version 2>/dev/null | head -n1)"
+    provision_agent_badge_plugin "$CLAUDE_BIN"
     exit 0
 fi
 
