@@ -13,7 +13,7 @@
         "name": "tafk7"
       },
       "category": "productivity",
-      "source": "./plugins/agent-badge"
+      "source": "./plugins/agent-badge-claude"
     }
   ]
 }

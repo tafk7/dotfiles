@@ -69,12 +69,6 @@ human review, and an untrusted hook is skipped *silently* — no error, no badge
 indistinguishable from a broken install. This is the single most likely reason
 the badge does not appear.
 
-Both harnesses load the same `hooks/hooks.json`: Codex picks it up by convention
-and expands `${CLAUDE_PLUGIN_ROOT}` in the commands, so one file serves both.
-`UserPromptSubmit` resolves to `working` rather than Codex's `thinking`, which is
-deliberate — they render identically, since the glyph and colour come from the
-pane's own command.
-
 **tmux**
 
 Nothing required. The plugin wires the tmux server itself, from its
@@ -83,8 +77,8 @@ Nothing required. The plugin wires the tmux server itself, from its
 If you do have the dotfiles, `configs/tmux.conf` calls it explicitly instead:
 
 ```tmux
-if-shell '[ -x "$HOME/dotfiles/plugins/agent-badge/agent-badge.tmux" ]' \
-    'run-shell "$HOME/dotfiles/plugins/agent-badge/agent-badge.tmux wire"'
+if-shell '[ -x "$HOME/dotfiles/plugins/shared/agent-badge.tmux" ]' \
+    'run-shell "$HOME/dotfiles/plugins/shared/agent-badge.tmux wire"'
 ```
 
 The badge then exists from the moment tmux starts rather than from the first
@@ -100,10 +94,38 @@ next runs, but the config line sidesteps it entirely by pinning tmux to the
 working tree, which is never swept. Self-wiring stays the fallback for machines
 that have the plugin and nothing else.
 
+## Why two plugins
+
+`agent-badge-claude` and `agent-badge-codex` are separate plugins carrying
+separate `hooks/hooks.json` files, and that is forced rather than chosen.
+
+Both harnesses auto-load hooks from the fixed path `<plugin>/hooks/hooks.json`,
+and neither lets a plugin name a different file — Codex rejects the `hooks`
+manifest field outright (`plugin.json field 'hooks' is not accepted`), which also
+invalidates the manifest and takes the plugin's *other* hooks down with it. So a
+plugin gets exactly one hooks file, at a path both harnesses read.
+
+That file cannot serve both. Their event vocabularies genuinely differ: Claude
+has `PermissionDenied`, `StopFailure`, `PostToolUseFailure` and `Notification`;
+Codex has `Interrupt`, which fires on an Esc-interrupted turn and is the only
+thing that clears the badge afterward. Claude rejects an entire hooks file
+containing an event it does not know — `Hooks (0)`, validation fails — so
+`Interrupt` can never share a file with Claude's events.
+
+A single plugin did work for a while, by sending Claude's file to both and
+relying on Codex ignoring the four events it does not recognise. That is
+tolerance, not a contract, and it cost `Interrupt` outright.
+
+Everything except `hooks/hooks.json` and the manifest is generated from
+`plugins/shared/` by `plugins/sync-shared.sh`, with a pre-commit check to catch
+edits made to a copy instead of the source. Symlinks would be tidier and do not
+work: Codex silently omits symlinked directories when copying a plugin into its
+cache, so the scripts would simply be missing. Claude dereferences them fine.
+
 ## Uninstall
 
 ```bash
-plugins/agent-badge/agent-badge.tmux unwire    # tmux hooks, formats, options
+plugins/shared/agent-badge.tmux unwire    # tmux hooks, formats, options
 claude plugin uninstall agent-badge@tafk7
 codex plugin remove agent-badge@tafk7
 ```
@@ -161,13 +183,11 @@ A badge stuck on "working" is worse than no badge.
 - Codex hooks are trusted by content hash and are skipped **silently** until
   reviewed via `/hooks`. Anything that changes a command's text — including a
   plugin update moving the cache path — un-trusts them again.
-- An Esc-interrupted Codex turn strands on "working" until that pane's agent does
-  something else. Codex fires no `Stop` there and has no session file to
-  reconcile against, and its `Interrupt` event cannot be delivered from this
-  plugin: `.codex-plugin/plugin.json` declaring `hooks` silently stops *all*
-  hooks loading, and putting `Interrupt` in the shared `hooks/hooks.json` makes
-  Claude reject the whole file (`Hooks (0)`, validation fails). Both verified.
-  Claude recovers from the equivalent on its own via the reconciler.
+- `Interrupt` is wired for Codex but has **not** been observed firing on a real
+  Esc interrupt — only verified to load. If it turns out not to fire, an
+  interrupted Codex turn strands on "working" until that pane does something
+  else: it emits no `Stop` and has no session file to reconcile against. Claude
+  recovers from the equivalent on its own via the reconciler.
 - Two harnesses in the *same pane* clobber each other's state. Two in the same
   *window*, in different panes, is fine and shows both glyphs.
 - Badges update on hook activity or on focus, not continuously. There is no

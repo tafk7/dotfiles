@@ -8,7 +8,7 @@
       "name": "agent-badge",
       "source": {
         "source": "local",
-        "path": "./plugins/agent-badge"
+        "path": "./plugins/agent-badge-codex"
       },
       "policy": {
         "installation": "AVAILABLE",

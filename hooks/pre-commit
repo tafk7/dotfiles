@@ -124,6 +124,22 @@ if [[ "$TSV_STAGED" == "true" ]]; then
     fi
 fi
 
+# Check 5: agent-badge generated copies match plugins/shared/
+# Claude and Codex need one plugin each (see plugins/sync-shared.sh), so the
+# scripts exist three times over. Editing a copy instead of the source is the
+# obvious mistake, and it fails silently — one harness keeps the old behaviour.
+for f in "${STAGED[@]}"; do
+    if [[ "$f" == plugins/* ]]; then
+        if [[ -x plugins/sync-shared.sh ]] && ! plugins/sync-shared.sh --check 2>/tmp/precommit-sync.$$; then
+            fail "agent-badge plugin copies are out of sync with plugins/shared/"
+            sed 's/^/  /' /tmp/precommit-sync.$$ >&2
+            ((errors++))
+        fi
+        rm -f /tmp/precommit-sync.$$
+        break
+    fi
+done
+
 if [[ $errors -gt 0 ]]; then
     echo >&2
     echo "${YELLOW}commit blocked.${NC} Fix the issues above, or bypass with: ${DIM}git commit --no-verify${NC}" >&2
