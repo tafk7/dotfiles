@@ -13,7 +13,7 @@
         "name": "tkeller"
       },
       "category": "productivity",
-      "source": "./plugins/agent-badge"
+      "source": "./plugins/agent-badge-claude"
     }
   ]
 }

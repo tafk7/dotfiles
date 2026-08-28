@@ -61,8 +61,7 @@ provision_agent_badge_plugin() {
     fi
     if "$claude_cmd" plugin install agent-badge@tafk7 >/dev/null 2>&1; then
         success "Plugin agent-badge installed (tmux window badges for agent sessions)."
-        log "  Takes effect in new Claude sessions. Codex hooks are separate:"
-        log "  $DOTFILES_DIR/plugins/agent-badge/codex/install.sh"
+        log "  Takes effect in new Claude sessions."
     else
         warn "Could not install the agent-badge plugin; see plugins/agent-badge/README.md."
     fi
