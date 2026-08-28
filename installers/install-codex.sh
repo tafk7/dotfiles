@@ -42,9 +42,39 @@ provision_codex_config() {
     success "Provisioned hardened ~/.codex/config.toml (metrics export disabled)."
 }
 
+# Install the agent-badge tmux hooks into ~/.codex/config.toml.
+#
+# The Claude side of this plugin installs through the plugin marketplace
+# (install-claude.sh). Codex could too -- its plugin-bundled hooks do load and
+# fire, contrary to an earlier reading here -- but config.toml is what carries
+# the Interrupt hook, which has no Claude equivalent and so is not in the
+# plugin's shared hooks/hooks.json. Interrupt is the only thing that clears a
+# badge after an Esc-interrupted turn: Codex fires no Stop there and has no
+# session-state file to reconcile against.
+#
+# Not fatal, and idempotent: the script manages one delimited block and exits 0
+# when the file is already current.
+provision_agent_badge_hooks() {
+    local installer="$DOTFILES_DIR/plugins/agent-badge/codex/install.sh"
+    [[ -x "$installer" ]] || return 0
+
+    if ! "$installer" >/dev/null 2>&1; then
+        warn "Could not install the agent-badge hooks into ~/.codex/config.toml."
+        warn "  Run manually: $installer"
+        return 0
+    fi
+    success "agent-badge hooks installed (tmux window badges for agent sessions)."
+    # Worth stating every run. Codex trusts hooks by content hash, so a changed
+    # path un-trusts them, and an untrusted hook is skipped in silence -- which
+    # looks exactly like a broken config.
+    log "  Run /hooks inside Codex once to review and trust them."
+    log "  Until you do, they are skipped silently and no badges appear."
+}
+
 # Config is independent of the binary — provision on every run so it lands even
 # when the binary is already present (the early exits below).
 provision_codex_config
+provision_agent_badge_hooks
 
 if [[ "$FORCE" != true && -x "$CODEX_BIN" ]] && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex already installed ($("$CODEX_BIN" --version 2>/dev/null | head -n1))."
