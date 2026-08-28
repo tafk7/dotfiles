@@ -15,7 +15,6 @@
     "badge",
     "hooks"
   ],
-  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "Agent Badge",
     "shortDescription": "tmux window badges for agent sessions",
