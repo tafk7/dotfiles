@@ -145,6 +145,8 @@ if [[ "$UNINSTALL" == true ]]; then
 else
     echo "Installed agent-badge hooks into $CONFIG (backup: $backup)"
     echo
-    echo "Codex will ask you to trust each hook the next time you start it."
-    echo "Their commands changed path, so previously-trusted hashes no longer match."
+    echo "IMPORTANT: start Codex interactively once and approve the hooks."
+    echo "Their command paths changed, so the content-addressed trusted_hash"
+    echo "entries no longer match -- and until you approve them, every hook is"
+    echo "skipped SILENTLY. No badges, and no error to tell you why."
 fi

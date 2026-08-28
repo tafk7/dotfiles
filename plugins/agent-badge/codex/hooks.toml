@@ -14,13 +14,12 @@
 # never fires. Do not set async: an async Stop hook is killed at process exit
 # before it can write.
 #
-# And an unsupported event name takes EVERY hook down with it, silently. There is
-# no warning, no parse error -- the whole [hooks] table just stops loading. Found
-# the hard way with Interrupt: `interrupt` appears in the binary's event list and
-# would have closed the Esc-interrupted-turn gap, but [[hooks.Interrupt]] in
-# config.toml zeroes out all hook execution (A/B: 6 hook invocations without it,
-# 0 with). It is presumably reachable only through the plugin hooks.json path.
-# Verify any event added here actually fires before trusting it.
+# Hooks are trusted by content hash, per event, in [hooks.state]. Changing a
+# command's text -- including just its path -- invalidates that entry, and an
+# untrusted hook is skipped SILENTLY. So immediately after (re)running
+# install.sh, every badge hook is dead until Codex is started interactively and
+# the hooks are approved. That looks identical to a broken config; it is not.
+# An untrusted event does not affect the others: they fire independently.
 
 [[hooks.SessionStart]]
 [[hooks.SessionStart.hooks]]
@@ -57,7 +56,20 @@ command = "__SCRIPT__ uncompact"
 type = "command"
 command = "__SCRIPT__ done"
 
-# Stop does not fire on an errored or Esc-interrupted turn, but SessionEnd does.
+# Esc-interrupting a turn fires no Stop, and Codex has no session-state file, so
+# unlike Claude the badge cannot be reconciled after the fact -- it strands on
+# "working". Interrupt is what closes that gap. It resolves to `done`, which
+# agent-status.sh demotes to `idle` when the pane is visible, and if you just hit
+# Esc, it is.
+#
+# NOT yet observed firing on a real interrupt: verified only that it loads and
+# coexists with the other hooks. It needs interactive trust like the rest.
+[[hooks.Interrupt]]
+[[hooks.Interrupt.hooks]]
+type = "command"
+command = "__SCRIPT__ done"
+
+# Stop does not fire on an errored turn either, but SessionEnd does.
 # timeout is clamped to ~3s.
 [[hooks.SessionEnd]]
 [[hooks.SessionEnd.hooks]]

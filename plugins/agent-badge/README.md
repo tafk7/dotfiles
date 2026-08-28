@@ -150,11 +150,14 @@ A badge stuck on "working" is worse than no badge.
 
 - `waiting` is Claude-only. Codex's `SubagentStop` does not reliably fire —
   stranded ids pinned a pane to `waiting` for 26 minutes in practice.
-- An Esc-interrupted Codex turn can still strand on "working". Codex fires no
-  `Stop` there and has no session file to reconcile against, and its `Interrupt`
-  event is not usable from `config.toml` — adding `[[hooks.Interrupt]]` silently
-  disables *every* hook (see `codex/hooks.toml`). Claude recovers from this on
-  its own via the reconciler.
+- Codex hooks are trusted by content hash, per event. Re-running
+  `codex/install.sh` changes every command path and so un-trusts all of them,
+  and **an untrusted hook is skipped silently** — indistinguishable from a broken
+  config. Start Codex interactively once and approve them.
+- Codex's `Interrupt` hook is wired but has not been observed firing on a real
+  Esc interrupt, only verified to load. Until it is confirmed, assume an
+  interrupted Codex turn can strand on "working": it fires no `Stop` and has no
+  session file to reconcile against. Claude recovers from this on its own.
 - Two harnesses in the *same pane* clobber each other's state. Two in the same
   *window*, in different panes, is fine and shows both glyphs.
 - Badges update on hook activity or on focus, not continuously. There is no
