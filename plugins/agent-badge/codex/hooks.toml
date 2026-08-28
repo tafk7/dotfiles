@@ -1,0 +1,82 @@
+# Codex CLI hooks for agent-badge.  This is a template: install.sh replaces the
+# script placeholder with an absolute path to scripts/agent-status.sh and writes
+# the result into ~/.codex/config.toml between managed markers.
+#
+# Why this is not a plugin manifest: Codex ships a plugin system with a
+# `hooks` manifest field, but plugin-provided hooks are behind the `plugin_hooks`
+# feature flag and do not execute in 0.150.1 -- verified with a throwaway probe
+# plugin, which installed and cached cleanly (hooks.json and all) yet never ran
+# its hook, with or without --enable plugin_hooks and -c bypass_hook_trust=true.
+# .codex-plugin/plugin.json is present and ready for when that ships; until then
+# config.toml is the only wiring that actually fires.
+#
+# Event names MUST be PascalCase. snake_case parses without error and silently
+# never fires. Do not set async: an async Stop hook is killed at process exit
+# before it can write.
+
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "__SCRIPT__ session-start"
+
+[[hooks.UserPromptSubmit]]
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = "__SCRIPT__ thinking"
+
+[[hooks.PostToolUse]]
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "__SCRIPT__ tool"
+
+[[hooks.PermissionRequest]]
+[[hooks.PermissionRequest.hooks]]
+type = "command"
+command = "__SCRIPT__ needs"
+
+[[hooks.PreCompact]]
+[[hooks.PreCompact.hooks]]
+type = "command"
+command = "__SCRIPT__ busy"
+
+[[hooks.PostCompact]]
+[[hooks.PostCompact.hooks]]
+type = "command"
+command = "__SCRIPT__ uncompact"
+
+[[hooks.Stop]]
+[[hooks.Stop.hooks]]
+type = "command"
+command = "__SCRIPT__ done"
+
+# Esc-interrupting a turn fires no Stop, which used to strand the badge on
+# "working" with nothing able to clear it -- Codex has no session-state file, so
+# unlike Claude it cannot be reconciled after the fact. Interrupt closes that
+# gap. It resolves to `done`, which agent-status.sh demotes to `idle` on its own
+# when the pane is visible -- and if you just hit Esc, it is.
+[[hooks.Interrupt]]
+[[hooks.Interrupt.hooks]]
+type = "command"
+command = "__SCRIPT__ done"
+
+# Stop does not fire on an errored turn either, but SessionEnd does.
+# timeout is clamped to ~3s.
+[[hooks.SessionEnd]]
+[[hooks.SessionEnd.hooks]]
+type = "command"
+command = "__SCRIPT__ gone"
+timeout = 2
+
+# Background subagents: tracked as a set of live agent ids (see agent-status.sh).
+# Recorded but deliberately not driving the badge for Codex -- SubagentStop does
+# not reliably fire, and stranded ids pinned a pane to "waiting" for 26 minutes
+# in practice.
+[[hooks.SubagentStart]]
+[[hooks.SubagentStart.hooks]]
+type = "command"
+command = "__SCRIPT__ sub-start"
+
+[[hooks.SubagentStop]]
+[[hooks.SubagentStop.hooks]]
+type = "command"
+command = "__SCRIPT__ sub-stop"

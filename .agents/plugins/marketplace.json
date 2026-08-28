@@ -1,0 +1,20 @@
+{
+  "name": "tafk7",
+  "interface": {
+    "displayName": "tafk7"
+  },
+  "plugins": [
+    {
+      "name": "agent-badge",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agent-badge"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
