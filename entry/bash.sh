@@ -56,3 +56,10 @@ HISTIGNORE=""
 
 SHELL_NAME=bash
 source "$DOTFILES_DIR/shell/init.sh"
+
+# ==============================================================================
+# Key Bindings
+# ==============================================================================
+
+bind '"\C-h": backward-kill-word' # Ctrl+Backspace (Backspace remains DEL)
+bind '"\e[3;5~": kill-word'       # Ctrl+Delete

@@ -89,6 +89,9 @@ bindkey -e
 
 bindkey '^[[1;5C' forward-word    # Ctrl+Right
 bindkey '^[[1;5D' backward-word   # Ctrl+Left
+bindkey '^H' backward-kill-word   # Ctrl+Backspace (Backspace remains ^?)
+bindkey '^[[3;5~' kill-word       # Ctrl+Delete
+bindkey '^[[Z' spell-word         # Shift+Tab
 
 autoload -U edit-command-line
 zle -N edit-command-line
