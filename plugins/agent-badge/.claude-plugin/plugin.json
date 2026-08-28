@@ -16,6 +16,5 @@
     "badge",
     "multitasking",
     "hooks"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
