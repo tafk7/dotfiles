@@ -39,7 +39,7 @@ tmux│Alt+w / Alt+r│Previous / next window (no prefix, repeatable)│previous
 tmux│Alt+Shift+Q│Toggle back to last active window│last-window
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+A│Zoom pane toggle│resize-pane -Z
-tmux│Alt+Shift+T│New window (inherits current path)│new-window -c #{pane_current_path}
+tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 tmux│Alt+Shift+X│Kill pane (with confirmation)│confirm-before kill-pane
 tmux│Alt+Shift+G│Toggle synchronized input to all panes│setw synchronize-panes
 tmux│Prefix+Alt+,│Revert window to automatic naming│setw automatic-rename on
@@ -58,7 +58,7 @@ tmux│Ctrl+a \│Split side-by-side (vertical divider)│split-window -h
 tmux│Ctrl+a b│Split side-by-side (left-hand alternative)│split-window -h
 tmux│Ctrl+a -│Split top/bottom (horizontal divider)│split-window -v
 # Prefix — Windows
-tmux│Ctrl+a t│New window (inherits current path)│new-window -c #{pane_current_path}
+tmux│Ctrl+a t│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 tmux│Ctrl+a w│Window picker tree view│choose-tree -Zw
 tmux│Ctrl+a x│Kill pane (with confirmation)│confirm-before kill-pane
 tmux│Ctrl+a X│Kill window and all its panes (with confirmation)│confirm-before kill-window
