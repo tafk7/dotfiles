@@ -2,19 +2,24 @@
 # Reconcile tmux badge state against Claude Code's own session files.
 #
 # Claude writes ~/.claude/sessions/<pid>.json per session, containing:
-#   status            "busy" | "idle"   -- first-party, authoritative
+#   status            "busy" | "idle" | "waiting"   -- first-party, authoritative
+#                     ("waiting" means a permission prompt is on screen)
 #   tmux              "0:@14.%117"      -- session:@window.%pane
 #   pid, statusUpdatedAt
 #
 # That is ground truth, and it makes every heuristic we would otherwise need
 # unnecessary. Hooks still drive the rich states (needs / busy-compacting /
-# waiting-on-subagents) because the file only knows busy-vs-idle -- but when a
+# waiting-on-subagents) because the file cannot express them -- but when a
 # hook is *missed*, this is what unsticks the badge. Missed hooks are not
 # hypothetical: an errored turn, a killed process, or a harness crash all leave
 # the last hook state pinned forever.
 #
-# Deliberately DEMOTION-ONLY, and only for the two states a missed hook strands:
+# Deliberately DEMOTION-ONLY, for the states a missed hook strands:
 #   file says idle + badge says working/thinking  -> demote to idle
+#   file says busy + badge says needs             -> demote to working
+#                                    (permission was granted; nothing fires on
+#                                     grant, so `needs` would otherwise persist
+#                                     for the whole tool run)
 # It never promotes. Promotion from a stale file would fight the hooks, which are
 # both faster and more specific, and it would clobber `needs`/`done`/`waiting`
 # with a state that cannot express them.
@@ -55,14 +60,43 @@ for f in "$sessdir"/*.json; do
 
     cur=$(tmux show -p -t "$pane" -qv @cc_pane_state 2>/dev/null)
 
-    if [[ "$status" == "idle" ]]; then
-        case "$cur" in
-            working|thinking)
-                tmux set -p -t "$pane" @cc_pane_state idle 2>/dev/null
-                changed_panes+=("$pane")
-                ;;
-        esac
-    fi
+    case "$status" in
+        idle)
+            case "$cur" in
+                working|thinking)
+                    tmux set -p -t "$pane" @cc_pane_state idle 2>/dev/null
+                    changed_panes+=("$pane")
+                    ;;
+            esac
+            ;;
+        busy)
+            # Nothing fires when you *grant* a permission. There is no
+            # PermissionGranted event -- verified against the manifest validator,
+            # which rejects PermissionGranted / PermissionResponse /
+            # PermissionResult / PermissionDecision / PermissionAllowed -- and
+            # PreToolUse is no help because it runs *before* PermissionRequest,
+            # which would just overwrite it.
+            #
+            # So `needs` survives the grant and stays lit for the entire tool
+            # run: observed at 3m35s on an approved `sudo du`, a window loudly
+            # asking for attention precisely while it needed none.
+            #
+            # The status file settles it, because it distinguishes the two cases
+            # that matter: "waiting" while a prompt is actually pending, "busy"
+            # once the tool is running. Both verified live against a real prompt.
+            # busy therefore means the decision has already been made.
+            case "$cur" in
+                needs)
+                    tmux set -p -t "$pane" @cc_pane_state working 2>/dev/null
+                    changed_panes+=("$pane")
+                    ;;
+            esac
+            ;;
+    esac
+    # No branch for status=waiting. Promoting to `needs` from here would catch a
+    # missed PermissionRequest, but this stays demotion-only on purpose: a stale
+    # read that invents an attention-demanding badge is worse than one that
+    # fails to.
 done
 
 # Rebuild once per affected pane. `reap` recomputes that pane's whole window, so
