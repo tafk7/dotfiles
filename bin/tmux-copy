@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Copy a tmux selection to the local system clipboard via OSC 52, size-gated.
+#
+# Why not just `set -g set-clipboard on`:
+#
+# On a Windows -> ssh -> Linux workflow, OSC 52 is the only clipboard path that
+# works. There is no clip.exe, no wl-copy, and xclip cannot reach a display
+# ($DISPLAY is unset; tmux's own environment reports XDG_SESSION_TYPE=tty), so
+# the usual `copy-pipe to a clipboard tool` recipes silently do nothing here.
+#
+# But tmux's own clipboard support has no size limit, and neither does the
+# terminal. A big selection is base64'd into ONE escape sequence and pushed down
+# the ssh link, and the terminal stalls for seconds parsing it -- reassembling a
+# payload split across many packets is the documented failure mode. Selecting a
+# few hundred lines of agent output froze the terminal every time.
+#
+# So tmux is told to stay out of it (`set-clipboard off`) and the copy bindings
+# pipe here instead, where the payload can be bounded. Over the limit, the
+# clipboard is skipped and you are told why -- the tmux buffer is still set
+# either way, so prefix+] pastes at any size.
+#
+# `set-clipboard off` is also the safer setting while agents are running: with
+# `on`, ANY command that can write to a pane can set your system clipboard --
+# sudo is irrelevant. With off, tmux ignores application OSC 52 entirely and
+# only this script reaches the clipboard.
+#
+# Limit is @clipboard-limit (bytes of raw text, before base64). Retune live:
+#     tmux set -g @clipboard-limit 32768
+#
+# Above roughly 75 KB the escape sequence exceeds the ~100 KB that terminals
+# accept in practice and is dropped anyway, so values beyond that buy nothing
+# but latency.
+#
+# Usage: as a tmux copy-pipe target --
+#     bind -T copy-mode-vi y send -X copy-pipe-and-cancel "…/bin/tmux-copy"
+
+set -uo pipefail
+
+DEFAULT_LIMIT=65536
+
+limit=$(tmux show -gv @clipboard-limit 2>/dev/null)
+[[ "$limit" =~ ^[0-9]+$ ]] || limit=$DEFAULT_LIMIT
+
+payload=$(cat)
+size=${#payload}
+
+if (( size > limit )); then
+    tmux display-message \
+        "clipboard skipped: $((size / 1024)) KB exceeds $((limit / 1024)) KB (prefix+] still pastes)" \
+        2>/dev/null
+    exit 0
+fi
+
+# base64 -w0: one line, no wrapping. A newline inside the escape sequence would
+# terminate it early and leave the tail printing as garbage into the pane.
+b64=$(printf '%s' "$payload" | base64 -w0 2>/dev/null) || exit 0
+
+# Write straight to each attached client's tty rather than to stdout. copy-pipe
+# gives us the selection on stdin but no path back to the terminal, and tmux
+# would swallow a bare escape sequence written to stdout. Every attached client
+# gets it, so the clipboard lands wherever you are actually looking.
+while IFS= read -r tty; do
+    [[ -w "$tty" ]] || continue
+    printf '\033]52;c;%s\007' "$b64" > "$tty" 2>/dev/null
+done < <(tmux list-clients -F '#{client_tty}' 2>/dev/null)
+
+exit 0
