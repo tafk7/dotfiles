@@ -63,8 +63,11 @@ To enforce policy that can't be bypassed, use system managed settings at
   `codex-rs/core/src/config/otel.rs`). Metrics only — `log_user_prompt` defaults
   to `false`, so no prompt/code — but still a third-party call. Traces/logs are
   off by default.
-- **Auto-update:** not a factor for us — we install Codex via eget pinned in
-  `eget-ai.toml` (no self-update).
+- **Updates:** Codex is installed with OpenAI's standalone installer. The
+  installer owns `~/.local/bin/codex` and the versioned releases under
+  `~/.codex/packages/standalone`; dotfiles owns configuration and plugins and
+  does not replace the launcher's symlink. Re-run `./setup.sh --codex --force`
+  to ask the official installer to update or repair the installation.
 
 **What we ship:** `~/.codex/config.toml` (only when absent) with:
 ```toml

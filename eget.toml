@@ -82,8 +82,8 @@ target = "~/.local/bin/direnv"
 tag = "v0.11.0"
 asset_filters = [".linux.x86_64.tar.xz"]
 
-# NOTE: Codex is an "ai" tier tool and is intentionally NOT listed here. It is
-# managed by installers/install-codex.sh (via eget-ai.toml) so that `--bash`'s
+# NOTE: Codex is an "ai" tier tool and is intentionally NOT listed here. Its
+# dedicated installer uses OpenAI's standalone installer so that `--bash`'s
 # `eget --download-all` never pulls it in — AI CLIs install only under --ai/--full.
 
 ["mame/wsl2-ssh-agent"]

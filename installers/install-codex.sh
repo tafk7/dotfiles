@@ -1,10 +1,10 @@
 #!/bin/bash
-# Install the OpenAI Codex CLI (native musl build) via eget, pinned in eget-ai.toml.
+# Install or update the OpenAI Codex CLI with OpenAI's standalone installer.
 #
 # Codex is an "ai" tier tool (./setup.sh --ai, or --full). It is kept out of the
-# shell-tier `eget --download-all` batch so an org-managed Codex install isn't
-# shadowed by default. Re-run with --force to reinstall (e.g. after a version bump
-# in eget-ai.toml, or to repair a broken binary).
+# shell-tier installers so an org-managed Codex install isn't shadowed by
+# default. A normal rerun preserves a working standalone install; --force asks
+# the official installer to update or repair it without deleting its launcher.
 set -euo pipefail
 
 source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
@@ -12,11 +12,11 @@ source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
 
-# eget renames the archive's binary to plain `codex` at this absolute path
-# (see eget-ai.toml). Verify by absolute path: on a fresh machine ~/.local/bin
-# is not guaranteed to be on the installer process's PATH.
+# The official standalone installer owns this launcher and the release tree
+# under ~/.codex/packages/standalone. Dotfiles owns configuration, plugins and
+# verification, but never rewrites the launcher itself.
 CODEX_BIN="$HOME/.local/bin/codex"
-AI_CONFIG="${DOTFILES_DIR:-$HOME/dotfiles}/eget-ai.toml"
+CODEX_INSTALLER_URL="https://chatgpt.com/codex/install.sh"
 
 # Provision a hardened ~/.codex/config.toml — chiefly to disable Codex's default
 # metrics export to OpenAI's Statsig endpoint (ab.chatgpt.com). Only when absent
@@ -75,57 +75,85 @@ provision_agent_badge_plugin() {
     fi
 }
 
+run_official_installer() {
+    local installer_path="${DOTFILES_CODEX_INSTALLER_SCRIPT:-}"
+    local downloaded=false
+
+    # Private test seam: CI supplies a local stand-in so it can exercise
+    # ownership behavior without executing a moving upstream installer.
+    if [[ -n "$installer_path" ]]; then
+        if [[ ! -f "$installer_path" ]]; then
+            error "DOTFILES_CODEX_INSTALLER_SCRIPT does not exist: $installer_path"
+            return 1
+        fi
+    else
+        if ! command -v curl >/dev/null 2>&1; then
+            error "curl is required to install Codex"
+            return 1
+        fi
+
+        installer_path="$(mktemp)"
+        downloaded=true
+        if ! curl --proto '=https' --tlsv1.2 -fsSL \
+            "$CODEX_INSTALLER_URL" -o "$installer_path"; then
+            rm -f "$installer_path"
+            error "Could not download the official Codex installer"
+            return 1
+        fi
+        if [[ ! -s "$installer_path" ]]; then
+            rm -f "$installer_path"
+            error "The downloaded Codex installer is empty"
+            return 1
+        fi
+    fi
+
+    local rc=0
+    sh "$installer_path" || rc=$?
+    [[ "$downloaded" == true ]] && rm -f "$installer_path"
+    if [[ "$rc" != 0 ]]; then
+        error "The official Codex installer failed (exit $rc)"
+        return "$rc"
+    fi
+}
+
 # Config is independent of the binary — provision on every run so it lands even
 # when the binary is already present (the early exits below).
 provision_codex_config
 
-if [[ "$FORCE" != true && -x "$CODEX_BIN" ]] && "$CODEX_BIN" --version >/dev/null 2>&1; then
+# Never shadow an externally managed Codex, including under the repository-wide
+# --force flag. Replacing another manager's binary must be a separate, explicit
+# operation rather than a side effect of refreshing dotfiles.
+EXTERNAL_CODEX="$(command -v codex 2>/dev/null || true)"
+if [[ -n "$EXTERNAL_CODEX" && "$EXTERNAL_CODEX" != "$CODEX_BIN" ]]; then
+    warn "Found an externally-managed codex on PATH: $EXTERNAL_CODEX"
+    warn "Skipping install to avoid a shadow copy at $CODEX_BIN."
+    provision_agent_badge_plugin "$EXTERNAL_CODEX"
+    exit 2
+fi
+
+# A symlink at the standard path is owned by the standalone installer. Leave a
+# working one alone on normal runs so setup remains fast and offline-friendly.
+if [[ "$FORCE" != true && -L "$CODEX_BIN" && -x "$CODEX_BIN" ]] \
+    && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex already installed ($("$CODEX_BIN" --version 2>/dev/null | head -n1))."
     provision_agent_badge_plugin "$CODEX_BIN"
     exit 2
 fi
 
-# Don't shadow an externally-managed Codex (same reasoning as install-claude.sh).
-EXTERNAL_CODEX="$(command -v codex 2>/dev/null || true)"
-if [[ "$FORCE" != true && -n "$EXTERNAL_CODEX" && "$EXTERNAL_CODEX" != "$CODEX_BIN" ]]; then
-    warn "Found an externally-managed codex on PATH: $EXTERNAL_CODEX"
-    warn "Skipping install to avoid a shadow copy at $CODEX_BIN."
-    warn "Re-run with --force to install the dotfiles-managed copy anyway."
-    # Still a working Codex, so still worth the plugin.
-    provision_agent_badge_plugin "$EXTERNAL_CODEX"
-    exit 2
+# Migrate the previous dotfiles/eget installation, which was a regular binary at
+# this same path, into the official release-managed layout. Do not delete it
+# first: the official installer performs the replacement, and a failed download
+# therefore leaves the working legacy binary intact.
+if [[ "$FORCE" != true && -x "$CODEX_BIN" ]]; then
+    warn "Found a legacy direct Codex binary at $CODEX_BIN."
+    log "Migrating it to the official standalone installation..."
+elif [[ "$FORCE" == true && -x "$CODEX_BIN" ]]; then
+    log "Updating or repairing Codex with the official standalone installer..."
+else
+    log "Installing Codex with the official standalone installer..."
 fi
 
-if [[ ! -f "$AI_CONFIG" ]]; then
-    error "eget-ai.toml not found at $AI_CONFIG"
-    exit 1
-fi
-
-# Codex is fetched with eget. eget lives in the bash tier, but --ai can run
-# without --bash, so ensure it is present first.
-eget_bin="$HOME/.local/bin/eget"
-command -v eget >/dev/null 2>&1 && eget_bin="$(command -v eget)"
-if [[ ! -x "$eget_bin" ]]; then
-    log "eget not found; installing it first (needed to fetch Codex)..."
-    rc=0
-    "${DOTFILES_DIR:-$HOME/dotfiles}/installers/install-eget.sh" || rc=$?
-    # install-eget.sh exits 2 when already up to date; only non-{0,2} is a failure.
-    if [[ "$rc" != 0 && "$rc" != 2 ]]; then
-        error "eget installation failed; cannot install Codex"
-        exit 1
-    fi
-    command -v eget >/dev/null 2>&1 && eget_bin="$(command -v eget)"
-    if [[ ! -x "$eget_bin" ]]; then
-        error "eget not found at $eget_bin after install"
-        exit 1
-    fi
-fi
-
-# Under --force, clear the existing binary so eget re-downloads it.
-[[ "$FORCE" == true ]] && rm -f "$CODEX_BIN"
-
-log "Installing Codex via eget (pinned in eget-ai.toml)..."
-if ! EGET_CONFIG="$AI_CONFIG" "$eget_bin" --download-all; then
+if ! run_official_installer; then
     error "Codex installation failed"
     exit 1
 fi
