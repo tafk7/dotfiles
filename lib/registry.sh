@@ -91,6 +91,7 @@ declare -A TOOL_TIER=(
 declare -A TOOL_VERIFY=(
     [nvm]='test -s "$HOME/.nvm/nvm.sh"'
     [rust]='command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1'
+    [codex]='command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1'
     # Binary present isn't success for a service — it must be running.
     [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
 )
@@ -103,7 +104,7 @@ declare -A TOOL_PATHS=(
     [rust]="\$HOME/.cargo \$HOME/.rustup"
     [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
     [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
-    [codex]="\$HOME/.local/bin/codex"
+    [codex]="\$HOME/.local/bin/codex \$HOME/.codex/packages/standalone"
     [opencode]="\$HOME/.local/bin/opencode \$HOME/.opencode"
 )
 
@@ -113,7 +114,7 @@ declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
     [rust]="rustup self uninstall -y  # removes \$HOME/.cargo and \$HOME/.rustup"
     [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
-    [codex]="rm -f \$HOME/.local/bin/codex  # ~/.codex config/sessions are preserved"
+    [codex]="rm -f \$HOME/.local/bin/codex && rm -rf \$HOME/.codex/packages/standalone  # ~/.codex config/sessions are preserved"
     [opencode]="rm -f \$HOME/.local/bin/opencode  # ~/.config/opencode config is preserved"
     [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
 )
