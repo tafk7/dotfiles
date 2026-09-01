@@ -148,9 +148,13 @@ tm <name> / ta <name>     # New session / attach
 tl / tk <name>            # List / kill session
 ```
 
-Clipboard: copy-mode `y` and `<prefix> P` auto-detect WSL (`clip.exe` /
-`powershell.exe Get-Clipboard`), Wayland (`wl-copy` / `wl-paste`), or X11
-(`xclip`). OSC 52 (`set-clipboard on`) handles SSH sessions.
+Clipboard: `Alt+Copy` (physical Copy is `Ctrl+Insert`) enters copy mode and
+confirms an active selection; `y` is the fallback. `Alt+Paste` pastes the tmux
+buffer, while plain Copy/Paste remain Windows Terminal actions. OSC 52 export
+is disabled by default; toggle it with `tmux set -g @clipboard-osc52 on|off`.
+Alt-drag copies directly to the tmux buffer; Shift-drag selects in the client.
+`<prefix> i` inserts the current window at a prompted index (`-1` means the
+end).
 
 ### WSL (auto-detected)
 

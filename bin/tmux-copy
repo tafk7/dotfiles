@@ -17,7 +17,7 @@
 # So tmux is told to stay out of it (`set-clipboard off`) and the copy bindings
 # pipe here instead, where the payload can be bounded. Over the limit, the
 # clipboard is skipped and you are told why -- the tmux buffer is still set
-# either way, so prefix+] pastes at any size.
+# either way, so prefix+p pastes at any size.
 #
 # `set-clipboard off` is also the safer setting while agents are running: with
 # `on`, ANY command that can write to a pane can set your system clipboard --
@@ -33,6 +33,7 @@
 #
 # Usage: as a tmux copy-pipe target --
 #     bind -T copy-mode-vi y send -X copy-pipe-and-cancel "…/bin/tmux-copy"
+# The tmux bindings only invoke this helper when @clipboard-osc52 is `on`.
 
 set -uo pipefail
 
@@ -46,7 +47,7 @@ size=${#payload}
 
 if (( size > limit )); then
     tmux display-message \
-        "clipboard skipped: $((size / 1024)) KB exceeds $((limit / 1024)) KB (prefix+] still pastes)" \
+        "clipboard skipped: $((size / 1024)) KB exceeds $((limit / 1024)) KB (prefix+p still pastes)" \
         2>/dev/null
     exit 0
 fi
