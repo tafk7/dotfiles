@@ -36,47 +36,48 @@ git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 tmux│Alt+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+w / Alt+r│Previous / next window (no prefix, repeatable)│previous-window / next-window
-tmux│Alt+Shift+Q│Toggle back to last active window│last-window
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
-tmux│Alt+Shift+A│Zoom pane toggle│resize-pane -Z
 tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
-tmux│Alt+Shift+X│Kill pane (with confirmation)│confirm-before kill-pane
-tmux│Alt+Shift+G│Toggle synchronized input to all panes│setw synchronize-panes
-tmux│Prefix+Alt+,│Revert window to automatic naming│setw automatic-rename on
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
 tmux│Ctrl+a Alt+ESDF│Send the original Meta key to the application│send-keys M-e/M-s/M-d/M-f
 tmux│Ctrl+a Shift+↑↓←→│Resize pane 5 lines in direction (repeatable)│resize-pane -U/-D/-L/-R 5
-tmux│Ctrl+a a│Zoom pane toggle│resize-pane -Z
+tmux│Ctrl+a z│Zoom pane toggle│resize-pane -Z
 tmux│Ctrl+a q│Show pane numbers (3s) — type number to jump│display-panes -d 3000
 tmux│Ctrl+a Space│Next pane layout│next-layout
 tmux│Ctrl+a Ctrl+Space│Previous pane layout│previous-layout
-tmux│Ctrl+a j│Pull a pane from another window into this one│join-pane -s
+tmux│Ctrl+a j│Join current pane into the right side of the window to the left│join-pane -h -t :-1
+tmux│Ctrl+a l│Leave current pane in a new window immediately to the right│break-pane -a
 tmux│Ctrl+a g│Toggle synchronized input to all panes│setw synchronize-panes
+tmux│Ctrl+a >│Open the pane context menu│display-menu (pane)
 # Prefix — Splits
-tmux│Ctrl+a \│Split side-by-side (vertical divider)│split-window -h
-tmux│Ctrl+a b│Split side-by-side (left-hand alternative)│split-window -h
 tmux│Ctrl+a -│Split top/bottom (horizontal divider)│split-window -v
+tmux│Ctrl+a =│Split side-by-side (vertical divider)│split-window -h
 # Prefix — Windows
 tmux│Ctrl+a t│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 tmux│Ctrl+a w│Window picker tree view│choose-tree -Zw
 tmux│Ctrl+a x│Kill pane (with confirmation)│confirm-before kill-pane
 tmux│Ctrl+a X│Kill window and all its panes (with confirmation)│confirm-before kill-window
-tmux│Ctrl+a c│Rename current window│command-prompt rename-window
+tmux│Ctrl+a c│Rename current window; blank restores automatic naming│command-prompt rename-window
+tmux│Ctrl+a i│Insert current window at index; -1 or beyond count moves it to end│move-window -a/-b
+tmux│Ctrl+a <│Open the window context menu│display-menu (window)
 # Prefix — Sessions
 tmux│Ctrl+a C│Create new session│new-session
 tmux│Ctrl+a s│Session chooser tree view│choose-tree -Zs
 tmux│Ctrl+a d│Detach (session keeps running in background)│detach-client
-tmux│Ctrl+a e/E│Next/previous session│switch-client -n/-p
+tmux│Ctrl+a ) / (│Next/previous session│switch-client -n/-p
 tmux│Ctrl+a $│Rename current session│command-prompt rename-session
 # Copy mode (vi keys)
 tmux│Ctrl+a v│Enter copy mode (scroll/select)│copy-mode
 tmux│v / V / Ctrl+v│Begin char/line/block selection (in copy mode)│begin-selection / select-line / rectangle-toggle
-tmux│y│Yank selection to system clipboard (in copy mode)│copy-pipe-and-cancel xclip -sel clipboard
-tmux│Ctrl+a p│Paste from tmux buffer│paste-buffer
-tmux│Ctrl+a P│Paste from system clipboard│xclip -o -sel clipboard | tmux load-buffer - ; tmux paste-buffer
+tmux│Alt+Copy / y│Enter copy mode or copy selection to the tmux buffer│C-M-Insert / copy-selection
+tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
+tmux│Alt+mouse drag│Copy directly to the tmux buffer on release│copy-selection-and-cancel
+tmux│Shift+mouse drag│Select natively in Windows Terminal│client-side selection
+tmux│Ctrl+a p│Paste from tmux buffer with bracketed-paste markers when supported│paste-buffer -p
 # Utility
 tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
+tmux│Ctrl+a R│Force current window to attached-client size and resume automatic sizing│resize-window -A; setw window-size latest; refresh-client
 tmux│Ctrl+a Ctrl+l│Clear screen and scrollback history│send-keys C-l; clear-history
 tmux│Ctrl+a ?│List all keybindings│list-keys
 
