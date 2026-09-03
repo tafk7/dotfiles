@@ -34,6 +34,8 @@ git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 # Tmux shortcuts (prefix is Ctrl+a)
 # No-prefix bindings (instant, left-hand optimized)
 tmux│Alt+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
+tmux│Alt+Up/Down│Move focus vertically between panes (laptop)│select-pane -U/-D
+tmux│Alt+Left/Right│Move horizontally between panes, then cross windows at the edge│select-pane or previous/next-window
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+w / Alt+r│Previous / next window (no prefix)│previous-window / next-window
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
@@ -72,9 +74,13 @@ tmux│Ctrl+a v│Enter copy mode (scroll/select)│copy-mode
 tmux│v / V / Ctrl+v│Begin char/line/block selection (in copy mode)│begin-selection / select-line / rectangle-toggle
 tmux│Alt+Copy / y│Enter copy mode or copy selection to the tmux buffer│C-M-Insert / copy-selection
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
+tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M
 tmux│Alt+mouse drag│Copy directly to the tmux buffer on release│copy-selection-and-cancel
+tmux│Alt+double-click│Copy clicked word directly to tmux buffer│select-word; copy-selection-and-cancel
+tmux│Alt+triple-click│Copy clicked line directly to tmux buffer│select-line; copy-selection-and-cancel
 tmux│Shift+mouse drag│Select natively in Windows Terminal│client-side selection
 tmux│Ctrl+a p│Paste from tmux buffer with bracketed-paste markers when supported│paste-buffer -p
+tmux│Ctrl+a e│Export current tmux buffer to the client/Windows clipboard│size-gated OSC 52 export
 # Utility
 tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
 tmux│Ctrl+a R│Force current window to attached-client size and resume automatic sizing│resize-window -A; setw window-size latest; refresh-client

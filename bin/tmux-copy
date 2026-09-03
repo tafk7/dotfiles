@@ -34,15 +34,38 @@
 # Usage: as a tmux copy-pipe target --
 #     bind -T copy-mode-vi y send -X copy-pipe-and-cancel "…/bin/tmux-copy"
 # The tmux bindings only invoke this helper when @clipboard-osc52 is `on`.
+#
+# Or explicitly export tmux's newest buffer with feedback --
+#     tmux-copy --buffer --notify
 
 set -uo pipefail
 
 DEFAULT_LIMIT=65536
 
+read_buffer=false
+notify=false
+for arg in "$@"; do
+    case "$arg" in
+        --buffer) read_buffer=true ;;
+        --notify) notify=true ;;
+        *)
+            tmux display-message "clipboard export: unknown option $arg" 2>/dev/null
+            exit 2
+            ;;
+    esac
+done
+
 limit=$(tmux show -gv @clipboard-limit 2>/dev/null)
 [[ "$limit" =~ ^[0-9]+$ ]] || limit=$DEFAULT_LIMIT
 
-payload=$(cat)
+if [[ "$read_buffer" == true ]]; then
+    if ! payload=$(tmux show-buffer 2>/dev/null); then
+        tmux display-message "clipboard export: tmux buffer is empty" 2>/dev/null
+        exit 1
+    fi
+else
+    payload=$(cat)
+fi
 size=${#payload}
 
 if (( size > limit )); then
@@ -60,9 +83,21 @@ b64=$(printf '%s' "$payload" | base64 -w0 2>/dev/null) || exit 0
 # gives us the selection on stdin but no path back to the terminal, and tmux
 # would swallow a bare escape sequence written to stdout. Every attached client
 # gets it, so the clipboard lands wherever you are actually looking.
+sent=0
 while IFS= read -r tty; do
     [[ -w "$tty" ]] || continue
-    printf '\033]52;c;%s\007' "$b64" > "$tty" 2>/dev/null
+    if printf '\033]52;c;%s\007' "$b64" > "$tty" 2>/dev/null; then
+        ((sent++))
+    fi
 done < <(tmux list-clients -F '#{client_tty}' 2>/dev/null)
+
+if [[ "$notify" == true ]]; then
+    if (( sent > 0 )); then
+        tmux display-message "tmux buffer exported to $sent client clipboard(s)"
+    else
+        tmux display-message "clipboard export failed: no writable tmux clients"
+        exit 1
+    fi
+fi
 
 exit 0

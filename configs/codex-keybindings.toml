@@ -1,0 +1,17 @@
+# Codex TUI keybinding fragment for the TAFK workflow.
+#
+# Manually merge these tables into ~/.codex/config.toml. Do not replace that
+# file wholesale: it may also contain machine-local providers, credentials,
+# trust state, hooks, and other settings that do not belong in dotfiles.
+#
+# `/keymap` can inspect and persist bindings from inside Codex. When changing
+# bindings there, mirror the resulting tui.keymap entries back into this file.
+
+# TAFK line-editing semantics for the Codex composer. Windows Terminal often
+# encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
+[tui.keymap.editor]
+delete_backward = "backspace"
+delete_backward_word = ["ctrl-backspace", "ctrl-h"]
+delete_forward_word = "ctrl-delete"
+kill_line_start = "alt-backspace"
+kill_line_end = "alt-delete"
