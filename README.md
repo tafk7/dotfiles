@@ -153,7 +153,11 @@ Clipboard: `Alt+Copy` (physical Copy is `Ctrl+Insert`) enters copy mode and
 confirms an active selection; `y` is the fallback. `Alt+Paste` pastes the tmux
 buffer, while plain Copy/Paste remain Windows Terminal actions. OSC 52 export
 is disabled by default; toggle it with `tmux set -g @clipboard-osc52 on|off`.
-Alt-drag copies directly to the tmux buffer; Shift-drag selects in the client.
+Alt-click enters tmux copy mode; Alt-drag, Alt-double-click, and Alt-triple-click
+copy a selection, word, or line directly to the tmux buffer. Shift-drag selects
+in the client.
+`<prefix> e` explicitly exports the current tmux buffer to the Windows/client
+clipboard through the same 64 KiB size gate.
 `<prefix> i` inserts the current window at a prompted index (`-1` means the
 end).
 
@@ -176,6 +180,13 @@ WezTerm alternative: copy [`configs/wezterm.lua`](configs/wezterm.lua) to
 `%USERPROFILE%\.wezterm.lua`. It provides the same TAFK/tmux key surface with
 an explicit Gruvbox palette, no native pane shortcuts, and reduced client-side
 scrollback.
+
+Codex: manually merge [`configs/codex-keybindings.toml`](configs/codex-keybindings.toml)
+into `~/.codex/config.toml`. Keep this as a portable keybinding backup rather
+than replacing or symlinking the full machine-local Codex config, which may
+also contain providers, credentials, trust state, and hooks. If bindings are
+changed through Codex's `/keymap` UI, mirror its `tui.keymap` entries back into
+the fragment.
 
 ## Theme System
 
