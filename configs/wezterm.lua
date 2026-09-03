@@ -26,10 +26,11 @@ config.hide_tab_bar_if_only_one_tab = true
 config.use_fancy_tab_bar = false
 config.tab_max_width = 32
 
--- Shift bypasses application/tmux mouse reporting for native client selection.
--- Alt remains available to tmux for Alt+drag selection.
+-- Shift bypasses application/tmux mouse reporting and invokes WezTerm's
+-- default native-selection bindings. Those bindings copy completed selections
+-- to ClipboardAndPrimarySelection, including words on double-click and lines
+-- on triple-click. Alt remains available to tmux for its selection gestures.
 config.bypass_mouse_reporting_modifiers = 'SHIFT'
-config.copy_on_select = false
 
 -- Avoid client opacity or a default scheme overriding the dotfiles palette.
 config.window_background_opacity = 1.0
