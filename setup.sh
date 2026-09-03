@@ -152,7 +152,7 @@ USAGE:
 TIERS (cumulative - each tier includes all previous tiers):
     --bash              Config + modern CLI tools. NO SUDO — every tool installs
                         to ~/.local/bin via eget: starship, eza, fzf, zoxide,
-                        delta, btop, gdu, glow, lazygit, uv, sd, bat, fd,
+                        delta, btop, gdu, glow, lazygit, gh, uv, sd, bat, fd,
                         ripgrep, direnv. The non-sudo base for managed systems.
                         (git is assumed present; a tool already installed
                         system-wide is left alone unless --force.)
@@ -221,8 +221,8 @@ TIER SUMMARY:
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
     │ config   │ Symlinks only (reconcile to installed tools)    │ No        │
     │ bash     │ + eget: starship, eza, fzf, zoxide, delta, btop,│ No        │
-    │          │   gdu, glow, lazygit, uv, sd, bat, fd, ripgrep, │           │
-    │          │   direnv  (all to ~/.local/bin)                 │           │
+    │          │   gdu, glow, lazygit, gh, uv, sd, bat, fd,      │           │
+    │          │   ripgrep, direnv  (all to ~/.local/bin)        │           │
     │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
     │ work     │ + NVM, Docker, Azure CLI, Rust                  │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤

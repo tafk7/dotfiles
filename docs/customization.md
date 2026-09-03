@@ -183,6 +183,19 @@ Keep machine-specific tweaks out of git via `*.local`:
 
 These are gitignored.
 
+For the `gcl-amd` helper, set the GitHub login associated with the AMD account
+after authenticating it with `gh`:
+
+```bash
+# ~/.shell.local
+GH_AMD_USER=your-amd-github-login
+```
+
+`gcl-amd OWNER/REPO [DIRECTORY]` clones through the machine-local
+`github.com-amd` SSH alias and records the repository's real `github.com`
+identity for GitHub CLI commands. It uses the AMD token only during that setup
+and does not change the globally active `gh` account.
+
 ### Per-machine git identity and commit signing
 
 The tracked `~/.gitconfig` sets a baseline; layer machine-specific identity and

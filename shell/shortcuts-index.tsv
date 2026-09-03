@@ -10,6 +10,8 @@
 # Git shortcuts
 git│gs│Show working tree status and staged changes│git status
 git│gl│Show commit history as decorated graph│git log --oneline --decorate --graph
+git│gcl│Clone a repository│git clone
+git│gcl-amd│Clone an AMD GitHub repo and configure its gh default│gcl-amd OWNER/REPO [DIRECTORY]
 git│ga│Stage specific files for commit│git add
 git│gaa│Stage all changes in working directory│git add .
 git│gau│Stage all tracked files that have changes│git add -u

@@ -18,6 +18,7 @@ declare -A TOOL_BINARY=(
     [gdu]=gdu
     [glow]=glow
     [lazygit]=lazygit
+    [gh]=gh
     [uv]=uv
     [bat]=bat
     [fd]=fd
@@ -48,6 +49,7 @@ declare -A TOOL_METHOD=(
     [gdu]=eget
     [glow]=eget
     [lazygit]=eget
+    [gh]=eget
     [uv]=eget
     [bat]=eget
     [fd]=eget
@@ -77,7 +79,8 @@ declare -A TOOL_METHOD=(
 declare -A TOOL_TIER=(
     [starship]=bash   [eza]=bash      [fzf]=bash       [zoxide]=bash
     [delta]=bash      [btop]=bash     [glow]=bash       [lazygit]=bash
-    [uv]=bash         [bat]=bash      [fd]=bash        [ripgrep]=bash
+    [gh]=bash         [uv]=bash       [bat]=bash       [fd]=bash
+    [ripgrep]=bash
     [direnv]=bash     [eget]=bash     [sd]=bash        [gdu]=bash
     [neovim]=dev      [tmux]=dev      [shellcheck]=dev
     [wsl2-ssh-agent]=bash
