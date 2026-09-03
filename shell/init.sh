@@ -30,6 +30,14 @@ for _tool_file in "$DOTFILES_DIR"/shell/tools/*.sh; do
 done
 unset _tool_file
 
+# An interrupted SSH/TUI session can leave the client terminal in mouse-report
+# mode, causing movement and wheel events to print as escape-sequence garbage.
+# Reset only at a fresh interactive SSH prompt outside tmux; tmux will enable
+# the modes it needs when attached.
+if [[ $- == *i* && -n "${SSH_CONNECTION:-}" && -z "${TMUX:-}" && "${TERM:-dumb}" != dumb ]]; then
+    fixmouse
+fi
+
 # WSL-specific (conditional)
 if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
     [[ -f "$DOTFILES_DIR/shell/platform/wsl.sh" ]] && \

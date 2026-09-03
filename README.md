@@ -144,7 +144,8 @@ nclean                    # rm node_modules + reinstall
 ### Tmux
 
 ```bash
-tm <name> / ta <name>     # New session / attach
+tm <name> / ta <name>     # New session / attach named session
+tr                       # Resume most recently used session
 tl / tk <name>            # List / kill session
 ```
 
@@ -163,6 +164,18 @@ pbcopy / pbpaste          # Clipboard integration
 cdwin / cddesk / cddl     # Navigate to Windows directories
 open / explorer           # Open in Windows Explorer
 ```
+
+Windows Terminal: merge the `actions` and `keybindings` arrays from
+[`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
+into the client machine's `settings.json`. The fragment preserves native
+Copy/Paste, forwards Alt+Copy/Paste to tmux, adds TAFK tab controls, and removes
+the competing Windows Terminal pane keymap. Shift-modified Backspace/Delete
+cuts word- or line-sized command-line ranges into the shared tmux buffer.
+
+WezTerm alternative: copy [`configs/wezterm.lua`](configs/wezterm.lua) to
+`%USERPROFILE%\.wezterm.lua`. It provides the same TAFK/tmux key surface with
+an explicit Gruvbox palette, no native pane shortcuts, and reduced client-side
+scrollback.
 
 ## Theme System
 

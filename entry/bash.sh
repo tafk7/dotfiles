@@ -63,3 +63,73 @@ source "$DOTFILES_DIR/shell/init.sh"
 
 bind '"\C-h": backward-kill-word' # Ctrl+Backspace (Backspace remains DEL)
 bind '"\e[3;5~": kill-word'       # Ctrl+Delete
+bind '"\e\C-h": backward-kill-line' # Alt+Backspace (BS encoding)
+bind '"\e\C-?": backward-kill-line' # Alt+Backspace (DEL encoding)
+bind '"\e[3;3~": kill-line'          # Alt+Delete
+
+# Shift means the removed range is also published to tmux's shared buffer.
+# Windows Terminal transports these chords as virtual F13-F16 sequences.
+_tafk_cut_backward_word() {
+    local line="$READLINE_LINE" point=$READLINE_POINT start char cut
+    start=$point
+
+    while (( start > 0 )); do
+        char=${line:start-1:1}
+        [[ $char =~ [[:alnum:]_] ]] && break
+        ((start--))
+    done
+    while (( start > 0 )); do
+        char=${line:start-1:1}
+        [[ $char =~ [[:alnum:]_] ]] || break
+        ((start--))
+    done
+
+    cut=${line:start:point-start}
+    [[ -n $cut ]] || return 0
+    READLINE_LINE=${line:0:start}${line:point}
+    READLINE_POINT=$start
+    _tafk_tmux_buffer_set "$cut"
+}
+
+_tafk_cut_forward_word() {
+    local line="$READLINE_LINE" point=$READLINE_POINT end=${#READLINE_LINE} char cut
+    end=$point
+
+    while (( end < ${#line} )); do
+        char=${line:end:1}
+        [[ $char =~ [[:alnum:]_] ]] && break
+        ((end++))
+    done
+    while (( end < ${#line} )); do
+        char=${line:end:1}
+        [[ $char =~ [[:alnum:]_] ]] || break
+        ((end++))
+    done
+
+    cut=${line:point:end-point}
+    [[ -n $cut ]] || return 0
+    READLINE_LINE=${line:0:point}${line:end}
+    READLINE_POINT=$point
+    _tafk_tmux_buffer_set "$cut"
+}
+
+_tafk_cut_backward_line() {
+    local line="$READLINE_LINE" point=$READLINE_POINT cut=${READLINE_LINE:0:READLINE_POINT}
+    [[ -n $cut ]] || return 0
+    READLINE_LINE=${line:point}
+    READLINE_POINT=0
+    _tafk_tmux_buffer_set "$cut"
+}
+
+_tafk_cut_forward_line() {
+    local line="$READLINE_LINE" point=$READLINE_POINT cut=${READLINE_LINE:READLINE_POINT}
+    [[ -n $cut ]] || return 0
+    READLINE_LINE=${line:0:point}
+    READLINE_POINT=$point
+    _tafk_tmux_buffer_set "$cut"
+}
+
+bind -x '"\e[1;2P":_tafk_cut_backward_word' # Ctrl+Shift+Backspace
+bind -x '"\e[1;2Q":_tafk_cut_forward_word'  # Ctrl+Shift+Delete
+bind -x '"\e[1;2R":_tafk_cut_backward_line' # Alt+Shift+Backspace
+bind -x '"\e[1;2S":_tafk_cut_forward_line'  # Alt+Shift+Delete

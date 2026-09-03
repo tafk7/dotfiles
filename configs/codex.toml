@@ -11,6 +11,15 @@
 metrics_exporter = "none"
 log_user_prompt = false
 
+# TAFK line-editing semantics for the Codex composer. Windows Terminal often
+# encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
+[tui.keymap.editor]
+delete_backward = "backspace"
+delete_backward_word = ["ctrl-backspace", "ctrl-h"]
+delete_forward_word = "ctrl-delete"
+kill_line_start = "alt-backspace"
+kill_line_end = "alt-delete"
+
 # ── Routing Codex at a local/secure endpoint (optional; fill in and uncomment) ──
 # NOTE: Codex requires the OpenAI *Responses* API — wire_api = "chat" was removed,
 # so the endpoint must implement /v1/responses, not just chat/completions.
