@@ -50,6 +50,10 @@ asset_filters = [".tar.gz", "^sbom"]
 ["jesseduffield/lazygit"]
 tag = "v0.59.0"
 
+["cli/cli"]
+tag = "v2.100.0"
+asset_filters = ["linux_amd64", ".tar.gz"]
+
 ["astral-sh/uv"]
 tag = "0.10.0"
 asset_filters = [".tar.gz", "gnu"]

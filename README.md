@@ -7,7 +7,7 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ```bash
 ./setup.sh                       # No args: prints help, changes nothing
 ./setup.sh --config              # Reconcile symlinks to installed tools (no sudo)
-./setup.sh --bash                # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, direnv (NO sudo — eget)
+./setup.sh --bash                # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gh, direnv (NO sudo — eget)
 ./setup.sh --dev                 # + zsh, build tools, neovim, tmux (first sudo tier)
 ./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
 ./setup.sh --ai                  # + all AI CLIs: Claude Code, Codex, opencode (orthogonal)
@@ -42,6 +42,8 @@ server with an XFCE session so you can remote into this machine's desktop
 opt-in. Details: `issues/xrdp-remote-desktop.md`.
 
 After installation, verify with `./bin/verify` and restart your shell.
+GitHub CLI authentication remains machine-local; run `gh auth login` on each
+machine where authenticated GitHub access is wanted.
 
 ### Fresh machine (one-liner)
 
