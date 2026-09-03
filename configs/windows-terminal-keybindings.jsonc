@@ -1,0 +1,282 @@
+{
+    // Windows Terminal keybinding fragment for the TAFK/tmux workflow.
+    //
+    // Merge these two arrays into the top level of Windows Terminal's
+    // settings.json. Do not replace the generated profiles or other settings.
+    // Open that file with Ctrl+Shift+, in Windows Terminal.
+
+    "actions":
+    [
+        // Alt + physical Copy (Ctrl+Alt+Insert) -> tmux copy key.
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[2;7~"
+            },
+            "id": "User.TmuxAltCopy"
+        },
+
+        // Alt + physical Paste (Alt+Shift+Insert) -> tmux paste key.
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[2;4~"
+            },
+            "id": "User.TmuxAltPaste"
+        },
+
+        // Shift-cut chords use F13-F16 escape sequences as a reliable,
+        // otherwise-unused transport through Windows Terminal, SSH, and tmux.
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[1;2P"
+            },
+            "id": "User.TmuxCutBackwardWord"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[1;2Q"
+            },
+            "id": "User.TmuxCutForwardWord"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[1;2R"
+            },
+            "id": "User.TmuxCutBackwardLine"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[1;2S"
+            },
+            "id": "User.TmuxCutForwardLine"
+        }
+    ],
+
+    "keybindings":
+    [
+        // With two tabs, Alt+A toggles between the two SSH machines.
+        {
+            "id": "Terminal.NextTab",
+            "keys": "alt+a"
+        },
+
+        // Direct access to the first two tabs.
+        {
+            "id": "Terminal.SwitchToTab0",
+            "keys": "ctrl+1"
+        },
+        {
+            "id": "Terminal.SwitchToTab1",
+            "keys": "ctrl+2"
+        },
+
+        // Reorder Windows Terminal tabs. These replace client scrollback paging;
+        // tmux owns the useful remote scrollback history.
+        {
+            "id": "Terminal.MoveTabBackward",
+            "keys": "ctrl+shift+pgup"
+        },
+        {
+            "id": "Terminal.MoveTabForward",
+            "keys": "ctrl+shift+pgdn"
+        },
+
+        // Forward the keyboard's modified Copy/Paste macros through SSH.
+        {
+            "id": "User.TmuxAltCopy",
+            "keys": "ctrl+alt+insert"
+        },
+        {
+            "id": "User.TmuxAltPaste",
+            "keys": "alt+shift+insert"
+        },
+
+        // Shift publishes the removed word/line range to tmux's shared buffer.
+        {
+            "id": "User.TmuxCutBackwardWord",
+            "keys": "ctrl+shift+backspace"
+        },
+        {
+            "id": "User.TmuxCutForwardWord",
+            "keys": "ctrl+shift+delete"
+        },
+        {
+            "id": "User.TmuxCutBackwardLine",
+            "keys": "alt+shift+backspace"
+        },
+        {
+            "id": "User.TmuxCutForwardLine",
+            "keys": "alt+shift+delete"
+        },
+
+        // Ctrl+C must remain interrupt/cancel and Ctrl+V must reach Vim/TUIs.
+        // Native Windows clipboard shortcuts remain Ctrl+Insert/Shift+Insert
+        // and Ctrl+Shift+C/Ctrl+Shift+V.
+        {
+            "id": "unbound",
+            "keys": "ctrl+c"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+v"
+        },
+
+        // Remove awkward default tab switching.
+        {
+            "id": "unbound",
+            "keys": "ctrl+tab"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+tab"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+1"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+2"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+3"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+4"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+5"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+6"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+7"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+8"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+alt+9"
+        },
+
+        // Remove profile-number shortcuts; profile creation remains available
+        // from Ctrl+Shift+T and the new-tab dropdown.
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+1"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+2"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+3"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+4"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+5"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+6"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+7"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+8"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+9"
+        },
+
+        // Windows Terminal pane management is disabled; tmux owns panes.
+        {
+            "id": "unbound",
+            "keys": "alt+up"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+down"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+left"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+right"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+up"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+down"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+left"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+right"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+-"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+="
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+shift+plus"
+        },
+
+        // Cover both older duplicate-pane and current duplicate-tab defaults.
+        {
+            "id": "unbound",
+            "keys": "alt+shift+d"
+        },
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+d"
+        },
+
+        // Avoid accidentally closing a client pane/tab and its SSH connection.
+        {
+            "id": "unbound",
+            "keys": "ctrl+shift+w"
+        }
+    ]
+}

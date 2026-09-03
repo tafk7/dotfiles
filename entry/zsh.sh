@@ -91,7 +91,49 @@ bindkey '^[[1;5C' forward-word    # Ctrl+Right
 bindkey '^[[1;5D' backward-word   # Ctrl+Left
 bindkey '^H' backward-kill-word   # Ctrl+Backspace (Backspace remains ^?)
 bindkey '^[[3;5~' kill-word       # Ctrl+Delete
+bindkey $'\e\x08' backward-kill-line # Alt+Backspace (BS encoding)
+bindkey $'\e\x7f' backward-kill-line # Alt+Backspace (DEL encoding)
+bindkey '^[[3;3~' kill-line          # Alt+Delete
 bindkey '^[[Z' spell-word         # Shift+Tab
+
+# Shift means the removed range is also published to tmux's shared buffer.
+# Windows Terminal transports these chords as virtual F13-F16 sequences.
+_tafk_cut_backward_word() {
+    local before="$LBUFFER" removed
+    zle backward-kill-word
+    removed=${before[${#LBUFFER}+1,-1]}
+    _tafk_tmux_buffer_set "$removed"
+}
+
+_tafk_cut_forward_word() {
+    local before="$RBUFFER" removed count
+    zle kill-word
+    count=$(( ${#before} - ${#RBUFFER} ))
+    (( count > 0 )) && removed=${before[1,count]}
+    _tafk_tmux_buffer_set "$removed"
+}
+
+_tafk_cut_backward_line() {
+    local before="$LBUFFER"
+    zle backward-kill-line
+    _tafk_tmux_buffer_set "$before"
+}
+
+_tafk_cut_forward_line() {
+    local before="$RBUFFER"
+    zle kill-line
+    _tafk_tmux_buffer_set "$before"
+}
+
+zle -N tafk-cut-backward-word _tafk_cut_backward_word
+zle -N tafk-cut-forward-word _tafk_cut_forward_word
+zle -N tafk-cut-backward-line _tafk_cut_backward_line
+zle -N tafk-cut-forward-line _tafk_cut_forward_line
+
+bindkey $'\e[1;2P' tafk-cut-backward-word # Ctrl+Shift+Backspace
+bindkey $'\e[1;2Q' tafk-cut-forward-word  # Ctrl+Shift+Delete
+bindkey $'\e[1;2R' tafk-cut-backward-line # Alt+Shift+Backspace
+bindkey $'\e[1;2S' tafk-cut-forward-line  # Alt+Shift+Delete
 
 autoload -U edit-command-line
 zle -N edit-command-line

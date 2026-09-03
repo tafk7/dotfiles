@@ -35,7 +35,7 @@ git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 # No-prefix bindings (instant, left-hand optimized)
 tmux│Alt+ESDF│Move focus between panes (no prefix)│select-pane -U/-L/-D/-R
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
-tmux│Alt+w / Alt+r│Previous / next window (no prefix, repeatable)│previous-window / next-window
+tmux│Alt+w / Alt+r│Previous / next window (no prefix)│previous-window / next-window
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 # Prefix — Panes
@@ -123,6 +123,12 @@ vim│,an│Jump to next lint error│:ALENext
 # Line editing
 shell│Ctrl+Backspace│Delete from the cursor back through the previous word│backward-kill-word
 shell│Ctrl+Delete│Delete from the cursor through the next word│kill-word
+shell│Alt+Backspace│Delete from cursor to line start│backward-kill-line
+shell│Alt+Delete│Delete from cursor to line end│kill-line
+shell│Ctrl+Shift+Backspace│Cut previous word to tmux buffer│TAFK F13 widget
+shell│Ctrl+Shift+Delete│Cut next word to tmux buffer│TAFK F14 widget
+shell│Alt+Shift+Backspace│Cut from cursor to line start into tmux buffer│TAFK F15 widget
+shell│Alt+Shift+Delete│Cut from cursor to line end into tmux buffer│TAFK F16 widget
 shell│Shift+Tab│Spell-correct the word at the cursor (zsh)│spell-word
 # Navigation
 shell│..│Go up one directory│cd ..
@@ -140,6 +146,7 @@ shell│tree│Recursive directory tree│eza --tree --color=auto --group-direct
 shell│bat│Syntax-highlighted file viewer│batcat
 shell│view│Same as bat│batcat
 shell│md│Render Markdown in terminal│glow (TUI if interactive, print if piped)
+shell│p [path...]│Print canonical current directory or resolve supplied paths│pwd -P / realpath
 # System info
 shell│df│Disk space (human readable)│df -h
 shell│du│Directory size (human readable)│du -h
@@ -157,12 +164,14 @@ shell│extract│Extract any archive format (.tar.gz, .zip, etc.)│extract <fi
 # Tmux session management
 shell│tm│Create new named tmux session│tmux new -s
 shell│ta│Attach to existing tmux session│tmux attach -t
+shell│tr│Resume most recently used tmux session (no args)│tmux attach-session
 shell│tl│List all tmux sessions│tmux list-sessions
 shell│tk│Kill specific tmux session│tmux kill-session -t
 # History
 shell│h│Show command history│history
 shell│hgrep│Search command history│history | grep
 shell│ducks│Show largest items in current directory│du -cks * | sort -rn | head
+shell│fixmouse│Reset stale terminal mouse-reporting modes│disable DEC/Xterm mouse modes
 # Configuration
 shell│reload│Reload shell configuration│source ~/.bashrc
 shell│themes│List available themes and show usage│ls $DOTFILES_DIR/configs/themes/

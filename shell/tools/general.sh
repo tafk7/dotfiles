@@ -43,6 +43,16 @@ alias localip='hostname -I'
 alias nano='nano -w'
 alias less='less -R'
 
+# Print canonical paths. With no arguments, resolve the current directory;
+# otherwise resolve every supplied path.
+p() {
+    if (( $# == 0 )); then
+        pwd -P
+    else
+        realpath -- "$@"
+    fi
+}
+
 # Process management
 alias killall='killall -v'
 
@@ -53,6 +63,20 @@ alias ducks='du -cks * | sort -rn | head'
 # History
 alias h='history'
 alias hgrep='history | grep'
+
+# Disable terminal mouse-reporting modes that may be left enabled when an SSH
+# connection or mouse-aware TUI exits without cleaning up. Safe to run manually
+# when pointer movement or scrolling prints escape-sequence garbage.
+fixmouse() {
+    printf '\033[?9l\033[?1000l\033[?1001l\033[?1002l\033[?1003l\033[?1005l\033[?1006l\033[?1007l\033[?1015l'
+}
+
+# Publish explicitly cut command-line text to the tmux server-wide buffer.
+# Shell-specific line-editor widgets call this after removing their range.
+_tafk_tmux_buffer_set() {
+    [[ -n "${TMUX:-}" && -n "${1:-}" ]] || return 0
+    printf '%s' "$1" | tmux load-buffer -
+}
 
 # Reload shell config. Unsets idempotency guards so the guarded portion of
 # env.sh + profile.sh actually re-runs (alias-based 'source ~/.bashrc' would
