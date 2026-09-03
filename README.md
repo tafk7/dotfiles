@@ -180,8 +180,9 @@ cuts word- or line-sized command-line ranges into the shared tmux buffer.
 
 WezTerm alternative: copy [`configs/wezterm.lua`](configs/wezterm.lua) to
 `%USERPROFILE%\.wezterm.lua`. It provides the same TAFK/tmux key surface with
-an explicit Gruvbox palette, no native pane shortcuts, and reduced client-side
-scrollback.
+the normal WezTerm palette, no native pane shortcuts, and reduced client-side
+scrollback. Remote shells and applications remain responsible for their own
+ANSI/truecolor styling.
 
 Codex: manually merge [`configs/codex-keybindings.toml`](configs/codex-keybindings.toml)
 into `~/.codex/config.toml`. Keep this as a portable keybinding backup rather
