@@ -1,6 +1,10 @@
 " Kanagawa theme configuration for Vim
 " https://github.com/rebelot/kanagawa.nvim
 
+" Dark background — set before the colorscheme so plugins that branch on
+" &background do not pick a light variant after switching from a light theme.
+set background=dark
+
 " Set colorscheme
 colorscheme kanagawa
 

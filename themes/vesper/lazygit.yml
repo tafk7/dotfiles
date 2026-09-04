@@ -1,0 +1,30 @@
+# Vesper — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#ffc799'
+      - bold
+    inactiveBorderColor:
+      - '#505050'
+    searchingActiveBorderColor:
+      - '#ffcfa8'
+    optionsTextColor:
+      - '#a0a0a0'
+    selectedLineBgColor:
+      - '#1c1c1c'
+    inactiveViewSelectedLineBgColor:
+      - '#232323'
+    cherryPickedCommitFgColor:
+      - '#99ffe4'
+    cherryPickedCommitBgColor:
+      - '#232323'
+    markedBaseCommitFgColor:
+      - '#ffcfa8'
+    markedBaseCommitBgColor:
+      - '#232323'
+    unstagedChangesColor:
+      - '#ff8080'
+    defaultFgColor:
+      - '#ffffff'
+  authorColors:
+    '*': '#99ffe4'

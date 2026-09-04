@@ -1,0 +1,30 @@
+# Everforest — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#a7c080'
+      - bold
+    inactiveBorderColor:
+      - '#7a8478'
+    searchingActiveBorderColor:
+      - '#dbbc7f'
+    optionsTextColor:
+      - '#a7c080'
+    selectedLineBgColor:
+      - '#343f44'
+    inactiveViewSelectedLineBgColor:
+      - '#3d484d'
+    cherryPickedCommitFgColor:
+      - '#83c092'
+    cherryPickedCommitBgColor:
+      - '#3d484d'
+    markedBaseCommitFgColor:
+      - '#dbbc7f'
+    markedBaseCommitBgColor:
+      - '#3d484d'
+    unstagedChangesColor:
+      - '#e67e80'
+    defaultFgColor:
+      - '#d3c6aa'
+  authorColors:
+    '*': '#d699b6'

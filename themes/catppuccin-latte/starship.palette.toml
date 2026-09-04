@@ -1,0 +1,16 @@
+# Catppuccin Latte — Starship palette (light)
+[palettes.catppuccin-latte]
+bg          = "#eff1f5"
+bg_dim      = "#e6e9ef"
+bg_alt      = "#ccd0da"
+fg          = "#4c4f69"
+fg_dim      = "#8c8fa1"
+red         = "#d20f39"
+orange      = "#fe640b"
+yellow      = "#df8e1d"
+green       = "#40a02b"
+aqua        = "#179299"
+blue        = "#1e66f5"
+purple      = "#8839ef"
+bracket     = "#8839ef"
+bracket_alt = "#ea76cb"

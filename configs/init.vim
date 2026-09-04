@@ -24,7 +24,10 @@ Plug 'sainnhe/gruvbox-material'              " Softer variant of gruvbox
 Plug 'arcticicestudio/nord-vim'              " Nord color scheme
 Plug 'folke/tokyonight.nvim'                 " Tokyo Night color scheme
 Plug 'rebelot/kanagawa.nvim'                 " Kanagawa color scheme
-Plug 'catppuccin/vim', { 'as': 'catppuccin' } " Catppuccin color scheme
+Plug 'catppuccin/vim', { 'as': 'catppuccin' } " Catppuccin color scheme (mocha + latte)
+Plug 'sainnhe/everforest'                    " Everforest color scheme
+Plug 'rose-pine/neovim', { 'as': 'rose-pine' } " Rosé Pine color scheme (dawn)
+Plug 'datsfilipe/vesper.nvim'                " Vesper color scheme (near-black)
 
 " Essential tpope plugins
 Plug 'tpope/vim-fugitive'                     " Git integration

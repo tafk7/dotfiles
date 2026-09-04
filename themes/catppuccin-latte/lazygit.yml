@@ -1,0 +1,30 @@
+# Catppuccin Latte — lazygit theme block (light)
+gui:
+  theme:
+    activeBorderColor:
+      - '#1e66f5'
+      - bold
+    inactiveBorderColor:
+      - '#9ca0b0'
+    searchingActiveBorderColor:
+      - '#df8e1d'
+    optionsTextColor:
+      - '#1e66f5'
+    selectedLineBgColor:
+      - '#ccd0da'
+    inactiveViewSelectedLineBgColor:
+      - '#bcc0cc'
+    cherryPickedCommitFgColor:
+      - '#1e66f5'
+    cherryPickedCommitBgColor:
+      - '#bcc0cc'
+    markedBaseCommitFgColor:
+      - '#df8e1d'
+    markedBaseCommitBgColor:
+      - '#bcc0cc'
+    unstagedChangesColor:
+      - '#d20f39'
+    defaultFgColor:
+      - '#4c4f69'
+  authorColors:
+    '*': '#8839ef'

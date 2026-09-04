@@ -1,0 +1,30 @@
+# Rosé Pine Dawn — lazygit theme block (light)
+gui:
+  theme:
+    activeBorderColor:
+      - '#286983'
+      - bold
+    inactiveBorderColor:
+      - '#9893a5'
+    searchingActiveBorderColor:
+      - '#ea9d34'
+    optionsTextColor:
+      - '#286983'
+    selectedLineBgColor:
+      - '#f2e9e1'
+    inactiveViewSelectedLineBgColor:
+      - '#dfdad9'
+    cherryPickedCommitFgColor:
+      - '#56949f'
+    cherryPickedCommitBgColor:
+      - '#dfdad9'
+    markedBaseCommitFgColor:
+      - '#ea9d34'
+    markedBaseCommitBgColor:
+      - '#dfdad9'
+    unstagedChangesColor:
+      - '#b4637a'
+    defaultFgColor:
+      - '#575279'
+  authorColors:
+    '*': '#907aa9'

@@ -1,0 +1,87 @@
+# Vesper — btop theme
+# Based on https://github.com/datsfilipe/vesper.nvim
+# Backgrounds stay at #101010 / #1c1c1c so btop does not light up an OLED panel.
+
+# Main bg
+theme[main_bg]="#101010"
+
+# Main text color
+theme[main_fg]="#a0a0a0"
+
+# Title color for boxes
+theme[title]="#ffffff"
+
+# Highlight color for keyboard shortcuts
+theme[hi_fg]="#ffc799"
+
+# Background color of selected item in processes box
+theme[selected_bg]="#1c1c1c"
+
+# Foreground color of selected item in processes box
+theme[selected_fg]="#ffc799"
+
+# Color of inactive/disabled text
+theme[inactive_fg]="#505050"
+
+# Misc colors for processes box including mini cpu graphs, details memory graph and details status text
+theme[proc_misc]="#99ffe4"
+
+# Cpu box outline color
+theme[cpu_box]="#232323"
+
+# Memory/disks box outline color
+theme[mem_box]="#232323"
+
+# Net up/down box outline color
+theme[net_box]="#232323"
+
+# Processes box outline color
+theme[proc_box]="#232323"
+
+# Box divider line and small boxes line color
+theme[div_line]="#232323"
+
+# Temperature graph colors
+theme[temp_start]="#99ffe4"
+theme[temp_mid]="#ffcfa8"
+theme[temp_end]="#ff8080"
+
+# CPU graph colors
+theme[cpu_start]="#99ffe4"
+theme[cpu_mid]="#ffc799"
+theme[cpu_end]="#ff8080"
+
+# Mem/Disk free meter
+theme[free_start]="#ff8080"
+theme[free_mid]="#ffcfa8"
+theme[free_end]="#99ffe4"
+
+# Mem/Disk cached meter
+theme[cached_start]="#505050"
+theme[cached_mid]="#8b8b8b"
+theme[cached_end]="#a0a0a0"
+
+# Mem/Disk available meter
+theme[available_start]="#ffc799"
+theme[available_mid]="#ffcfa8"
+theme[available_end]="#ffffff"
+
+# Mem/Disk used meter
+theme[used_start]="#99ffe4"
+theme[used_mid]="#ffc799"
+theme[used_end]="#ff8080"
+
+# Download graph colors
+theme[download_start]="#505050"
+theme[download_mid]="#a0a0a0"
+theme[download_end]="#99ffe4"
+
+# Upload graph colors
+theme[upload_start]="#505050"
+theme[upload_mid]="#a0a0a0"
+theme[upload_end]="#ffc799"
+
+# Process box color gradient for threads, mem and cpu usage
+theme[process_start]="#99ffe4"
+theme[process_mid]="#ffc799"
+theme[process_end]="#ff8080"
