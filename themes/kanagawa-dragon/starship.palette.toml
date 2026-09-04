@@ -1,0 +1,16 @@
+# Kanagawa Dragon — Starship palette
+[palettes.kanagawa-dragon]
+bg          = "#181616"
+bg_dim      = "#0d0c0c"
+bg_alt      = "#282727"
+fg          = "#c5c9c5"
+fg_dim      = "#737c73"
+red         = "#c4746e"
+orange      = "#b6927b"
+yellow      = "#c4b28a"
+green       = "#8a9a7b"
+aqua        = "#8ea4a2"
+blue        = "#8ba4b0"
+purple      = "#8992a7"
+bracket     = "#a292a3"
+bracket_alt = "#b6927b"

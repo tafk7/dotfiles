@@ -1,6 +1,10 @@
 " Tokyo Night theme configuration for Vim
 " https://github.com/folke/tokyonight.nvim
 
+" Dark background — set before the colorscheme so plugins that branch on
+" &background do not pick a light variant after switching from a light theme.
+set background=dark
+
 " Tokyo Night specific settings (set before loading colorscheme)
 let g:tokyonight_style = 'night'
 let g:tokyonight_italic_functions = 1

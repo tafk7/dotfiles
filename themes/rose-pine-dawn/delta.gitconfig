@@ -1,0 +1,22 @@
+# Rosé Pine Dawn — delta feature (light)
+# syntax-theme uses a delta/bat built-in (delta embeds its own bat and cannot
+# see our vendored themes). "Solarized (light)" is the closest warm-paper
+# light built-in to Dawn's muted palette.
+[delta "rose-pine-dawn"]
+syntax-theme = "Solarized (light)"
+light = true
+plus-style = "syntax #dee9e4"
+plus-emph-style = "syntax #c2d8cf bold"
+plus-non-emph-style = "syntax #dee9e4"
+minus-style = "syntax #f5dedc"
+minus-emph-style = "syntax #e8c2c4 bold"
+minus-non-emph-style = "syntax #f5dedc"
+file-style = "#286983 bold"
+file-decoration-style = "#dfdad9 ul"
+hunk-header-style = "syntax bold #575279"
+hunk-header-decoration-style = "#dfdad9 box"
+line-numbers-zero-style = "#9893a5"
+line-numbers-left-style = "#286983"
+line-numbers-right-style = "#286983"
+line-numbers-minus-style = "#b4637a"
+line-numbers-plus-style = "#56949f"

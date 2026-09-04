@@ -18,13 +18,22 @@ The theme system lets you:
 
 Themes are discovered from `themes/<name>/`. Out of the box:
 
-| Theme              | Best For              | Vibe                                  |
-| ------------------ | --------------------- | ------------------------------------- |
-| **gruvbox**        | Retro feel            | Warm, comfortable, nostalgic (default) |
-| **nord**           | Long coding sessions  | Cool, professional, Arctic            |
-| **tokyo-night**    | Modern development    | Vibrant, city lights, contemporary    |
-| **kanagawa**       | Focused work          | Earthy, Japanese aesthetic, calming   |
-| **catppuccin**     | Gentle on eyes        | Soft pastels, cozy, smooth (Mocha variant) |
+| Theme                | Best For              | Vibe                                  |
+| -------------------- | --------------------- | ------------------------------------- |
+| **gruvbox**          | Retro feel            | Warm, comfortable, nostalgic (default) |
+| **nord**             | Long coding sessions  | Cool, professional, Arctic            |
+| **tokyo-night**      | Modern development    | Vibrant, city lights, contemporary    |
+| **kanagawa**         | Focused work          | Earthy, Japanese aesthetic, calming   |
+| **catppuccin**       | Gentle on eyes        | Soft pastels, cozy, smooth (Mocha variant) |
+| **everforest**       | Low-fatigue sessions  | Green-tinted forest, muted, soft      |
+| **kanagawa-dragon**  | Dim rooms             | Near-black warm ink, heavily desaturated |
+| **vesper**           | OLED panels           | `#101010` minimal — amber + mint on near-black |
+| **catppuccin-latte** | Daylight, projectors  | Light — soft pastels on warm paper    |
+| **rose-pine-dawn**   | Daylight, screenshots | Light — muted rose and pine on warm paper |
+
+The set is deliberately spread across the design space rather than clustered:
+two light themes, one near-black/OLED, one green-family, one warm earth, and
+the blue-violet-ink family (nord, tokyo-night, kanagawa, catppuccin).
 
 ## Usage
 

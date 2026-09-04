@@ -1,0 +1,16 @@
+# Everforest (dark medium) — Starship palette
+[palettes.everforest]
+bg          = "#2d353b"
+bg_dim      = "#232a2e"
+bg_alt      = "#343f44"
+fg          = "#d3c6aa"
+fg_dim      = "#859289"
+red         = "#e67e80"
+orange      = "#e69875"
+yellow      = "#dbbc7f"
+green       = "#a7c080"
+aqua        = "#83c092"
+blue        = "#7fbbb3"
+purple      = "#d699b6"
+bracket     = "#a7c080"
+bracket_alt = "#83c092"

@@ -1,12 +1,7 @@
-" Kanagawa theme configuration for Vim
-" https://github.com/rebelot/kanagawa.nvim
+" Kanagawa Dragon theme configuration for Vim
+" https://github.com/rebelot/kanagawa.nvim — 'dragon' variant
 
-" Dark background — set before the colorscheme so plugins that branch on
-" &background do not pick a light variant after switching from a light theme.
 set background=dark
-
-" Set colorscheme
-colorscheme kanagawa
 
 " Kanagawa specific settings
 let g:kanagawa_transparent = 0
@@ -20,6 +15,9 @@ let g:kanagawa_contrast = "medium"
 let g:kanagawa_contrast_dark = "medium"
 let g:kanagawa_disable_background = 0
 let g:kanagawa_cursorline_transparent = 0
+
+" Set colorscheme — kanagawa.nvim ships wave/dragon/lotus as separate names.
+colorscheme kanagawa-dragon
 
 " Airline theme (use a compatible dark theme)
 let g:airline_theme='minimalist'

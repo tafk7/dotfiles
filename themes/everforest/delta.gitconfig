@@ -1,0 +1,21 @@
+# Everforest — delta feature
+# syntax-theme uses a delta/bat built-in (delta embeds its own bat and cannot
+# see our vendored themes). "zenburn" is the closest low-saturation, earthy
+# built-in to Everforest's muted palette.
+[delta "everforest"]
+syntax-theme = zenburn
+plus-style = "syntax #3c4841"
+plus-emph-style = "syntax #4f5b4a bold"
+plus-non-emph-style = "syntax #3c4841"
+minus-style = "syntax #514045"
+minus-emph-style = "syntax #6b5157 bold"
+minus-non-emph-style = "syntax #514045"
+file-style = "#a7c080 bold"
+file-decoration-style = "#475258 ul"
+hunk-header-style = "syntax bold #d3c6aa"
+hunk-header-decoration-style = "#475258 box"
+line-numbers-zero-style = "#7a8478"
+line-numbers-left-style = "#a7c080"
+line-numbers-right-style = "#a7c080"
+line-numbers-minus-style = "#e67e80"
+line-numbers-plus-style = "#a7c080"

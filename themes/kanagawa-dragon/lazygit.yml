@@ -1,0 +1,30 @@
+# Kanagawa Dragon — lazygit theme block
+gui:
+  theme:
+    activeBorderColor:
+      - '#8ba4b0'
+      - bold
+    inactiveBorderColor:
+      - '#625e5a'
+    searchingActiveBorderColor:
+      - '#c4b28a'
+    optionsTextColor:
+      - '#8ba4b0'
+    selectedLineBgColor:
+      - '#282727'
+    inactiveViewSelectedLineBgColor:
+      - '#393836'
+    cherryPickedCommitFgColor:
+      - '#8ea4a2'
+    cherryPickedCommitBgColor:
+      - '#393836'
+    markedBaseCommitFgColor:
+      - '#c4b28a'
+    markedBaseCommitBgColor:
+      - '#393836'
+    unstagedChangesColor:
+      - '#c4746e'
+    defaultFgColor:
+      - '#c5c9c5'
+  authorColors:
+    '*': '#a292a3'

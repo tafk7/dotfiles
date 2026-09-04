@@ -1,6 +1,10 @@
 " Nord theme configuration for Vim
 " https://www.nordtheme.com/
 
+" Dark background — set before the colorscheme so plugins that branch on
+" &background do not pick a light variant after switching from a light theme.
+set background=dark
+
 " Set colorscheme
 colorscheme nord
 

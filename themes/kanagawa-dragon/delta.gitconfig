@@ -1,0 +1,21 @@
+# Kanagawa Dragon — delta feature
+# syntax-theme uses a delta/bat built-in (delta embeds its own bat and cannot
+# see our vendored themes). "TwoDark" matches the wave variant's warm balance
+# and reads well against the near-black dragon background.
+[delta "kanagawa-dragon"]
+syntax-theme = TwoDark
+plus-style = "syntax #1e2326"
+plus-emph-style = "syntax #2b3328 bold"
+plus-non-emph-style = "syntax #1e2326"
+minus-style = "syntax #2d1e20"
+minus-emph-style = "syntax #43242b bold"
+minus-non-emph-style = "syntax #2d1e20"
+file-style = "#8ba4b0 bold"
+file-decoration-style = "#393836 ul"
+hunk-header-style = "syntax bold #c5c9c5"
+hunk-header-decoration-style = "#393836 box"
+line-numbers-zero-style = "#625e5a"
+line-numbers-left-style = "#8ba4b0"
+line-numbers-right-style = "#8ba4b0"
+line-numbers-minus-style = "#c4746e"
+line-numbers-plus-style = "#8a9a7b"

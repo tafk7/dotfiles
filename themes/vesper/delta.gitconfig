@@ -1,0 +1,21 @@
+# Vesper — delta feature
+# syntax-theme uses a delta/bat built-in (delta embeds its own bat and cannot
+# see our vendored themes). "DarkNeon" is the closest built-in with a truly
+# black background; anything lighter would break the OLED canvas mid-diff.
+[delta "vesper"]
+syntax-theme = DarkNeon
+plus-style = "syntax #152520"
+plus-emph-style = "syntax #1f3a31 bold"
+plus-non-emph-style = "syntax #152520"
+minus-style = "syntax #2a1a1a"
+minus-emph-style = "syntax #452626 bold"
+minus-non-emph-style = "syntax #2a1a1a"
+file-style = "#ffc799 bold"
+file-decoration-style = "#232323 ul"
+hunk-header-style = "syntax bold #ffffff"
+hunk-header-decoration-style = "#232323 box"
+line-numbers-zero-style = "#505050"
+line-numbers-left-style = "#8b8b8b"
+line-numbers-right-style = "#8b8b8b"
+line-numbers-minus-style = "#ff8080"
+line-numbers-plus-style = "#99ffe4"

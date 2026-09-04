@@ -1,0 +1,22 @@
+# Catppuccin Latte — delta feature (light)
+# syntax-theme uses a delta/bat built-in: delta embeds its own bat, so it can
+# only see built-in theme names, not our vendored ones. "GitHub" is the closest
+# light built-in to Latte's blue-on-paper palette.
+[delta "catppuccin-latte"]
+syntax-theme = GitHub
+light = true
+plus-style = "syntax #dbf0d8"
+plus-emph-style = "syntax #b6e3af bold"
+plus-non-emph-style = "syntax #dbf0d8"
+minus-style = "syntax #fbdde3"
+minus-emph-style = "syntax #f5b8c4 bold"
+minus-non-emph-style = "syntax #fbdde3"
+file-style = "#1e66f5 bold"
+file-decoration-style = "#bcc0cc ul"
+hunk-header-style = "syntax bold #4c4f69"
+hunk-header-decoration-style = "#bcc0cc box"
+line-numbers-zero-style = "#9ca0b0"
+line-numbers-left-style = "#1e66f5"
+line-numbers-right-style = "#1e66f5"
+line-numbers-minus-style = "#d20f39"
+line-numbers-plus-style = "#40a02b"
