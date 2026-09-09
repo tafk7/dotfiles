@@ -18,7 +18,7 @@ source "$SCRIPT_DIR/lib/install.sh"
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool flag).
 AI_ALL=false           # --ai / --full: install every ai-tier tool.
-declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode.
+declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode / --pi.
 INSTALL_RDP=false      # Orthogonal: xrdp RDP server. Off by default; NOT implied by --full.
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
@@ -68,7 +68,7 @@ parse_arguments() {
                 AI_ALL=true
                 shift
                 ;;
-            --claude|--codex|--opencode)
+            --claude|--codex|--opencode|--pi)
                 # Per-tool AI selection (orthogonal; composes with any tier).
                 INSTALL_AI=true
                 AI_TOOLS+=("${1#--}")
@@ -170,13 +170,17 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Equivalent to: --work --ai
 
 AI TOOLING (orthogonal - combines with any tier):
-    --ai                Install ALL AI CLIs (Claude Code, Codex, opencode) into
+    --ai                Install ALL AI CLIs (Claude Code, Codex, opencode, Pi) into
                         ~/.local/bin. Leave this off when your org manages the
                         install; the shell aliases/shortcuts load either way and
                         resolve whatever binary is on PATH.
     --claude            Install only Claude Code.
     --codex             Install only Codex.
     --opencode          Install only opencode.
+    --pi                Install only Pi. Unlike the others Pi is an npm package,
+                        so it needs Node >=22.19 (the work tier's NVM provides
+                        it); the installer exits cleanly with instructions if
+                        Node is missing rather than pulling in a toolchain.
                         (Per-tool flags combine: --claude --opencode installs
                         just those two. --ai / --full install all of them.)
 
@@ -226,8 +230,8 @@ TIER SUMMARY:
     │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
     │ work     │ + NVM, Docker, Azure CLI, Rust                  │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ --ai     │ + Claude Code, Codex, opencode (orthogonal)     │ No        │
-    │          │   (or --claude / --codex / --opencode singly)   │           │
+    │ --ai     │ + Claude Code, Codex, opencode, Pi (orthogonal) │ No        │
+    │          │   (or --claude/--codex/--opencode/--pi singly)  │           │
     │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
     │ --full   │ = work + ai (everything except --rdp)           │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘

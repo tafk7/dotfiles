@@ -62,7 +62,7 @@ tmux│Ctrl+a t│Insert new window after current (inherits current path)│new-
 tmux│Ctrl+a w│Window picker tree view│choose-tree -Zw
 tmux│Ctrl+a x│Kill pane (with confirmation)│confirm-before kill-pane
 tmux│Ctrl+a X│Kill window and all its panes (with confirmation)│confirm-before kill-window
-tmux│Ctrl+a c│Rename current window; blank restores automatic naming│command-prompt rename-window
+tmux│Ctrl+a n│Rename current window; blank restores automatic naming│command-prompt rename-window
 tmux│Ctrl+a i│Insert current window at index; -1 or beyond count moves it to end│move-window -a/-b
 tmux│Ctrl+a <│Open the window context menu│display-menu (window)
 # Prefix — Sessions
@@ -72,8 +72,9 @@ tmux│Ctrl+a d│Detach (session keeps running in background)│detach-client
 tmux│Ctrl+a ) / (│Next/previous session│switch-client -n/-p
 tmux│Ctrl+a $│Rename current session│command-prompt rename-session
 # Copy mode (vi keys)
-tmux│Ctrl+a v│Enter copy mode (scroll/select)│copy-mode
-tmux│v / V / Ctrl+v│Begin char/line/block selection (in copy mode)│begin-selection / select-line / rectangle-toggle
+tmux│Ctrl+a v│Toggle transcript view without changing scroll position│copy-mode / cancel
+tmux│v│Toggle the single tmux highlight in transcript view│begin-selection / clear-selection
+tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy selection to the tmux buffer│C-M-Insert / copy-selection
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
 tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M
@@ -215,10 +216,13 @@ shell│clp│Run one-off Claude prompt│claude --print
 shell│cll│Claude local (no global settings)│claude --setting-sources project,local
 shell│cllc│Continue Claude local session│claude --setting-sources project,local --continue
 shell│cllp│One-off Claude local prompt│claude --setting-sources project,local --print
-shell│claude-vsc│Run Claude via the VS Code extension binary (CLAUDE_USE_VSCODE=1 to make primary)│claude-vsc
 
 # Codex
 shell│cx│Start new Codex session│codex
+codex│Ctrl+E│Open composer in external editor│tui.keymap.global.open_external_editor
+codex│Ctrl+G│Next permission mode│tui.keymap.chat.next_permission_mode
+codex│Ctrl+Shift+G│Previous permission mode│tui.keymap.chat.previous_permission_mode
+codex│End│Move to end of composer line│tui.keymap.editor.move_line_end
 shell│cxr│Resume Codex session (picker)│codex resume
 shell│cxc│Continue last Codex session│codex resume --last
 shell│cxp│Run one-off Codex prompt│codex exec
@@ -226,7 +230,12 @@ shell│cxh│Codex with alt config dir (~/.codex-alt)│CODEX_HOME=~/.codex-alt
 shell│cxhr│Resume Codex (alt dir, picker)│CODEX_HOME=~/.codex-alt codex resume
 shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex resume --last
 shell│cxhp│One-off Codex prompt (alt dir)│CODEX_HOME=~/.codex-alt codex exec
-shell│codex-vsc│Run Codex via the VS Code extension binary (CODEX_USE_VSCODE=1 to make primary)│codex-vsc
+shell│oc│Launch opencode TUI (new session)│opencode
+shell│ocr│Run one-off opencode prompt│opencode run
+shell│ocrc│Run one-off opencode prompt, continuing last│opencode run --continue
+shell│pi│Start new Pi session│pi
+shell│pic│Continue most recent Pi session│pi -c
+shell│pir│Browse and select a past Pi session│pi -r
 
 # Docker shortcuts
 docker│dps│List running containers│docker ps

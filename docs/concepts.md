@@ -33,10 +33,9 @@ Read this first — every other doc assumes you understand these primitives.
                             │ sources
                 ┌───────────┴───────────┐
                 ▼                       ▼
-        shell/env.sh            generated/theme.sh
-        (PATH, exports)         (active palette → BAT_THEME,
-                                 STARSHIP_PALETTE, FZF colors,
-                                 DELTA_FEATURE, etc.)
+        shell/env.sh            theme-switcher env
+        (PATH, exports)         (global/session/window context →
+                                 scoped tool paths and palettes)
 ```
 
 ## The four pillars
@@ -58,8 +57,8 @@ so the modern shell works on managed machines you can't `sudo` on.
 Three extras sit outside the cumulative chain:
 
 - `--ai` — an **orthogonal** flag that installs the AI CLIs (Claude Code,
-  Codex, opencode) into `~/.local/bin`. Pick individual tools with `--claude`,
-  `--codex`, and/or `--opencode` (they compose; `--ai` is the "all" shortcut).
+  Codex, opencode, Pi) into `~/.local/bin`. Pick individual tools with `--claude`,
+  `--codex`, `--opencode`, and/or `--pi` (they compose; `--ai` is the "all" shortcut).
   It combines with any tier and is off by default, so a machine whose org
   manages the AI install can run `--work` (or any tier) without a competing
   copy. The shell aliases load regardless of these flags.
@@ -111,13 +110,14 @@ tools` — pick it up automatically.
 
 ### 4. Theme cascade — *how* themes apply to many surfaces
 
-`bin/theme-switcher` resolves a single `<surface, theme>` decision through a
-three-level cascade: **surface override → group override → global default**.
+`bin/theme-switcher` resolves a `<surface, theme>` decision across global,
+tmux session, and tmux window scopes. Within each scope the order is tool,
+group, then default; narrower scopes are considered first.
 
 ```
-DOTFILES_THEME           = nord            ← global (set once)
-DOTFILES_THEME_CODE      = tokyo-night     ← group override (vim, bat, delta)
-DOTFILES_THEME_STARSHIP  = catppuccin      ← surface override (just starship)
+window: vim=gruvbox, default=everforest
+session: default=catppuccin
+global: starship=kanagawa, default=tokyo-night
 ```
 
 **Three groups, eight surfaces** (defined in `lib/theme-resolve.sh`):
@@ -128,15 +128,15 @@ DOTFILES_THEME_STARSHIP  = catppuccin      ← surface override (just starship)
 | chrome  | tmux, starship, fzf       |
 | apps    | btop, lazygit             |
 
-Surfaces are **globally unique**, so `theme set fzf nord` works just as well
-as the (no longer accepted) qualified form. `theme show` prints the entire
-resolved cascade tree.
+`theme explain --window` prints the effective value and winning scope for each
+tool. Stable tmux session/window ids hold scoped state; global state lives in
+`generated/theme-state.sh`.
 
 Themes themselves are **data on disk**: each `themes/<name>/` directory
-contains per-tool palette files (`vim.vim`, `tmux.conf`, `starship.palette.toml`,
-`btop.theme`, etc.). `theme-switcher` writes the resolved active artifacts to
-`generated/` (gitignored), and `shell/env.sh` exports the right env vars from
-`generated/theme.sh` so each tool finds its themed config.
+contains semantic and per-tool palette files (`palette.sh`, `vim.vim`,
+`starship.palette.toml`, `btop.theme`, etc.). The switcher builds immutable
+per-theme artifacts under `generated/themes/`; shells resolve the correct paths
+for their current tmux context and refresh them at the next prompt.
 
 ## File layout cheat sheet
 
@@ -147,7 +147,7 @@ lib/
   registry.sh             → TOOL_* arrays (data, no side effects)
   install.sh              → install-time helpers (apt, eget, run_installer)
   runtime.sh              → safe-everywhere helpers (log, is_wsl, command_exists)
-  theme-resolve.sh        → cascade resolution + override file I/O
+  theme-resolve.sh        → global/session/window cascade resolution
 configs/                  → symlink sources (target == ~/.<file>)
 entry/                    → ~/.bashrc, ~/.zshrc, ~/.profile sources
 shell/

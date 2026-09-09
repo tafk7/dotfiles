@@ -34,6 +34,7 @@ declare -A TOOL_BINARY=(
     [claude]=claude
     [codex]=codex
     [opencode]=opencode
+    [pi]=pi
     [wsl2-ssh-agent]=wsl2-ssh-agent
     [xrdp]=xrdp
 )
@@ -65,6 +66,7 @@ declare -A TOOL_METHOD=(
     [claude]=installer
     [codex]=installer
     [opencode]=installer
+    [pi]=installer
     [wsl2-ssh-agent]=eget
     [xrdp]=installer
 )
@@ -84,7 +86,7 @@ declare -A TOOL_TIER=(
     [direnv]=bash     [eget]=bash     [sd]=bash        [gdu]=bash
     [neovim]=dev      [tmux]=dev      [shellcheck]=dev
     [wsl2-ssh-agent]=bash
-    [claude]=ai       [codex]=ai       [opencode]=ai
+    [claude]=ai       [codex]=ai       [opencode]=ai    [pi]=ai
     [xrdp]=rdp
     [nvm]=work        [rust]=work
 )
@@ -95,6 +97,9 @@ declare -A TOOL_VERIFY=(
     [nvm]='test -s "$HOME/.nvm/nvm.sh"'
     [rust]='command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1'
     [codex]='command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1'
+    # pi is a node script, not a native binary — a present-but-broken node (or a
+    # dangling symlink into ~/.pi/agent/install) still passes `command -v`.
+    [pi]='command -v pi >/dev/null 2>&1 && pi --version >/dev/null 2>&1'
     # Binary present isn't success for a service — it must be running.
     [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
 )
@@ -109,6 +114,9 @@ declare -A TOOL_PATHS=(
     [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
     [codex]="\$HOME/.local/bin/codex \$HOME/.codex/packages/standalone"
     [opencode]="\$HOME/.local/bin/opencode \$HOME/.opencode"
+    # Only the install/ subtree — ~/.pi/agent also holds settings.json,
+    # sessions/, trust.json and models.json, which are user data.
+    [pi]="\$HOME/.local/bin/pi \$HOME/.pi/agent/install"
 )
 
 # TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
@@ -119,6 +127,7 @@ declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
     [codex]="rm -f \$HOME/.local/bin/codex && rm -rf \$HOME/.codex/packages/standalone  # ~/.codex config/sessions are preserved"
     [opencode]="rm -f \$HOME/.local/bin/opencode  # ~/.config/opencode config is preserved"
+    [pi]="rm -f \$HOME/.local/bin/pi && rm -rf \$HOME/.pi/agent/install  # ~/.pi/agent settings and sessions are preserved"
     [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
 )
 

@@ -1,8 +1,8 @@
 # AI CLIs: data egress & hardening
 
-What Claude Code, Codex, and opencode send to third parties by default, and how
-we harden each. All findings verified against each tool's own docs/source (not
-memory). None of these tools is air-gapped by default.
+What Claude Code, Codex, opencode, and Pi send to third parties by default, and
+how we harden each. All findings verified against each tool's own docs/source
+(not memory). None of these tools is air-gapped by default.
 
 **The guarantee is always the network layer.** Config reduces a tool's
 *intended* egress; only an egress allowlist + `tcpdump` verification *proves* no
@@ -69,16 +69,16 @@ To enforce policy that can't be bypassed, use system managed settings at
   does not replace the launcher's symlink. Re-run `./setup.sh --codex --force`
   to ask the official installer to update or repair the installation.
 
-**What we ship:** `~/.codex/config.toml` (only when absent) with:
+**What we ship:** a marked portable block in `~/.codex/config.toml` with:
 ```toml
 [otel]
 metrics_exporter = "none"
 log_user_prompt = false
 ```
-For an existing config, `install-codex.sh` warns if it lacks `metrics_exporter`
-and tells you the two lines to add. The local-provider block is documented above
-(not auto-shipped — `base_url` is site-specific and the Responses-API requirement
-means a generic local endpoint may not work).
+On later runs, `install-codex.sh` refreshes only that marked block and preserves
+Codex-owned trust, hook, plugin, and machine-local profile state. Provider
+profiles remain site-specific and are installed separately; Codex requires
+those endpoints to implement the Responses API.
 
 **Fleet enforcement (admins):** Codex honors a managed `requirements.toml` layer
 above user `config.toml`.
@@ -96,6 +96,46 @@ providers to a local endpoint, disables share, and enables local-only OTEL.
 
 ---
 
+## Pi
+
+Two startup calls to `pi.dev`, both documented upstream:
+
+- **Update check** — `GET https://pi.dev/api/latest-version`. Disable with
+  `PI_SKIP_VERSION_CHECK=1`.
+- **Install/update telemetry** — an anonymous version ping to
+  `https://pi.dev/api/report-install` after a first install or a
+  changelog-detected update. The same setting also controls optional provider
+  attribution headers for OpenRouter, Cloudflare, and direct NVIDIA NIM
+  requests. Disable with `enableInstallTelemetry: false` in `settings.json`, or
+  `PI_TELEMETRY=0`.
+
+We ship `configs/pi-settings.json` (`enableInstallTelemetry: false`),
+provisioned to `~/.pi/agent/settings.json` **only when absent** — it is a rich
+user-owned file (models, keybindings, trust, compaction). Note this disables the
+telemetry ping but **not** the version check; those are independent.
+
+`--offline` / `PI_OFFLINE=1` disables *all* startup network operations (update
+check, package update checks, and telemetry) in one switch.
+
+**Weaker sandbox posture than the others — worth knowing.** Pi has no built-in
+permission system: it runs with the full permissions of the launching user, with
+no per-action approval prompts (contrast Claude Code's permission flow and
+Codex's `sandbox_mode`). Pi packages and extensions execute arbitrary code with
+full system access, and skills can instruct the model to run executables.
+Upstream states this plainly. Pi does prompt before trusting a project folder
+that carries project-local settings/resources (recorded in
+`~/.pi/agent/trust.json`, fallback governed by `defaultProjectTrust`), but that
+gates *loading project config*, not what the agent may then do. Treat "review
+third-party pi packages before installing" as the actual control, and
+containerize if you need a real boundary.
+
+Pi is also the only AI CLI here that is an npm package rather than a standalone
+binary, so it needs Node >= 22.19 at runtime; `installers/install-pi.sh` drives
+npm into `~/.pi/agent/install` rather than using `pi.dev/install.sh` (which
+would edit shell rc files and can sudo-install Node — see that script's header).
+
+---
+
 ## The network allowlist (the actual guarantee)
 
 Egress-allowlist the host/process; deny everything else. Then verify with a
@@ -107,7 +147,9 @@ auto-update / managed settings) · `api.github.com` + `github.com` +
 `objects.githubusercontent.com` (opencode auto-update).
 
 **Deny:** `ab.chatgpt.com` (Codex Statsig metrics) · `models.dev` (opencode) ·
-`opencode.ai` (opencode zen/share) · everything else.
+`opencode.ai` (opencode zen/share) · `pi.dev` (Pi version check + install
+telemetry; also `registry.npmjs.org` if you don't want `pi update` / `pi
+install` to reach npm) · everything else.
 
 `bin/opencode-contract egress` lists opencode's outbound hosts from source as a
 drift signal; the Codex/Claude equivalents here are documented from source above.
