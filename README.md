@@ -10,8 +10,8 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --bash                # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gh, direnv (NO sudo — eget)
 ./setup.sh --dev                 # + zsh, build tools, neovim, tmux (first sudo tier)
 ./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
-./setup.sh --ai                  # + all AI CLIs: Claude Code, Codex, opencode (orthogonal)
-./setup.sh --claude --opencode   # + only the AI CLIs you name (--claude / --codex / --opencode)
+./setup.sh --ai                  # + all AI CLIs: Claude Code, Codex, opencode, Pi (orthogonal)
+./setup.sh --claude --opencode   # + only the AI CLIs you name (--claude / --codex / --opencode / --pi)
 ./setup.sh --rdp                 # + xrdp RDP server + XFCE desktop (orthogonal flag; combines with any tier)
 ./setup.sh --full                # Everything: --work plus --ai (but NOT --rdp)
 ./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
@@ -21,11 +21,11 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 
 The tiers `config → bash → dev → work` are cumulative (each includes the
 previous). `--ai` is **orthogonal**: it installs the AI CLIs (Claude Code,
-Codex, opencode) and can be added to any tier. Install them individually with
-`--claude`, `--codex`, and/or `--opencode` (they compose: `--claude --opencode`
+Codex, opencode, Pi) and can be added to any tier. Install them individually with
+`--claude`, `--codex`, `--opencode`, and/or `--pi` (they compose: `--claude --opencode`
 installs just those two). Leave AI off entirely when your org manages the
 install — the shell aliases/shortcuts load regardless and resolve whatever
-`claude`/`codex`/`opencode` is on your `PATH`. `--full` is shorthand for
+`claude`/`codex`/`opencode`/`pi` is on your `PATH`. `--full` is shorthand for
 `--work --ai`. Use `--force` to overwrite without prompting.
 
 The **sudo boundary sits at `dev`**: `config` and `bash` need no root — every
@@ -184,42 +184,52 @@ the normal WezTerm palette, no native pane shortcuts, and reduced client-side
 scrollback. Remote shells and applications remain responsible for their own
 ANSI/truecolor styling.
 
-Codex: manually merge [`configs/codex-keybindings.toml`](configs/codex-keybindings.toml)
-into `~/.codex/config.toml`. Keep this as a portable keybinding backup rather
-than replacing or symlinking the full machine-local Codex config, which may
-also contain providers, credentials, trust state, and hooks. If bindings are
-changed through Codex's `/keymap` UI, mirror its `tui.keymap` entries back into
-the fragment.
+Codex: [`configs/codex.toml`](configs/codex.toml) is the portable base. The
+Codex installer refreshes only its marked block in `~/.codex/config.toml`, so
+project trust, hook trust, plugins, and private provider selections remain
+machine-local. If bindings are changed through Codex's `/keymap` UI, mirror the
+resulting `tui.keymap` entries back into the tracked config.
 
 ## Theme System
 
-Five unified themes applied across **eight surfaces** with a single command:
-neovim, tmux, shell (FZF colors + env exports), bat, starship, delta, btop,
-and lazygit.
+Scoped themes applied across **eight surfaces** with a single command:
+neovim, tmux, FZF, bat, Starship, Delta, btop, and lazygit.
 
 ```bash
 ./bin/theme-switcher              # Interactive FZF selection
-./bin/theme-switcher nord         # Direct switch
+./bin/theme-switcher --session    # Pick current session default
+./bin/theme-switcher --window     # Pick current window default
+./bin/theme-switcher --window vim # Pick current window's Vim override
+./bin/theme-switcher -s           # Short session form
+./bin/theme-switcher -w tmux      # Short window/tool form
+./bin/theme-switcher kanagawa     # Direct switch
 ./bin/theme-switcher --preview tokyo-night
 ./bin/theme-switcher --revert     # Revert to previous
 ./bin/theme-switcher --list       # Show available themes
 ./bin/theme-switcher --init       # Re-render all surfaces from current theme
+./bin/theme-switcher diagnose     # Real default/ANSI/truecolor samples
 ```
 
-**Per-component overrides** (CSS-style cascade — `surface > group > global`):
+**Global, session, window, and per-component overrides:**
 
 ```bash
 ./bin/theme-switcher set code tokyo-night       # editor group → tokyo-night
-./bin/theme-switcher set starship nord          # just starship → nord
-./bin/theme-switcher show                       # see the full cascade tree
+./bin/theme-switcher set starship kanagawa      # just starship → kanagawa
+./bin/theme-switcher set --session default catppuccin
+./bin/theme-switcher set --window vim gruvbox
+./bin/theme-switcher explain --window           # effective value + source
 ./bin/theme-switcher unset starship             # back to chrome group/global
-./bin/theme-switcher reset                      # clear all overrides
+./bin/theme-switcher reset --window             # clear this window scope
 ```
 
-Groups: `code` (vim, bat, delta) · `chrome` (tmux, starship, fzf) ·
-`apps` (btop, lazygit). See [docs/theme-system.md](docs/theme-system.md#per-component-overrides).
+Resolution is window tool/group/default, then session tool/group/default, then
+global tool/group/default. Groups: `code` (vim, bat, delta), `chrome` (tmux,
+starship, fzf), and `apps` (btop, lazygit). See
+[docs/theme-system.md](docs/theme-system.md).
 
-**Available:** Nord, Kanagawa, Tokyo Night, Gruvbox Material, Catppuccin Mocha
+**Available:** Kanagawa Wave/Dragon, Tokyo Night, Gruvbox Material
+(medium, classic, light, and light-soft), Catppuccin Mocha/Latte, Everforest,
+Vesper, and GitHub Light.
 
 Per-tool palettes live under `themes/<name>/`:
 
@@ -227,9 +237,10 @@ Per-tool palettes live under `themes/<name>/`:
 |-------------------------------|-------------------------------------------|
 | `meta.sh`                     | Theme metadata (display name, description)|
 | `colors.sh`                   | Canonical hex/RGB palette                 |
+| `palette.sh`                  | Semantic roles + scoped ANSI palette      |
 | `vim.vim`                     | Neovim/vim colorscheme + overrides        |
 | `tmux.conf`                   | tmux status bar + pane borders            |
-| `shell.sh`                    | FZF colors + `BAT_THEME`/`STARSHIP_PALETTE`/`DELTA_FEATURE` exports |
+| `shell.sh`                    | Native `BAT_THEME`/`STARSHIP_PALETTE`/Delta feature names |
 | `starship.palette.toml`       | Starship `[palettes.<name>]` block        |
 | `delta.gitconfig`             | Delta `[delta "<name>"]` feature          |
 | `btop.theme`                  | btop color theme                          |
@@ -271,7 +282,7 @@ eget.toml                 Static binary downloads (tier=shell tools)
 ```
 
 **Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `init.sh` → `env.sh` →
-`tool-init.sh` (interactive only) → `generated/theme.sh` → `fzf.sh` →
+`tool-init.sh` (interactive only) → scoped theme resolver → `fzf.sh` →
 `tools/*.sh` → `platform/wsl.sh` (when WSL) → `lazy/nvm.sh` → `~/.shell.local`.
 
 **Project search roots** (`proj`, `fzf-project`, `cproj`) are unified behind

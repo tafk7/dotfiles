@@ -56,11 +56,13 @@ dotfiles/
 │   └── zsh.sh                → ~/.zshrc
 ├── generated/
 │   ├── bridge.sh             ← DOTFILES_DIR export (written by setup.sh)
-│   └── theme.sh              ← active theme colors (written by theme-switcher)
+│   ├── theme-state.sh        ← persistent global theme state
+│   └── themes/<name>/        ← immutable scoped launch artifacts
 ├── installers/               ← per-tool install scripts
 ├── shell/
 │   ├── init.sh               ← shared sourcing sequence for bash + zsh
 │   ├── env.sh                ← PATH composition + static exports (single source of truth)
+│   ├── theme-runtime.sh      ← prompt-time scoped theme refresh
 │   ├── tool-init.sh          ← eval-based init (direnv, completions)
 │   ├── fzf.sh                ← FZF configuration
 │   ├── lazy/nvm.sh           ← lazy NVM loader for both shells
@@ -69,8 +71,8 @@ dotfiles/
 │   │   ├── nav.sh, node.sh, process.sh, python.sh
 │   │   ├── tmux.sh, vim.sh, vscode.sh
 │   └── platform/wsl.sh      ← WSL-specific functions
-├── themes/                   ← color themes (5 themes)
-│   └── <name>/ {colors.sh, meta.sh, shell.sh, tmux.conf, vim.vim}
+├── themes/                   ← color themes
+│   └── <name>/ {palette.sh, colors.sh, meta.sh, shell.sh, tmux.conf, vim.vim, ...}
 ├── bin/
 │   ├── theme-switcher, verify, replace, cheatsheet
 ��   ├── uninstall-tool, git-credential-azdo
@@ -170,15 +172,15 @@ because we don't blanket-redirect stderr at the eval site.
 | shell        | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
 | dev          | + neovim, tmux                                     | Yes   |
 | work         | + NVM, Docker, Azure CLI                           | Yes   |
-| `--ai`       | + Claude Code, Codex, opencode (orthogonal)        | No    |
-| `--claude` / `--codex` / `--opencode` | + that one AI CLI (compose freely) | No |
+| `--ai`       | + Claude Code, Codex, opencode, Pi (orthogonal)    | No    |
+| `--claude` / `--codex` / `--opencode` / `--pi` | + that one AI CLI (compose freely) | No |
 | `--rdp`      | + xrdp server + XFCE desktop (orthogonal flag)     | Yes   |
 | `--full`     | = work + ai (everything except `--rdp`)            | Yes   |
 
 `config → shell → dev → work` are cumulative. `--ai` and `--rdp` are
 orthogonal to the chain — each installs only under its own flag and combines
-with any tier. `--ai` covers all AI CLIs (Claude Code, Codex, opencode); pick
-individually with `--claude` / `--codex` / `--opencode` (they compose). Leave
+with any tier. `--ai` covers all AI CLIs (Claude Code, Codex, opencode, Pi); pick
+individually with `--claude` / `--codex` / `--opencode` / `--pi` (they compose). Leave
 AI off when an org manages the install. `--rdp` installs the xrdp RDP server
 and is deliberately NOT implied by `--full`, since no tier should silently open
 a network listener. `--full` = `--work --ai`.

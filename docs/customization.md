@@ -71,7 +71,13 @@ For tools that need more than `eget`:
      (`~/.local/bin` is already on PATH via `shell/env.sh`, or symlink the binary
      there like `bat`/`fd`/`opencode`). Suppression varies by tool:
      `--no-modify-path` (opencode), `PROFILE=/dev/null` (nvm), or install to a
-     dir already on PATH so the installer skips the edit (claude).
+     dir already on PATH so the installer skips the edit (claude). When a vendor
+     installer offers **no** suppression at all — Pi's `pi.dev/install.sh`
+     interactively appends a PATH line and has no opt-out — don't use it: drive
+     the underlying package manager yourself into a controlled prefix and
+     symlink the result (see `installers/install-pi.sh`). Either way, end the
+     installer with the `git diff -- entry/ shell/` safety net the AI installers
+     use, so a write-through is caught rather than assumed impossible.
 2. Register in `lib/registry.sh`:
    ```bash
    TOOL_BINARY[mytool]=mytool
@@ -303,7 +309,7 @@ version_gte "$a" "$b" # 0 if a >= b
 ## Adding a Theme
 
 See [`docs/theme-system.md`](./theme-system.md). Short version: create
-`themes/<name>/` with `meta.sh`, `vim.vim`, `tmux.conf`, `shell.sh`, `colors.sh`
+`themes/<name>/` with `meta.sh`, `palette.sh`, `vim.vim`, `tmux.conf`, `shell.sh`, `colors.sh`
 plus the per-tool palette files (`bat/<name>.tmTheme`, `starship.palette.toml`,
 `delta.gitconfig`, `btop.theme`, `lazygit.yml`). The theme is auto-discovered
 on next `bin/theme-switcher` invocation.
@@ -316,12 +322,12 @@ bash -n shell/env.sh      # syntax check any modified shell script
 ./setup.sh --dry-run --bash     # preview install without making changes
 ```
 
-For theme changes, cycle every theme to make sure your wiring works:
+For theme changes, use the isolated automated checks. They create a temporary
+HOME and a named tmux server, so they do not switch the live theme:
 
 ```bash
-for t in nord tokyo-night kanagawa catppuccin gruvbox; do
-    ./bin/theme-switcher "$t"
-done
+tests/theme-contrast.py
+tests/theme-system.sh
 ```
 
 ## Best Practices
