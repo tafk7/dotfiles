@@ -5,27 +5,26 @@
 " &background do not pick a light variant after switching from a light theme.
 set background=dark
 
-" Tokyo Night specific settings (set before loading colorscheme)
-let g:tokyonight_style = 'night'
-let g:tokyonight_italic_functions = 1
-let g:tokyonight_italic_comments = 1
-let g:tokyonight_italic_keywords = 1
-let g:tokyonight_italic_strings = 0
-let g:tokyonight_italic_variables = 0
-let g:tokyonight_transparent = 0
-let g:tokyonight_hide_inactive_statusline = 0
-let g:tokyonight_sidebars = ["qf", "vista_kind", "terminal", "packer"]
-let g:tokyonight_transparent_sidebar = 0
-let g:tokyonight_dark_sidebar = 1
-let g:tokyonight_dark_float = 1
-let g:tokyonight_colors = {}
-let g:tokyonight_lualine_bold = 1
+lua << EOF
+require('tokyonight').setup({
+  style = 'night',
+  transparent = false,
+  terminal_colors = true,
+  styles = {
+    comments = { italic = true },
+    keywords = { italic = true },
+    functions = {},
+    variables = {},
+    sidebars = 'dark',
+    floats = 'dark',
+  },
+})
+EOF
 
 " Set colorscheme with error handling
 try
-    colorscheme tokyonight
-    " Use a compatible airline theme (tokyonight doesn't have native airline support)
-    let g:airline_theme='deus'
+    colorscheme tokyonight-night
+    let g:airline_theme='dotfiles'
 catch
     " Fallback if tokyonight not available
     colorscheme desert

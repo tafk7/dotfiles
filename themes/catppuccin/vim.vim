@@ -5,11 +5,11 @@
 " &background do not pick a light variant after switching from a light theme.
 set background=dark
 
-" Set colorscheme
-colorscheme catppuccin_mocha
-
 " Catppuccin specific settings
 let g:catppuccin_flavour = "mocha"
+
+" Set colorscheme after selecting the flavour.
+colorscheme catppuccin_mocha
 
 " Integration settings
 let g:airline_theme = 'catppuccin_mocha'

@@ -5,11 +5,11 @@
 " otherwise plugins that branch on &background pick dark variants.
 set background=light
 
-" Set colorscheme
-colorscheme catppuccin_latte
-
 " Catppuccin specific settings
 let g:catppuccin_flavour = "latte"
+
+" Set colorscheme after selecting the flavour.
+colorscheme catppuccin_latte
 
 " Integration settings
 let g:airline_theme = 'catppuccin_latte'

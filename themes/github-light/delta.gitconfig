@@ -1,0 +1,18 @@
+[delta "github-light"]
+syntax-theme = GitHub
+light = true
+plus-style = "syntax #dafbe1"
+plus-emph-style = "syntax #aceebb bold"
+plus-non-emph-style = "syntax #dafbe1"
+minus-style = "syntax #ffebe9"
+minus-emph-style = "syntax #ffcecb bold"
+minus-non-emph-style = "syntax #ffebe9"
+file-style = "#0550ae bold"
+file-decoration-style = "#afb8c1 ul"
+hunk-header-style = "syntax bold #24292f"
+hunk-header-decoration-style = "#afb8c1 box"
+line-numbers-zero-style = "#57606a"
+line-numbers-left-style = "#0550ae"
+line-numbers-right-style = "#0550ae"
+line-numbers-minus-style = "#a40e26"
+line-numbers-plus-style = "#116329"

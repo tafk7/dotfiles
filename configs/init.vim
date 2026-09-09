@@ -21,13 +21,12 @@ call plug#begin('~/.config/nvim/plugged')
 " Color schemes
 Plug 'morhetz/gruvbox'                        " Retro groove color scheme
 Plug 'sainnhe/gruvbox-material'              " Softer variant of gruvbox
-Plug 'arcticicestudio/nord-vim'              " Nord color scheme
 Plug 'folke/tokyonight.nvim'                 " Tokyo Night color scheme
 Plug 'rebelot/kanagawa.nvim'                 " Kanagawa color scheme
 Plug 'catppuccin/vim', { 'as': 'catppuccin' } " Catppuccin color scheme (mocha + latte)
 Plug 'sainnhe/everforest'                    " Everforest color scheme
-Plug 'rose-pine/neovim', { 'as': 'rose-pine' } " Rosé Pine color scheme (dawn)
 Plug 'datsfilipe/vesper.nvim'                " Vesper color scheme (near-black)
+Plug 'projekt0n/github-nvim-theme'           " High-contrast neutral light theme
 
 " Essential tpope plugins
 Plug 'tpope/vim-fugitive'                     " Git integration
@@ -90,10 +89,10 @@ if &term =~ '256color'
     set t_ut=
 endif
 
-" Dynamic theme loading
-" Source theme configuration if it exists
-if filereadable(expand("~/.config/nvim/theme.vim"))
-    source ~/.config/nvim/theme.vim
+" Dynamic scoped theme loading
+if exists('$DOTFILES_DIR') && filereadable($DOTFILES_DIR . '/lib/theme.vim')
+    execute 'set runtimepath^=' . fnameescape($DOTFILES_DIR . '/configs/nvim')
+    execute 'source ' . fnameescape($DOTFILES_DIR . '/lib/theme.vim')
 else
     " Default theme fallback
     try

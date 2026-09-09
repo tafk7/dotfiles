@@ -51,7 +51,8 @@ inspect_one() {
     local key="$1"
     local mapping="${CONFIG_MAP[$key]}"
     local target="${mapping%%:*}"
-    local type="${mapping##*:}"
+    local remainder="${mapping#*:}"
+    local type="${remainder%%:*}"
     local source_path
     source_path="$(config_source_path "$key")"
 

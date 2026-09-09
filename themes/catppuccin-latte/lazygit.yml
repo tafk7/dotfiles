@@ -2,20 +2,20 @@
 gui:
   theme:
     activeBorderColor:
-      - '#1e66f5'
+      - '#1e5ab6'
       - bold
     inactiveBorderColor:
       - '#9ca0b0'
     searchingActiveBorderColor:
       - '#df8e1d'
     optionsTextColor:
-      - '#1e66f5'
+      - '#1e5ab6'
     selectedLineBgColor:
       - '#ccd0da'
     inactiveViewSelectedLineBgColor:
-      - '#bcc0cc'
+      - '#ccd0da'
     cherryPickedCommitFgColor:
-      - '#1e66f5'
+      - '#1e5ab6'
     cherryPickedCommitBgColor:
       - '#bcc0cc'
     markedBaseCommitFgColor:

@@ -3,21 +3,17 @@
 
 set background=dark
 
-" Kanagawa specific settings
-let g:kanagawa_transparent = 0
-let g:kanagawa_terminal_colors = 1
-let g:kanagawa_italic_comments = 1
-let g:kanagawa_italic_keywords = 1
-let g:kanagawa_italic_functions = 0
-let g:kanagawa_italic_strings = 0
-let g:kanagawa_italic_variables = 0
-let g:kanagawa_contrast = "medium"
-let g:kanagawa_contrast_dark = "medium"
-let g:kanagawa_disable_background = 0
-let g:kanagawa_cursorline_transparent = 0
-
-" Set colorscheme — kanagawa.nvim ships wave/dragon/lotus as separate names.
+lua << EOF
+require('kanagawa').setup({
+  transparent = false,
+  terminalColors = true,
+  commentStyle = { italic = true },
+  keywordStyle = { italic = true },
+  statementStyle = { bold = true },
+  theme = 'dragon',
+})
+EOF
 colorscheme kanagawa-dragon
 
 " Airline theme (use a compatible dark theme)
-let g:airline_theme='minimalist'
+let g:airline_theme='dotfiles'

@@ -28,7 +28,7 @@ theme[selected_bg]="#d8a657"
 theme[selected_fg]="#282828"
 
 # Color of inactive/disabled text
-theme[inactive_fg]="#282828"
+theme[inactive_fg]="#a89984"
 
 # Color of text appearing on top of graphs, i.e uptime and current network graph scaling
 theme[graph_text]="#665c54"

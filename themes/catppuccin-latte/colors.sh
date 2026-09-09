@@ -6,7 +6,7 @@ export THEME_BG_R=239 THEME_BG_G=241 THEME_BG_B=245     # base #eff1f5
 export THEME_FG_R=76 THEME_FG_G=79 THEME_FG_B=105       # text #4c4f69
 
 # Primary colors
-export THEME_PRIMARY_R=30 THEME_PRIMARY_G=102 THEME_PRIMARY_B=245     # blue #1e66f5
+export THEME_PRIMARY_R=30 THEME_PRIMARY_G=90 THEME_PRIMARY_B=182      # accessible blue #1e5ab6
 export THEME_SECONDARY_R=136 THEME_SECONDARY_G=57 THEME_SECONDARY_B=239 # mauve #8839ef
 
 # Accent colors

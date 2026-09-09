@@ -106,6 +106,20 @@ fi
 alias theme='$DOTFILES_DIR/bin/theme-switcher'
 alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme <name>  (or: theme set <target> <name>)"'
 
+# These applications accept a config path at launch, which keeps their theme
+# local to this shell's tmux context instead of patching a shared user file.
+btop() {
+    "$DOTFILES_DIR/bin/theme-switcher" prepare "${DOTFILES_THEME_BTOP_RESOLVED:?theme environment not loaded}" >/dev/null
+    command btop --config "${BTOP_THEME_CONFIG:?theme environment not loaded}" \
+        --themes-dir "${BTOP_THEME_DIR:?theme environment not loaded}" "$@"
+}
+
+lazygit() {
+    local files="${LAZYGIT_THEME_CONFIG:?theme environment not loaded}"
+    [[ -f "$HOME/.config/lazygit/config.yml" ]] && files="$HOME/.config/lazygit/config.yml,$files"
+    command lazygit --use-config-file="$files" "$@"
+}
+
 # Find and replace utility
 alias fr='$DOTFILES_DIR/bin/replace'
 
