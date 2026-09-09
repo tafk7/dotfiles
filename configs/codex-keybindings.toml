@@ -1,8 +1,7 @@
 # Codex TUI keybinding fragment for the TAFK workflow.
 #
-# Manually merge these tables into ~/.codex/config.toml. Do not replace that
-# file wholesale: it may also contain machine-local providers, credentials,
-# trust state, hooks, and other settings that do not belong in dotfiles.
+# Reference-only fragment. The same bindings are deployed automatically from
+# configs/codex.toml; keep this smaller file for copying into other setups.
 #
 # `/keymap` can inspect and persist bindings from inside Codex. When changing
 # bindings there, mirror the resulting tui.keymap entries back into this file.
@@ -10,8 +9,17 @@
 # TAFK line-editing semantics for the Codex composer. Windows Terminal often
 # encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
 [tui.keymap.editor]
+move_line_end = "end"
 delete_backward = "backspace"
 delete_backward_word = ["ctrl-backspace", "ctrl-h"]
 delete_forward_word = "ctrl-delete"
 kill_line_start = "alt-backspace"
 kill_line_end = "alt-delete"
+
+# Ctrl stays application-local; Alt remains available for tmux navigation.
+[tui.keymap.global]
+open_external_editor = "ctrl-e"
+
+[tui.keymap.chat]
+next_permission_mode = "ctrl-g"
+previous_permission_mode = "ctrl-shift-g"
