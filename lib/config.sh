@@ -37,9 +37,9 @@ declare -A CONFIG_MAP=(
     [config/bat]="$HOME/.config/bat:symlink:bat"
     [config/fd]="$HOME/.config/fd:symlink:fd"
     [ssh_config]="$HOME/.ssh/config:symlink:"
-    # starship.toml: NOT a symlink. theme-switcher generates
-    # generated/starship.toml from configs/starship.toml; STARSHIP_CONFIG
-    # (set in shell/env.sh) points starship at the generated file.
+    # starship.toml: NOT a symlink. theme-switcher generates immutable
+    # generated/themes/<theme>/starship.toml files; STARSHIP_CONFIG selects one
+    # for the current shell's global/session/window context.
 
     # Special handling
     [gitconfig]="$HOME/.gitconfig:gitconfig:"

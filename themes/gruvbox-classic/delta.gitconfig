@@ -1,0 +1,17 @@
+[delta "gruvbox-classic"]
+syntax-theme = gruvbox-dark
+plus-style = "syntax #32361a"
+plus-emph-style = "syntax #4f5d1f bold"
+plus-non-emph-style = "syntax #32361a"
+minus-style = "syntax #4c2320"
+minus-emph-style = "syntax #71302a bold"
+minus-non-emph-style = "syntax #4c2320"
+file-style = "#fabd2f bold"
+file-decoration-style = "#504945 ul"
+hunk-header-style = "syntax bold #ebdbb2"
+hunk-header-decoration-style = "#504945 box"
+line-numbers-zero-style = "#bdae93"
+line-numbers-left-style = "#83a598"
+line-numbers-right-style = "#83a598"
+line-numbers-minus-style = "#fb4934"
+line-numbers-plus-style = "#b8bb26"

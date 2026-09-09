@@ -1,8 +1,9 @@
 #!/bin/bash
 # FZF configuration — layout, commands, and preview integration
 
-# Default options (layout, keybinds — theme colors merged from FZF_THEME_COLORS)
-export FZF_DEFAULT_OPTS="
+# Default options (layout/keybinds kept separate so prompt-time theme refreshes
+# can replace colors without duplicating the static flags).
+_DOTFILES_FZF_BASE_OPTS="
     --height 60%
     --layout=reverse
     --border=rounded
@@ -11,8 +12,12 @@ export FZF_DEFAULT_OPTS="
     --bind 'ctrl-p:toggle-preview'
     --bind 'ctrl-right:forward-word'
     --bind 'ctrl-backspace:backward-kill-word'
-    --bind 'ctrl-delete:kill-word'
-    ${FZF_THEME_COLORS:-}"
+    --bind 'ctrl-delete:kill-word'"
+
+_dotfiles_fzf_apply_theme() {
+    export FZF_DEFAULT_OPTS="$_DOTFILES_FZF_BASE_OPTS ${FZF_THEME_COLORS:-}"
+}
+_dotfiles_fzf_apply_theme
 
 # Use fd for better file/directory listing
 if command -v fd >/dev/null 2>&1; then

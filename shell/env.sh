@@ -6,7 +6,7 @@
 #   - entry/profile.sh (login shells, non-interactive subshells)
 #   - shell/init.sh (interactive shells)
 # Always AFTER shell/env-runtime.sh, which holds the always-fresh exports
-# (STARSHIP_CONFIG, BAT_CACHE_PATH, theme-overrides) that point at
+# (STARSHIP_CONFIG, BAT_CACHE_PATH, scoped theme state) that point at
 # generated/ files and must re-evaluate on `reload`.
 #
 # Safe to source multiple times — guarded by _DOTFILES_ENV_LOADED below.

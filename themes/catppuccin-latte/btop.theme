@@ -10,16 +10,16 @@ theme[main_fg]="#4c4f69"
 theme[title]="#4c4f69"
 
 # Highlight color for keyboard shortcuts
-theme[hi_fg]="#1e66f5"
+theme[hi_fg]="#1e5ab6"
 
 # Background color of selected item in processes box
 theme[selected_bg]="#bcc0cc"
 
 # Foreground color of selected item in processes box
-theme[selected_fg]="#1e66f5"
+theme[selected_fg]="#3b3d52"
 
 # Color of inactive/disabled text
-theme[inactive_fg]="#8c8fa1"
+theme[inactive_fg]="#5c5f77"
 
 # Misc colors for processes box including mini cpu graphs, details memory graph and details status text
 theme[proc_misc]="#40a02b"
@@ -34,7 +34,7 @@ theme[mem_box]="#40a02b"
 theme[net_box]="#e64553"
 
 # Processes box outline color
-theme[proc_box]="#1e66f5"
+theme[proc_box]="#1e5ab6"
 
 # Box divider line and small boxes line color
 theme[div_line]="#9ca0b0"
@@ -57,7 +57,7 @@ theme[free_end]="#40a02b"
 # Mem/Disk cached meter
 theme[cached_start]="#04a5e5"
 theme[cached_mid]=""
-theme[cached_end]="#1e66f5"
+theme[cached_end]="#1e5ab6"
 
 # Mem/Disk available meter
 theme[available_start]="#fe640b"

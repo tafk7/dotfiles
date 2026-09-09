@@ -1,402 +1,273 @@
-# Theme System Documentation
+# Theme system
 
-The dotfiles theme system applies a single color scheme across **neovim, tmux,
-shell (FZF + prompt), bat, starship, delta, btop, and lazygit** with one
-command. Themes are auto-discovered from `themes/` — no central registry to
-update when adding one.
+The theme system supports a persistent global default, tmux session themes,
+tmux window themes, and group or tool overrides inside every scope. Outside
+tmux, the global scope is used.
 
-## Overview
+Managed tools are grouped as follows:
 
-The theme system lets you:
+| Group | Tools |
+|---|---|
+| `code` | `vim`, `bat`, `delta` |
+| `chrome` | `tmux`, `starship`, `fzf` |
+| `apps` | `btop`, `lazygit` |
 
-- Switch between multiple color schemes instantly across every tool.
-- Preview themes before applying them.
-- Maintain consistent colors across all terminal applications.
-- Add new themes by dropping a directory under `themes/`.
+Available themes are discovered from `themes/`. The collection includes
+Gruvbox Material Medium, Classic, Light, and Light Soft; Tokyo Night; Kanagawa
+Wave and Dragon; Catppuccin Mocha and Latte; Everforest; Vesper; and the
+readability-focused GitHub Light theme.
 
-## Available Themes
+The Gruvbox family is intentionally explicit:
 
-Themes are discovered from `themes/<name>/`. Out of the box:
+| Name | Editor settings | Canvas |
+|---|---|---|
+| `gruvbox` | Material foreground, medium background | `#282828` |
+| `gruvbox-classic` | Original foreground, medium background | `#282828` |
+| `gruvbox-light` | Original foreground, medium light background | `#fbf1c7` |
+| `gruvbox-light-soft` | Original foreground, soft light background | `#f2e5bc` |
 
-| Theme                | Best For              | Vibe                                  |
-| -------------------- | --------------------- | ------------------------------------- |
-| **gruvbox**          | Retro feel            | Warm, comfortable, nostalgic (default) |
-| **nord**             | Long coding sessions  | Cool, professional, Arctic            |
-| **tokyo-night**      | Modern development    | Vibrant, city lights, contemporary    |
-| **kanagawa**         | Focused work          | Earthy, Japanese aesthetic, calming   |
-| **catppuccin**       | Gentle on eyes        | Soft pastels, cozy, smooth (Mocha variant) |
-| **everforest**       | Low-fatigue sessions  | Green-tinted forest, muted, soft      |
-| **kanagawa-dragon**  | Dim rooms             | Near-black warm ink, heavily desaturated |
-| **vesper**           | OLED panels           | `#101010` minimal — amber + mint on near-black |
-| **catppuccin-latte** | Daylight, projectors  | Light — soft pastels on warm paper    |
-| **rose-pine-dawn**   | Daylight, screenshots | Light — muted rose and pine on warm paper |
+GitHub Light uses GitHub Primer's neutral light palette (MIT licensed) and the
+maintained `projekt0n/github-nvim-theme` editor plugin. It is intentionally less
+muted than the other light themes: normal text, secondary text, selected rows,
+search states, and all 16 ANSI entries are checked for 4.5:1 contrast.
+Existing installations should run `vplug` once to install the newly declared
+editor plugin before selecting GitHub Light in Neovim.
 
-The set is deliberately spread across the design space rather than clustered:
-two light themes, one near-black/OLED, one green-family, one warm earth, and
-the blue-violet-ink family (nord, tokyo-night, kanagawa, catppuccin).
+## Resolution order
 
-## Usage
+Each tool is resolved independently. The first configured value wins:
 
-### Quick Start
+1. window tool override
+2. window group override
+3. window default
+4. session tool override
+5. session group override
+6. session default
+7. global tool override
+8. global group override
+9. global default
 
-```bash
-# Interactive selection (FZF picker, with preview)
-bin/theme-switcher
+Scope is considered before specificity. A window default therefore supersedes
+a session or global tool override. This makes a scope a complete visual context
+unless a more specific value is set in that same scope.
 
-# Direct switch
-bin/theme-switcher nord
-bin/theme-switcher tokyo-night
-
-# Show current theme
-bin/theme-switcher --current
-
-# List available themes
-bin/theme-switcher --list
-
-# Preview without applying
-bin/theme-switcher --preview kanagawa
-
-# Revert to the previous theme
-bin/theme-switcher --revert
-```
-
-### Themed Picker Preview
-
-Running `theme` (or `bin/theme-switcher`) with no args opens an FZF picker
-with a **prebaked themed preview** of every theme:
-
-- The right pane displays a rich card per theme — palette swatches, an
-  accent ramp, a mock prompt line, resolved tool-native names, and a
-  `bat`-rendered code snippet using **that theme's** syntax highlighting.
-- The **entire preview pane content is painted with that theme's
-  background color** so the right side visibly changes color per focus
-  even though the surrounding fzf chrome can't recolor mid-session.
-- Press `enter` to apply the focused theme (full `apply_theme`); press
-  `esc` to cancel without making any changes.
-
-Nothing changes outside the picker until you press `enter` — scrolling
-through the list is purely a preview operation.
-
-**How prebaking works.** On picker launch, `theme-switcher` renders
-each theme's preview to `generated/theme-previews/<theme>.ansi` (sized
-for the current terminal width) and the fzf preview becomes a pure
-`cat <cache>` — zero per-keystroke compute. Caches invalidate when the
-theme's source files (or the renderer itself) are newer than the cache.
-
-Caveats:
-- The fzf overlay's own background (border, gutter, search bar) is set
-  by `FZF_THEME_COLORS` at fzf launch and **cannot** be repainted
-  mid-session — only the preview pane content displays the focused
-  theme's color.
-- The bat code sample requires `bat` on `PATH` and falls back silently
-  otherwise.
-
-### Per-Component Overrides
-
-Sometimes you want a mix — say, a Tokyo Night editor on a Kanagawa terminal
-chrome. The switcher supports a CSS-style cascade across three groups:
-
-| Group     | Surfaces                | Coupling reason                          |
-|-----------|-------------------------|------------------------------------------|
-| `code`    | `vim`, `bat`, `delta`   | Share the screen during edit/diff/preview |
-| `chrome`  | `tmux`, `starship`, `fzf` | Persistent UI elements visible together |
-| `apps`    | `btop`, `lazygit`       | Full-screen TUI takeovers                |
-
-**Cascade rule:** `surface override > group override > global default`.
+For example:
 
 ```bash
-# Group override — flip just the editor stack
-bin/theme-switcher set code tokyo-night
-
-# Surface override — flip just one surface
-bin/theme-switcher set starship nord
-
-# See what's effective everywhere
-bin/theme-switcher show
-
-# Remove one override (cascades back to group/global)
-bin/theme-switcher unset starship
-
-# Clear every override (back to pure global)
-bin/theme-switcher reset
+theme-switcher tokyo-night
+theme-switcher set --session default catppuccin
+theme-switcher set --window default everforest
+theme-switcher set --window vim gruvbox
+theme-switcher set --window tmux catppuccin
 ```
 
-Example `theme-switcher show` output:
+The current window then uses Gruvbox in Neovim, Catppuccin for tmux, and
+Everforest for its other tools. Other windows still inherit Catppuccin from the
+session, and other sessions still inherit Tokyo Night globally.
 
-```
-global: catppuccin
-├─ code   : tokyo-night  (override)
-│  ├─ vim     : tokyo-night
-│  ├─ bat     : tokyo-night
-│  └─ delta   : tokyo-night
-├─ chrome : catppuccin
-│  ├─ tmux    : catppuccin
-│  ├─ starship: nord  (override)
-│  └─ fzf     : catppuccin
-└─ apps   : catppuccin
-   ├─ btop    : catppuccin
-   └─ lazygit : catppuccin
-```
+## CLI
 
-Overrides are stored in `generated/theme-overrides.sh` (gitignored).
-Bare `bin/theme-switcher <name>` only updates the global default — your
-overrides survive theme switches. Use `reset` first if you want a clean slate.
-
-Caveats:
-
-- `delta`, `btop`, and `lazygit` configs are machine-global, so the
-  override is honored but only one theme of each can be live per machine.
-- Open `nvim` sessions need `:source ~/.config/nvim/theme.vim` to repaint.
-- `bin/verify` summarizes the effective cascade and warns on artifact mismatch.
-
-### How It Works
-
-When you switch themes, `bin/theme-switcher` writes / regenerates the
-following loader files. The originals in `themes/<name>/` are never modified.
-
-| Surface  | Loader / target                             | Mechanism                                   |
-| -------- | ------------------------------------------- | ------------------------------------------- |
-| Neovim   | `~/.config/nvim/theme.vim`                  | Sources `themes/$THEME/vim.vim` at runtime  |
-| Tmux     | `~/.tmux/theme.conf`                        | Sources `themes/$THEME/tmux.conf` at runtime |
-| Shell    | `generated/theme.sh`                        | Exports `DOTFILES_THEME`, sources theme's `shell.sh` |
-| Bat      | `BAT_THEME` (via shell.sh) + `bat/*.tmTheme` | Vendored `.tmTheme` + bat cache rebuild    |
-| Starship | `generated/starship.toml`                   | Concatenates base config + active palette   |
-| Delta    | `generated/delta.gitconfig`                 | Included by `~/.gitconfig`                  |
-| Btop     | `~/.config/btop/themes/dotfiles-<name>.theme` + `btop.conf` patch | Drop-in theme + `color_theme = "dotfiles-<name>"` |
-| Lazygit  | `~/.config/lazygit/config.yml` (marker block) | Marker block keeps user content intact     |
-
-The active theme name and previous-theme name are stored inside
-`generated/theme.sh` (so `--revert` works across sessions).
-
-### Integration Points
-
-#### Neovim
-
-- Theme loaded from `~/.config/nvim/theme.vim` (auto-generated).
-- Falls back to gruvbox-material if no theme is set.
-- All theme plugins are pre-installed via vim-plug.
-- Airline theme updates automatically.
-
-#### Tmux
-
-- Theme loaded from `~/.tmux/theme.conf` (auto-generated).
-- Includes status bar styling and pane borders.
-- After switching, run `Ctrl-a r` to reload, or fully restart tmux.
-
-#### Shell (Bash/Zsh)
-
-- Colors loaded from `generated/theme.sh`.
-- Affects FZF colors, prompt accents, error/success symbols.
-- New shells pick up the theme automatically; for the current shell, `reload`.
-
-#### FZF
-
-- Each theme defines `FZF_THEME_COLORS` in its `shell.sh`.
-- Affects fuzzy finder appearance everywhere FZF is used.
-
-#### Bat
-
-- Each theme exports `BAT_THEME` from its `shell.sh`.
-- Themes that aren't bat built-ins ship a vendored `.tmTheme` under
-  `themes/<name>/bat/<name>.tmTheme`.
-- `bin/theme-switcher` rebuilds the bat cache only when the vendored set changes.
-
-#### Starship
-
-- A single `configs/starship.toml` defines structure and references colors via
-  `palette = "$STARSHIP_PALETTE"`.
-- Each theme contributes a `themes/<name>/starship.palette.toml` snippet
-  containing one `[palettes.<name>]` block.
-- The switcher concatenates base + active palette into
-  `generated/starship.toml` and points `STARSHIP_CONFIG` there.
-
-#### Delta (git diff)
-
-- Each theme provides `themes/<name>/delta.gitconfig` with a `[delta]`
-  block (syntax-theme + plus/minus styles).
-- The switcher writes the active one to `generated/delta.gitconfig`,
-  which is included by `~/.gitconfig`.
-
-#### Btop
-
-- Each theme ships a `themes/<name>/btop.theme`.
-- The switcher copies it to `~/.config/btop/themes/dotfiles-<name>.theme`
-  and patches `~/.config/btop/btop.conf` (`color_theme = "dotfiles-<name>"`).
-
-#### Lazygit
-
-- Each theme provides `themes/<name>/lazygit.yml` (a `gui.theme:` block).
-- The switcher merges it into `~/.config/lazygit/config.yml` between
-  `# >>> dotfiles theme >>>` / `# <<< dotfiles theme <<<` markers, so any
-  user customizations outside the block survive.
-
-## Adding a New Theme
-
-1. Create the directory:
-   ```bash
-   mkdir -p themes/my-theme/bat
-   ```
-
-2. Create the **required** files:
-
-   **`meta.sh`** — name + description (one line each):
-   ```bash
-   NAME="My Theme"
-   DESCRIPTION="One-line summary for the picker"
-   ```
-
-   **`vim.vim`** — neovim colorscheme:
-   ```vim
-   try
-       colorscheme my-theme
-       let g:airline_theme = 'my_theme'
-   catch
-       colorscheme desert
-   endtry
-   ```
-
-   **`tmux.conf`** — status bar styling (status-style, pane-border-style, …).
-
-   **`shell.sh`** — exports for FZF + bat:
-   ```bash
-   export FZF_THEME_COLORS='--color=bg+:#…,bg:#…,fg:#…,…'
-   export BAT_THEME='my-theme'
-   ```
-
-   **`colors.sh`** — RGB triplets used by `--preview`:
-   ```bash
-   export THEME_BG_R=30 THEME_BG_G=30 THEME_BG_B=30
-   export THEME_FG_R=220 THEME_FG_G=220 THEME_FG_B=220
-   export THEME_PRIMARY_R=… THEME_PRIMARY_G=… THEME_PRIMARY_B=…
-   export THEME_SECONDARY_R=… THEME_SECONDARY_G=… THEME_SECONDARY_B=…
-   export THEME_TINT_1='#…' THEME_TINT_2='#…' THEME_TINT_3='#…'
-   ```
-
-3. Create the **optional** per-tool palette files. Each is a no-op when
-   missing — the switcher logs a warning and skips that surface.
-
-   - `bat/my-theme.tmTheme` — Sublime/TextMate `.tmTheme` (omit if `BAT_THEME`
-     points at a bat built-in like `gruvbox-dark` or `Nord`).
-   - `starship.palette.toml` — single `[palettes.my-theme]` block.
-   - `delta.gitconfig` — single `[delta]` block (or `[delta "my-theme"]`
-     plus `features = my-theme` in the active block).
-   - `btop.theme` — drop-in btop theme.
-   - `lazygit.yml` — `gui.theme:` block.
-
-4. Install vim plugin (if needed) by adding to `configs/init.vim`:
-   ```vim
-   Plug 'author/my-theme.vim'
-   ```
-
-5. Apply:
-   ```bash
-   bin/theme-switcher my-theme
-   ```
-
-The theme is discovered automatically — no central registry to update.
-
-## Troubleshooting
-
-### Theme not applying in neovim
-- Run `:PlugInstall` to ensure the theme plugin is installed.
-- Check `:colorscheme` to see what's currently active.
-- Verify `~/.config/nvim/theme.vim` exists and is readable.
-
-### Tmux colors not updating
-- Reload tmux config: `Ctrl-a r`.
-- For full update: exit and restart tmux.
-
-### Shell prompt colors not changing
-- Run `reload` (or `source ~/.bashrc` / `source ~/.zshrc`).
-- Start a new shell session.
-
-### FZF colors not updating
-- FZF colors load when FZF starts — try a new FZF command or restart shell.
-
-### Bat colors not updating
-- Run `bat cache --build` once after switching to refresh.
-- Check `bat --list-themes` to confirm the theme is known.
-
-### Starship colors not updating
-- Confirm `STARSHIP_CONFIG` points at `generated/starship.toml`.
-- Check that `generated/starship.toml` exists and contains
-  `[palettes.<your-theme>]`.
-
-### Lazygit colors not updating
-- Open `~/.config/lazygit/config.yml` and confirm the
-  `# >>> dotfiles theme >>>` block reflects the current theme.
-- Restart lazygit (it reads config at start).
-
-## Technical Details
-
-### File Structure
-
-```
-themes/
-├── nord/
-│   ├── meta.sh                    # required
-│   ├── vim.vim                    # required
-│   ├── tmux.conf                  # required
-│   ├── shell.sh                   # required (FZF + BAT_THEME)
-│   ├── colors.sh                  # required (RGB for preview)
-│   ├── bat/nord.tmTheme           # optional
-│   ├── starship.palette.toml      # optional
-│   ├── delta.gitconfig            # optional
-│   ├── btop.theme                 # optional
-│   └── lazygit.yml                # optional
-├── kanagawa/
-│   └── ...
-└── ...
-
-bin/
-└── theme-switcher                 # the orchestrator
-
-generated/
-├── theme.sh                       # current theme + previous theme
-├── starship.toml                  # base + active palette (concatenated)
-└── delta.gitconfig                # active delta block
-```
-
-### Configuration Paths
-
-- **Active theme name**: stored as `DOTFILES_THEME=...` in `generated/theme.sh`.
-- **Previous theme**: stored as `_DOTFILES_PREVIOUS_THEME=...` in same file.
-- **Vim loader**: `~/.config/nvim/theme.vim`.
-- **Tmux loader**: `~/.tmux/theme.conf`.
-- **Bat tmTheme**: copied to bat config dir and cache rebuilt.
-- **Starship config**: `generated/starship.toml` (pointed at by `STARSHIP_CONFIG`).
-- **Delta config**: `generated/delta.gitconfig` (included by `~/.gitconfig`).
-- **Btop**: `~/.config/btop/themes/dotfiles-<name>.theme` + `btop.conf` patch.
-- **Lazygit**: marker block inside `~/.config/lazygit/config.yml`.
-
-### Dependencies
-
-- `fzf` — interactive theme picker.
-- `tput` — terminal color preview.
-- Standard unix tools: `ln`, `mkdir`, `sed`, `awk`.
-
-## Tips
-
-- **Quick alias**:
-  ```bash
-  alias nord='bin/theme-switcher nord'
-  alias tokyo='bin/theme-switcher tokyo-night'
-  ```
-
-- **Per-project override**: set `DOTFILES_THEME` in a project's `.envrc` and
-  source `themes/$DOTFILES_THEME/shell.sh` from there.
-
-## Quick Start (10-Second Version)
+With no scope flag, commands operate on the global scope. This preserves the
+existing global commands.
 
 ```bash
-bin/theme-switcher                 # interactive (FZF)
-bin/theme-switcher nord            # apply nord
-bin/theme-switcher --revert        # back to previous
-bin/theme-switcher --list          # show all
+theme-switcher                         # interactive global picker
+theme-switcher --session               # picker for current session default
+theme-switcher --window                # picker for current window default
+theme-switcher --window vim            # picker for this window's Vim override
+theme-switcher -s                      # short form: current session picker
+theme-switcher -w tmux                 # short form: current window tmux picker
+theme-switcher kanagawa                # set global default
+theme-switcher set code tokyo-night    # global group override
+theme-switcher unset starship          # alias for `clear`; global compatibility
+theme-switcher reset                   # clear global group/tool overrides
+theme-switcher --current
+theme-switcher --list
+theme-switcher --revert
 ```
 
-After switching:
+Inside tmux, bare `--session`/`-s` and `--window`/`-w` mean the current object.
+Outside tmux, or when scripting, pass a stable tmux id. Quote session ids so
+the shell does not expand `$`.
 
-- **Tmux**: `Ctrl-a r` to reload.
-- **Vim**: applies to new sessions.
-- **Shell**: applies to new terminals; `reload` for current.
+```bash
+theme-switcher set --session default catppuccin
+theme-switcher set -s code kanagawa
+theme-switcher set --session='$3' code kanagawa
+theme-switcher set --window default github-light
+theme-switcher set -w vim gruvbox
+theme-switcher set --window=@12 vim gruvbox
+
+theme-switcher clear --window vim      # inherit window group/default, then session/global
+theme-switcher clear --session default # remove the session default
+theme-switcher reset --window          # remove every setting on this window
+theme-switcher reset --session='$3'    # remove every setting on session $3
+```
+
+`show` displays the selected context and all effective tools. `explain` adds
+the winning cascade level for each tool and can be limited to one tool.
+
+```bash
+theme-switcher show --window
+theme-switcher explain --window
+theme-switcher explain --session='$3' delta
+```
+
+`theme-switcher diagnose` prints default-color text, ANSI colors 0–15, and
+truecolor samples in the current context. Unlike the graphical preview, this
+exercises the real terminal/tmux palette path.
+
+The interactive picker fills its preview pane with the candidate theme and
+shows semantic UI states, all 16 ANSI colors, and a C++ sample rendered by that
+theme's actual bat syntax definition. Moving through the list is read-only;
+only Enter applies the selected theme and Escape cancels.
+
+## State and lifetime
+
+Global settings are written atomically to `generated/theme-state.sh` and
+survive shell and machine restarts. The old `generated/theme.sh` and
+`generated/theme-overrides.sh` are read for migration; a small compatibility
+`theme.sh` remains for older scripts.
+
+The former active loaders `~/.tmux/theme.conf`, `~/.config/nvim/theme.vim`, and
+`generated/starship.toml` are no longer read. They may remain on disk as inert
+upgrade leftovers; the switcher deliberately does not delete or rewrite live
+user configuration. Existing btop and lazygit files are treated as base user
+configuration and receive a scoped launch overlay.
+
+Session and window settings are tmux user options on stable ids (`$N` and
+`@N`). They survive renames and window index changes because names and indexes
+are never used as storage keys. Their lifetime is the tmux object:
+
+- a new window inherits its session when the creation hook runs;
+- a split inherits its window options, including the ANSI palette;
+- a moved, unlinked window inherits its new session;
+- a renamed session or window keeps its settings;
+- killing a session/window removes its scoped settings;
+- restarting the tmux server removes scoped settings unless a restoration tool
+  explicitly saves and restores tmux user options.
+
+This repository does not install tmux-resurrect or another tmux state restorer.
+If one is added, include `@dotfiles_theme_*` session/window options in its saved
+state. Global state remains independent and persistent.
+
+### Linked windows
+
+A linked window is one window object with one pane tree, even when visible in
+several sessions. It cannot display conflicting canvases or expose different
+environment state to the same running shell based on which client is looking
+at it. The resolver therefore chooses the lowest stable linked session id as
+the deterministic inheritance owner. `theme-switcher explain --window=@N`
+shows all links and the owner. Set a window default when a linked window should
+not inherit from that owner.
+
+Status entries and left/right content use window-local palette values, so two
+clients viewing different windows can render the selected window's colors.
+Tmux messages and display-pane overlays are session options and use the session
+theme; tmux does not expose those as per-client options.
+
+## Runtime application
+
+The switcher does not rewrite one active config for every context. It builds
+immutable per-theme artifacts under `generated/themes/<theme>/` and resolves
+launch-time environment variables for each shell.
+
+| Tool | Scoped mechanism | Existing process behavior |
+|---|---|---|
+| tmux | window/session options; `pane-colours[]` on tmux 3.3+ | canvas, status entries, borders, and palette update immediately |
+| shell | lightweight prompt signature check | exports update at the next prompt |
+| FZF | `FZF_THEME_COLORS` | next FZF invocation |
+| bat | `BAT_THEME` plus one shared cache containing all custom themes | next invocation |
+| Starship | per-theme `STARSHIP_CONFIG` | next prompt |
+| Delta | all features loaded once; `DELTA_FEATURES` selects one per process | next Git/Delta invocation |
+| Neovim | launch environment plus tracked runtime loader | new instance; use `:ThemeReload` in an existing instance |
+| btop | wrapper passes scoped `--config` and `--themes-dir` | restart btop |
+| lazygit | wrapper passes the user config plus a scoped theme overlay | restart lazygit |
+
+The prompt check compares a global and tmux generation signature. If nothing
+changed, it emits no exports and rebuilds no caches. Bat's cache contains every
+vendored theme and is rebuilt only when a source theme changes.
+
+Outside tmux, shells, editors, and tools resolve the global cascade. No terminal
+palette is changed, so standalone operation remains compatible with local and
+remote terminals.
+
+## Tmux ANSI palettes and light themes
+
+Tmux 3.3 added the `pane-colours[]` pane option. This implementation sets the
+16 ANSI entries at window scope, where existing panes inherit them and new
+splits receive them automatically. Every split in a window shares that full
+theme, while pane tints may vary. Different themed windows can be visible from
+separate clients without changing WezTerm, another terminal, or an SSH client's
+global palette. Truecolor applications continue to emit their own RGB colors,
+while uncolored text uses the window foreground/background.
+
+On tmux older than 3.3, full window foreground/background styling still works,
+but tmux cannot remap ANSI colors. Light themes then depend on a compatible
+terminal palette. The switcher reports `@dotfiles_theme_palette=unavailable`
+and never sends OSC palette mutations, because those may leak to another tab,
+session, client, or remote host. Outside tmux the same terminal-owned limitation
+applies. Run `theme-switcher diagnose` to see the actual result.
+
+Clearing a window or session setting reapplies the newly inherited palette.
+No terminal-global restoration sequence is needed because the terminal palette
+was never changed.
+
+## Pane tints
+
+`pane-tint 1`, `pane-tint 2`, and `pane-tint 3` remain subtle background
+variants within a window. `pane-tint 0` or `pane-tint reset` restores the
+window canvas. The tint level is stored on the pane and recomputed from the
+effective tmux theme whenever that window changes. Independent full pane themes
+are deliberately outside this system.
+
+## Readability and fidelity
+
+Normal informational text targets WCAG AA contrast of at least 4.5:1 against
+its actual background. Automated checks cover the main foreground and
+secondary roles, light-theme ANSI colors, tmux inactive window text, Starship
+dim text, and btop inactive text. Host labels, inactive window names, comments,
+line numbers, and search states use these readable roles. Pane borders and
+separators may be quieter because they are decorative and are not the sole
+navigation cue.
+
+Neovim applies supported plugin setup APIs before loading each colorscheme.
+Comments, line numbers, search, selection, and Airline are normalized after the
+scheme loads using the theme's exact palette. The Airline adapter replaces the
+former unrelated `deus` and shared `minimalist` mappings.
+
+Bat uses exact bundled or built-in themes. Delta 0.18.2 exposes only its
+embedded bat themes and does not load the external bat cache, so exact custom
+syntax themes remain unavailable there. Delta's diff chrome uses exact palette
+colors; documented syntax approximations remain for Tokyo Night, Kanagawa,
+Kanagawa Dragon, Everforest, Catppuccin, and Vesper. Gruvbox Material uses
+Delta's `gruvbox-dark`, which is the closest embedded variant.
+
+## Adding a complete theme
+
+Create `themes/<name>/` with all of these files:
+
+- `meta.sh`: display name and description
+- `palette.sh`: semantic roles and a 16-entry `THEME_ANSI` array
+- `colors.sh`: preview RGB values and three pane tints
+- `vim.vim`: supported setup calls before `:colorscheme`
+- `tmux.conf`: readable reference/fallback styling
+- `shell.sh`: native bat, Starship, and Delta names
+- `starship.palette.toml`
+- `delta.gitconfig`
+- `btop.theme`
+- `lazygit.yml`
+- `bat/*.tmTheme` when bat has no matching built-in
+
+Add the Starship palette block to `configs/starship.toml` and an editor plugin
+to `configs/init.vim` only when the theme is not already supported. Then run:
+
+```bash
+bin/theme-switcher --init
+tests/theme-contrast.py
+tests/theme-system.sh
+```
+
+The theme is discovered automatically. Use `bin/theme-switcher --preview NAME`
+for its color card and `bin/theme-switcher diagnose` inside a themed window to
+check default, ANSI, and truecolor behavior together.

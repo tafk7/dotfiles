@@ -1,8 +1,8 @@
 # Kanagawa Wave — delta feature
-# syntax-theme: delta-bat built-in approximation (see tokyo-night for context).
-# "TwoDark" provides a warm, balanced dark palette that suits Kanagawa.
+# Delta cannot load the vendored Kanagawa bat theme. gruvbox-dark is the
+# closest embedded warm syntax palette; all diff chrome uses Kanagawa colors.
 [delta "kanagawa"]
-syntax-theme = TwoDark
+syntax-theme = gruvbox-dark
 plus-style = "syntax #2b3328"
 plus-emph-style = "syntax #4d5a3d bold"
 plus-non-emph-style = "syntax #2b3328"
@@ -13,7 +13,7 @@ file-style = "#7e9cd8 bold"
 file-decoration-style = "#363646 ul"
 hunk-header-style = "syntax bold #dcd7ba"
 hunk-header-decoration-style = "#363646 box"
-line-numbers-zero-style = "#54546d"
+line-numbers-zero-style = "#c8c093"
 line-numbers-left-style = "#7e9cd8"
 line-numbers-right-style = "#7e9cd8"
 line-numbers-minus-style = "#c34043"

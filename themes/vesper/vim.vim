@@ -3,15 +3,20 @@
 
 set background=dark
 
-" Vesper specific settings — must be set BEFORE the colorscheme loads.
-" transparent=0 keeps the #101010 canvas; the point of this theme is the
-" near-black background, so we do not want the terminal showing through.
-let g:vesper_transparent = 0
-let g:vesper_italics = 1
+lua << EOF
+require('vesper').setup({
+  transparent = false,
+  italics = {
+    comments = true,
+    keywords = true,
+    functions = true,
+    strings = true,
+    variables = true,
+  },
+})
+EOF
 
 " Set colorscheme
 colorscheme vesper
 
-" Airline theme — Vesper ships no airline theme; 'minimalist' matches its
-" low-chroma, mostly-monochrome intent.
-let g:airline_theme = 'minimalist'
+let g:airline_theme = 'dotfiles'

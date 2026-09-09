@@ -4,9 +4,6 @@
 " Important: set this before colorscheme
 set background=dark
 
-" Set colorscheme
-colorscheme gruvbox-material
-
 " Gruvbox Material specific settings
 let g:gruvbox_material_background = 'medium'
 let g:gruvbox_material_foreground = 'material'
@@ -21,6 +18,9 @@ let g:gruvbox_material_sign_column_background = 'none'
 let g:gruvbox_material_spell_foreground = 'colored'
 let g:gruvbox_material_statusline_style = 'material'
 let g:gruvbox_material_better_performance = 1
+
+" Set colorscheme after every supported option has been configured.
+colorscheme gruvbox-material
 
 " Airline theme
 let g:airline_theme='gruvbox_material'

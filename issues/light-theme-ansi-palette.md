@@ -1,92 +1,52 @@
-# Issue: light themes are unreadable for ANSI-colored output
+# Light themes and ANSI-colored output
 
-**Status:** half-fixed. The `window-style fg` half is done and committed to the working
-tree. The ANSI-palette half is open and needs a decision — see *Options* below.
+**Status:** resolved inside tmux 3.3 or newer; documented fallback elsewhere.
 
-Introduced alongside the two light themes (`catppuccin-latte`, `rose-pine-dawn`) added
-to `themes/`. Symptom: previews look correct, but once a light theme is applied the
-text in a real pane looks washed out to invisible.
+The original report identified two separate failures correctly:
 
-## Two independent causes
+1. tmux set a light pane background without a matching default foreground;
+2. ANSI-colored programs still used the terminal's dark-oriented 16-color
+   palette, even though truecolor previews looked correct.
 
-### 1. `window-style` set `bg` without `fg` — FIXED
+Capability verification for this change found tmux 3.7b installed. Its manual
+documents `pane-colours[]`, and the upstream changelog places the option in the
+3.2a-to-3.3 release. The Linux environment does not contain a WezTerm binary,
+so no runtime WezTerm behavior was assumed; the tracked `configs/wezterm.lua`
+was inspected and still deliberately leaves `colors` unset.
 
-Every `themes/*/tmux.conf` had:
+The foreground/background pair was fixed in every theme. The remaining claim
+that “tmux cannot fix this” was true for older tmux releases, but is no longer
+true for the installed tmux 3.7b. Tmux 3.3 introduced the `pane-colours[]`
+pane option, with entries 0–255 and normal window/pane inheritance.
 
-```tmux
-set -g window-style bg='#eff1f5'
-```
+## Implemented behavior
 
-Background only. Unstyled text therefore fell back to the **terminal's** default
-foreground, which for WezTerm's built-in palette is `#dcdccc` — tuned for a dark
-background. On paper-white that is effectively invisible.
+The theme switcher now applies ANSI entries 0–15 at window scope. Existing
+panes inherit the window palette and new splits inherit it automatically. All
+splits share the window's full theme, as intended; their backgrounds may still
+use independent subtle tints. Different windows can retain different palettes
+without changing terminal-global state. The palette is applied after SSH or
+local programs emit ANSI color indices, so it works regardless of whether the
+underlying terminal is WezTerm, Windows Terminal, or another compatible client.
 
-Measured contrast of plain text on the pane background:
+This avoids OSC palette mutation entirely. No terminal-global state is changed,
+so switching one session/window cannot silently recolor another tab, client,
+remote host, or standalone shell. Clearing an override simply reapplies the
+inherited window palette.
 
-| Theme | Before | After |
-|---|---|---|
-| catppuccin-latte | **1.23:1** | 7.06:1 |
-| rose-pine-dawn | **1.27:1** | 6.66:1 |
-| vesper | 13.73:1 | 19.03:1 |
-| gruvbox | 10.64:1 | 8.16:1 |
+Every light theme uses deliberately dark ANSI entries against its canvas.
+Automated contrast checks require every ANSI 0–15 entry to reach 4.5:1 against
+the actual theme background.
 
-1.0:1 is *identical to the background*. WCAG AA is 4.5:1, AAA is 7:1.
+## Remaining limitation
 
-Fix applied to all 10 themes, not just the light two, so the pane canvas is
-self-consistent rather than depending on whatever the terminal defaults to:
+Tmux versions before 3.3 have no `pane-colours[]` option. They still receive the
+correct default foreground/background and truecolor styling, but ANSI colors
+come from the terminal palette. Standalone shells outside tmux have the same
+terminal-owned limitation. The implementation does not attempt unverified OSC
+sequences or rewrite `configs/wezterm.lua`, because either approach is global
+to a terminal context and breaks independent window/session isolation.
 
-```tmux
-set -g window-style bg='#eff1f5',fg='#4c4f69'
-set -g window-active-style bg='#eff1f5',fg='#4c4f69'
-```
-
-Dark themes drop slightly (gruvbox 10.6 → 8.2) because they now use their own
-palette fg instead of WezTerm's brighter gray. That is the intended color.
-
-### 2. The 16-color ANSI palette — OPEN
-
-`window-style fg` only governs text with *no* color set. Anything emitting ANSI
-colors — `ls`, `git status`, `grep`, diff output, most TUI chrome — draws from the
-terminal's 16-color palette.
-
-`configs/wezterm.lua` deliberately leaves colors unset (commit 2e19f34, "Remove
-wezterm palette"), so WezTerm supplies its dark-oriented built-in defaults. On
-paper-white, **13 of 16 ANSI colors fall below WCAG AA**:
-
-```
-br-yellow #ffff55  1.06:1     br-cyan   #55ffff  1.08:1
-br-white  #ffffff  1.13:1     br-green  #55ff55  1.17:1
-white     #cccccc  1.42:1     yellow    #cdcd55  1.49:1
-cyan      #7acaca  1.67:1     green     #55cc55  1.83:1
-br-magenta #ff55ff 2.32:1     br-red    #ff5555  2.78:1
-magenta   #cc55cc  3.24:1     red       #cc5555  3.72:1
-br-blue   #5555ff  4.50:1
-```
-
-`rose-pine-dawn` is the same picture (12 of 16 below AA).
-
-**tmux cannot fix this.** There is no per-pane ANSI palette remap. This is why light
-terminal themes generally require terminal-level palette support — the theme system
-currently owns 8 surfaces, and the terminal is not one of them.
-
-## Options for cause 2
-
-1. **Per-theme WezTerm palette**, regenerated by `bin/theme-switcher` — makes the
-   terminal a 9th surface. Only complete fix; covers every ANSI-emitting tool.
-   Reverses the 2e19f34 decision, and does nothing when SSH'ing in from another client.
-2. **Per-theme `LS_COLORS`** — nothing sets it today. Narrower: fixes `ls`/`eza`/`fd`,
-   not `git`, `grep`, or diffs.
-3. **Document light themes as terminal-palette-dependent** — the user sets a light
-   WezTerm profile by hand when using them. Zero code, but the themes stay
-   half-broken by default.
-
-Recommendation: (1), if the light themes are meant to be genuinely usable. It is the
-only option that covers all ANSI-emitting tools.
-
-## Why the previews did not catch it
-
-`theme-switcher`'s preview cards paint every cell with explicit truecolor fg **and**
-bg escapes (`_paint_bg` in `bin/theme-switcher`), so the preview never exercises the
-default-foreground path or the ANSI palette. A preview can look perfect while the
-applied theme is unreadable. Worth remembering when adding future themes — the
-preview validates the palette, not the integration.
+`theme-switcher diagnose` prints real default-color, ANSI 0–15, and truecolor
+samples. In tmux it also reports whether the scoped palette is active. This
+catches the integration gap that the old truecolor-only preview hid.
