@@ -1,58 +1,37 @@
 #!/bin/bash
 
-# OpenAI Codex CLI resolution: prefer the official standalone binary (installed
-# by `./setup.sh --ai`), then fall back to the bundled binary from the
-# openai.chatgpt VS Code extension. Both are discovered once at init; the active
-# one is chosen at call time. Set
-# CODEX_USE_VSCODE=1 (exported, or inline) to make the extension binary primary,
-# or call `codex-vsc` to invoke it explicitly regardless of the default.
+# OpenAI Codex CLI: the official standalone binary on PATH (installed by
+# `./setup.sh --ai`, normally ~/.local/bin/codex). The wrapper exists solely to
+# inject $CODEX_FLAGS.
+#
+# The openai.chatgpt VS Code extension binary is deliberately NOT discovered any
+# more. Locating it meant a `find` across ~13k files under
+# ~/.vscode-server/extensions on every single shell start (~127ms) to resolve a
+# path that changes only when the extension updates.
 
-# Re-source safety: drop our own functions so `command -v` resolves the PATH
+# Re-source safety: drop our own function so `command -v` resolves the PATH
 # binary, not the wrapper. `command -v` is portable across bash and zsh; `type -P`
 # is bash-only (zsh errors "bad option: -P", silently yielding no match).
 unset -f codex codex-vsc 2>/dev/null
 
-# Standalone `codex` on PATH (native install at ~/.local/bin/codex).
-_CODEX_STANDALONE=$(command -v codex 2>/dev/null || true)
-[[ -n "$_CODEX_STANDALONE" && -x "$_CODEX_STANDALONE" ]] || _CODEX_STANDALONE=""
-
-# VS Code "ChatGPT - Codex" extension binary (WSL / remote SSH)
-_CODEX_VSCODE=""
-if [[ -d "$HOME/.vscode-server/extensions" ]]; then
-    _CODEX_VSCODE=$(find "$HOME/.vscode-server/extensions" \
-        -path "*/openai.chatgpt-*-linux-x64/bin/linux-x86_64/codex" \
-        -type f -perm -111 2>/dev/null | sort -V | tail -1)
-fi
-
-# Default = native when present, else the extension binary.
-if [[ -n "$_CODEX_STANDALONE" ]]; then
-    _CODEX_DEFAULT="$_CODEX_STANDALONE"
-else
-    _CODEX_DEFAULT="$_CODEX_VSCODE"
-fi
-unset _CODEX_STANDALONE
-
-if [[ -n "$_CODEX_DEFAULT" ]]; then
-    # Choose at call time so CODEX_USE_VSCODE works inline, without re-scanning.
-    codex() {
-        local bin="$_CODEX_DEFAULT"
-        [[ "${CODEX_USE_VSCODE:-0}" == "1" && -n "$_CODEX_VSCODE" ]] && bin="$_CODEX_VSCODE"
-        # CODEX_FLAGS intentionally unquoted — allows multiple space-separated flags
-        "$bin" ${CODEX_FLAGS:-} "$@"
-    }
+# `command -v` as a bare condition is a builtin — no subshell, no fork. Capturing
+# it (`x=$(command -v ...)`) would fork, which is what this file used to do.
+if command -v codex >/dev/null 2>&1; then
+    # CODEX_FLAGS is intentionally split into separate arguments. zsh does NOT
+    # word-split unquoted parameter expansions, so the shared `${CODEX_FLAGS:-}`
+    # form silently passed CODEX_FLAGS="--profile amd" to codex as a SINGLE
+    # argument under zsh ("unexpected argument '--profile amd'") while working
+    # under bash. ${=VAR} forces the split; keep the two branches in sync.
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        codex() { command codex ${=CODEX_FLAGS} "$@"; }
+    else
+        codex() { command codex ${CODEX_FLAGS:-} "$@"; }
+    fi
 else
     codex() {
-        echo "Codex CLI not found." >&2
-        echo "  CLI:     ./setup.sh --ai  (official standalone installer)" >&2
-        echo "  VS Code: install the 'openai.chatgpt' extension" >&2
+        echo "Codex CLI not found. Install with: ./setup.sh --ai" >&2
         return 1
     }
-fi
-
-# Explicit handle to the VS Code extension binary, independent of the default.
-# Defined only when that binary is present.
-if [[ -n "$_CODEX_VSCODE" ]]; then
-    codex-vsc() { "$_CODEX_VSCODE" ${CODEX_FLAGS:-} "$@"; }
 fi
 
 # Codex CLI shortcuts

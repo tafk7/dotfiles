@@ -1,12 +1,11 @@
 #!/bin/bash
 # Always-fresh exports — safe to re-source on every shell start and on `reload`.
 #
-# Two categories live here:
-#   1. Generated/ artifacts (STARSHIP_CONFIG, BAT_CACHE_PATH,
-#      theme-overrides) that may be created or rewritten AFTER the
-#      first source of env.sh (e.g., by theme-switcher). `reload` needs
-#      to re-evaluate them so the shell picks up new generated paths
-#      instead of cached-empty values.
+# Two categories live here, with DIFFERENT guards — see each section:
+#   1. Scoped theme artifacts and launch variables that may change when the
+#      tmux window/session cascade changes. `reload` and fresh shells resolve
+#      them again instead of retaining another context's paths. INTERACTIVE
+#      ONLY (see below) — nothing non-interactive renders a themed surface.
 #   2. CWD-sensitive exports (direnv .envrc activation) that must
 #      re-fire in every subprocess. The exported guard on env.sh causes
 #      child shells to skip env.sh's body entirely, so direnv has to
@@ -22,27 +21,80 @@
 #   - shell/init.sh      (interactive shells)
 # Always immediately before env.sh.
 
-if [[ -n "${DOTFILES_DIR:-}" ]]; then
-    if [[ -f "$DOTFILES_DIR/generated/starship.toml" ]]; then
-        export STARSHIP_CONFIG="$DOTFILES_DIR/generated/starship.toml"
-    elif [[ -f "$DOTFILES_DIR/configs/starship.toml" ]] \
-         && ! grep -q '__DOTFILES_PALETTE__' "$DOTFILES_DIR/configs/starship.toml" 2>/dev/null; then
-        # Only fall back to the base config if it doesn't contain the
-        # placeholder marker (would otherwise cause starship warnings).
-        export STARSHIP_CONFIG="$DOTFILES_DIR/configs/starship.toml"
+# ==============================================================================
+# PATH hygiene
+# ==============================================================================
+#
+# Defined here (un-guarded, sourced by entry/profile.sh for every bash/zsh shell
+# and again by shell/init.sh) so the interactive and agent paths share one
+# implementation. Two callers, because duplicates get introduced at two points:
+#   - entry/profile.sh, right after env.sh: catches /etc/profile.d scripts that
+#     append unconditionally. /etc/profile.d/rocm.sh re-adds three /opt/rocm
+#     dirs on EVERY login shell, so `bash -lc` — the shape coding agents run
+#     per tool call — accumulated them without this.
+#   - shell/init.sh, after ~/.shell.local: catches vendor scripts you source
+#     yourself (Xilinx settings64.sh), which must be deduped after they run.
+#
+# Keeps first occurrence, so precedence is unchanged. Empty entries are dropped:
+# an empty PATH element means "current directory".
+#
+# Splits with each shell's native mechanism. Walking the string by hand
+# (`${rest%%:*}` / `${rest#*:}` in a loop) is O(n^2) over a 16KB value and
+# measured ~680ms per call here — far worse than the duplication it fixes.
+_dotfiles_dedupe_path() {
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        # zsh ties $path to $PATH; -U makes it unique-on-assignment, so this
+        # both dedupes now and prevents re-duplication for the rest of the
+        # session. -U keeps one empty element if present, hence the :# strip.
+        # shellcheck disable=SC2296,SC2298  # zsh typeset/array syntax
+        typeset -gU path PATH
+        # shellcheck disable=SC2296,SC2298
+        path=("${(@)path:#}")
+        return 0
     fi
+    local -a parts=()
+    local entry out="" had_noglob=0
+    local -A seen=()
+    local IFS=:
+    # Word-split on IFS with globbing off: no forks, no herestring temp file.
+    # Without `set -f`, a PATH entry containing * or ? would expand.
+    [[ $- == *f* ]] && had_noglob=1
+    set -f
+    # shellcheck disable=SC2206  # deliberate IFS word split, globbing off
+    parts=($PATH)
+    (( had_noglob )) || set +f
+    for entry in "${parts[@]}"; do
+        [[ -z "$entry" ]] && continue
+        [[ -n "${seen[$entry]:-}" ]] && continue
+        seen[$entry]=1
+        out="${out:+$out:}$entry"
+    done
+    [[ -n "$out" ]] && export PATH="$out"
+    return 0
+}
 
-    if [[ -d "$DOTFILES_DIR/generated/bat/cache" ]]; then
-        export BAT_CACHE_PATH="$DOTFILES_DIR/generated/bat/cache"
-    fi
-
-    # Per-component theme overrides — sourced after generated/theme.sh emits
-    # the global DOTFILES_THEME, so DOTFILES_THEME_<GROUP|SURFACE>=... overrides
-    # the global default. Cascade applied at apply-time by bin/theme-switcher.
-    # Read by lib/theme-resolve.sh and consumed by tools (BAT_THEME etc.) that
-    # generated/theme.sh emits per-surface based on the cascade.
-    [[ -f "$DOTFILES_DIR/generated/theme-overrides.sh" ]] \
-        && source "$DOTFILES_DIR/generated/theme-overrides.sh"
+# Resolve the current tmux window/session (or the global standalone scope) into
+# launch-time paths and tool variables. Artifacts are keyed by theme, so this
+# never rewrites another context's active configuration.
+#
+# Interactive shells only. This file is reached from ~/.zshenv (via ~/.profile)
+# for EVERY zsh context, including `zsh -c "cmd"`, script shebangs, and agent
+# subprocesses — none of which draw a prompt, an fzf window, or a tmux status
+# line. Resolution used to run there unconditionally and cost ~1s per
+# subprocess. Non-interactive shells still inherit whatever theme variables
+# their parent exported, plus the static fallbacks in shell/env.sh.
+# Set DOTFILES_FORCE_THEME_ENV=1 to opt a non-interactive shell back in.
+#
+# The signature argument lets theme-switcher short-circuit when nothing has
+# changed. An interactive shell reaches this file twice (~/.zshenv, then
+# ~/.zshrc -> shell/init.sh); the second pass inherits the signature the first
+# pass exported and returns almost immediately. A theme switch bumps
+# DOTFILES_THEME_GENERATION, which changes the signature and forces a full
+# re-resolve, so `reload` and the precmd hook still pick up changes.
+# `unset DOTFILES_THEME_CONTEXT_SIGNATURE` forces an unconditional re-resolve.
+if [[ $- == *i* || -n "${DOTFILES_FORCE_THEME_ENV:-}" ]] \
+   && [[ -n "${DOTFILES_DIR:-}" && -x "$DOTFILES_DIR/bin/theme-switcher" ]]; then
+    eval "$("$DOTFILES_DIR/bin/theme-switcher" env "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" 2>/dev/null)"
 fi
 
 # ==============================================================================

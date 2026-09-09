@@ -14,9 +14,43 @@ for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dotfiles/generated/bri
 done
 unset _bridge
 
-# Non-interactive: just set PATH baseline and stop
+# Non-interactive: just set PATH baseline and stop.
+#
+# This branch IS the agent shell. Coding harnesses run commands as `bash -lc`
+# (Codex) or snapshot a non-interactive login shell and source that snapshot on
+# every tool call (Claude Code, and Codex's unified_exec shell_snapshot). Either
+# way they land here, via entry/bash_profile -> ~/.bashrc.
 if [[ $- != *i* ]]; then
     [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+
+    # Drop functions inherited from /etc/profile.d. They are dead weight in a
+    # non-interactive shell and actively expensive downstream: Claude Code
+    # re-encodes every captured function into its snapshot as
+    #   eval "$(echo '<base64>' | base64 -d)"
+    # which is a subshell plus a `base64` exec PER FUNCTION, paid on every
+    # single tool call. Six trivial gawk AWKPATH helpers from
+    # /etc/profile.d/gawk.sh accounted for 30ms of a 40ms call here (26
+    # clone+execve syscalls vs 2 without them).
+    #
+    # Generic rather than a hardcoded name list so the next profile.d package
+    # that ships functions is neutralised automatically. Interactive shells
+    # never reach this line — the whole branch is non-interactive only — so
+    # bash-completion and our own tool functions are untouched.
+    #
+    # `declare -F` emits "declare -f NAME" per line; strip the prefix with a
+    # parameter expansion rather than piping to awk. This runs on every
+    # `bash -lc`, so its own cost matters: the awk pipeline measured 9.1ms per
+    # call (two forks + an exec), which would have made Codex's per-call path
+    # slower than it started. The substitution form is one subshell, ~1.5ms.
+    #
+    # $_dotfiles_fns is unquoted on purpose — word splitting is what turns the
+    # newline-separated list into arguments. An empty expansion is a harmless
+    # no-op that still exits 0.
+    _dotfiles_fns=$(declare -F)
+    # shellcheck disable=SC2086
+    unset -f ${_dotfiles_fns//declare -f /} 2>/dev/null || true
+    unset _dotfiles_fns
+
     return
 fi
 
