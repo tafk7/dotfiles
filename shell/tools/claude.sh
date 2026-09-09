@@ -1,57 +1,38 @@
 #!/bin/bash
 
-# Claude Code resolution: prefer the standalone native CLI (~/.local/bin/claude),
-# fall back to the VS Code extension's bundled binary. Both are discovered once at
-# init; the active one is chosen at call time. Set CLAUDE_USE_VSCODE=1 (exported,
-# or inline as `CLAUDE_USE_VSCODE=1 claude ...`) to make the extension binary
-# primary, or call `claude-vsc` to invoke it explicitly regardless of the default.
+# Claude Code: the native CLI on PATH (installed by `./setup.sh --ai`, normally
+# ~/.local/bin/claude). The wrapper exists solely to inject $CLAUDE_FLAGS.
+#
+# The VS Code extension binary is deliberately NOT discovered any more. Locating
+# it meant a `find` across ~13k files under ~/.vscode-server/extensions on every
+# single shell start (~126ms) to resolve a path that changes only when the
+# extension updates.
 
-# Re-source safety: drop our own functions so `command -v` resolves the PATH
+# Re-source safety: drop our own function so `command -v` resolves the PATH
 # binary, not the wrapper. `command -v` is portable across bash and zsh; `type -P`
 # is bash-only (zsh errors "bad option: -P", silently yielding no match).
 unset -f claude claude-vsc 2>/dev/null
 
-# Standalone `claude` on PATH (native install at ~/.local/bin/claude).
-_CLAUDE_STANDALONE=$(command -v claude 2>/dev/null || true)
-[[ -n "$_CLAUDE_STANDALONE" && -x "$_CLAUDE_STANDALONE" ]] || _CLAUDE_STANDALONE=""
-
-# VS Code "Claude Code" extension binary (WSL / remote SSH)
-_CLAUDE_VSCODE=""
-if [[ -d "$HOME/.vscode-server/extensions" ]]; then
-    _CLAUDE_VSCODE=$(find "$HOME/.vscode-server/extensions" \
-        -path "*/anthropic.claude-code-*-linux-x64/resources/native-binary/claude" \
-        -type f -perm -111 2>/dev/null | sort -V | tail -1)
-fi
-
-# Default = native when present, else the extension binary.
-if [[ -n "$_CLAUDE_STANDALONE" ]]; then
-    _CLAUDE_DEFAULT="$_CLAUDE_STANDALONE"
-else
-    _CLAUDE_DEFAULT="$_CLAUDE_VSCODE"
-fi
-unset _CLAUDE_STANDALONE
-
-if [[ -n "$_CLAUDE_DEFAULT" ]]; then
-    # Choose at call time so CLAUDE_USE_VSCODE works inline, without re-scanning.
-    claude() {
-        local bin="$_CLAUDE_DEFAULT"
-        [[ "${CLAUDE_USE_VSCODE:-0}" == "1" && -n "$_CLAUDE_VSCODE" ]] && bin="$_CLAUDE_VSCODE"
-        # CLAUDE_FLAGS intentionally unquoted — allows multiple space-separated flags
-        "$bin" ${CLAUDE_FLAGS:-} "$@"
-    }
+# `command -v` as a bare condition is a builtin — no subshell, no fork. Capturing
+# it (`x=$(command -v ...)`) would fork, which is what this file used to do.
+if command -v claude >/dev/null 2>&1; then
+    # `command` bypasses this function and runs the PATH binary.
+    #
+    # CLAUDE_FLAGS is intentionally split into separate arguments. zsh does NOT
+    # word-split unquoted parameter expansions, so the shared `${CLAUDE_FLAGS:-}`
+    # form silently passed a multi-flag CLAUDE_FLAGS to claude as a SINGLE
+    # argument under zsh while working under bash. ${=VAR} forces the split;
+    # keep the two branches in sync.
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        claude() { command claude ${=CLAUDE_FLAGS} "$@"; }
+    else
+        claude() { command claude ${CLAUDE_FLAGS:-} "$@"; }
+    fi
 else
     claude() {
-        echo "Claude Code not found." >&2
-        echo "  CLI:     ./setup.sh --ai  (native installer)" >&2
-        echo "  VS Code: install the 'anthropic.claude-code' extension" >&2
+        echo "Claude Code not found. Install with: ./setup.sh --ai" >&2
         return 1
     }
-fi
-
-# Explicit handle to the VS Code extension binary, independent of the default.
-# Defined only when that binary is present.
-if [[ -n "$_CLAUDE_VSCODE" ]]; then
-    claude-vsc() { "$_CLAUDE_VSCODE" ${CLAUDE_FLAGS:-} "$@"; }
 fi
 
 # Clean Claude Code shell snapshots (fixes zoxide issues)

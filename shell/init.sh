@@ -18,9 +18,6 @@ source "$DOTFILES_DIR/shell/env.sh"
 # Tool initialization (interactive only — evals)
 [[ $- == *i* ]] && source "$DOTFILES_DIR/shell/tool-init.sh"
 
-# Theme (must load before fzf.sh to set FZF_THEME_COLORS)
-[[ -f "$DOTFILES_DIR/generated/theme.sh" ]] && source "$DOTFILES_DIR/generated/theme.sh"
-
 # FZF configuration
 [[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
 
@@ -53,6 +50,11 @@ else
     PS1='\[\e[38;5;108m\]\u\[\e[0m\]@\[\e[38;5;214m\]\h\[\e[0m\]:\[\e[38;5;108m\]\w\[\e[0m\] \$ '
 fi
 
+# Existing interactive shells adopt scoped changes at the next prompt. The
+# signature check avoids rebuilding or re-exporting anything when state is
+# unchanged; the only steady-state work in tmux is reading one user option.
+[[ -f "$DOTFILES_DIR/shell/theme-runtime.sh" ]] && source "$DOTFILES_DIR/shell/theme-runtime.sh"
+
 # FZF key bindings + completion (fzf >= 0.48 generates its own shell integration)
 # zsh: deferred to entry/zsh.sh after compinit so tab completion integrates properly
 if command -v fzf >/dev/null 2>&1 && [[ "$SHELL_NAME" != "zsh" ]]; then
@@ -67,6 +69,14 @@ source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
 # Local overrides (not tracked)
 [[ -f ~/.shell.local ]] && source ~/.shell.local
+
+# Collapse duplicate PATH entries. Must run LAST: vendor scripts sourced from
+# ~/.shell.local (e.g. Xilinx settings64.sh) prepend unconditionally, and
+# because this file is re-sourced by every nested interactive shell and by
+# `reload`, those entries accumulate — 330 entries / 35 unique / 16.8KB was the
+# observed steady state. Defined in shell/env-runtime.sh and shared with the
+# non-interactive path; see the comment there.
+command -v _dotfiles_dedupe_path >/dev/null 2>&1 && _dotfiles_dedupe_path
 
 # Leave a clean exit status. A missing ~/.shell.local (or a non-zero last
 # command inside it) would otherwise leave $?=1 after startup, which a status-

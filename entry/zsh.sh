@@ -63,8 +63,59 @@ source "$DOTFILES_DIR/shell/init.sh"
 # Completion System (must be after init.sh)
 # ==============================================================================
 
+# Vendored completion functions, generated on demand into a private fpath dir.
+# MUST come before compinit — compinit scans fpath and registers what it finds.
+#
+# These files are `#compdef`-style autoload stubs, so compinit only records the
+# name; zsh parses the (6000+ line, for uv) body the first time you actually
+# complete that command. Sourcing them at startup instead cost ~80ms per shell.
+_dotfiles_compdir="${DOTFILES_DIR:-$HOME/dotfiles}/generated/zsh/completions"
+_dotfiles_comp_dirty=0
+
+# uv: regenerate only when the binary is newer than the cached function.
+# shellcheck disable=SC2154  # $commands is a zsh builtin hash (name -> path)
+if command -v uv >/dev/null 2>&1; then
+    if [[ ! -s "$_dotfiles_compdir/_uv" || "${commands[uv]}" -nt "$_dotfiles_compdir/_uv" ]]; then
+        mkdir -p "$_dotfiles_compdir"
+        if uv generate-shell-completion zsh >"$_dotfiles_compdir/_uv" 2>/dev/null; then
+            _dotfiles_comp_dirty=1
+        else
+            rm -f "$_dotfiles_compdir/_uv"
+        fi
+    fi
+fi
+
+# shellcheck disable=SC2206  # zsh array splat; $fpath is already an array here
+[[ -d "$_dotfiles_compdir" ]] && fpath=("$_dotfiles_compdir" $fpath)
+unset _dotfiles_compdir
+
+# Rebuild the completion dump at most once a day; otherwise trust the cache
+# (`-C` skips the security/staleness scan of every fpath entry, ~85ms here).
+# Trade-off: a tool installed today may not offer completions until tomorrow —
+# run `compinit` by hand after installing something you want to complete now.
+# shellcheck disable=SC2296,SC2298  # zsh glob qualifiers
 autoload -Uz compinit
-compinit
+# Array assignment, not [[ -n ... ]] — `[[` does NOT perform filename generation
+# in zsh, so a glob-qualifier test there is just a non-empty literal string and
+# is always true. Qualifiers: N=nullglob, .=plain file, mh+24=mtime over 24h old.
+#
+# Wrapped in eval so `bash -n` (run by hooks/pre-commit on every *.sh file) can
+# parse this file: the bare parenthesised glob qualifier is a bash syntax error.
+# Only zsh ever sources this file, so the eval never runs anywhere else.
+eval '_zcompdump_stale=(${HOME}/.zcompdump(N.mh+24))'
+# A regenerated completion function above means the dump no longer describes
+# fpath, so force the full path in that case regardless of the dump's age.
+# shellcheck disable=SC2154  # assigned inside the eval above
+if (( ${#_zcompdump_stale} || _dotfiles_comp_dirty )); then
+    compinit
+    # compinit only rewrites the dump when the completion set actually changed,
+    # so without this the mtime never advances and every shell takes the slow
+    # path forever. Stamping it makes the check a real once-a-day rebuild.
+    touch ~/.zcompdump
+else
+    compinit -C
+fi
+unset _zcompdump_stale _dotfiles_comp_dirty
 
 zstyle ':completion:*' completer _complete _ignored
 # shellcheck disable=SC2296  # zsh-specific (s.:.) parameter expansion flag
@@ -76,10 +127,7 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 zstyle ':completion:*:*:docker:*' option-stacking yes
 zstyle ':completion:*:*:docker-*:*' option-stacking yes
 
-# Tool completions (must be after compinit)
-if command -v uv >/dev/null 2>&1; then
-    eval "$(uv generate-shell-completion zsh 2>/dev/null || true)"
-fi
+# (Tool completion functions are generated into fpath above, before compinit.)
 
 # ==============================================================================
 # Key Bindings

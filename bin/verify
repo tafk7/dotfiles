@@ -9,8 +9,7 @@ source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
 source "$DOTFILES_DIR/lib/theme-resolve.sh"
 
-# Make sure on-disk theme overrides are reflected in this process's env so
-# the cascade resolution below matches what apply_theme would do.
+# Load persistent global state before resolving the current scoped context.
 load_theme_overrides
 
 # Counters
@@ -192,14 +191,10 @@ else
     check_warn "bridge file missing (run setup.sh)"
 fi
 
-if [[ -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
-    # Extract theme name from generated/theme.sh
-    theme=$(grep -oP 'DOTFILES_THEME="\K[^"]+' "$DOTFILES_DIR/generated/theme.sh" 2>/dev/null || true)
-    if [[ -n "$theme" ]]; then
-        check_pass "theme: $theme"
-    else
-        check_warn "theme.sh exists but no theme name found"
-    fi
+if [[ -f "$DOTFILES_DIR/generated/theme-state.sh" || -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
+    load_theme_context
+    theme="$DOTFILES_THEME"
+    check_pass "global theme: $theme"
 else
     check_warn "no theme set (run: bin/theme-switcher <theme>)"
     theme=""
@@ -210,33 +205,20 @@ fi
 # ==============================================================================
 
 if [[ -n "$theme" ]]; then
-    # Resolve effective theme per surface using the loaded overrides.
-    # `theme` here is the global default; overrides may select something else.
-    DOTFILES_THEME="$theme"
+    # Resolve the current shell's window/session when inside tmux, otherwise
+    # verify the standalone global scope.
+    load_theme_context
     r_bat="$(resolve_surface_theme bat)"
     r_starship="$(resolve_surface_theme starship)"
     r_delta="$(resolve_surface_theme delta)"
     r_btop="$(resolve_surface_theme btop)"
     r_lazygit="$(resolve_surface_theme lazygit)"
 
-    # Heading: collapsed when no overrides, expanded otherwise.
-    overrides_active=0
-    for g in code chrome apps; do
-        group_has_override "$g" && overrides_active=1
-    done
-    for s in vim bat delta tmux starship fzf btop lazygit; do
-        surface_has_override "$s" && overrides_active=1
-    done
-
     echo
-    if [[ $overrides_active -eq 0 ]]; then
-        echo "Theme integration [$theme]"
-    else
-        echo "Theme integration [global=$theme — per-component overrides active]"
-    fi
+    echo "Theme integration [global=$theme${THEME_CONTEXT_SESSION:+ session=$THEME_CONTEXT_SESSION}${THEME_CONTEXT_WINDOW:+ window=$THEME_CONTEXT_WINDOW}]"
     echo "─────────────────────────────────────"
 
-    # bat: built-in themes (gruvbox-dark, Nord) need no vendored file
+    # bat: built-in themes such as gruvbox-dark need no vendored file
     if [[ -d "$DOTFILES_DIR/themes/$r_bat/bat" ]]; then
         bat_files=("$DOTFILES_DIR/themes/$r_bat/bat"/*.tmTheme)
         if [[ -e "${bat_files[0]}" ]]; then
@@ -253,23 +235,24 @@ if [[ -n "$theme" ]]; then
         check_pass "bat [$r_bat]: uses bat built-in (no vendored .tmTheme needed)"
     fi
 
-    # starship: generated/starship.toml + palette directive
-    if [[ -f "$DOTFILES_DIR/generated/starship.toml" ]]; then
-        if grep -q "^palette = \"$r_starship\"" "$DOTFILES_DIR/generated/starship.toml"; then
-            check_pass "starship [$r_starship]: generated/starship.toml pinned correctly"
+    # starship: immutable per-theme generated config
+    starship_config="$DOTFILES_DIR/generated/themes/$r_starship/starship.toml"
+    if [[ -f "$starship_config" ]]; then
+        if grep -q "^palette = \"$r_starship\"" "$starship_config"; then
+            check_pass "starship [$r_starship]: scoped artifact ready"
         else
-            check_warn "starship: generated config palette doesn't match resolved theme '$r_starship'"
+            check_warn "starship: scoped artifact palette mismatch for '$r_starship'"
         fi
     else
-        check_warn "starship: generated/starship.toml missing (run bin/theme-switcher --init)"
+        check_warn "starship: scoped artifact missing (run bin/theme-switcher --init)"
     fi
 
-    # delta: generated/delta.gitconfig + ~/.gitconfig include
+    # delta: one shared definition index; DELTA_FEATURES selects per process.
     if [[ -f "$DOTFILES_DIR/generated/delta.gitconfig" ]]; then
-        if grep -q "features = $r_delta" "$DOTFILES_DIR/generated/delta.gitconfig"; then
-            check_pass "delta [$r_delta]: generated/delta.gitconfig active"
+        if grep -Fq "path = $DOTFILES_DIR/themes/$r_delta/delta.gitconfig" "$DOTFILES_DIR/generated/delta.gitconfig"; then
+            check_pass "delta [$r_delta]: feature definition indexed"
         else
-            check_warn "delta: generated config doesn't list resolved theme '$r_delta'"
+            check_warn "delta: generated index is missing '$r_delta'"
         fi
         if git config --global --get-all include.path 2>/dev/null | grep -Fxq "$DOTFILES_DIR/generated/delta.gitconfig"; then
             check_pass "delta: ~/.gitconfig includes generated/delta.gitconfig"
@@ -282,42 +265,17 @@ if [[ -n "$theme" ]]; then
         fi
     fi
 
-    # btop: ~/.config/btop/btop.conf color_theme
-    if [[ -f "$HOME/.config/btop/btop.conf" ]]; then
-        if grep -qE "^color_theme = \"dotfiles-$r_btop\"" "$HOME/.config/btop/btop.conf"; then
-            check_pass "btop [$r_btop]: color_theme set to dotfiles-$r_btop"
-        else
-            current_btop=$(grep -oE '^color_theme = "[^"]+"' "$HOME/.config/btop/btop.conf" | head -1 || true)
-            check_warn "btop: color_theme not pinned to dotfiles-$r_btop ($current_btop)"
-        fi
+    # btop and lazygit use launch-time config paths and never patch user files.
+    if [[ -f "$DOTFILES_DIR/generated/themes/$r_btop/btop.conf" ]]; then
+        check_pass "btop [$r_btop]: scoped config ready"
     else
-        if [[ -f "$DOTFILES_DIR/themes/$r_btop/btop.theme" ]]; then
-            check_warn "btop: ~/.config/btop/btop.conf missing (run bin/theme-switcher $r_btop)"
-        fi
+        check_warn "btop [$r_btop]: scoped config missing"
     fi
 
-    # lazygit: marker block in ~/.config/lazygit/config.yml
-    if [[ -f "$HOME/.config/lazygit/config.yml" ]]; then
-        if grep -qF "# >>> dotfiles theme >>>" "$HOME/.config/lazygit/config.yml"; then
-            check_pass "lazygit [$r_lazygit]: dotfiles theme block present"
-        else
-            check_warn "lazygit: config.yml missing dotfiles theme marker"
-        fi
+    if [[ -f "$DOTFILES_DIR/themes/$r_lazygit/lazygit.yml" ]]; then
+        check_pass "lazygit [$r_lazygit]: launch overlay ready"
     else
-        if [[ -f "$DOTFILES_DIR/themes/$r_lazygit/lazygit.yml" ]]; then
-            check_warn "lazygit: ~/.config/lazygit/config.yml missing"
-        fi
-    fi
-
-    # Override summary (only when active)
-    if [[ $overrides_active -eq 1 ]]; then
-        echo
-        ovs="$(_theme_overrides_list || true)"
-        if [[ -n "$ovs" ]]; then
-            log "Active overrides:"
-            printf '%s\n' "$ovs" | sed 's/^/    /'
-            log "Run 'theme-switcher show' for the full cascade tree."
-        fi
+        check_warn "lazygit [$r_lazygit]: theme overlay missing"
     fi
 fi
 
@@ -338,6 +296,49 @@ for alias_file in "$DOTFILES_DIR"/shell/tools/*.sh; do
 done
 if [[ "$editor_conflict" == false ]]; then
     check_pass "EDITOR (single source: shell/env.sh)"
+fi
+
+# ==============================================================================
+# 8. Agent shell surface
+# ==============================================================================
+#
+# Coding harnesses (Claude Code, Codex, opencode) never load the interactive
+# profile — they run `bash -lc` and/or snapshot a non-interactive login shell
+# and source that snapshot on every tool call. Anything defined in that shell is
+# paid per call, forever. tests/agent-shell.sh enforces this; surface it here
+# too so it shows up in a routine health check.
+
+echo
+echo "Agent shell"
+echo "─────────────────────────────────────"
+
+agent_fns="$(bash -lc 'declare -F' 2>/dev/null | wc -l)"
+if [[ "$agent_fns" -eq 0 ]]; then
+    check_pass "no functions leak into the agent shell"
+else
+    check_warn "$agent_fns function(s) in the agent shell — each is re-encoded into every harness snapshot and paid per tool call (bash -lc 'declare -F')"
+fi
+
+agent_aliases="$(bash -lc 'alias' 2>/dev/null | wc -l)"
+if [[ "$agent_aliases" -eq 0 ]]; then
+    check_pass "no aliases leak into the agent shell"
+else
+    check_warn "$agent_aliases alias(es) in the agent shell"
+fi
+
+if [[ -z "$(bash -lc 'printf %s "${BASH_ENV:-}"' 2>/dev/null)" ]]; then
+    check_pass "BASH_ENV unset (bare \`bash -c\` stays free)"
+else
+    check_warn "BASH_ENV is set — every \`bash -c\` sources a file, taxing all harnesses"
+fi
+
+agent_path="$(bash -lc 'printf %s "$PATH"' 2>/dev/null)"
+ap_total="$(printf '%s\n' "$agent_path" | tr ':' '\n' | wc -l)"
+ap_unique="$(printf '%s\n' "$agent_path" | tr ':' '\n' | sort -u | wc -l)"
+if [[ "$ap_total" -eq "$ap_unique" ]]; then
+    check_pass "agent PATH deduped ($ap_total entries)"
+else
+    check_warn "agent PATH has duplicates ($ap_total entries, $ap_unique unique)"
 fi
 
 # ==============================================================================
