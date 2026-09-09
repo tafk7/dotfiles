@@ -78,11 +78,31 @@ use_home "$TEST_ROOT/home-fresh"
 run_expect 0 "$REPO_ROOT/installers/install-codex.sh"
 [[ -L "$HOME/.local/bin/codex" ]] || fail "fresh install did not create launcher symlink"
 [[ -f "$HOME/.codex/config.toml" ]] || fail "fresh install did not provision config"
+grep -qx 'model = "gpt-6-astra"' "$HOME/.codex/config.toml" \
+    || fail "fresh config did not select gpt-6-astra"
+grep -qx '# BEGIN DOTFILES-MANAGED CODEX CONFIG' "$HOME/.codex/config.toml" \
+    || fail "fresh config has no managed block"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "fresh install invocation count"
 
-# An ordinary rerun preserves the working launcher and does not call upstream.
+# An ordinary rerun refreshes the managed block, preserves local state, and does
+# not call upstream.
+sed -i 's/model_reasoning_effort = "xhigh"/model_reasoning_effort = "low"/' \
+    "$HOME/.codex/config.toml"
+cat >>"$HOME/.codex/config.toml" <<'LOCAL_STATE'
+
+[projects."/tmp/example"]
+trust_level = "trusted"
+LOCAL_STATE
 run_expect 2 "$REPO_ROOT/installers/install-codex.sh"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "ordinary rerun called installer"
+grep -qx 'model_reasoning_effort = "xhigh"' "$HOME/.codex/config.toml" \
+    || fail "ordinary rerun did not refresh managed settings"
+grep -qx '\[projects\."/tmp/example"\]' "$HOME/.codex/config.toml" \
+    || fail "ordinary rerun discarded local Codex state"
+[[ "$(grep -cx '# BEGIN DOTFILES-MANAGED CODEX CONFIG' "$HOME/.codex/config.toml")" == 1 ]] \
+    || fail "ordinary rerun duplicated the managed block"
+[[ "$(grep -cx '# Codex portable base configuration.*' "$HOME/.codex/config.toml")" == 1 ]] \
+    || fail "ordinary rerun duplicated the managed block preamble"
 
 # --force invokes repair/update while leaving the launcher present for the
 # upstream installer to replace atomically.

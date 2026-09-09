@@ -1,6 +1,19 @@
-# Codex config — dotfiles-provisioned hardening (~/.codex/config.toml).
-# Written by installers/install-codex.sh ONLY when no config exists yet; it never
-# clobbers an existing one. Edit freely — add your auth/model/providers here.
+# BEGIN DOTFILES-MANAGED CODEX CONFIG
+# Codex portable base configuration. installers/install-codex.sh installs this
+# block into ~/.codex/config.toml and refreshes it on later runs while preserving
+# Codex-owned project trust, hook trust, plugin state, and machine-local overlays.
+
+model = "gpt-6-astra"
+model_context_window = 872000
+model_reasoning_effort = "xhigh"
+plan_mode_reasoning_effort = "high"
+approvals_reviewer = "user"
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[history]
+persistence = "save-all"
 
 # Disable Codex's default-on metrics export. In release builds, stock Codex sends
 # OpenTelemetry METRICS to OpenAI's Statsig endpoint (https://ab.chatgpt.com/
@@ -13,24 +26,23 @@ log_user_prompt = false
 
 # TAFK line-editing semantics for the Codex composer. Windows Terminal often
 # encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
+[tui]
+status_line = ["context-used", "total-output-tokens", "model"]
+
 [tui.keymap.editor]
+move_line_end = "end"
 delete_backward = "backspace"
 delete_backward_word = ["ctrl-backspace", "ctrl-h"]
 delete_forward_word = "ctrl-delete"
 kill_line_start = "alt-backspace"
 kill_line_end = "alt-delete"
 
-# ── Routing Codex at a local/secure endpoint (optional; fill in and uncomment) ──
-# NOTE: Codex requires the OpenAI *Responses* API — wire_api = "chat" was removed,
-# so the endpoint must implement /v1/responses, not just chat/completions.
-# base_url is a literal (no env substitution); the API key is read from the env
-# var named by env_key. See docs/ai-tools-egress.md.
-#
-# model_provider = "local"
-# model = "your-model-id"
-#
-# [model_providers.local]
-# name = "Secure local LLM"
-# base_url = "https://your-internal-llm.example/v1"
-# wire_api = "responses"
-# env_key = "CODEX_API_KEY"
+# Ctrl stays application-local; Alt remains available for tmux navigation.
+[tui.keymap.global]
+open_external_editor = "ctrl-e"
+
+[tui.keymap.chat]
+next_permission_mode = "ctrl-g"
+previous_permission_mode = "ctrl-shift-g"
+
+# END DOTFILES-MANAGED CODEX CONFIG
