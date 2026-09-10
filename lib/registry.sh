@@ -71,6 +71,12 @@ declare -A TOOL_METHOD=(
     [xrdp]=installer
 )
 
+# TOOL_EGET_REPO: tool name → eget.toml repo slug ("owner/repo")
+# Empty = the repo basename is the tool name (starship/starship → starship)
+declare -A TOOL_EGET_REPO=(
+    [gh]=cli/cli
+)
+
 # TOOL_TIER: tool name → tier (bash|dev|work|ai|rdp)
 # The cumulative chain is bash→dev→work. The "bash" tier is the non-sudo base:
 # every tool in it installs to ~/.local/bin via eget (no root). The sudo boundary

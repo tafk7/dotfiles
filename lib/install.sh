@@ -709,12 +709,15 @@ install_eget_tools() {
     fi
 
     # Map each tool name to its eget repo slug by parsing the config headers
-    # (["owner/repo"]). eget.toml stays the single source of truth for slugs; the
-    # repo basename always equals the registry tool name, so we key on that.
-    local -A tool_slug=()
+    # (["owner/repo"]). eget.toml stays the single source of truth for slugs. The
+    # repo basename is the registry tool name except where TOOL_EGET_REPO says
+    # otherwise (gh ships from cli/cli); an override must still name a slug that
+    # eget.toml pins, so a typo can't fetch an unpinned release.
+    local -A tool_slug=() pinned_slug=()
     local slug
     while IFS= read -r slug; do
         tool_slug["${slug##*/}"]="$slug"
+        pinned_slug["$slug"]=1
     done < <(grep -Po '^\["\K[^"]+' "$config")
 
     # Drive eget per surviving tool rather than --download-all: the guard above
@@ -726,9 +729,9 @@ install_eget_tools() {
     # so don't trust it: judge each tool by whether its binary lands on disk.
     local any_missing=false
     for name in "${eget_tools[@]}"; do
-        slug="${tool_slug[$name]:-}"
-        if [[ -z "$slug" ]]; then
-            warn "No eget.toml entry for $name — skipping"
+        slug="${TOOL_EGET_REPO[$name]:-${tool_slug[$name]:-}}"
+        if [[ -z "$slug" || -z "${pinned_slug[$slug]:-}" ]]; then
+            warn "No eget.toml entry for $name${slug:+ ($slug)} — skipping"
             track_install "$name" fail
             any_missing=true
             continue
