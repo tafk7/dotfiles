@@ -267,7 +267,7 @@ install.
    ```
    The unit carries `ConditionPathExists=%h/.ssh/use-windows-agent`, so removing the
    marker disables it cleanly. If the relay ever drops mid-session (e.g. Bitwarden was
-   locked), run **`ssh-bridge`** to restart it.
+   locked), run **`ssh-bridge restart`** to restart it.
 3. Git signing (optional): paste Bitwarden's WSL signing snippet into
    `~/.gitconfig.local`.
 
