@@ -141,7 +141,7 @@ jobs:
           echo "All themes cycled successfully."
 
   install-test:
-    name: Containerized install (--shell)
+    name: Containerized install (--bash)
     runs-on: ubuntu-latest
     container:
       image: ubuntu:latest
@@ -169,12 +169,12 @@ jobs:
           cp -a "$GITHUB_WORKSPACE" /home/test/dotfiles
           chown -R test:test /home/test/dotfiles
 
-      - name: Run the installer (--shell tier)
+      - name: Run the installer (--bash tier)
         run: |
           su - test <<'EOSU'
           set -euo pipefail
           cd ~/dotfiles
-          ./setup.sh --shell --force --git-name "CI Bot" --git-email ci@example.com
+          ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
           EOSU
 
       - name: Assert configs linked and shell-tier tools on PATH
@@ -207,7 +207,7 @@ jobs:
               esac
           done
           # Every shell-tier tool must be on PATH after install.
-          for name in $(tools_for_tier shell); do
+          for name in $(tools_for_tier bash); do
               bin="${TOOL_BINARY[$name]}"
               command -v "$bin" >/dev/null 2>&1 \
                 || { echo "::error::shell-tier tool missing: $name ($bin)"; fail=1; }
@@ -243,8 +243,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y hyperfine zsh
 
-      - name: Install dotfiles (--shell, so tool-init runs realistically)
-        run: ./setup.sh --shell --force --git-name "CI Bot" --git-email ci@example.com
+      - name: Install dotfiles (--bash, so tool-init runs realistically)
+        run: ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
 
       - name: Benchmark interactive startup
         run: |
