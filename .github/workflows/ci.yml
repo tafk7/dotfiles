@@ -131,10 +131,12 @@ jobs:
             echo "::group::Apply theme: $t"
             # Apply writes generated/theme.sh + per-tool artifacts. We don't
             # have the consumer tools (vim, btop, etc.) installed in CI, so
-            # we just check the apply itself doesn't error and that it
-            # produced a generated/theme.sh file referencing the theme.
+            # we just check the apply itself doesn't error and that the
+            # generated/theme.sh it produced pins DOTFILES_THEME to the theme.
+            # Source it rather than grep it: theme-switcher writes the value
+            # with printf %q, so the quoting is not part of the contract.
             ./bin/theme-switcher "$t"
-            grep -q "DOTFILES_THEME=\"$t\"" generated/theme.sh \
+            ( source generated/theme.sh && [[ "$DOTFILES_THEME" == "$t" ]] ) \
               || { echo "::error::theme.sh did not pin to $t"; exit 1; }
             echo "::endgroup::"
           done
