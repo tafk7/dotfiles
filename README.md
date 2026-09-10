@@ -278,7 +278,7 @@ shell/
 installers/               Per-tool install scripts (run by lib/install.sh::run_installer)
 generated/                Theme artifacts + bridge.sh (gitignored)
 bin/                      User commands (theme-switcher, verify, cheatsheet, replace, diff-config, check-updates, uninstall-tool, install-git-hooks)
-eget.toml                 Static binary downloads (tier=shell tools)
+eget.toml                 Static binary downloads (tier=bash tools)
 ```
 
 **Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `init.sh` → `env.sh` →

@@ -98,7 +98,7 @@ time, `bin/diff-config` walks it too. **Three tools, one source of truth.**
 ```bash
 TOOL_BINARY[fzf]=fzf            # what to look for in PATH
 TOOL_METHOD[fzf]=eget           # how it gets installed (eget|apt|installer)
-TOOL_TIER[fzf]=shell            # min tier that installs it
+TOOL_TIER[fzf]=bash            # min tier that installs it
 TOOL_PATHS[fzf]=...             # paths to delete on uninstall (eget falls back to ~/.local/bin/<binary>)
 TOOL_VERIFY[fzf]=...            # custom verify command (optional)
 ```
