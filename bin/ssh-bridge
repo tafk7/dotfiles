@@ -5,6 +5,7 @@
 #   ssh-bridge status     Report bridge prerequisites and live state (default)
 #   ssh-bridge enable     Install the bridge, set the marker, verify (personal only)
 #   ssh-bridge disable    Remove the marker (revert to local on-disk keys)
+#   ssh-bridge restart    Restart the relay (systemd service, else inline)
 #
 # The bridge forwards the Windows ssh-agent — which Bitwarden (or 1Password)
 # serves on the standard openssh-ssh-agent pipe — into WSL, so SSH keys live in
@@ -21,7 +22,7 @@ source "$DOTFILES_DIR/lib/runtime.sh"
 
 MARKER="$HOME/.ssh/use-windows-agent"
 
-usage() { sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }
+usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }
 
 # Run the Windows ssh-add.exe (to inspect the Windows-side agent from WSL).
 win_ssh_add() {
@@ -113,11 +114,41 @@ cmd_disable() {
     fi
 }
 
+cmd_restart() {
+    is_wsl || { error "ssh-bridge restart only applies under WSL"; exit 1; }
+
+    # The systemd user service owns the relay wherever setup.sh installed it;
+    # fall back to an inline relay on hosts without systemd (or before setup).
+    if command -v systemctl >/dev/null 2>&1 \
+       && systemctl --user show-environment >/dev/null 2>&1 \
+       && systemctl --user list-unit-files wsl2-ssh-agent.service >/dev/null 2>&1; then
+        log "Restarting wsl2-ssh-agent.service..."
+        systemctl --user restart wsl2-ssh-agent.service \
+            || { error "systemctl restart failed"; exit 1; }
+    elif command -v wsl2-ssh-agent >/dev/null 2>&1; then
+        log "No systemd unit — starting an inline relay..."
+        eval "$(wsl2-ssh-agent)"
+    else
+        error "wsl2-ssh-agent not installed — run: ssh-bridge enable"
+        exit 1
+    fi
+
+    export SSH_AUTH_SOCK="${SSH_AUTH_SOCK:-$HOME/.ssh/wsl2-ssh-agent.sock}"
+    if ssh-add -l >/dev/null 2>&1; then
+        success "Relay restarted; agent reachable:"
+        ssh-add -l | sed 's/^/    /'
+    else
+        warn "Relay restarted, but the agent returned no keys."
+        warn "Check that Bitwarden Desktop is running and unlocked on Windows."
+    fi
+}
+
 main() {
     case "${1:-status}" in
         status)         cmd_status ;;
         enable)         cmd_enable ;;
         disable)        cmd_disable ;;
+        restart)        cmd_restart ;;
         -h|--help|help) usage ;;
         *)              error "Unknown command: $1"; echo; usage; exit 1 ;;
     esac

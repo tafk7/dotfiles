@@ -35,18 +35,6 @@ if [[ -f "$HOME/.ssh/use-windows-agent" ]]; then
     fi
 fi
 
-# Manual recovery if the relay ever dies mid-session (also callable from tooling):
-# prefers the systemd service, falls back to an inline relay.
-ssh-bridge() {
-    if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 \
-       && systemctl --user list-unit-files wsl2-ssh-agent.service >/dev/null 2>&1; then
-        systemctl --user restart wsl2-ssh-agent.service 2>/dev/null
-    elif command -v wsl2-ssh-agent >/dev/null 2>&1; then
-        eval "$(wsl2-ssh-agent)"
-    fi
-    ssh-add -l
-}
-
 # ==============================================================================
 # Functions
 # ==============================================================================
