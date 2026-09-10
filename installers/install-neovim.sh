@@ -14,6 +14,16 @@ FORCE=false
 FALLBACK_VERSION="0.10.4"
 MIN_GLIBC="2.32"
 
+# Pipe-free version probe. `nvim --version | head -n1` returns 141 when head exits
+# before nvim finishes writing (SIGPIPE), and `set -o pipefail` makes that fatal.
+nvim_version() {
+    local out
+    out=$(nvim --version 2>/dev/null) || return 1
+    out=${out%%$'\n'*}
+    out=${out##* }
+    printf '%s\n' "${out#v}"
+}
+
 log "Installing Neovim..."
 
 # Determine which version to install
@@ -22,7 +32,7 @@ if version_gte "$GLIBC_VERSION" "$MIN_GLIBC"; then
     VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
         # If API fails (rate-limited) and --force, fall back to reinstalling current
         if [[ "$FORCE" == true ]] && verify_binary nvim; then
-            VERSION=$(nvim --version 2>/dev/null | head -n1 | awk '{print $2}' | sed 's/^v//')
+            VERSION=$(nvim_version)
             warn "GitHub API unavailable — reinstalling current v$VERSION"
         else
             error "Failed to fetch latest Neovim version"
@@ -37,7 +47,7 @@ fi
 
 # Check existing installation
 if [[ "$FORCE" != true ]] && verify_binary nvim; then
-    CURRENT=$(nvim --version 2>/dev/null | head -n1 | awk '{print $2}' | sed 's/^v//')
+    CURRENT=$(nvim_version)
     if [[ "$CURRENT" == "$VERSION" ]]; then
         success "Neovim v$VERSION already installed"
         exit 2

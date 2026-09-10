@@ -93,7 +93,13 @@ get_arch() {
 
 # Parse system glibc version (e.g. "2.31")
 get_glibc_version() {
-    ldd --version 2>&1 | head -1 | grep -oP '[0-9]+\.[0-9]+$'
+    # Capture before filtering. `ldd --version | head -1` returns 141 whenever head
+    # exits before ldd finishes writing (SIGPIPE), and under `set -o pipefail` that
+    # aborted every `set -e` caller — it broke installers/install-neovim.sh.
+    local out first
+    out=$(ldd --version 2>&1)
+    first=${out%%$'\n'*}
+    [[ "$first" =~ ([0-9]+\.[0-9]+)$ ]] && printf '%s\n' "${BASH_REMATCH[1]}"
 }
 
 # Dotted version comparison: returns 0 (true) if $1 >= $2
