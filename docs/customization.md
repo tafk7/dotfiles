@@ -13,7 +13,7 @@ machinery picks it up.
 | Runtime helpers  | `lib/runtime.sh`                         | `log`, `success`, `warn`, `error`, `is_wsl`, `command_exists`. Safe everywhere.      |
 | Install helpers  | `lib/install.sh`                         | `install_apt`, `safe_sudo`, `run_installer`, `track_install`. Sourced ONLY by `setup.sh` and installers. |
 | Tool installers  | `installers/install-<tool>.sh`           | One script per non-apt tool (neovim, tmux, nvm, …). Exit 0 = installed, 2 = up-to-date, 1 = failed. |
-| Shell entrypoints | `entry/{bash.sh,zsh.sh,profile.sh}`     | Symlinked to `~/.bashrc`, `~/.zshrc`, `~/.profile`. Source `generated/bridge.sh` then `shell/init.sh`. |
+| Shell entrypoints | `entry/{bash.sh,zsh.sh,profile.sh}`     | Symlinked to `~/.bashrc`, `~/.zshrc`, `~/.profile`. Resolve the checkout from the symlink or XDG state, load Layer 0, then interactive layers. |
 | Shell startup    | `shell/env.sh`, `shell/init.sh`, `shell/tools/*.sh`, `shell/platform/*.sh` | PATH composition, tool-init, domain-grouped functions/aliases. |
 | Themes           | `themes/<name>/`                         | One directory per theme. `bin/theme-switcher` writes runtime files.                  |
 
@@ -204,13 +204,15 @@ and does not change the globally active `gh` account.
 
 ### Per-machine git identity and commit signing
 
-The tracked `~/.gitconfig` sets a baseline; layer machine-specific identity and
-signing on top via `~/.gitconfig.local`. Example (SSH signing):
+Setup renders the tracked portable base to
+`${XDG_CONFIG_HOME:-~/.config}/dotfiles/gitconfig` and adds an include to the
+existing `~/.gitconfig`; it never replaces that user-owned file. Put identity
+and signing in the final `~/.gitconfig.local` include. Example (SSH signing):
 
 ```ini
 # ~/.gitconfig.local
 [user]
-    email = you@work.example          # override the baseline identity per machine
+    email = you@work.example
     signingkey = ~/.ssh/id_ed25519.pub
 [gpg]
     format = ssh

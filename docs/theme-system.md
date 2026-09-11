@@ -124,10 +124,11 @@ only Enter applies the selected theme and Escape cancels.
 
 ## State and lifetime
 
-Global settings are written atomically to `generated/theme-state.sh` and
-survive shell and machine restarts. The old `generated/theme.sh` and
-`generated/theme-overrides.sh` are read for migration; a small compatibility
-`theme.sh` remains for older scripts.
+Global settings are written atomically to
+`${XDG_STATE_HOME:-~/.local/state}/dotfiles/theme.tsv` and survive shell and
+machine restarts. The old checkout-local `generated/theme.sh` and
+`generated/theme-overrides.sh` are read without `eval` during migration and are
+never the durable source of truth.
 
 The former active loaders `~/.tmux/theme.conf`, `~/.config/nvim/theme.vim`, and
 `generated/starship.toml` are no longer read. They may remain on disk as inert
@@ -169,7 +170,8 @@ theme; tmux does not expose those as per-client options.
 ## Runtime application
 
 The switcher does not rewrite one active config for every context. It builds
-immutable per-theme artifacts under `generated/themes/<theme>/` and resolves
+immutable per-theme artifacts under
+`${XDG_CACHE_HOME:-~/.cache}/dotfiles/theme/themes/<theme>/` and resolves
 launch-time environment variables for each shell.
 
 | Tool | Scoped mechanism | Existing process behavior |
@@ -187,6 +189,12 @@ launch-time environment variables for each shell.
 The prompt check compares a global and tmux generation signature. If nothing
 changed, it emits no exports and rebuilds no caches. Bat's cache contains every
 vendored theme and is rebuilt only when a source theme changes.
+
+`theme-switcher disable` persists the feature choice and immediately removes
+theme-owned hooks and styles from a reachable tmux server without deleting
+global, session, or window selections. Native defaults remain usable for every
+consumer. `theme-switcher enable` rebuilds the cache and reapplies the preserved
+cascade.
 
 Outside tmux, shells, editors, and tools resolve the global cascade. No terminal
 palette is changed, so standalone operation remains compatible with local and

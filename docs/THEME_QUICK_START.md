@@ -18,6 +18,10 @@ bin/theme-switcher set --window tmux catppuccin
 
 # Inspect the result and its source
 bin/theme-switcher explain --window
+
+# Persistently disable or re-enable all theme integration
+bin/theme-switcher disable
+bin/theme-switcher enable
 ```
 
 The cascade checks window tool/group/default, session tool/group/default, then

@@ -1,206 +1,154 @@
-# Dotfiles Architecture
+# Dotfiles architecture
 
-## Overview
+This repository supports Ubuntu 22.04/24.04/26.04 on x86_64, Ubuntu
+24.04/26.04 on aarch64, and WSL2 on Windows 11. Package tier, optional features,
+platform, and architecture are separate decisions.
 
-This dotfiles system manages an Ubuntu/WSL development environment through a tiered
-installation system (`--config`, `--bash`, `--dev`, `--work`, plus the
-orthogonal `--ai` flag and the `--full` = work+ai shorthand) with declarative
-configuration, domain-split shell modules, and unified theme management.
+## Runtime layers
 
-## System Architecture
+```text
+Layer 0: entry/profile.sh -> shell/env-runtime.sh -> shell/env.sh
+  locale, XDG paths, PATH, editor, project environment, direnv
+  safe for startup-reading non-interactive Bash and Zsh
 
-```
-setup.sh ─┬─ source → lib/install.sh (pulls in runtime.sh + config.sh)
-           └─ calls  → installers/install-*.sh
+Layer 1: shell/init.sh
+  shell options, history, completion, aliases/functions, prompt fallback
 
-entry/bash.sh ─┐
-entry/zsh.sh  ─┤─ source → entry/profile.sh → shell/env.sh
-               └─ source → shell/init.sh
-                            ├─ shell/env.sh (idempotent, guarded)
-                            ├─ shell/tool-init.sh (interactive only)
-                            ├─ shell/tools/*.sh
-                            ├─ shell/lazy/nvm.sh
-                            └─ starship init / zoxide init
-
-bin/*     ──── source → lib/runtime.sh
+Layer 2: optional/default features
+  shell/interactive/theme-env.sh and shell/theme-runtime.sh
+  WSL adapter and independently installed agent-badge plugins
 ```
 
-### Boundary Rules
+Login Bash follows `.bash_profile -> .bashrc -> .profile`. Non-login
+interactive Bash follows `.bashrc -> .profile`. A startup-reading
+non-interactive Bash stops after Layer 0; plain `bash -c` and Bash shebangs do
+not read these files.
 
-- `lib/install.sh` — sourced only by `setup.sh` and `installers/`. Never at shell startup.
-- `lib/runtime.sh` — safe for all contexts (bin/, shell startup).
-- `lib/config.sh` — declarative data (CONFIG_MAP, PACKAGES). No functions, no side effects.
-- `shell/env.sh` — static exports and PATH composition. The one `eval` here is `direnv export bash` at the bottom (see Claude Code compatibility below).
-- `shell/tool-init.sh` — interactive-only `eval` calls (direnv hook, completions).
-- `shell/tools/*.sh` — domain-split functions and aliases (one file per tool domain).
+Zsh always reads `.zshenv`, which loads Layer 0, and reads `.zshrc` only for
+interactive sessions. Layer 0 does not resolve themes, query tmux, define public
+interactive commands, or remove externally owned functions.
 
-## Directory Layout
+Project activation follows shell startup semantics: `zsh -c` refreshes direnv
+through `.zshenv`; plain `bash -c` reads no dotfiles and inherits its parent's
+environment, while `bash -lc` refreshes through the login chain.
 
-```
-dotfiles/
-├── setup.sh                  ← orchestrator (reads lib/config.sh)
-├── lib/
-│   ├── install.sh            ← install-time helpers
-│   ├── runtime.sh            ← runtime helpers (logging, is_wsl, verify_binary)
-│   ├── config.sh             ← declarative data: CONFIG_MAP + PACKAGES
-│   └── registry.sh           ← TOOL_BINARY/METHOD/TIER/PATHS/VERIFY data
-├── eget.toml                 ← binary tool manifest
-├── configs/                  ← config files symlinked to $HOME
-│   ├── gitconfig             → ~/.gitconfig (template)
-│   ├── tmux.conf, init.vim, editorconfig, ripgreprc, starship.toml
-│   ├── ssh_config, config/bat, config/fd
-├── entry/
-│   ├── bash_profile          → ~/.bash_profile (sources .bashrc)
-│   ├── bash.sh               → ~/.bashrc
-│   ├── profile.sh            → ~/.profile
-│   └── zsh.sh                → ~/.zshrc
-├── generated/
-│   ├── bridge.sh             ← DOTFILES_DIR export (written by setup.sh)
-│   ├── theme-state.sh        ← persistent global theme state
-│   └── themes/<name>/        ← immutable scoped launch artifacts
-├── installers/               ← per-tool install scripts
-├── shell/
-│   ├── init.sh               ← shared sourcing sequence for bash + zsh
-│   ├── env.sh                ← PATH composition + static exports (single source of truth)
-│   ├── theme-runtime.sh      ← prompt-time scoped theme refresh
-│   ├── tool-init.sh          ← eval-based init (direnv, completions)
-│   ├── fzf.sh                ← FZF configuration
-│   ├── lazy/nvm.sh           ← lazy NVM loader for both shells
-│   ├── tools/                ← domain-split functions and aliases
-│   │   ├── claude.sh, docker.sh, fzf.sh, general.sh, git.sh
-│   │   ├── nav.sh, node.sh, process.sh, python.sh
-│   │   ├── tmux.sh, vim.sh, vscode.sh
-│   └── platform/wsl.sh      ← WSL-specific functions
-├── themes/                   ← color themes
-│   └── <name>/ {palette.sh, colors.sh, meta.sh, shell.sh, tmux.conf, vim.vim, ...}
-├── bin/
-│   ├── theme-switcher, verify, replace, cheatsheet
-��   ├── uninstall-tool, git-credential-azdo
-└── docs/
+## Installation dimensions
+
+The cumulative package tiers are `config -> bash -> dev -> work`. AI tools and
+RDP are orthogonal selections. The theme feature is enabled by default but can
+be persistently disabled. Agent-badge is enabled by default when a supported AI
+CLI is installed and can be independently disabled.
+
+```bash
+./setup.sh --bash
+./setup.sh --dev --ai
+./setup.sh --bash --no-theme
+./setup.sh --ai --no-agent-badge
 ```
 
-## Environment Management
+Multiple tier flags select the highest tier, independent of argument order.
+`--full` always means `--work --ai`; it never enables RDP.
 
-### Single source of truth: `shell/env.sh`
+## State and ownership
 
-All PATH composition and static exports live in one file: `shell/env.sh`.
-No other file modifies PATH.
+Durable state lives under
+`${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/`:
 
+- `preferences.tsv`: explicit feature preferences;
+- `components.tsv`: observed component status, ownership, version, path, and
+  update contract;
+- `theme.tsv`: global theme selection and overrides;
+- `install-path`: fallback checkout discovery for flattened deployments;
+- `transaction.tsv`: an interrupted artifact replacement journal;
+- `backups/`: displaced user configuration.
+
+These files have a version header, contain data only, are validated before use,
+and are atomically replaced. Read-modify-write operations use a bounded
+inter-process lock with conservative stale-lock recovery. Setup reconciles an
+incomplete artifact journal before starting another install; verification
+reports a pending journal as a failure.
+
+Rebuildable theme output lives under
+`${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme/`. The checkout is not the
+machine-state database.
+
+## Configuration ownership
+
+`lib/config.sh` maps each source to `target:type:owner`. Base configuration is
+always reconciled; tool-owned configuration is only installed when its owner is
+present. Symlinks are unchanged on an idempotent rerun, and backups are created
+lazily only when real user data is displaced.
+
+Portable Git behavior is rendered to
+`${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig` and included by the
+user's existing `~/.gitconfig`. Identity and machine-local overrides stay in
+`~/.gitconfig.local`.
+
+## Component registry
+
+`lib/registry.sh` is the shared inventory for setup, verification, update
+reporting, and uninstall. Each component records a binary/service check,
+installation method, tier/feature, platform, supported architectures, ownership
+roots, update contract, and uninstall paths where automated removal is safe.
+
+Eget downloads are staged and executed before an atomic replacement. Neovim and
+tmux also stage their artifacts/builds before replacing the working executable.
+APT and moving vendor installers have explicit in-place failure contracts and
+are never described as rollback-safe.
+
+Uninstall requires recorded dotfiles ownership and validates every target
+against the component's allowlisted roots. It rejects empty paths, HOME, broad
+XDG roots, the checkout, and paths outside ownership.
+
+## Theme feature
+
+The theme feature owns global theme state, cache rendering, tmux theme hooks,
+and launch-time adapters for Starship, FZF, bat, Delta, Neovim, btop, and
+lazygit. When disabled:
+
+- no theme state is resolved during shell startup;
+- Starship, FZF, bat, and Delta use native defaults;
+- btop and lazygit wrappers delegate directly;
+- Neovim uses its built-in fallback;
+- tmux removes theme hooks and generated styles while preserving session/window
+  override values for a later re-enable.
+
+`bin/theme-switcher enable|disable` performs the explicit feature transition.
+`bin/dotfiles-feature` provides the common feature preference interface.
+
+## Agent-badge
+
+The base tmux configuration has no agent-badge dependency. The Claude and Codex
+marketplace packages are self-contained copies generated from `plugins/shared/`
+and wire themselves when their session hook runs. Disabling agent-badge unwires
+the live tmux fragments without deleting AI configuration or session data.
+
+## Repository layout
+
+```text
+entry/                         shell entrypoints
+shell/env*.sh                  Layer 0 implementation
+shell/init.sh                  Layer 1 loader
+shell/interactive/             Layer 2 shell adapters
+lib/runtime.sh                 side-effect-free command helpers
+lib/config.sh                  configuration/package declarations
+lib/registry.sh                component inventory and ownership
+lib/state.sh                   persistent state, lock, journal
+installers/                    component-specific installation
+features are represented by their adapters and public commands
+themes/                        theme source data
+plugins/shared/                agent-badge source of truth
+plugins/agent-badge-*/         self-contained marketplace packages
 ```
-shell/env.sh owns:
-  PATH additions     ~/bin, ~/.local/bin, /usr/local/bin
-                     $NVM_DIR/default/bin
-                     $GOPATH/bin, $CARGO_HOME/bin
 
-  Static exports     NVM_DIR, GOPATH, CARGO_HOME
-                     EDITOR, VISUAL, PYTHONDONTWRITEBYTECODE
-                     NODE_OPTIONS, DOCKER_BUILDKIT, BAT_THEME
+## Test and deployment boundary
 
-  WSL environment    DISPLAY, BROWSER, WSLENV, WIN_HOME
-                     PATH stripping (Windows system dirs)
-```
+Automated tests create isolated HOME, XDG, PATH, temporary, and tmux roots.
+Host-mutating commands are faked in unit tests. Hook tests use disposable
+standalone repositories. Architecture jobs explicitly label ARM checks as
+selection-only unless an ARM binary was actually executed.
 
-`env.sh` has an idempotency guard (`_DOTFILES_ENV_LOADED`) so it's safe
-to source multiple times — `.profile` sources it, then `init.sh` sources
-it again. Only the first invocation modifies state.
-
-### Initialization chains
-
-Every shell context reaches `env.sh` through one of these paths:
-
-```
-Login bash:          .bash_profile → .bashrc → .profile → env.sh
-                                                        → init.sh → env.sh (guarded)
-
-Non-interactive bash: .bashrc → .profile → env.sh → return
-(scripts, Claude Code)
-
-Interactive bash:    .bashrc → .profile → env.sh
-(VS Code terminal)           → init.sh → env.sh (guarded) → tool-init.sh → tools/*
-
-Login zsh:           .zshrc → .profile → env.sh → init.sh → env.sh (guarded)
-```
-
-### NVM two-tier strategy
-
-- **Non-interactive**: `env.sh` adds `$NVM_DIR/default/bin` to PATH — a
-  stable symlink created by `install-nvm.sh` pointing to the active LTS.
-  No `nvm.sh` sourcing needed. `node`, `npm`, `npx` are immediately available.
-- **Interactive**: `shell/lazy/nvm.sh` installs stub functions that source
-  `$NVM_DIR/nvm.sh` on first call (~200ms deferred until needed).
-
-### Claude Code compatibility
-
-Claude Code runs each Bash tool invocation as a fresh subprocess with a
-shell snapshot captured at session start. The snapshot freezes PATH and
-environment variables from the moment Claude Code launched.
-
-This means PATH must be correct at snapshot time — which is why all PATH
-composition lives in `env.sh` rather than being split across files. The
-chain `.bashrc` → `.profile` → `env.sh` runs in every context, including
-Claude Code's non-interactive snapshot capture. If `env.sh` is correct,
-the snapshot is correct.
-
-When adding a new tool to PATH:
-1. Add the `[[ -d ... ]] && PATH=...` line to `shell/env.sh`
-2. Restart Claude Code to re-capture the snapshot
-3. Do NOT add PATH entries in `.profile`, `init.sh`, or tool-specific files
-
-### direnv in non-interactive subshells
-
-`direnv hook bash` (in `tool-init.sh`) only fires before interactive
-prompts via `PROMPT_COMMAND`. Claude Code's `bash -c` invocations are
-non-interactive — they never trigger the hook, so a project's `.envrc`
-(and any venv it activates) would not load.
-
-To fix this, `shell/env.sh` ends with `eval "$(direnv export bash)"`,
-which runs the standalone `.envrc` loader against the spawn `$PWD`.
-This activates the project venv for every Claude Bash invocation that
-lands inside an allowed project tree. The shared allow-list at
-`~/.local/share/direnv/allow/` is honored — interactive `direnv allow`
-carries over to non-interactive subshells.
-
-`DIRENV_LOG_FORMAT=""` suppresses the `loading .envrc` chatter so
-Bash-tool stdout/stderr stays clean. Genuine load errors still surface
-because we don't blanket-redirect stderr at the eval site.
-
-## Installation Tiers
-
-| Tier         | What It Installs                                   | Sudo? |
-|--------------|---------------------------------------------------|-------|
-| config       | Symlinks only (zero installs)                      | No    |
-| shell        | + eget tools, APT packages (bat, fd, rg, direnv)  | Yes   |
-| dev          | + neovim, tmux                                     | Yes   |
-| work         | + NVM, Docker, Azure CLI                           | Yes   |
-| `--ai`       | + Claude Code, Codex, opencode, Pi (orthogonal)    | No    |
-| `--claude` / `--codex` / `--opencode` / `--pi` | + that one AI CLI (compose freely) | No |
-| `--rdp`      | + xrdp server + XFCE desktop (orthogonal flag)     | Yes   |
-| `--full`     | = work + ai (everything except `--rdp`)            | Yes   |
-
-`config → shell → dev → work` are cumulative. `--ai` and `--rdp` are
-orthogonal to the chain — each installs only under its own flag and combines
-with any tier. `--ai` covers all AI CLIs (Claude Code, Codex, opencode, Pi); pick
-individually with `--claude` / `--codex` / `--opencode` / `--pi` (they compose). Leave
-AI off when an org manages the install. `--rdp` installs the xrdp RDP server
-and is deliberately NOT implied by `--full`, since no tier should silently open
-a network listener. `--full` = `--work --ai`.
-
-## Key Design Decisions
-
-1. **Single PATH authority** (`shell/env.sh`) — all PATH additions in one
-   file. Works for login shells, non-interactive subshells, VS Code
-   terminals, and Claude Code's shell snapshot mechanism.
-
-2. **Lazy NVM** (`shell/lazy/nvm.sh`) — both shells defer `nvm.sh` loading
-   until first `nvm`, `node`, `npm`, or `npx` call. Eliminates ~200ms
-   startup penalty. Non-interactive contexts use the `default/bin` symlink.
-
-3. **Single CONFIG_MAP** (`lib/config.sh`) — both the installer and
-   verifier read the same data. Adding a config automatically extends
-   verification.
-
-4. **Domain-split tools** — each file in `shell/tools/` owns one domain.
-   Finding where a function lives is self-evident from the filename.
-
-5. **Idempotent sourcing** — `env.sh` and `.profile` have guards so they're
-   safe to source multiple times from different init paths.
+Development occurs in a separate worktree. Integration into the live checkout,
+durable state migration/live-process synchronization, and host-level mutations
+are separate approval gates described in
+[`repository-improvement-plan.md`](repository-improvement-plan.md).

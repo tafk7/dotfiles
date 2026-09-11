@@ -45,28 +45,25 @@ failure mode that started this.
 
 Set `"autoupdate": "notify"` in `~/.config/opencode/opencode.json` so opencode
 tells you when a new version exists but doesn't silently change the contract
-under our tooling. Upgrade deliberately, then re-baseline (below).
+under our tooling. Upgrade deliberately, then inspect the live contract.
 
-## Drift check: `bin/opencode-contract`
+## Inspection command: `bin/opencode-contract`
 
-Snapshots the contract (live config schema + tag-pinned CLI source + the
-contract-bearing docs `cli.mdx`/`config.mdx` + the installed binary's `--help`)
-into `docs/opencode-contract/`, and diffs a fresh capture against it so a change
-surfaces as a reviewable git diff.
+The repository intentionally does not carry a snapshot that silently becomes
+stale. The command inspects the installed CLI or current upstream sources on
+demand:
 
 ```bash
-bin/opencode-contract capture      # (re)write the baseline; commit the result
-bin/opencode-contract check        # diff live contract vs baseline; exit 1 on drift
-bin/opencode-contract show         # print the stored baseline manifest
-bin/opencode-contract docs [dir]   # mirror the FULL docs tree locally for reading
-                                   # (default generated/opencode-docs, gitignored)
+bin/opencode-contract runtime      # installed version and CLI help (offline)
+bin/opencode-contract schema       # fetch and validate current JSON schemas
+bin/opencode-contract docs DIR     # mirror current docs into an explicit path
+bin/opencode-contract egress       # list hosts referenced by current source
 ```
 
 `docs` enumerates every page via the GitHub tree API — export `GITHUB_TOKEN` or
 it hits the 60 req/hr anonymous limit. For a single page, skip it and just
 `curl` the raw `.mdx` URL above.
 
-Run `capture` on a machine with opencode installed and `opencode.ai` reachable
-(CI can't — the site is blocked and opencode isn't installed there). Re-run
-`check` after an opencode self-update; on drift, review the diff, fix any
-affected installer/wrapper/aliases, then re-`capture`.
+Run `runtime` before and after an opencode update and use `schema` when changing
+configuration integration. Network-enforced allowlists remain the authority for
+egress; the source scan is a review aid, not a runtime guarantee.
