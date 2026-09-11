@@ -594,7 +594,9 @@ cmd_env() {
     fi
     [[ $explicit -eq 1 ]] && old_signature="${1:-}"
     tmux_gen=""
-    theme_tmux_available && tmux_gen="$(theme_tmux show-options -gqv @dotfiles_theme_generation 2>/dev/null || true)"
+    if [[ -n "$THEME_CONTEXT_SESSION" || -n "$THEME_CONTEXT_WINDOW" ]] && theme_tmux_available; then
+        tmux_gen="$(theme_tmux show-options -gqv @dotfiles_theme_generation 2>/dev/null || true)"
+    fi
     signature="${DOTFILES_THEME_GENERATION}:${tmux_gen}:${THEME_CONTEXT_SESSION}:${THEME_CONTEXT_WINDOW}"
     [[ -n "$old_signature" && "$old_signature" == "$signature" ]] && return 0
 

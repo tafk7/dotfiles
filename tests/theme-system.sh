@@ -11,6 +11,12 @@ export DOTFILES_LEGACY_GENERATED_DIR="$TMP_ROOT/legacy-generated"
 export DOTFILES_TMUX_SERVER=dotfiles-theme-tests
 export TMUX_TMPDIR="$TMP_ROOT/tmux"
 export HOME="$TMP_ROOT/home"
+export XDG_STATE_HOME="$TMP_ROOT/state"
+export XDG_CACHE_HOME="$TMP_ROOT/cache"
+export XDG_CONFIG_HOME="$TMP_ROOT/config"
+export XDG_DATA_HOME="$TMP_ROOT/data"
+# Never reuse the caller's durable state or cache overrides, including on reruns.
+unset DOTFILES_STATE_DIR DOTFILES_THEME_CACHE_DIR DOTFILES_CACHE_DIR
 export TMUX=
 mkdir -p "$TMUX_TMPDIR" "$HOME" "$DOTFILES_LEGACY_GENERATED_DIR"
 printf 'export DOTFILES_THEME="gruvbox"\n_DOTFILES_PREVIOUS_THEME="nord"\n' > "$DOTFILES_LEGACY_GENERATED_DIR/theme.sh"

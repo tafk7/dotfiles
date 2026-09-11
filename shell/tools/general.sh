@@ -36,6 +36,8 @@ alias free='free -h'
 
 # Network
 alias ports='ss -tulanp'
+# Clear the pre-upgrade alias before Bash/Zsh parse the function on reload.
+unalias myip 2>/dev/null || true
 myip() {
     curl --fail --silent --show-error --max-time 10 --proto '=https' \
         https://ifconfig.me/ip

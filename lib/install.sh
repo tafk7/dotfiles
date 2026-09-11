@@ -308,7 +308,11 @@ setup_wsl_clipboard() {
     local bin_dir="$HOME/.local/bin"
     mkdir -p "$bin_dir"
 
-    cat > "$bin_dir/pbcopy" << 'EOF'
+    # Render outside HOME so a no-op rerun preserves both file and directory
+    # mtimes. Replace only changed wrappers, matching config reconciliation.
+    local staged file
+    staged="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-clipboard.XXXXXX")" || return 1
+    cat > "$staged/pbcopy" << 'EOF'
 #!/bin/bash
 clip.exe
 EOF
@@ -316,7 +320,7 @@ EOF
     # Call PowerShell by absolute path: shell/env.sh strips the Windows
     # PowerShell directory from PATH, so `powershell.exe` by name won't resolve.
     # Prefer PowerShell 7 when present, otherwise Windows PowerShell 5.
-    cat > "$bin_dir/pbpaste" << 'EOF'
+    cat > "$staged/pbpaste" << 'EOF'
 #!/bin/bash
 if [[ -x "/mnt/c/Program Files/PowerShell/7/pwsh.exe" ]]; then
     "/mnt/c/Program Files/PowerShell/7/pwsh.exe" -NoProfile -Command "Get-Clipboard" | sed 's/\r$//'
@@ -325,7 +329,17 @@ else
 fi
 EOF
 
-    chmod +x "$bin_dir/pbcopy" "$bin_dir/pbpaste"
+    for file in pbcopy pbpaste; do
+        if ! cmp -s "$staged/$file" "$bin_dir/$file"; then
+            install -m 0755 "$staged/$file" "$bin_dir/$file" || {
+                rm -rf "$staged"
+                return 1
+            }
+        elif [[ ! -x "$bin_dir/$file" ]]; then
+            chmod +x "$bin_dir/$file" || { rm -rf "$staged"; return 1; }
+        fi
+    done
+    rm -rf "$staged"
 
     if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
         export PATH="$HOME/.local/bin:$PATH"

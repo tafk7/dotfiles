@@ -71,8 +71,12 @@ fi
 # that exact environmental diagnostic; any other verifier output still fails.
 unit_verify_output=""
 unit_verify_rc=0
-unit_verify_output="$(systemd-analyze verify configs/wsl2-ssh-agent.service 2>&1)" \
-    || unit_verify_rc=$?
+unit_verify_output="$(
+    unit_runtime="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-unit-verify.XXXXXX")" || exit 1
+    trap 'rm -rf "$unit_runtime"' EXIT
+    XDG_RUNTIME_DIR="$unit_runtime" SYSTEMD_UNIT_PATH=/usr/lib/systemd/user:/lib/systemd/user \
+        systemd-analyze --user verify configs/wsl2-ssh-agent.service 2>&1
+)" || unit_verify_rc=$?
 if (( unit_verify_rc != 0 )); then
     unexpected_unit_output="$(
         printf '%s\n' "$unit_verify_output" \

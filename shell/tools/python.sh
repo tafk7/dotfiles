@@ -18,12 +18,13 @@ alias ipy='ipython'
 alias pytest='python3 -m pytest'
 alias pyt='python3 -m pytest -v'
 
-# Code quality (if installed)
-command -v black >/dev/null 2>&1 && alias fmt='black .'
-if command -v ruff >/dev/null 2>&1; then
-    alias lint='ruff check .'
-    alias lintf='ruff check . --fix'
-fi
+# Resolve optional tools on invocation. A missing-tool PATH search can traverse
+# Windows mounts on WSL; it should not delay every new shell. Clear old aliases
+# so an existing shell can adopt these functions through reload.
+unalias fmt lint lintf 2>/dev/null || true
+fmt() { command black . "$@"; }
+lint() { command ruff check . "$@"; }
+lintf() { command ruff check . --fix "$@"; }
 
 # Quick server
 alias pyserver='python3 -m http.server'
