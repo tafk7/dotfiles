@@ -6,6 +6,8 @@ TEST_REPO_ROOT="$ROOT"
 source "$ROOT/tests/lib/harness.sh"
 trap fixture_cleanup EXIT
 fixture_init
+export DOTFILES_LEGACY_GENERATED_DIR="$TEST_ROOT/legacy-generated"
+mkdir -p "$DOTFILES_LEGACY_GENERATED_DIR"
 source "$ROOT/lib/runtime.sh"
 source "$ROOT/lib/registry.sh"
 source "$ROOT/lib/state.sh"
