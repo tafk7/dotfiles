@@ -105,7 +105,11 @@ ini_changed=false
 #    group; without membership it silently falls back to weaker RDP security.
 if ! id -nG xrdp 2>/dev/null | grep -qw ssl-cert; then
     if getent group ssl-cert >/dev/null 2>&1; then
-        safe_sudo adduser xrdp ssl-cert
+        # gpasswd updates only /etc/group and /etc/gshadow. Using adduser here
+        # delegates to usermod, which needlessly opens /etc/passwd and
+        # /etc/shadow even for a supplementary-group-only change. Hardened
+        # hosts may keep those credential files immutable.
+        safe_sudo gpasswd -a xrdp ssl-cert
     else
         warn "ssl-cert group absent — skipping TLS cert group membership."
         warn "(RDP may use weaker security; install the 'ssl-cert' package to enable TLS.)"
