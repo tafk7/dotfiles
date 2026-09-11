@@ -25,11 +25,34 @@ fixture_cleanup() {
     [[ -n "${TEST_ROOT:-}" && "$TEST_ROOT" == /tmp/* ]] && /bin/rm -rf -- "$TEST_ROOT"
 }
 
-fixture_snapshot() {
+fixture_manifest() {
     local root="$1"
     find "$root" -path "$root/.git" -prune -o -printf '%P\t%y\t%m\t%s\t%T@' \
         -exec sh -c 'for f do if [ -f "$f" ]; then sha256sum "$f" | cut -d" " -f1; else printf "%s\n" -; fi; done' sh {} + \
-        | LC_ALL=C sort | sha256sum | awk '{print $1}'
+        | LC_ALL=C sort
+}
+
+fixture_snapshot() {
+    fixture_manifest "$1" | sha256sum | awk '{print $1}'
+}
+
+fixture_managed_manifest() {
+    local label root
+    for label in HOME CONFIG DATA STATE CACHE; do
+        case "$label" in
+            HOME) root="$HOME" ;;
+            CONFIG) root="$XDG_CONFIG_HOME" ;;
+            DATA) root="$XDG_DATA_HOME" ;;
+            STATE) root="$XDG_STATE_HOME" ;;
+            CACHE) root="$XDG_CACHE_HOME" ;;
+        esac
+        printf '## %s\n' "$label"
+        fixture_manifest "$root"
+    done
+    if [[ -e "$DOTFILES_BACKUP_PREFIX" ]]; then
+        printf '## BACKUPS\n'
+        fixture_manifest "$DOTFILES_BACKUP_PREFIX"
+    fi
 }
 
 fixture_managed_snapshot() {

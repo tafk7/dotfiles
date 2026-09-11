@@ -6,6 +6,29 @@ TEST_REPO_ROOT="$ROOT"
 source "$ROOT/tests/lib/harness.sh"
 trap fixture_cleanup EXIT
 fixture_init
+
+# GitHub's hosted Ubuntu image includes Azure CLI. Its `az --version` command
+# creates ~/.azure state and writes telemetry asynchronously, which made the
+# whole-HOME idempotence snapshot race after external-component discovery.
+# Provide a deterministic stand-in and assert that APT metadata is used instead
+# of executing the external CLI for its version.
+printf '%s\n' \
+    '#!/bin/bash' \
+    'mkdir -p "$HOME/.azure/logs"' \
+    'printf "unexpected version probe\n" >> "$HOME/.azure/logs/telemetry.log"' \
+    'printf "azure-cli 99.0\n"' \
+    > "$TEST_ROOT/bin/az"
+printf '%s\n' \
+    '#!/bin/bash' \
+    'if [[ "${*: -1}" == azure-cli ]]; then' \
+    '    printf "99.0\n"' \
+    'else' \
+    '    exec /usr/bin/dpkg-query "$@"' \
+    'fi' \
+    > "$TEST_ROOT/bin/dpkg-query"
+chmod +x "$TEST_ROOT/bin/az" "$TEST_ROOT/bin/dpkg-query"
+export PATH="$TEST_ROOT/bin:$PATH"
+
 printf '[custom]\n    preserved = yes\n' > "$HOME/.gitconfig"
 
 run_setup() {
@@ -17,6 +40,7 @@ run_setup() {
 }
 
 run_setup
+[[ ! -e "$HOME/.azure" ]] || fail "external Azure CLI was executed during component discovery"
 [[ ! -d "$DOTFILES_BACKUP_PREFIX" ]] || fail "fresh config created an unnecessary backup directory"
 grep -q 'preserved = yes' "$HOME/.gitconfig" || fail "existing Git config was overwritten"
 grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig" "$HOME/.gitconfig" || fail "portable Git include missing"
@@ -29,10 +53,15 @@ source "$ROOT/lib/runtime.sh"
 source "$ROOT/lib/registry.sh"
 source "$ROOT/lib/state.sh"
 ledger_record docker yes package-manager installed 1 /usr/bin/docker apt-in-place
+first_manifest="$(fixture_managed_manifest)"
 first="$(fixture_managed_snapshot)"
 run_setup
+second_manifest="$(fixture_managed_manifest)"
 second="$(fixture_managed_snapshot)"
-assert_eq "$second" "$first" "second config run was not idempotent"
+if [[ "$second" != "$first" ]]; then
+    diff -u <(printf '%s\n' "$first_manifest") <(printf '%s\n' "$second_manifest") >&2 || true
+    fail "expected '$first', got '$second' (second config run was not idempotent)"
+fi
 [[ "$(ledger_line docker)" == $'docker\tyes\tpackage-manager\tinstalled\t1\t/usr/bin/docker\tapt-in-place\t'* ]] \
     || fail "lower-tier reconciliation erased higher-tier ledger history"
 
