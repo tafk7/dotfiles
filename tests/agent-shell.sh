@@ -30,6 +30,15 @@ rg_config="$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" bash --n
     'source "$DOTFILES_DIR/entry/bash.sh"; printf %s "$RIPGREP_CONFIG_PATH"')"
 assert_eq "$rg_config" "$HOME/.ripgreprc" "tracked ripgrep config was not activated"
 
+external_fixture_function() { :; }
+export -f external_fixture_function
+login_result="$(env -u _DOTFILES_ENV_LOADED -u _DOTFILES_BASE_ENV -u _PROFILE_LOADED \
+    HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" bash -lc '
+        declare -F external_fixture_function >/dev/null || exit 21
+        compgen -A function | grep -E "^(_dotfiles_|reload$|proj$|theme$)" || true
+    ')"
+[[ -z "$login_result" ]] || fail "bash -lc leaked Layer 1 functions: $login_result"
+
 zsh_result="$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" zsh -dfc '
     external_fixture_function() { : }
     source "$DOTFILES_DIR/entry/zshenv"
@@ -37,6 +46,10 @@ zsh_result="$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" zsh -df
     print -rl -- ${(k)functions} | grep -E "^(_dotfiles_|reload$|proj$|theme$)" || true
 ')"
 [[ -z "$zsh_result" ]] || fail "zsh Layer 0 leaked interactive/private functions: $zsh_result"
+zsh_login_result="$(env -u _DOTFILES_ENV_LOADED -u _DOTFILES_BASE_ENV -u _PROFILE_LOADED \
+    HOME="$HOME" ZDOTDIR="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" zsh -lc \
+    'print -rl -- ${(k)functions} | grep -E "^(_dotfiles_|reload$|proj$|theme$)" || true')"
+[[ -z "$zsh_login_result" ]] || fail "zsh -lc leaked Layer 1 functions: $zsh_login_result"
 
 [[ -z "$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" bash --noprofile --norc -c 'source "$1/entry/bash.sh"; alias' _ "$ROOT")" ]] \
     || fail "bash Layer 0 defined aliases"

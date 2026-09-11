@@ -90,14 +90,16 @@ extract_export() {
 }
 
 ensure_theme_artifacts() {
-    local theme="$1" dir base source_config config
+    local theme="$1" dir base source_config config tmp
     dir="$GENERATED_DIR/themes/$theme"
     validate_theme "$theme" >/dev/null
     mkdir -p "$dir"
 
     base="$DOTFILES_DIR/configs/starship.toml"
     if [[ ! -f "$dir/starship.toml" || "$base" -nt "$dir/starship.toml" ]]; then
-        sed "s|__DOTFILES_PALETTE__|$theme|g" "$base" > "$dir/starship.toml"
+        tmp="$(mktemp "$dir/starship.toml.tmp.XXXXXX")"
+        sed "s|__DOTFILES_PALETTE__|$theme|g" "$base" > "$tmp"
+        mv "$tmp" "$dir/starship.toml"
     fi
 
     if [[ ! -f "$dir/dotfiles-$theme.theme" ]] || ! cmp -s "$THEMES_DIR/$theme/btop.theme" "$dir/dotfiles-$theme.theme"; then
@@ -119,18 +121,18 @@ ensure_theme_artifacts() {
             /^[[:space:]]*color_theme[[:space:]]*=/ { print "color_theme = \"" t "\""; found=1; next }
             { print }
             END { if (!found) print "color_theme = \"" t "\"" }
-        ' "$source_config" > "$config.tmp"
+        ' "$source_config" > "${config}.tmp.$$"
     else
-        printf 'color_theme = "dotfiles-%s"\ntheme_background = True\ntruecolor = True\n' "$theme" > "$config.tmp"
+        printf 'color_theme = "dotfiles-%s"\ntheme_background = True\ntruecolor = True\n' "$theme" > "${config}.tmp.$$"
     fi
-    if [[ ! -f "$config" ]] || ! cmp -s "$config.tmp" "$config"; then
-        mv "$config.tmp" "$config"
+    if [[ ! -f "$config" ]] || ! cmp -s "${config}.tmp.$$" "$config"; then
+        mv "${config}.tmp.$$" "$config"
     else
         # Touch so the mtime gate above sees this run's work next time; without
         # it an unchanged-content run leaves $config older than $source_config
         # forever and the gate never engages.
         touch "$config"
-        rm -f "$config.tmp"
+        rm -f "${config}.tmp.$$"
     fi
 }
 
