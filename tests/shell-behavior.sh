@@ -65,4 +65,54 @@ HOME="$HOME" DOTFILES_DIR="$ROOT" zsh -dfc \
     'source "$DOTFILES_DIR/shell/tools/general.sh"; reload; [[ "$DOTFILES_RELOAD_MARKER" == 1 ]]' \
     || fail "zsh reload"
 
+# A running pre-upgrade shell still has aliases for names now implemented as
+# functions. Exercise reload with alias expansion enabled, then reload again.
+for rc in .bashrc .zshrc; do
+    cat > "$HOME/$rc" <<'EOF'
+source "$DOTFILES_DIR/shell/tools/general.sh" || return 1
+source "$DOTFILES_DIR/shell/tools/node.sh" || return 1
+EOF
+done
+for shell in bash zsh; do
+    if [[ "$shell" == bash ]]; then
+        shell_args=(--noprofile --norc -c)
+    else
+        shell_args=(-dfc)
+    fi
+    HOME="$HOME" DOTFILES_DIR="$ROOT" "$shell" "${shell_args[@]}" '
+        source "$DOTFILES_DIR/shell/tools/general.sh"
+        if [[ -n "${BASH_VERSION:-}" ]]; then shopt -s expand_aliases; fi
+        alias myip="curl ifconfig.me"
+        alias nclean="nrm && npm install"
+        for attempt in 1 2; do
+            reload || exit 41
+            if alias myip >/dev/null 2>&1 || alias nclean >/dev/null 2>&1; then exit 42; fi
+            typeset -f myip >/dev/null || exit 43
+            typeset -f nclean >/dev/null || exit 44
+        done
+    ' || fail "$shell reload from legacy aliases"
+done
+
+export TEST_ROOT
+# Optional Python tools are discovered at invocation, including after a PATH
+# change. No startup probes are needed and legacy aliases cannot block reload.
+for shell in bash zsh; do
+    if [[ "$shell" == bash ]]; then args=(--noprofile --norc -c); else args=(-dfc); fi
+    "$shell" "${args[@]}" '
+        if [[ -n "${BASH_VERSION:-}" ]]; then shopt -s expand_aliases; fi
+        alias fmt="black ."
+        alias lint="ruff check ."
+        alias lintf="ruff check . --fix"
+        source "$DOTFILES_DIR/shell/tools/python.sh"
+        # Install the tools only after sourcing: lazy resolution sees them.
+        mkdir -p "$HOME/new-tools"
+        ln -sf "$TEST_ROOT/bin/argument-recorder" "$HOME/new-tools/black"
+        ln -sf "$TEST_ROOT/bin/argument-recorder" "$HOME/new-tools/ruff"
+        export PATH="$HOME/new-tools:$PATH"
+        [[ "$(fmt --check)" == "black|.|--check" ]] || exit 51
+        [[ "$(lint --select E)" == "ruff|check|.|--select|E" ]] || exit 52
+        [[ "$(lintf --unsafe-fixes)" == "ruff|check|.|--fix|--unsafe-fixes" ]] || exit 53
+    ' || fail "$shell deferred Python tools"
+done
+
 printf 'shell-behavior: ok\n'

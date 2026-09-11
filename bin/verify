@@ -193,8 +193,8 @@ echo
 echo "Git"
 echo "─────────────────────────────────────"
 
-git_name=$(git config --global --get user.name 2>/dev/null || true)
-git_email=$(git config --global --get user.email 2>/dev/null || true)
+git_name=$(git config --global --includes --get user.name 2>/dev/null || true)
+git_email=$(git config --global --includes --get user.email 2>/dev/null || true)
 if [[ -n "$git_name" && -n "$git_email" ]]; then
     check_pass "user: $git_name <$git_email>"
 else
@@ -400,21 +400,20 @@ fi
 # 8. Agent shell surface
 # ==============================================================================
 #
-# Coding harnesses (Claude Code, Codex, opencode) never load the interactive
-# profile — they run `bash -lc` and/or snapshot a non-interactive login shell
-# and source that snapshot on every tool call. Anything defined in that shell is
-# paid per call, forever. tests/agent-shell.sh enforces this; surface it here
-# too so it shows up in a routine health check.
+# Check our non-interactive boundary, not a particular harness's snapshot
+# serialization. External profile functions are deliberately preserved; their
+# presence alone does not establish a meaningful per-command performance cost.
 
 echo
 echo "Agent shell"
 echo "─────────────────────────────────────"
 
-agent_fns="$(bash -lc 'declare -F' 2>/dev/null | wc -l)"
-if [[ "$agent_fns" -eq 0 ]]; then
-    check_pass "no functions leak into the agent shell"
+agent_fns="$(bash -lc 'compgen -A function || true' 2>/dev/null)"
+agent_dotfiles_fns="$(printf '%s\n' "$agent_fns" | grep -Ec '^(_dotfiles_|reload$|proj$|theme$|fmt$|lint$|lintf$)' || true)"
+if [[ "$agent_dotfiles_fns" -eq 0 ]]; then
+    check_pass "no dotfiles interactive/private functions leak into the agent shell"
 else
-    check_warn "$agent_fns function(s) in the agent shell — each is re-encoded into every harness snapshot and paid per tool call (bash -lc 'declare -F')"
+    check_warn "$agent_dotfiles_fns dotfiles interactive/private function(s) in the agent shell"
 fi
 
 agent_aliases="$(bash -lc 'alias' 2>/dev/null | wc -l)"

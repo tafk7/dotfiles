@@ -8,6 +8,7 @@ Run the local suite:
 
 ```bash
 for test_file in tests/*.sh; do bash "$test_file"; done
+python3 tests/startup-benchmark-test.py
 python3 tests/theme-contrast.py
 ```
 
@@ -18,9 +19,35 @@ the base revision:
 python3 tests/startup-benchmark.py /path/to/base /path/to/candidate
 ```
 
-The benchmark takes at least 30 samples for Bash and Zsh, for both Layer 0 and
-interactive startup. It fails when the candidate regression exceeds both 10 ms
-and 15%, and also enforces a two-second catastrophic ceiling.
+The benchmark copies both revisions without live generated state and links the
+actual startup files into isolated HOME directories. It starts with a clean
+environment and deterministic direnv/Starship/uv/fzf/zoxide fixtures, then checks
+that the intended profile, checkout, project exports, and interactive functions
+loaded. A nonzero exit, startup diagnostic, or missing marker fails the run.
+Interactive measurements use a controlling terminal; output is never silently
+discarded. The fixture suppresses Ubuntu's first-shell sudo tutorial explicitly.
+
+It takes at least 30 samples per revision for first environment initialization,
+inherited environment, interactive startup (Bash and Zsh), and Bash export/function
+snapshot replay. Base/candidate execution order alternates randomly; reports
+include medians and p95. Use `--json /tmp/startup.json` to retain raw samples.
+It fails when the candidate regression exceeds both 10 ms and 15%, and also
+enforces a two-second catastrophic ceiling. These are warm-cache shell/config
+measurements with controlled tools, not benchmarks of real tool releases,
+Windows IPC, first prompt rendering, or model/tool transport latency.
+
+`tests/project-environment.sh` requires direnv and tests actual authorized
+project activation in fresh Bash/Zsh subprocesses, including a changed working
+directory with inherited environment guards and rejection of an unapproved
+`.envrc`. Bare Bash intentionally inherits its parent's environment. An agent
+using snapshot replay must arrange activation separately when needed; a child
+shell's activation does not update the agent parent's environment.
+
+`tests/theme-refresh.sh` verifies the prompt fast path in both shells, including
+global/session/window changes, standalone operation alongside a running tmux
+server, enable/disable transitions, exit-status preservation, and fallback for
+unfamiliar state. Unchanged prompts read freshness data with shell builtins and
+make one tmux context query when inside tmux; they do not launch the full resolver.
 
 ## Platform confidence
 

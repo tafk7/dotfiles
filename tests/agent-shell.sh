@@ -8,6 +8,7 @@ source "$ROOT/tests/lib/harness.sh"
 trap fixture_cleanup EXIT
 fixture_init
 unset _DOTFILES_ENV_LOADED _DOTFILES_BASE_ENV _PROFILE_LOADED
+unset RIPGREP_CONFIG_PATH
 
 mkdir -p "$HOME"
 ln -s "$ROOT/entry/profile.sh" "$HOME/.profile"

@@ -58,7 +58,7 @@ jobs:
       - name: Install validation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-yaml zsh tmux
+          sudo apt-get install -y python3-yaml zsh tmux direnv
 
       - name: Theme catalog parses
         run: |
@@ -91,11 +91,12 @@ jobs:
             tests/config-reconcile.sh tests/eget-staging.sh tests/install-failures.sh \
             tests/install-ai.sh tests/install-toolchains.sh tests/neovim.sh \
             tests/uninstall-safety.sh tests/git-hooks.sh tests/registry.sh tests/agent-badge.sh \
-            tests/agent-shell.sh tests/shell-behavior.sh tests/features.sh tests/theme-system.sh \
+            tests/agent-shell.sh tests/project-environment.sh tests/shell-behavior.sh tests/features.sh tests/theme-system.sh tests/theme-refresh.sh \
             tests/tmux-config.sh tests/verify-profiles.sh tests/wsl.sh \
             tests/xrdp.sh tests/validate-structured.sh; do
             bash "$test_file"
           done
+          python3 tests/startup-benchmark-test.py
 
       - name: Cheatsheet TSV is well-formed
         run: |

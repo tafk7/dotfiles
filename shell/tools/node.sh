@@ -14,6 +14,8 @@ alias nrt='npm run test'
 alias nrs='npm run start'
 
 # Clean reinstall. Preserve the lockfile and use its reproducible install mode.
+# Clear the pre-upgrade alias before Bash/Zsh parse the function on reload.
+unalias nclean 2>/dev/null || true
 nclean() {
     rm -rf node_modules
     if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then
