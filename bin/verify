@@ -352,7 +352,7 @@ if [[ -n "$theme" ]]; then
         else
             check_warn "delta: generated index is missing '$r_delta'"
         fi
-        if git config --global --get-all include.path 2>/dev/null | grep -Fxq "$(_theme_generated_dir)/delta.gitconfig"; then
+        if git config --global --includes --get-all include.path 2>/dev/null | grep -Fxq "$(_theme_generated_dir)/delta.gitconfig"; then
             check_pass "delta: ~/.gitconfig includes the XDG theme cache"
         else
             check_warn "delta: ~/.gitconfig missing the XDG theme-cache include"
