@@ -46,7 +46,11 @@ track_install() {
 record_component_outcome() {
     local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes note existing_record existing_note
     binary="${TOOL_BINARY[$name]}"
-    path="$(command -v "$binary" 2>/dev/null || true)"
+    if [[ "${TOOL_METHOD[$name]:-}" == eget && -x "$HOME/.local/bin/$binary" ]]; then
+        path="$HOME/.local/bin/$binary"
+    else
+        path="$(command -v "$binary" 2>/dev/null || true)"
+    fi
     [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
     if [[ -z "$path" && "$result" != fail ]]; then
         local candidate
@@ -818,11 +822,16 @@ install_eget_tools() {
     # the pinned version regardless. Same courtesy the AI installers extend to an
     # org-managed binary on PATH.
     if [[ "${FORCE_REINSTALL:-false}" != "true" ]]; then
-        local -a to_download=() existing binary
+        local -a to_download=() existing binary managed_target
         local verify_cmd
         for name in "${eget_tools[@]}"; do
             binary="${TOOL_BINARY[$name]}"
-            existing="$(command -v "$binary" 2>/dev/null || true)"
+            managed_target="$HOME/.local/bin/$binary"
+            if [[ -x "$managed_target" ]]; then
+                existing="$managed_target"
+            else
+                existing="$(command -v "$binary" 2>/dev/null || true)"
+            fi
             if [[ -n "$existing" && "$existing" != "$HOME/.local/bin/"* ]]; then
                 verify_cmd="$(tool_verify_command "$name")"
                 if eval "$verify_cmd"; then
@@ -947,6 +956,9 @@ install_eget_tools() {
         fi
         staged_hash="$(sha256sum "$staged" | awk '{print $1}')"
         atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"
+        PATH="$HOME/.local/bin:$PATH"
+        export PATH
+        hash -r
         rm -rf "$stage_home"
         # Judge by the binary on disk at our prefix, NOT command -v: on a fresh
         # machine ~/.local/bin isn't on PATH yet, so a PATH lookup would report

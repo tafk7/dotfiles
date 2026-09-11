@@ -173,7 +173,7 @@ declare -A TOOL_VERIFY=(
     [pi]='command -v pi >/dev/null 2>&1 && pi --version >/dev/null 2>&1'
     # Binary present isn't success for a service — it must be running.
     [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
-    [ripgrep]='p=$(command -v rg 2>/dev/null || true); [[ -n "$p" && "$p" != */.codex/* && "$p" != */.vscode*/extensions/* ]]'
+    [ripgrep]='if [[ -x "$HOME/.local/bin/rg" ]]; then "$HOME/.local/bin/rg" --version >/dev/null 2>&1; else p=$(command -v rg 2>/dev/null || true); [[ -n "$p" && "$p" != */.codex/* && "$p" != */.vscode*/extensions/* ]]; fi'
 )
 
 # TOOL_PATHS: tool name → space-separated paths to remove on uninstall
