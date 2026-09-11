@@ -20,10 +20,26 @@ export DOTFILES_MUTATION_LOG="$TEST_ROOT/network.log"
 export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
 export DOTFILES_THEME_ENABLED=0
 
+# An installed vim-plug is an autoload function: exists('*plug#begin') is false
+# until the file is loaded. Provide a minimal fixture to prove init.vim calls
+# the installed manager without downloading it.
+mkdir -p "$HOME/.config/nvim/autoload"
+cat > "$HOME/.config/nvim/autoload/plug.vim" <<'EOF'
+function! plug#begin(...) abort
+  let g:dotfiles_test_plug_begin = 1
+  command! -nargs=+ Plug call plug#register(<q-args>)
+endfunction
+function! plug#register(...) abort
+endfunction
+function! plug#end(...) abort
+endfunction
+EOF
+
 printf 'markdown keeps two spaces  \n' > "$TEST_ROOT/note.md"
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
     XDG_CACHE_HOME="$XDG_CACHE_HOME" DOTFILES_DIR="$ROOT" PATH="$PATH" \
-    "$NVIM_BIN" --headless -u "$ROOT/configs/init.vim" "$TEST_ROOT/note.md" '+write' '+quit'
+    "$NVIM_BIN" --headless -u "$ROOT/configs/init.vim" "$TEST_ROOT/note.md" \
+        '+if !get(g:, "dotfiles_test_plug_begin", 0) | cquit 30 | endif' '+write' '+quit'
 grep -q '  $' "$TEST_ROOT/note.md" || fail "Markdown trailing spaces were removed"
 
 printf 'python removes spaces   \nsecond line\n' > "$TEST_ROOT/code.py"
