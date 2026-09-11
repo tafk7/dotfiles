@@ -77,6 +77,27 @@ record_component_outcome() {
     ledger_record "$name" "$applicable" "$ownership" "$status" "$version" "$path" "${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
 }
 
+reconcile_observed_components() {
+    [[ "${DRY_RUN:-false}" == "true" ]] && return 0
+    local name verify_cmd path version ownership
+    for name in "${!TOOL_BINARY[@]}"; do
+        ledger_line "$name" >/dev/null 2>&1 && continue
+        tool_applicable "$name" || {
+            ledger_record "$name" no unknown not-applicable "" "" "platform/architecture"
+            continue
+        }
+        verify_cmd="$(tool_verify_command "$name")"
+        eval "$verify_cmd" || continue
+        path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
+        [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+        version=""
+        [[ -z "$path" || ! -x "$path" ]] || version="$("$path" --version 2>/dev/null | head -n1 || true)"
+        ownership=unknown
+        [[ -n "$path" ]] && ! tool_owned_path "$name" "$path" && ownership=external
+        ledger_record "$name" yes "$ownership" present "$version" "$path" "observed during reconciliation; ownership unclaimed"
+    done
+}
+
 print_install_summary() {
     [[ ${#INSTALL_OK[@]} -eq 0 && ${#INSTALL_SKIP[@]} -eq 0 && ${#INSTALL_FAIL[@]} -eq 0 && ${#INSTALL_NA[@]} -eq 0 ]] && return 0
 
