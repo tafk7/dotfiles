@@ -49,4 +49,19 @@ ln -s "$TEST_ROOT/missing" "$HOME/.profile"
 run_setup
 assert_eq "$(readlink -f "$HOME/.profile")" "$(readlink -f "$ROOT/entry/profile.sh")" "broken symlink not repaired"
 
+HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
+    XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+    DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" \
+    "$ROOT/setup.sh" --config --theme --no-hooks \
+    --git-name 'Fixture User' --git-email fixture@example.com >/dev/null
+themed_first="$(fixture_managed_snapshot)"
+run_setup_theme_output="$(HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
+    XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+    DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" \
+    "$ROOT/setup.sh" --config --no-hooks \
+    --git-name 'Fixture User' --git-email fixture@example.com)"
+themed_second="$(fixture_managed_snapshot)"
+assert_eq "$themed_second" "$themed_first" "default-theme setup rerun was not idempotent"
+: "$run_setup_theme_output"
+
 printf 'config-reconcile: ok\n'

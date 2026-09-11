@@ -16,6 +16,7 @@ fixture_init() {
     export XDG_CACHE_HOME="$TEST_ROOT/cache"
     export TMPDIR="$TEST_ROOT/tmp"
     export TMUX_TMPDIR="$TEST_ROOT/tmux"
+    export TMUX=""
     export DOTFILES_DIR="$TEST_REPO_ROOT"
     export DOTFILES_BACKUP_PREFIX="$TEST_ROOT/backups"
 }
