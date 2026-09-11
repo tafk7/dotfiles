@@ -87,6 +87,25 @@ record_component_outcome() {
     ledger_record "$name" "$applicable" "$ownership" "$status" "$version" "$path" "$note"
 }
 
+observed_component_version() {
+    local name="$1" path="$2" package version=""
+
+    # Executing an externally owned CLI merely to discover its version is not
+    # reliably read-only. Azure CLI, for example, creates ~/.azure metadata and
+    # appends telemetry even for `az --version`. Prefer package-manager metadata
+    # for registered APT components, which is both faster and side-effect-free.
+    package="${TOOL_APT_PACKAGE[$name]:-}"
+    if [[ "${TOOL_METHOD[$name]:-}" == "apt" && -n "$package" ]] \
+       && command -v dpkg-query >/dev/null 2>&1; then
+        version="$(dpkg-query -W -f='${Version}\n' "$package" 2>/dev/null || true)"
+    fi
+
+    if [[ -z "$version" && -n "$path" && -x "$path" ]]; then
+        version="$("$path" --version 2>/dev/null | head -n1 || true)"
+    fi
+    printf '%s\n' "$version"
+}
+
 reconcile_observed_components() {
     [[ "${DRY_RUN:-false}" == "true" ]] && return 0
     local name verify_cmd path version ownership
@@ -100,8 +119,7 @@ reconcile_observed_components() {
         eval "$verify_cmd" || continue
         path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
         [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
-        version=""
-        [[ -z "$path" || ! -x "$path" ]] || version="$("$path" --version 2>/dev/null | head -n1 || true)"
+        version="$(observed_component_version "$name" "$path")"
         ownership=unknown
         [[ -n "$path" ]] && ! tool_owned_path "$name" "$path" && ownership=external
         ledger_record "$name" yes "$ownership" present "$version" "$path" "observed during reconciliation; ownership unclaimed"

@@ -91,7 +91,7 @@ jobs:
             tests/config-reconcile.sh tests/eget-staging.sh tests/install-failures.sh \
             tests/install-ai.sh tests/install-toolchains.sh tests/neovim.sh \
             tests/uninstall-safety.sh tests/git-hooks.sh tests/registry.sh tests/agent-badge.sh \
-            tests/agent-shell.sh tests/shell-behavior.sh tests/theme-system.sh \
+            tests/agent-shell.sh tests/shell-behavior.sh tests/features.sh tests/theme-system.sh \
             tests/tmux-config.sh tests/verify-profiles.sh tests/wsl.sh \
             tests/xrdp.sh tests/validate-structured.sh; do
             bash "$test_file"
@@ -138,6 +138,14 @@ jobs:
         run: |
           set -euo pipefail
           export DOTFILES_DIR="$PWD"
+          test_root="$(mktemp -d "$RUNNER_TEMP/dotfiles-theme-cycle.XXXXXX")"
+          export HOME="$test_root/home"
+          export XDG_CONFIG_HOME="$test_root/config"
+          export XDG_DATA_HOME="$test_root/data"
+          export XDG_STATE_HOME="$test_root/state"
+          export XDG_CACHE_HOME="$test_root/cache"
+          export TMUX=""
+          mkdir -p "$HOME"
           # Discover themes the same way theme-switcher does: every dir
           # under themes/ that contains a meta.sh is a valid theme.
           themes=$(find themes -mindepth 2 -maxdepth 2 -name meta.sh \
@@ -145,15 +153,13 @@ jobs:
           [[ -z "$themes" ]] && { echo "no themes discovered"; exit 1; }
           for t in $themes; do
             echo "::group::Apply theme: $t"
-            # Apply writes generated/theme.sh + per-tool artifacts. We don't
-            # have the consumer tools (vim, btop, etc.) installed in CI, so
-            # we just check the apply itself doesn't error and that the
-            # generated/theme.sh it produced pins DOTFILES_THEME to the theme.
-            # Source it rather than grep it: theme-switcher writes the value
-            # with printf %q, so the quoting is not part of the contract.
             ./bin/theme-switcher "$t"
-            ( source generated/theme.sh && [[ "$DOTFILES_THEME" == "$t" ]] ) \
-              || { echo "::error::theme.sh did not pin to $t"; exit 1; }
+            state="$XDG_STATE_HOME/dotfiles/theme.tsv"
+            actual="$(awk -F '\t' '$1 == "default" { print $2 }' "$state")"
+            [[ "$actual" == "$t" ]] \
+              || { echo "::error::theme state did not select $t (got: ${actual:-missing})"; exit 1; }
+            [[ -f "$XDG_CACHE_HOME/dotfiles/theme/themes/$t/starship.toml" ]] \
+              || { echo "::error::theme cache missing for $t"; exit 1; }
             echo "::endgroup::"
           done
           echo "All themes cycled successfully."
@@ -163,6 +169,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
     steps:
       # The structural jobs above never execute lib/install.sh. This one runs
       # the real installer in a clean container as a non-root sudo user — the
@@ -179,7 +188,7 @@ jobs:
           echo 'test ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/test
           chmod 0440 /etc/sudoers.d/test
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Stage repo for the test user
         run: |
@@ -306,7 +315,8 @@ jobs:
       - name: Install test prerequisites
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates git curl bash
+          DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates git curl bash passwd
+          useradd -m -s /bin/bash test
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Exercise supported release without mutation
-        run: bash tests/setup-safety.sh
+        run: su -s /bin/bash test -c "cd '$GITHUB_WORKSPACE' && bash tests/setup-safety.sh"
