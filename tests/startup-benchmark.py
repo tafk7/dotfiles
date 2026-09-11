@@ -141,6 +141,24 @@ class Fixture:
             p = self.root / "bin" / name
             p.write_text("#!/bin/bash\n" + body + "\n")
             p.chmod(0o755)
+
+        # The benchmark measures warm-cache startup. Seed both the controlled
+        # uv completion and a valid compinit dump before timing. `compinit -i`
+        # is used only for fixture preparation: it prevents host-specific
+        # insecure completion files from opening an interactive prompt. The
+        # startup under test still follows entry/zsh.sh and uses `compinit -C`.
+        completion_dir = self.root / "cache/dotfiles/zsh/completions"
+        completion_dir.mkdir(parents=True)
+        (completion_dir / "_uv").write_text("#compdef uv\n_uv() { :; }\n")
+        warm_env = self.env | {"FPATH": f"{completion_dir}:{self.env['FPATH']}"}
+        subprocess.run(
+            ["/usr/bin/zsh", "-dfc", 'autoload -Uz compinit; compinit -i -d "$HOME/.zcompdump"'],
+            env=warm_env,
+            cwd=self.tree,
+            capture_output=True,
+            check=True,
+            timeout=10,
+        )
         self.inherited: dict[str, dict[str, str]] = {}
         for shell in ("bash", "zsh"):
             argv = self.command(shell, "first-env", 'command env -0')

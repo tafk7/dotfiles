@@ -30,8 +30,12 @@ class StartupBenchmarkTest(unittest.TestCase):
     def test_zsh_fpath_is_distribution_owned(self):
         roots = self.fixture.env["FPATH"].split(":")
         self.assertTrue(roots)
-        self.assertTrue(all(path.startswith(("/usr/share/zsh/", "/usr/lib/zsh/")) for path in roots))
+        self.assertTrue(
+            all(path.startswith(("/usr/share/zsh/", "/usr/lib/zsh/")) for path in roots)
+        )
         self.assertTrue(any((pathlib.Path(path) / "compinit").is_file() for path in roots))
+        self.assertTrue((self.fixture.root / "home/.zcompdump").is_file())
+        self.assertTrue((self.fixture.root / "cache/dotfiles/zsh/completions/_uv").is_file())
 
     def test_missing_profile_fails_even_with_inherited_guards(self):
         (self.fixture.root / "home/.profile").unlink()

@@ -28,7 +28,8 @@ Interactive measurements use a controlling terminal; output is never silently
 discarded. The fixture suppresses Ubuntu's first-shell sudo tutorial explicitly
 and restricts Zsh's completion search to distribution-owned function directories,
 so permissive host or runner plugin directories cannot trigger an interactive
-`compinit` security prompt.
+`compinit` security prompt. It prepares a valid completion dump before sampling,
+matching the documented warm-cache benchmark scope.
 
 It takes at least 30 samples per revision for first environment initialization,
 inherited environment, interactive startup (Bash and Zsh), and Bash export/function
