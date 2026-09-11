@@ -103,6 +103,12 @@ INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
 install_eget_tools >/dev/null
 [[ -x "$HOME/.local/bin/rg" ]] || fail "private Codex rg suppressed managed ripgrep"
 assert_eq "$("$HOME/.local/bin/rg" --version)" "ripgrep 15.2.0"
+PATH="$private_bin:$HOME/.local/bin:$TEST_SYSTEM_PATH"
+eval "$(tool_verify_command ripgrep)" || fail "managed ripgrep was hidden by private PATH entry"
+INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
+install_eget_tools >/dev/null
+[[ "$(ledger_line ripgrep)" == $'ripgrep\tyes\tdotfiles\tinstalled\t'* ]] \
+    || fail "managed ripgrep ownership was not retained"
 
 # Multi-line version output (eza/ShellCheck) must still match the pin and avoid
 # an unnecessary download.
