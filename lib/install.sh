@@ -44,7 +44,7 @@ track_install() {
 }
 
 record_component_outcome() {
-    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes
+    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes note existing_record existing_note
     binary="${TOOL_BINARY[$name]}"
     path="$(command -v "$binary" 2>/dev/null || true)"
     [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
@@ -74,7 +74,13 @@ record_component_outcome() {
             ;;
         *) status="$result" ;;
     esac
-    ledger_record "$name" "$applicable" "$ownership" "$status" "$version" "$path" "${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
+    note="${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
+    existing_record="$(ledger_line "$name" 2>/dev/null || true)"
+    if [[ -n "$existing_record" ]]; then
+        IFS=$'\t' read -r _ _ _ _ _ _ existing_note _ <<< "$existing_record"
+        [[ "$existing_note" != *' pin='* ]] || note="$existing_note"
+    fi
+    ledger_record "$name" "$applicable" "$ownership" "$status" "$version" "$path" "$note"
 }
 
 reconcile_observed_components() {
@@ -194,7 +200,7 @@ validate_tar_archive() {
 }
 
 atomic_replace_binary() {
-    local component="$1" staged="$2" target="$3"
+    local component="$1" staged="$2" target="$3" metadata="${4:-}"
     [[ -x "$staged" ]] || { error "Staged $component binary is not executable: $staged"; return 1; }
     mkdir -p "$(dirname "$target")"
     local pending="${target}.dotfiles-new.$$"
@@ -203,7 +209,9 @@ atomic_replace_binary() {
     mv -f "$pending" "$target"
     local version
     version="$("$target" --version 2>/dev/null | head -n1 || true)"
-    ledger_record "$component" yes dotfiles installed "$version" "$target" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
+    local note="${TOOL_UPDATE_CONTRACT[$component]:-staged}"
+    [[ -z "$metadata" ]] || note+=" $metadata"
+    ledger_record "$component" yes dotfiles installed "$version" "$target" "$note"
     journal_clear
 }
 
@@ -889,7 +897,7 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
-        local pinned current_output target
+        local pinned current_output target existing_record recorded_note recorded_hash actual_hash
         pinned="$(awk -v section="[\"$slug\"]" '
             $0 == section { active=1; next }
             active && /^\[/ { exit }
@@ -899,6 +907,19 @@ install_eget_tools() {
         ' "$config")"
         target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
         if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" ]]; then
+            existing_record="$(ledger_line "$name" 2>/dev/null || true)"
+            recorded_note=""
+            if [[ -n "$existing_record" ]]; then
+                IFS=$'\t' read -r _ _ _ _ _ _ recorded_note _ <<< "$existing_record"
+            fi
+            if [[ "$recorded_note" == *" pin=$pinned "* && "$recorded_note" =~ sha256=([0-9a-f]{64}) ]]; then
+                recorded_hash="${BASH_REMATCH[1]}"
+                actual_hash="$(sha256sum "$target" | awk '{print $1}')"
+                if [[ "$actual_hash" == "$recorded_hash" ]]; then
+                    track_install "$name" skip
+                    continue
+                fi
+            fi
             current_output="$("$target" --version 2>/dev/null || true)"
             if [[ "$current_output" == *"${pinned#v}"* ]]; then
                 track_install "$name" skip
@@ -906,9 +927,10 @@ install_eget_tools() {
             fi
         fi
 
-        local stage_home stage_config staged
+        local stage_home stage_config staged staged_hash
         stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")"
         stage_config="$stage_home/eget.toml"
+        mkdir -p "$stage_home/.local/bin"
         sed "s|~/.local/bin|$stage_home/.local/bin|g" "$config" > "$stage_config"
         if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "$slug"; then
             rm -rf "$stage_home"
@@ -923,7 +945,8 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
-        atomic_replace_binary "$name" "$staged" "$target"
+        staged_hash="$(sha256sum "$staged" | awk '{print $1}')"
+        atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"
         rm -rf "$stage_home"
         # Judge by the binary on disk at our prefix, NOT command -v: on a fresh
         # machine ~/.local/bin isn't on PATH yet, so a PATH lookup would report

@@ -13,7 +13,7 @@ cat > "$HOME/.local/bin/eget" <<'EOF'
 #!/bin/sh
 if [ "${1:-}" = --version ]; then echo 'eget 1.3.4'; exit 0; fi
 [ "${EGET_TEST_FAIL:-0}" = 0 ] || exit 42
-mkdir -p "$HOME/.local/bin"
+[ -d "$HOME/.local/bin" ] || exit 43
 cat > "$HOME/.local/bin/demo" <<'BIN'
 #!/bin/sh
 [ "${1:-}" = --version ] && echo 'demo new'
@@ -63,6 +63,7 @@ INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
 FORCE_REINSTALL=false
 install_eget_tools >/dev/null
 assert_eq "$("$HOME/.local/bin/demo" --version)" "demo new"
+[[ "$(ledger_line demo)" == *'pin=v1 sha256='* ]] || fail "staged artifact pin/hash not recorded"
 
 # A bundled/private rg elsewhere on PATH is not a durable system installation.
 # It must not suppress installation of the pinned dotfiles-owned ripgrep.
@@ -76,7 +77,7 @@ chmod +x "$private_bin/rg"
 cat > "$HOME/.local/bin/eget" <<'EOF'
 #!/bin/sh
 if [ "${1:-}" = --version ]; then echo 'eget 1.3.4'; exit 0; fi
-mkdir -p "$HOME/.local/bin"
+[ -d "$HOME/.local/bin" ] || exit 43
 cat > "$HOME/.local/bin/rg" <<'BIN'
 #!/bin/sh
 [ "${1:-}" = --version ] && echo 'ripgrep 15.2.0'
