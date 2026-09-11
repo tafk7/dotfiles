@@ -27,6 +27,12 @@ class StartupBenchmarkTest(unittest.TestCase):
                     self.fixture.sample(shell, mode)
         self.fixture.sample("bash", "snapshot")
 
+    def test_zsh_fpath_is_distribution_owned(self):
+        roots = self.fixture.env["FPATH"].split(":")
+        self.assertTrue(roots)
+        self.assertTrue(all(path.startswith(("/usr/share/zsh/", "/usr/lib/zsh/")) for path in roots))
+        self.assertTrue(any((pathlib.Path(path) / "compinit").is_file() for path in roots))
+
     def test_missing_profile_fails_even_with_inherited_guards(self):
         (self.fixture.root / "home/.profile").unlink()
         for shell in ("bash", "zsh"):

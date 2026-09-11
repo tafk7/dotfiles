@@ -24,6 +24,25 @@ RUNS = max(30, int(os.environ.get("DOTFILES_BENCH_RUNS", "30")))
 MARKER = b"DOTFILES_BENCH_OK"
 
 
+def distribution_zsh_fpath() -> str:
+    """Return deterministic distro-owned Zsh function directories."""
+    proc = subprocess.run(
+        ["/usr/bin/zsh", "-dfc", "print -rl -- $fpath"],
+        env={"HOME": "/nonexistent", "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+    roots = [
+        entry for entry in proc.stdout.splitlines()
+        if entry.startswith(("/usr/share/zsh/", "/usr/lib/zsh/")) and pathlib.Path(entry).is_dir()
+    ]
+    if not any((pathlib.Path(entry) / "compinit").is_file() for entry in roots):
+        raise RuntimeError("Unable to locate compinit in the distribution Zsh function path")
+    return ":".join(roots)
+
+
 def execute(argv: list[str], env: dict[str, str], cwd: pathlib.Path, interactive: bool = False) -> tuple[float, bytes]:
     """Use a controlling terminal for interactive shells; retain diagnostics."""
     start = time.perf_counter_ns()
@@ -50,7 +69,11 @@ def execute(argv: list[str], env: dict[str, str], cwd: pathlib.Path, interactive
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0 or not select.select([master], [], [], remaining)[0]:
-                    raise TimeoutError("Interactive startup exceeded 10 seconds")
+                    captured = b"".join(chunks).decode(errors="replace")
+                    raise TimeoutError(
+                        f"Interactive startup exceeded 10 seconds: {argv[0]}\n"
+                        f"Captured terminal output:\n{captured}"
+                    )
                 try:
                     chunk = os.read(master, 65536)
                 except OSError as exc:
@@ -91,6 +114,12 @@ class Fixture:
             "TMUX": "", "DOTFILES_DIR": str(self.tree), "WIN_USER": "fixture",
             "DOTFILES_BENCH_TREE": str(self.tree),
             "DOTFILES_LEGACY_GENERATED_DIR": str(self.root / "legacy"),
+            # Hosted runners commonly expose writable /usr/local completion
+            # directories. A real TTY makes compinit prompt about those paths,
+            # turning a startup benchmark into an input wait. Benchmark only
+            # the distro-owned completion tree; user/plugin completion paths
+            # are represented by the controlled fixture cache below.
+            "FPATH": distribution_zsh_fpath(),
         }
         for name in ("home", "bin", "config", "data", "state", "cache", "tmp", "tmux", "legacy"):
             (self.root / name).mkdir()

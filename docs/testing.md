@@ -25,7 +25,10 @@ environment and deterministic direnv/Starship/uv/fzf/zoxide fixtures, then check
 that the intended profile, checkout, project exports, and interactive functions
 loaded. A nonzero exit, startup diagnostic, or missing marker fails the run.
 Interactive measurements use a controlling terminal; output is never silently
-discarded. The fixture suppresses Ubuntu's first-shell sudo tutorial explicitly.
+discarded. The fixture suppresses Ubuntu's first-shell sudo tutorial explicitly
+and restricts Zsh's completion search to distribution-owned function directories,
+so permissive host or runner plugin directories cannot trigger an interactive
+`compinit` security prompt.
 
 It takes at least 30 samples per revision for first environment initialization,
 inherited environment, interactive startup (Bash and Zsh), and Bash export/function
