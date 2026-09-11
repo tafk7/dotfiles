@@ -71,7 +71,7 @@ declare -A TOOL_METHOD=(
     [opencode]=installer
     [pi]=installer
     [wsl2-ssh-agent]=eget
-    [xrdp]=installer
+    [xrdp]=apt
     [zsh]=apt
     [docker]=apt
     [azure-cli]=apt
@@ -112,6 +112,15 @@ declare -A TOOL_PLATFORM=()
 declare -A TOOL_ARCHES=()
 declare -A TOOL_OWNERSHIP_ROOTS=()
 declare -A TOOL_UPDATE_CONTRACT=()
+declare -A TOOL_RELATIVE_BINARY=(
+    [neovim]="bin/nvim"
+)
+declare -A TOOL_APT_PACKAGE=(
+    [zsh]="zsh"
+    [docker]="docker-ce"
+    [azure-cli]="azure-cli"
+    [xrdp]="xrdp"
+)
 
 for _registry_name in "${!TOOL_BINARY[@]}"; do
     TOOL_PLATFORM["$_registry_name"]="ubuntu"
@@ -126,8 +135,8 @@ for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv 
 done
 unset _registry_name
 TOOL_OWNERSHIP_ROOTS[eget]="$HOME/.local/bin"
-TOOL_OWNERSHIP_ROOTS[neovim]="$HOME/.local"
-TOOL_OWNERSHIP_ROOTS[tmux]="$HOME/.local"
+TOOL_OWNERSHIP_ROOTS[neovim]="$HOME/.local/bin|$HOME/.local/nvim|$HOME/.local/.dotfiles-neovim-rollback"
+TOOL_OWNERSHIP_ROOTS[tmux]="$HOME/.local/bin"
 TOOL_OWNERSHIP_ROOTS[nvm]="$HOME/.nvm"
 TOOL_OWNERSHIP_ROOTS[rust]="$HOME/.cargo|$HOME/.rustup"
 TOOL_OWNERSHIP_ROOTS[claude]="$HOME/.local/bin|$HOME/.local/share/claude"
@@ -166,6 +175,7 @@ declare -A TOOL_VERIFY=(
 # Empty = managed by install method (apt uses apt remove; eget uses ~/.local/bin/BINARY)
 declare -A TOOL_PATHS=(
     [neovim]="$HOME/.local/bin/nvim|$HOME/.local/nvim"
+    [tmux]="$HOME/.local/bin/tmux"
     [nvm]="$HOME/.nvm"
     [rust]=""
     [uv]="$HOME/.local/bin/uv|$HOME/.local/bin/uvx"
@@ -250,11 +260,14 @@ tool_applicable() {
 }
 
 tool_owned_path() {
-    local name="$1" path="$2" roots root
+    local name="$1" path="$2" roots root path_canon root_canon
+    path_canon="$(realpath -m -- "$path" 2>/dev/null || true)"
+    [[ -n "$path_canon" ]] || return 1
     roots="${TOOL_OWNERSHIP_ROOTS[$name]:-}"
     while [[ -n "$roots" ]]; do
         case "$roots" in *'|'*) root="${roots%%|*}"; roots="${roots#*|}" ;; *) root="$roots"; roots="" ;; esac
-        [[ "$path" == "$root" || "$path" == "$root/"* ]] && return 0
+        root_canon="$(realpath -m -- "$root" 2>/dev/null || true)"
+        [[ "$path_canon" == "$root_canon" || "$path_canon" == "$root_canon/"* ]] && return 0
     done
     return 1
 }

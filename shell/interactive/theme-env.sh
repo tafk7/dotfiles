@@ -15,8 +15,10 @@ unset _dotfiles_theme_preferences _dotfiles_theme_key _dotfiles_theme_value
 
 if [[ "$_DOTFILES_THEME_ACTIVE" == 1 && -n "${DOTFILES_DIR:-}" \
    && -x "$DOTFILES_DIR/bin/theme-switcher" ]]; then
+    export DOTFILES_THEME_ENABLED=1
     eval "$("$DOTFILES_DIR/bin/theme-switcher" env "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" 2>/dev/null)"
 else
+    export DOTFILES_THEME_ENABLED=0
     unset DOTFILES_THEME DOTFILES_THEME_CONTEXT_SIGNATURE \
         DOTFILES_THEME_SESSION_ID DOTFILES_THEME_WINDOW_ID \
         DOTFILES_THEME_VIM_RESOLVED DOTFILES_THEME_BAT_RESOLVED \

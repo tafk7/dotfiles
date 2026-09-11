@@ -151,7 +151,24 @@ for tier in bash dev work ai rdp; do
         [[ "$name" != "$binary" ]] && label="$name ($binary)"
 
         if eval "$verify_cmd"; then
-            check_pass "$label"
+            if [[ "$VERIFY_MODE" == installed ]]; then
+                ledger="$(ledger_line "$name" 2>/dev/null || true)"
+                IFS=$'\t' read -r _ _ recorded_owner recorded_status _ recorded_path _ _ <<< "$ledger"
+                observed_path="$(command -v "$binary" 2>/dev/null || true)"
+                [[ -z "$observed_path" ]] || observed_path="$(readlink -f "$observed_path" 2>/dev/null || printf '%s' "$observed_path")"
+                if [[ "$recorded_status" == update-failed ]]; then
+                    check_warn "$label (prior installation works; last update failed)"
+                elif [[ "$recorded_owner" == dotfiles && -n "$observed_path" ]] \
+                     && ! tool_owned_path "$name" "$observed_path"; then
+                    check_fail "$label (present outside recorded ownership: $observed_path)"
+                elif [[ "$recorded_path" != - && -n "$observed_path" && "$recorded_path" != "$observed_path" ]]; then
+                    check_warn "$label (path changed: recorded $recorded_path, observed $observed_path)"
+                else
+                    check_pass "$label"
+                fi
+            else
+                check_pass "$label"
+            fi
         else
             if [[ "$expected" == true ]]; then
                 check_fail "$label (not found)"
@@ -170,8 +187,8 @@ echo
 echo "Git"
 echo "─────────────────────────────────────"
 
-git_name=$(git config --get user.name 2>/dev/null || true)
-git_email=$(git config --get user.email 2>/dev/null || true)
+git_name=$(git config --global --get user.name 2>/dev/null || true)
+git_email=$(git config --global --get user.email 2>/dev/null || true)
 if [[ -n "$git_name" && -n "$git_email" ]]; then
     check_pass "user: $git_name <$git_email>"
 else

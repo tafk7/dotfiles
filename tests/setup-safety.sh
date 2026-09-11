@@ -11,6 +11,9 @@ fixture_init
 # Seed more backups than retention would keep. A dry-run must not rotate them.
 /bin/mkdir -p "$DOTFILES_BACKUP_PREFIX"
 for n in $(seq 1 12); do /bin/mkdir -p "$DOTFILES_BACKUP_PREFIX/backup-20260101-0000$n"; done
+/bin/mkdir -p "$XDG_STATE_HOME/dotfiles"
+printf 'schema\t1\ncomponent\tdemo\nold_path\t-\nstaged_path\t-\nnew_path\t-\n' \
+    > "$XDG_STATE_HOME/dotfiles/transaction.tsv"
 
 install_mutation_spies
 repo_before="$(fixture_snapshot "$ROOT")"

@@ -44,7 +44,7 @@ track_install() {
 }
 
 record_component_outcome() {
-    local name="$1" result="$2" binary path="" ownership="unknown" version="" status
+    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes
     binary="${TOOL_BINARY[$name]}"
     path="$(command -v "$binary" 2>/dev/null || true)"
     [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
@@ -61,19 +61,20 @@ record_component_outcome() {
         if tool_owned_path "$name" "$path"; then ownership="dotfiles"; else ownership="external"; fi
         version="$("$path" --version 2>/dev/null | head -n1 || true)"
     fi
-    if [[ "${TOOL_METHOD[$name]:-}" == apt && "$result" == ok ]]; then
+    if [[ "${TOOL_METHOD[$name]:-}" == apt && "$result" == ok ]] \
+       && dpkg-query -W "${TOOL_APT_PACKAGE[$name]:-$name}" >/dev/null 2>&1; then
         ownership="package-manager"
     fi
     case "$result" in
-        ok) status=installed ;;
+        ok) if [[ "$ownership" == external ]]; then status=present; else status=installed; fi ;;
         skip) if [[ "$ownership" == dotfiles ]]; then status=installed; else status=present; fi ;;
-        not-applicable) status=not-applicable ;;
+        not-applicable) status=not-applicable; applicable=no ;;
         fail)
             if [[ -n "$path" && -x "$path" ]]; then status=update-failed; else status=failed; fi
             ;;
         *) status="$result" ;;
     esac
-    ledger_record "$name" yes "$ownership" "$status" "$version" "$path" "${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
+    ledger_record "$name" "$applicable" "$ownership" "$status" "$version" "$path" "${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
 }
 
 print_install_summary() {
@@ -109,16 +110,11 @@ safe_sudo() {
 
 # Detect Ubuntu version and WSL
 detect_environment() {
-    if ! command -v lsb_release >/dev/null 2>&1; then
-        warn "lsb_release not found — skipping environment detection"
-        return 0
-    fi
-
     local ubuntu_version ubuntu_codename
-    ubuntu_version=$(lsb_release -rs)
-    ubuntu_codename=$(lsb_release -cs)
+    ubuntu_version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}" 2>/dev/null || true)"
+    ubuntu_codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}" 2>/dev/null || true)"
 
-    log "Detected Ubuntu $ubuntu_version ($ubuntu_codename)"
+    [[ -z "$ubuntu_version" ]] || log "Detected Ubuntu $ubuntu_version (${ubuntu_codename:-unknown codename})"
 
     if is_wsl; then
         wsl_log "Running on Windows Subsystem for Linux"
@@ -191,27 +187,42 @@ atomic_replace_binary() {
 }
 
 atomic_replace_tree() {
-    local component="$1" staged="$2" target="$3" verify_relative="$4"
+    local component="$1" staged="$2" target="$3" verify_relative="$4" link_path="${5:-}"
     [[ -d "$staged" && -x "$staged/$verify_relative" ]] \
         || { error "Staged $component tree is incomplete: $staged"; return 1; }
     "$staged/$verify_relative" --version >/dev/null 2>&1 \
         || { error "Staged $component tree failed verification"; return 1; }
     mkdir -p "$(dirname "$target")"
-    local rollback="${target}.dotfiles-rollback.$$" version
+    local rollback_root rollback version
+    rollback_root="$(dirname "$target")/.dotfiles-${component}-rollback"
+    rollback="$rollback_root/${BASHPID:-$$}"
+    mkdir -p "$rollback_root"
     journal_begin "$component" "$rollback" "$staged" "$target"
     if [[ -e "$target" ]]; then mv "$target" "$rollback"; fi
     if ! mv "$staged" "$target"; then
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
         return 1
     fi
-    if ! "$target/$verify_relative" --version >/dev/null 2>&1; then
+    if [[ -n "$link_path" ]]; then
+        mkdir -p "$(dirname "$link_path")"
+        ln -sfn "$target/$verify_relative" "$link_path"
+    fi
+    if ! "${link_path:-$target/$verify_relative}" --version >/dev/null 2>&1; then
         rm -rf "$target"
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
+        if [[ -n "$link_path" ]]; then
+            if [[ -e "$target/$verify_relative" ]]; then
+                ln -sfn "$target/$verify_relative" "$link_path"
+            else
+                rm -f "$link_path"
+            fi
+        fi
         return 1
     fi
-    version="$("$target/$verify_relative" --version 2>/dev/null | head -n1 || true)"
-    ledger_record "$component" yes dotfiles installed "$version" "$target" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
+    version="$("${link_path:-$target/$verify_relative}" --version 2>/dev/null | head -n1 || true)"
+    ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
     rm -rf "$rollback"
+    rmdir "$rollback_root" 2>/dev/null || true
     journal_clear
 }
 
@@ -646,7 +657,8 @@ ensure_docker_repo() {
     fi
 
     local codename
-    codename=$(lsb_release -cs)
+    codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
+    [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Docker repository"; return 1; }
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" | \
         safe_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
@@ -689,7 +701,8 @@ install_azure_cli() {
     fi
 
     local codename
-    codename=$(lsb_release -cs)
+    codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
+    [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Azure CLI repository"; return 1; }
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $codename main" | \
         safe_sudo tee /etc/apt/sources.list.d/azure-cli.list > /dev/null
 
@@ -936,7 +949,10 @@ install_dev_packages() {
     # shellcheck disable=SC2206
     is_wsl && packages+=(${PACKAGES[wsl]})
 
-    install_apt "dev" "${packages[@]}" || return 1
+    if ! install_apt "dev" "${packages[@]}"; then
+        [[ "${DRY_RUN:-false}" == "true" ]] || track_install zsh fail
+        return 1
+    fi
     if [[ "${DRY_RUN:-false}" != "true" ]]; then
         if command -v zsh >/dev/null 2>&1; then track_install zsh ok; else track_install zsh fail; return 1; fi
     fi
@@ -1021,7 +1037,7 @@ install_rdp_packages() {
     fi
 
     # Pin the display-manager answer before apt can ask (see helper above).
-    preserve_default_display_manager
+    preserve_default_display_manager || { track_install "xrdp" fail; return 1; }
 
     # Deliberately not install_apt: we need a preseeded, fully non-interactive
     # apt run. DEBIAN_FRONTEND=noninteractive suppresses the dialog; DEBIAN_PRIORITY
@@ -1039,7 +1055,7 @@ install_rdp_packages() {
     fi
 
     # System config + service enablement (idempotent; owns /etc/xrdp edits)
-    run_installer "xrdp"
+    run_installer "xrdp" || return 1
 
     success "RDP server installation complete"
 }
@@ -1108,6 +1124,10 @@ install_work_packages() {
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" || failed=true
+    if [[ -d "$HOME/.nvm/default/bin" && ":$PATH:" != *":$HOME/.nvm/default/bin:"* ]]; then
+        PATH="$HOME/.nvm/default/bin:$PATH"
+        export PATH
+    fi
     # Rust toolchain (userspace, no sudo). Non-critical: unlike node (which
     # underpins the AI CLIs), nothing else in setup depends on it.
     run_installer "rust" || failed=true

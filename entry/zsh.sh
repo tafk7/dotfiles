@@ -9,13 +9,21 @@
 # idempotent via _PROFILE_LOADED.
 if [[ -z "${DOTFILES_DIR:-}" ]]; then
     # readlink locates the repo, but a flattened symlink (bind-mount/copy) makes
-    # it resolve wrong; let generated/bridge.sh override with the install-time
-    # truth — try the derived path, then the conventional location.
+    # it resolve wrong; use the data-only XDG install-path record, with the old
+    # generated/bridge.sh retained as a read-only compatibility fallback.
     DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
+    if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
+        _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
+        if [[ -r "$_dotfiles_path_file" ]]; then
+            IFS= read -r DOTFILES_DIR < "$_dotfiles_path_file"
+        else
+            DOTFILES_DIR="$HOME/dev/dotfiles"
+        fi
+        unset _dotfiles_path_file
+    fi
     export DOTFILES_DIR
-    for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dev/dotfiles/generated/bridge.sh"; do
-        [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
-    done
+    _bridge="$DOTFILES_DIR/generated/bridge.sh"
+    [[ -f "$_bridge" ]] && source "$_bridge"
     unset _bridge
     [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
 fi

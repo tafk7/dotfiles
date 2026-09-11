@@ -7,6 +7,7 @@ TEST_REPO_ROOT="$ROOT"
 source "$ROOT/tests/lib/harness.sh"
 trap fixture_cleanup EXIT
 fixture_init
+unset _DOTFILES_ENV_LOADED _DOTFILES_BASE_ENV _PROFILE_LOADED
 
 mkdir -p "$HOME"
 ln -s "$ROOT/entry/profile.sh" "$HOME/.profile"
@@ -25,6 +26,9 @@ bash_result="$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" bash -
     compgen -A function | grep -E "^(_dotfiles_|reload$|proj$|theme$)" || true
 ')"
 [[ -z "$bash_result" ]] || fail "bash Layer 0 leaked interactive/private functions: $bash_result"
+rg_config="$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" bash --noprofile --norc -c \
+    'source "$DOTFILES_DIR/entry/bash.sh"; printf %s "$RIPGREP_CONFIG_PATH"')"
+assert_eq "$rg_config" "$HOME/.ripgreprc" "tracked ripgrep config was not activated"
 
 zsh_result="$(HOME="$HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" zsh -dfc '
     external_fixture_function() { : }

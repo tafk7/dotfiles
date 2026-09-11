@@ -74,7 +74,7 @@ chmod +x "$external/claude"
 fresh="$TEST_ROOT/external-home"; mkdir -p "$fresh"
 rc=0
 HOME="$fresh" PATH="$external:$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" \
-    DOTFILES_AGENT_BADGE_ENABLED=0 "$ROOT/installers/install-claude.sh" >/dev/null 2>&1 || rc=$?
+    DOTFILES_AGENT_BADGE_ENABLED=0 "$ROOT/installers/install-claude.sh" --force >/dev/null 2>&1 || rc=$?
 [[ $rc -eq 2 && ! -e "$fresh/.local/bin/claude" ]] || fail "Claude external ownership"
 
 printf 'install-ai: ok\n'

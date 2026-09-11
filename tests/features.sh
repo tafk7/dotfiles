@@ -14,6 +14,10 @@ status="$("$ROOT/bin/dotfiles-feature" status)"
 "$ROOT/bin/dotfiles-feature" disable theme >/dev/null
 "$ROOT/bin/theme-switcher" enabled && fail "theme disable did not persist"
 [[ ! -e "$XDG_CACHE_HOME/dotfiles/theme" ]] || fail "disable unexpectedly rendered theme cache"
+export DOTFILES_THEME=stale STARSHIP_CONFIG=stale BAT_THEME=stale DELTA_FEATURES=stale
+source "$ROOT/shell/interactive/theme-env.sh"
+[[ -z "${DOTFILES_THEME:-}" && -z "${STARSHIP_CONFIG:-}" && -z "${BAT_THEME:-}" ]] \
+    || fail "disabled theme left stale interactive environment"
 
 "$ROOT/bin/dotfiles-feature" enable theme >/dev/null
 "$ROOT/bin/theme-switcher" enabled || fail "theme enable did not persist"

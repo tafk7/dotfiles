@@ -24,7 +24,11 @@ if command -v pi >/dev/null 2>&1; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         pi() { command pi ${=PI_FLAGS} "$@"; }
     else
-        pi() { command pi ${PI_FLAGS:-} "$@"; }
+        pi() {
+            local -a flags=()
+            read -r -a flags <<< "${PI_FLAGS:-}"
+            command pi "${flags[@]}" "$@"
+        }
     fi
 else
     pi() {

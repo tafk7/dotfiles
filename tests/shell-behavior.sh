@@ -15,7 +15,7 @@ for arg do printf '|%s' "$arg"; done
 printf '\n'
 EOF
 chmod +x "$TEST_ROOT/bin/argument-recorder"
-for command in claude codex opencode pi; do ln -s argument-recorder "$TEST_ROOT/bin/$command"; done
+for command in claude codex opencode pi btop lazygit; do ln -s argument-recorder "$TEST_ROOT/bin/$command"; done
 cat > "$TEST_ROOT/bin/docker" <<'EOF'
 #!/bin/sh
 if [ "$1" = ps ]; then printf '%s\n' alpha beta; else exec argument-recorder "$@"; fi
@@ -30,6 +30,7 @@ run_shell_matrix() {
         "$shell" -c '
             source "$DOTFILES_DIR/shell/tools/nav.sh"
             source "$DOTFILES_DIR/shell/tools/docker.sh"
+            source "$DOTFILES_DIR/shell/tools/general.sh"
             source "$DOTFILES_DIR/shell/tools/claude.sh"
             source "$DOTFILES_DIR/shell/tools/codex.sh"
             source "$DOTFILES_DIR/shell/tools/opencode.sh"
@@ -39,12 +40,16 @@ run_shell_matrix() {
             CLAUDE_FLAGS="--model sonnet"; CODEX_FLAGS="--profile work"
             OPENCODE_FLAGS="--model local"; PI_FLAGS="--provider test"
             claude prompt; codex exec prompt; opencode run prompt; pi prompt
+            unset DOTFILES_THEME_BTOP_RESOLVED BTOP_THEME_CONFIG BTOP_THEME_DIR LAZYGIT_THEME_CONFIG
+            btop plain; lazygit plain
             dstopall
         ')"
     [[ "$output" == *'claude|--model|sonnet|prompt'* ]] || fail "$shell claude flag splitting"
     [[ "$output" == *'codex|--profile|work|exec|prompt'* ]] || fail "$shell codex flag splitting"
     [[ "$output" == *'opencode|--model|local|run|prompt'* ]] || fail "$shell opencode flag splitting"
     [[ "$output" == *'pi|--provider|test|prompt'* ]] || fail "$shell pi flag splitting"
+    [[ "$output" == *'btop|plain'* && "$output" != *'btop|--config'* ]] || fail "$shell btop neutral fallback"
+    [[ "$output" == *'lazygit|plain'* && "$output" != *'lazygit|--use-config-file'* ]] || fail "$shell lazygit neutral fallback"
     [[ "$output" == *'argument-recorder|stop|alpha|beta'* ]] || fail "$shell docker array handling"
 }
 

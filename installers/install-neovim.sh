@@ -87,8 +87,7 @@ STAGED_TREE="$TEMP_DIR/nvim-linux-${NVIM_ARCH}"
 "$STAGED_TREE/bin/nvim" --version >/dev/null 2>&1 || { error "Staged Neovim binary does not run"; exit 1; }
 
 mkdir -p "$HOME/.local/bin" "$HOME/.local"
-atomic_replace_tree neovim "$STAGED_TREE" "$HOME/.local/nvim" bin/nvim
-ln -sfn "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
+atomic_replace_tree neovim "$STAGED_TREE" "$HOME/.local/nvim" bin/nvim "$HOME/.local/bin/nvim"
 
 # Verify
 if "$HOME/.local/bin/nvim" --version >/dev/null 2>&1; then
