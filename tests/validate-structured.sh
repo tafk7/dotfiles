@@ -59,11 +59,31 @@ if grep -Fq 'plugins/shared/agent-badge.tmux' configs/tmux.conf; then
     echo "base tmux config directly wires optional agent-badge" >&2
     exit 1
 fi
-if rg -n '\$HOME/dotfiles|~/dotfiles' bin configs entry installers lib plugins shell setup.sh bootstrap.sh; then
+if grep -R -nE '\$HOME/dotfiles|~/dotfiles' \
+    bin configs entry installers lib plugins shell setup.sh bootstrap.sh; then
     echo "functional source contains a hard-coded legacy checkout path" >&2
     exit 1
 fi
-systemd-analyze verify configs/wsl2-ssh-agent.service
+
+# Verify the tracked unit itself. On machines where the optional bridge is not
+# installed, systemd-analyze reports its %h-based ExecStart/ExecStop target as
+# missing and exits non-zero even though the unit syntax is valid. Ignore only
+# that exact environmental diagnostic; any other verifier output still fails.
+unit_verify_output=""
+unit_verify_rc=0
+unit_verify_output="$(systemd-analyze verify configs/wsl2-ssh-agent.service 2>&1)" \
+    || unit_verify_rc=$?
+if (( unit_verify_rc != 0 )); then
+    unexpected_unit_output="$(
+        printf '%s\n' "$unit_verify_output" \
+            | grep -Ev '^wsl2-ssh-agent\.service: Command .*/\.local/bin/wsl2-ssh-agent is not executable: No such file or directory$' \
+            || true
+    )"
+    if [[ -n "$unexpected_unit_output" ]]; then
+        printf '%s\n' "$unit_verify_output" >&2
+        exit "$unit_verify_rc"
+    fi
+fi
 for manifest in .claude-plugin/marketplace.json .agents/plugins/marketplace.json \
     plugins/agent-badge-claude/.claude-plugin/plugin.json \
     plugins/agent-badge-codex/.codex-plugin/plugin.json; do
