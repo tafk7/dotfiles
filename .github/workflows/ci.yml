@@ -15,7 +15,7 @@ jobs:
     name: Lint shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Bash syntax check (bash -n) on every *.sh
         run: |
@@ -42,23 +42,23 @@ jobs:
           exit "$fail"
 
       - name: ShellCheck (warning+ severity)
-        uses: ludeeus/action-shellcheck@master
-        with:
-          severity: warning
-          scandir: '.'
-          ignore_paths: >-
-            .git
-            .backups
-            generated
-            .scratchpad
-            .agents
-            .claude
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          find . -path ./.git -prune -o -path ./generated -prune -o \
+            -type f \( -name '*.sh' -o -path './bin/*' \) -print0 \
+            | xargs -0 shellcheck --severity=warning
 
   structure:
     name: Structural smoke tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Install validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml zsh tmux
 
       - name: Theme catalog parses
         run: |
@@ -77,9 +77,25 @@ jobs:
           ./bin/diff-config --help          >/dev/null
           ./bin/uninstall-tool --help       >/dev/null
           ./bin/ssh-bridge --help           >/dev/null
+          ./bin/dotfiles-feature --help     >/dev/null
+          ./bin/opencode-contract --help    >/dev/null
 
       - name: Codex installer ownership behavior
         run: bash tests/install-codex.sh
+
+      - name: Hermetic behavior and safety suite
+        run: |
+          set -euo pipefail
+          for test_file in \
+            tests/argument-parsing.sh tests/state.sh tests/setup-safety.sh \
+            tests/config-reconcile.sh tests/eget-staging.sh tests/install-failures.sh \
+            tests/install-ai.sh tests/install-toolchains.sh tests/neovim.sh \
+            tests/uninstall-safety.sh tests/git-hooks.sh tests/registry.sh tests/agent-badge.sh \
+            tests/agent-shell.sh tests/shell-behavior.sh tests/theme-system.sh \
+            tests/tmux-config.sh tests/verify-profiles.sh tests/wsl.sh \
+            tests/xrdp.sh tests/validate-structured.sh; do
+            bash "$test_file"
+          done
 
       - name: Cheatsheet TSV is well-formed
         run: |
@@ -116,7 +132,7 @@ jobs:
     name: Theme cycling smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Cycle every theme via --init/apply
         run: |
@@ -146,7 +162,7 @@ jobs:
     name: Containerized install (--bash)
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:latest
+      image: ubuntu:24.04
     steps:
       # The structural jobs above never execute lib/install.sh. This one runs
       # the real installer in a clean container as a non-root sudo user — the
@@ -157,7 +173,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends \
-            ca-certificates curl wget git sudo locales lsb-release
+            ca-certificates curl git sudo locales lsb-release
           # setup.sh refuses to run as root, so install as an unprivileged user.
           useradd -m -s /bin/bash test
           echo 'test ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/test
@@ -168,14 +184,15 @@ jobs:
       - name: Stage repo for the test user
         run: |
           set -euo pipefail
-          cp -a "$GITHUB_WORKSPACE" /home/test/dotfiles
-          chown -R test:test /home/test/dotfiles
+          mkdir -p /home/test/dev
+          cp -a "$GITHUB_WORKSPACE" /home/test/dev/dotfiles
+          chown -R test:test /home/test/dev
 
       - name: Run the installer (--bash tier)
         run: |
           su - test <<'EOSU'
           set -euo pipefail
-          cd ~/dotfiles
+          cd ~/dev/dotfiles
           ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
           EOSU
 
@@ -187,7 +204,7 @@ jobs:
           # eget binaries in ~/.local/bin.
           cat > /home/test/assert.sh <<'EOS'
           set -euo pipefail
-          cd "$HOME/dotfiles"
+          cd "$HOME/dev/dotfiles"
           export DOTFILES_DIR="$PWD"
           export PATH="$HOME/.local/bin:$PATH"
           # shellcheck disable=SC1091
@@ -197,8 +214,8 @@ jobs:
           # Every CONFIG_MAP entry must resolve (reuses the repo's own data).
           for key in "${!CONFIG_MAP[@]}"; do
               mapping="${CONFIG_MAP[$key]}"
-              target="${mapping%%:*}"
-              type="${mapping##*:}"
+              IFS=: read -r target type owner <<< "$mapping"
+              config_owner_present "$owner" || continue
               case "$type" in
                   symlink)
                       [[ -L "$target" ]] || { echo "::error::missing symlink: $target"; fail=1; } ;;
@@ -210,6 +227,7 @@ jobs:
           done
           # Every shell-tier tool must be on PATH after install.
           for name in $(tools_for_tier bash); do
+              tool_applicable "$name" || continue
               bin="${TOOL_BINARY[$name]}"
               command -v "$bin" >/dev/null 2>&1 \
                 || { echo "::error::shell-tier tool missing: $name ($bin)"; fail=1; }
@@ -220,58 +238,75 @@ jobs:
           if command -v codex >/dev/null 2>&1; then
               echo "::error::codex must not be installed at the shell tier (--ai only)"; fail=1
           fi
-          # wsl2-ssh-agent (bare-binary asset) still installs at the shell tier — validate its filter.
-          command -v wsl2-ssh-agent >/dev/null 2>&1 \
-            || { echo "::error::wsl2-ssh-agent not installed by eget"; fail=1; }
+          # WSL-only tools must not be installed on native Ubuntu.
+          if command -v wsl2-ssh-agent >/dev/null 2>&1; then
+              echo "::error::wsl2-ssh-agent installed on native Ubuntu"; fail=1
+          fi
           [[ $fail -eq 0 ]] && echo "Install assertions passed."
           exit $fail
           EOS
           chown test:test /home/test/assert.sh
           sudo -u test -H bash /home/test/assert.sh
 
-      - name: bin/verify (informational — full verify expects dev+ tiers)
-        continue-on-error: true
-        run: su - test -c 'cd ~/dotfiles && ./bin/verify'
+      - name: Re-run setup and verify bash profile
+        run: |
+          su - test -c 'cd ~/dev/dotfiles && ./setup.sh --bash --git-name "CI Bot" --git-email ci@example.com'
+          su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash'
 
   startup-benchmark:
     name: Shell startup benchmark
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
 
-      - name: Install hyperfine + zsh
+      - name: Install zsh
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y hyperfine zsh
+          sudo apt-get install -y zsh
 
-      - name: Install dotfiles (--bash, so tool-init runs realistically)
-        run: ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
-
-      - name: Benchmark interactive startup
+      - name: Compare base and candidate startup
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
-          # The architecture is tuned for fast startup (lazy nvm, interactive-only
-          # sourcing). Measure it so a regression (e.g. un-lazying nvm) is visible.
-          # Force `exit 0`: a bare `exit` inherits the last init command's status
-          # (and shell startup is what we're timing, not its exit code).
-          hyperfine --warmup 5 --runs 50 --export-json /tmp/bench.json \
-            --command-name 'bash -i' "bash -i -c 'exit 0'" \
-            --command-name 'zsh -i'  "zsh -i -c 'exit 0'"
-          # Catastrophic-regression guard. Fine-grained history tracking would use
-          # benchmark-action/github-action-benchmark (see yutkat/dotfiles); this
-          # generous ceiling just keeps the job honest without runner-variance flakes.
-          python3 - <<'PY'
-          import json, sys
-          ceiling = 1.0  # seconds
-          status = 0
-          for r in json.load(open('/tmp/bench.json'))['results']:
-              mean = r['mean']
-              print(f"{r['command']}: {mean*1000:.1f} ms "
-                    f"(min {r['min']*1000:.1f}, max {r['max']*1000:.1f})")
-              if mean > ceiling:
-                  print(f"::error::{r['command']} mean {mean*1000:.0f} ms "
-                        f"exceeds {ceiling*1000:.0f} ms ceiling")
-                  status = 1
-          sys.exit(status)
-          PY
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+          mkdir -p /tmp/dotfiles-baseline
+          git archive "$BASE_SHA" | tar -x -C /tmp/dotfiles-baseline
+          python3 tests/startup-benchmark.py /tmp/dotfiles-baseline "$PWD"
+
+  architecture-selection:
+    name: Registry selection (${{ matrix.arch }} / ${{ matrix.platform }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+        platform: [ubuntu, wsl]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate applicability (selection-only)
+        env:
+          DOTFILES_TEST_ARCH: ${{ matrix.arch }}
+          DOTFILES_TEST_PLATFORM: ${{ matrix.platform }}
+        run: bash tests/registry.sh
+
+  ubuntu-matrix:
+    name: Ubuntu ${{ matrix.release }} dry-run
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:${{ matrix.release }}
+    strategy:
+      matrix:
+        release: ['22.04', '24.04', '26.04']
+    steps:
+      - name: Install test prerequisites
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates git curl bash
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Exercise supported release without mutation
+        run: bash tests/setup-safety.sh

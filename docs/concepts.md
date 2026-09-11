@@ -79,16 +79,18 @@ required.
 
 ```bash
 declare -A CONFIG_MAP=(
-    [tmux.conf]="$HOME/.tmux.conf:symlink"
-    [gitconfig]="$HOME/.gitconfig:gitconfig"     # special: template-processed
+    [tmux.conf]="$HOME/.tmux.conf:symlink:tmux"
+    [gitconfig]="$HOME/.gitconfig:gitconfig:"    # include-based portable base
     ...
 )
 ```
 
-Each key is a source filename; each value is `<target>:<type>`. The source path
+Each key is a source filename; each value is `<target>:<type>:<owner>`. The source path
 is resolved by `config_source_path()` (`entry/` for shell rc files, `configs/`
 for everything else). At install time, `setup.sh` walks the map and creates the
-symlinks. At verify time, `bin/verify` walks it and checks them. At drift-check
+symlinks. Tool-owned entries are skipped when the owner is absent. Git's
+portable base is included without replacing the user's global file. At verify
+time, `bin/verify` walks the map and checks it. At drift-check
 time, `bin/diff-config` walks it too. **Three tools, one source of truth.**
 
 ### 3. Tool registry — *which* binaries to install / verify / remove
@@ -99,8 +101,10 @@ time, `bin/diff-config` walks it too. **Three tools, one source of truth.**
 TOOL_BINARY[fzf]=fzf            # what to look for in PATH
 TOOL_METHOD[fzf]=eget           # how it gets installed (eget|apt|installer)
 TOOL_TIER[fzf]=bash            # min tier that installs it
-TOOL_PATHS[fzf]=...             # paths to delete on uninstall (eget falls back to ~/.local/bin/<binary>)
+TOOL_PATHS[fzf]=...             # owned paths eligible for guarded uninstall
 TOOL_VERIFY[fzf]=...            # custom verify command (optional)
+TOOL_PLATFORM[fzf]=ubuntu       # ubuntu or wsl
+TOOL_ARCHES[fzf]=x86_64,aarch64
 ```
 
 Adding a new tool means adding one row to each array (and an `eget.toml` block
@@ -129,14 +133,15 @@ global: starship=kanagawa, default=tokyo-night
 | apps    | btop, lazygit             |
 
 `theme explain --window` prints the effective value and winning scope for each
-tool. Stable tmux session/window ids hold scoped state; global state lives in
-`generated/theme-state.sh`.
+tool. Stable tmux session/window ids hold scoped state; durable global state
+lives in `${XDG_STATE_HOME:-~/.local/state}/dotfiles/theme.tsv`.
 
 Themes themselves are **data on disk**: each `themes/<name>/` directory
 contains semantic and per-tool palette files (`palette.sh`, `vim.vim`,
 `starship.palette.toml`, `btop.theme`, etc.). The switcher builds immutable
-per-theme artifacts under `generated/themes/`; shells resolve the correct paths
-for their current tmux context and refresh them at the next prompt.
+per-theme artifacts under `${XDG_CACHE_HOME:-~/.cache}/dotfiles/theme/themes/`;
+shells resolve the correct paths for their current tmux context and refresh
+them at the next prompt.
 
 ## File layout cheat sheet
 
@@ -147,6 +152,7 @@ lib/
   registry.sh             → TOOL_* arrays (data, no side effects)
   install.sh              → install-time helpers (apt, eget, run_installer)
   runtime.sh              → safe-everywhere helpers (log, is_wsl, command_exists)
+  state.sh                → versioned preferences, ledger, lock, journal
   theme-resolve.sh        → global/session/window cascade resolution
 configs/                  → symlink sources (target == ~/.<file>)
 entry/                    → ~/.bashrc, ~/.zshrc, ~/.profile sources
@@ -157,10 +163,11 @@ shell/
 themes/<name>/            → per-tool palette files
 installers/install-*.sh   → one script per non-eget tool
 eget.toml                 → static binary downloads (versions pinned)
-generated/                → runtime artifacts (gitignored)
+XDG state/cache           → durable state / rebuildable generated artifacts
 bin/
-  theme-switcher          → 5 themes × 8 surfaces × 3 groups (cascade)
-  verify                  → 44 health checks across configs + tools + theme
+  theme-switcher          → 12 themes × 8 surfaces × 3 groups (cascade)
+  dotfiles-feature        → persistent feature enable/disable/status
+  verify                  → installed/tier/all health reconciliation
   cheatsheet              → searchable shortcut catalog (incl. tools from registry)
   diff-config             → drift report between configs/ and ~/
   check-updates           → eget.toml pins vs latest GitHub releases

@@ -15,6 +15,8 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --rdp                 # + xrdp RDP server + XFCE desktop (orthogonal flag; combines with any tier)
 ./setup.sh --full                # Everything: --work plus --ai (but NOT --rdp)
 ./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
+./setup.sh --bash --no-theme      # Core shell with the default theme feature disabled
+./setup.sh --ai --no-agent-badge # AI CLIs without the optional tmux badge plugin
 ./setup.sh --bash --dry-run      # Preview without changes
 ./setup.sh --bash --no-hooks     # Skip the pre-commit lint hook (default: installed)
 ```
@@ -26,7 +28,9 @@ Codex, opencode, Pi) and can be added to any tier. Install them individually wit
 installs just those two). Leave AI off entirely when your org manages the
 install — the shell aliases/shortcuts load regardless and resolve whatever
 `claude`/`codex`/`opencode`/`pi` is on your `PATH`. `--full` is shorthand for
-`--work --ai`. Use `--force` to overwrite without prompting.
+`--work --ai`. Multiple tier flags select the highest tier regardless of order.
+Use `--force` to refresh dotfiles-owned components; externally managed tools are
+never replaced implicitly.
 
 The **sudo boundary sits at `dev`**: `config` and `bash` need no root — every
 bash-tier tool installs to `~/.local/bin` via eget — so the full modern shell
@@ -41,9 +45,17 @@ server with an XFCE session so you can remote into this machine's desktop
 **not** part of `--full` — opening a network listener is always an explicit
 opt-in. Details: `issues/xrdp-remote-desktop.md`.
 
-After installation, verify with `./bin/verify` and restart your shell.
+The coordinated theme is enabled by default and agent-badge is enabled when a
+supported AI CLI is selected. Both are optional, persistent preferences:
+`--no-theme` and `--no-agent-badge` remain in effect until `--theme` or
+`--agent-badge` is explicitly requested (or `bin/dotfiles-feature` is used).
+
+After installation, verify with `./bin/verify --installed` and restart your shell.
 GitHub CLI authentication remains machine-local; run `gh auth login` on each
 machine where authenticated GitHub access is wanted.
+
+This repository does not currently declare an overall software license. Theme
+attribution is recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Fresh machine (one-liner)
 
@@ -140,7 +152,8 @@ dstopall                  # Stop all running containers
 
 ```bash
 ni / nr / nrd / nrb       # install / run / run dev / run build
-nclean                    # rm node_modules + reinstall
+nclean                    # preserve lockfile; npm ci when one exists
+nuke-node                 # explicitly remove node_modules and lockfiles
 ```
 
 ### Tmux
@@ -208,6 +221,10 @@ neovim, tmux, FZF, bat, Starship, Delta, btop, and lazygit.
 ./bin/theme-switcher --list       # Show available themes
 ./bin/theme-switcher --init       # Re-render all surfaces from current theme
 ./bin/theme-switcher diagnose     # Real default/ANSI/truecolor samples
+./bin/theme-switcher disable      # Persistent neutral fallback; unwire live tmux
+./bin/theme-switcher enable       # Re-enable, render cache, and sync live tmux
+./bin/dotfiles-feature status     # Inspect theme and agent-badge preferences
+./bin/dotfiles-feature disable agent-badge  # Unwire badge without deleting data
 ```
 
 **Global, session, window, and per-component overrides:**
@@ -247,8 +264,9 @@ Per-tool palettes live under `themes/<name>/`:
 | `lazygit.yml`                 | lazygit `gui.theme` block                 |
 | `bat/<name>.tmTheme` (opt.)   | bat tmTheme — only when not a bat builtin |
 
-Generated artifacts live in `generated/` (gitignored):
-`theme.sh`, `starship.toml`, `delta.gitconfig`, `bat/cache/`. The bat cache
+Durable preferences live in `${XDG_STATE_HOME:-~/.local/state}/dotfiles/`.
+Rebuildable theme artifacts live in `${XDG_CACHE_HOME:-~/.cache}/dotfiles/theme/`.
+The bat cache
 is **isolated** (`BAT_CACHE_PATH`) so it doesn't pollute delta's embedded
 bat (different versions are binary-incompatible).
 
@@ -261,28 +279,28 @@ bat (different versions are binary-incompatible).
 setup.sh                  Entry point — 3-phase orchestrator (reads lib/config.sh)
 lib/
   install.sh              Install-time helpers (APT, backup, eget, tier functions)
+  state.sh                Versioned preferences, component ledger, locks, journal
   runtime.sh              Runtime helpers (logging, is_wsl, command_exists)
   config.sh               Declarative data: CONFIG_MAP + PACKAGES
   registry.sh             Tool registry: TOOL_BINARY/METHOD/TIER/PATHS for verify + bin/cheatsheet
 configs/                  Config files without dots (symlinked to ~/.<name>)
-themes/                   5 theme dirs — see "Theme System" table above
+themes/                   Theme data — see "Theme System" table above
 shell/
   init.sh                 Single sourcing sequence for bash + zsh
-  bash.sh / zsh.sh        Shell-specific entry → ~/.bashrc / ~/.zshrc
-  profile.sh              Login shell → ~/.profile
-  env.sh                  Environment: PATH, EDITOR, PROJECTS_DIRS, BAT_CACHE_PATH, STARSHIP_CONFIG, theme exports
+  env.sh / env-runtime.sh Layer 0: environment and project activation
+  interactive/theme-env.sh Optional theme adapter
   fzf.sh / tool-init.sh   Tool initializers (zoxide, starship, fzf keybinds)
   tools/*.sh              Domain-split functions + aliases (nav, process, python, fzf, vscode, claude, docker, git, node, tmux, vim, general)
   platform/wsl.sh         WSL-only helpers (pbcopy/pbpaste, cdwin)
   lazy/nvm.sh             Lazy NVM loader
 installers/               Per-tool install scripts (run by lib/install.sh::run_installer)
-generated/                Theme artifacts + bridge.sh (gitignored)
-bin/                      User commands (theme-switcher, verify, cheatsheet, replace, diff-config, check-updates, uninstall-tool, install-git-hooks)
+bin/                      User commands (theme-switcher, dotfiles-feature, verify, cheatsheet, replace, diff-config, check-updates, uninstall-tool, install-git-hooks)
 eget.toml                 Static binary downloads (tier=bash tools)
 ```
 
-**Shell startup** (`~/.bashrc` or `~/.zshrc`) sources: `init.sh` → `env.sh` →
-`tool-init.sh` (interactive only) → scoped theme resolver → `fzf.sh` →
+**Shell startup** loads Layer 0 (`profile.sh` → `env-runtime.sh` → `env.sh`) in
+startup-reading non-interactive shells. Interactive shells continue through
+`init.sh` → optional theme adapter → `tool-init.sh` → `fzf.sh` →
 `tools/*.sh` → `platform/wsl.sh` (when WSL) → `lazy/nvm.sh` → `~/.shell.local`.
 
 **Project search roots** (`proj`, `fzf-project`, `cproj`) are unified behind
@@ -299,7 +317,9 @@ Override per-machine in `~/.shell.local`.
 
 **New APT package:** Append to `PACKAGES[<group>]` in `lib/config.sh`.
 
-**New config:** Add file to `configs/`, add a `[<file>]` block to `CONFIG_MAP` in `lib/config.sh` with `target=` (and optional `template=true`). Templates support `{{GIT_NAME}}`, `{{GIT_EMAIL}}`, `{{DOTFILES_DIR}}` substitution.
+**New config:** Add the file to `configs/`, then add a `target:type:owner` entry
+to `CONFIG_MAP` in `lib/config.sh`. Git uses an include-based portable config;
+machine identity belongs in `~/.gitconfig.local`.
 
 **New theme:** Create `themes/<name>/` with the required files (`meta.sh`, `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`) — themes are auto-discovered from disk. Add per-tool palette files (`starship.palette.toml`, `delta.gitconfig`, `btop.theme`, `lazygit.yml`, optional `bat/<name>.tmTheme`) for full surface coverage.
 
@@ -320,14 +340,17 @@ fi
 ## Troubleshooting
 
 ```bash
-./bin/verify                      # Validate installation health (44+ checks)
+./bin/verify --installed          # Validate recorded installation health
+./bin/verify --tier bash          # Validate a requested profile
+./bin/verify --all                # Inspect every applicable component
+./bin/dotfiles-feature status     # Inspect persistent feature preferences
 ./bin/diff-config                 # Show drift between sources and ~ (use --diff for details)
 ./bin/check-updates               # Are pinned eget tool versions stale?
 ./bin/cheatsheet commands         # List all bin/ utilities (auto-generated from headers)
 ./setup.sh --dry-run --bash       # Preview what would happen
 ./bin/install-git-hooks --check   # Are dotfiles git hooks installed in this clone?
 reload                            # Reload shell config
-ls .backups/                      # See available backups
+ls ~/.local/state/dotfiles/backups/  # See recoverable displaced configs
 ```
 
 `bin/check-updates` uses the GitHub releases API. It auto-detects auth from
@@ -341,4 +364,6 @@ auth method was used.
 - [`docs/architecture.md`](docs/architecture.md) — Boundary rules and sourcing order.
 - [`docs/customization.md`](docs/customization.md) — Recipes for adding tools, configs, aliases.
 - [`docs/theme-system.md`](docs/theme-system.md) — Cascade internals + adding themes.
+- [`docs/supply-chain.md`](docs/supply-chain.md) — Download trust and update-failure contracts.
+- [`docs/testing.md`](docs/testing.md) — Hermetic matrix and manual WSL/RDP checks.
 - [`docs/THEME_QUICK_START.md`](docs/THEME_QUICK_START.md) — Day-to-day theme commands.
