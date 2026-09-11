@@ -158,6 +158,8 @@ for tier in bash dev work ai rdp; do
                 [[ -z "$observed_path" ]] || observed_path="$(readlink -f "$observed_path" 2>/dev/null || printf '%s' "$observed_path")"
                 if [[ "$recorded_status" == update-failed ]]; then
                     check_warn "$label (prior installation works; last update failed)"
+                elif [[ "$recorded_owner" == unknown ]]; then
+                    check_warn "$label (present; ownership not yet claimed)"
                 elif [[ "$recorded_owner" == dotfiles && -n "$observed_path" ]] \
                      && ! tool_owned_path "$name" "$observed_path"; then
                     check_fail "$label (present outside recorded ownership: $observed_path)"

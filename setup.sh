@@ -229,7 +229,7 @@ AI TOOLING (orthogonal - combines with any tier):
     --opencode          Install only opencode.
     --pi                Install only Pi. Unlike the others Pi is an npm package,
                         so it needs Node >=22.19 (the work tier's NVM provides
-                        it); the installer exits cleanly with instructions if
+                        it); the requested install fails with instructions if
                         Node is missing rather than pulling in a toolchain.
                         (Per-tool flags combine: --claude --opencode installs
                         just those two. --ai / --full install all of them.)
@@ -237,7 +237,6 @@ AI TOOLING (orthogonal - combines with any tier):
 RDP SERVER (orthogonal - combines with any tier):
     --rdp               Install + configure the xrdp RDP server with an XFCE
                         session. Requires sudo. NOT implied by --full (opens a
-                        network listener, so it is always an explicit opt-in).
                         WSL: listens on localhost:3390 for the Windows host
                         (connect with mstsc). Native: port 3389 — keep it
                         behind a VPN/firewall. See issues/xrdp-remote-desktop.md.
@@ -518,8 +517,9 @@ phase_setup_configs() {
         "$DOTFILES_DIR/bin/install-git-hooks" --quiet || { warn "git hooks install failed"; failed=true; }
     fi
 
-    # Write install-time environment to generated/bridge.sh
+    # Record the checkout location and WSL details in data-only XDG state.
     write_dotfiles_env || failed=true
+    reconcile_observed_components || failed=true
 
     # Cleanup
     if [[ "$DRY_RUN" != "true" && -n "${ACTIVE_BACKUP_DIR:-}" ]]; then
