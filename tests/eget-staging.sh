@@ -60,8 +60,83 @@ failed_line="$(ledger_line demo)"
 
 export EGET_TEST_FAIL=0
 INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
+FORCE_REINSTALL=false
 install_eget_tools >/dev/null
 assert_eq "$("$HOME/.local/bin/demo" --version)" "demo new"
+
+# A bundled/private rg elsewhere on PATH is not a durable system installation.
+# It must not suppress installation of the pinned dotfiles-owned ripgrep.
+private_bin="$TEST_ROOT/.codex/private/bin"
+mkdir -p "$private_bin"
+cat > "$private_bin/rg" <<'EOF'
+#!/bin/sh
+[ "${1:-}" = --version ] && echo 'ripgrep private'
+EOF
+chmod +x "$private_bin/rg"
+cat > "$HOME/.local/bin/eget" <<'EOF'
+#!/bin/sh
+if [ "${1:-}" = --version ]; then echo 'eget 1.3.4'; exit 0; fi
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/rg" <<'BIN'
+#!/bin/sh
+[ "${1:-}" = --version ] && echo 'ripgrep 15.2.0'
+BIN
+chmod +x "$HOME/.local/bin/rg"
+EOF
+chmod +x "$HOME/.local/bin/eget"
+PATH="$private_bin:$HOME/.local/bin:$TEST_SYSTEM_PATH"
+TOOL_METHOD=(['ripgrep']=eget)
+TOOL_BINARY=(['ripgrep']=rg)
+TOOL_TIER=(['ripgrep']=bash)
+TOOL_PLATFORM=(['ripgrep']=ubuntu)
+TOOL_ARCHES=(['ripgrep']='x86_64,aarch64')
+TOOL_OWNERSHIP_ROOTS=(['ripgrep']="$HOME/.local/bin")
+TOOL_UPDATE_CONTRACT=(['ripgrep']=staged-release)
+cat > "$DOTFILES_DIR/eget.toml" <<'EOF'
+[global]
+target = "~/.local/bin"
+["BurntSushi/ripgrep"]
+tag = "15.2.0"
+EOF
+INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
+install_eget_tools >/dev/null
+[[ -x "$HOME/.local/bin/rg" ]] || fail "private Codex rg suppressed managed ripgrep"
+assert_eq "$("$HOME/.local/bin/rg" --version)" "ripgrep 15.2.0"
+
+# Multi-line version output (eza/ShellCheck) must still match the pin and avoid
+# an unnecessary download.
+cat > "$HOME/.local/bin/eza" <<'EOF'
+#!/bin/sh
+if [ "${1:-}" = --version ]; then
+    echo 'eza - A modern replacement for ls'
+    echo 'v0.23.4 [+git]'
+fi
+EOF
+chmod +x "$HOME/.local/bin/eza"
+cat > "$HOME/.local/bin/eget" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = --version ]; then echo 'eget 1.3.4'; exit 0; fi
+touch "$TEST_ROOT/unnecessary-download"
+exit 42
+EOF
+chmod +x "$HOME/.local/bin/eget"
+PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
+TOOL_METHOD=(['eza']=eget)
+TOOL_BINARY=(['eza']=eza)
+TOOL_TIER=(['eza']=bash)
+TOOL_PLATFORM=(['eza']=ubuntu)
+TOOL_ARCHES=(['eza']='x86_64,aarch64')
+TOOL_OWNERSHIP_ROOTS=(['eza']="$HOME/.local/bin")
+TOOL_UPDATE_CONTRACT=(['eza']=staged-release)
+cat > "$DOTFILES_DIR/eget.toml" <<'EOF'
+[global]
+target = "~/.local/bin"
+["eza-community/eza"]
+tag = "v0.23.4"
+EOF
+INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
+install_eget_tools >/dev/null
+[[ ! -e "$TEST_ROOT/unnecessary-download" ]] || fail "multi-line pinned version triggered a download"
 
 mkdir -p "$HOME/.local/demo/bin" "$TEST_ROOT/bad-tree"
 printf '#!/bin/sh\necho old-tree\n' > "$HOME/.local/demo/bin/demo"
