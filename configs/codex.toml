@@ -37,6 +37,8 @@ delete_forward_word = "ctrl-delete"
 kill_line_start = "alt-backspace"
 kill_line_end = "alt-delete"
 
+# END DOTFILES-MANAGED CODEX CONFIG
+
 # Ctrl stays application-local; Alt remains available for tmux navigation.
 [tui.keymap.global]
 open_external_editor = "ctrl-e"
@@ -44,5 +46,3 @@ open_external_editor = "ctrl-e"
 [tui.keymap.chat]
 next_permission_mode = "ctrl-g"
 previous_permission_mode = "ctrl-shift-g"
-
-# END DOTFILES-MANAGED CODEX CONFIG
