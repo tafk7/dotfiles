@@ -12,7 +12,9 @@
 " Plugins
 " ==============================================================================
 
-if exists('*plug#begin')
+let s:vim_plug = expand('~/.config/nvim/autoload/plug.vim')
+if filereadable(s:vim_plug)
+execute 'source ' . fnameescape(s:vim_plug)
 call plug#begin('~/.config/nvim/plugged')
 
 " Color schemes
@@ -53,6 +55,7 @@ Plug 'dense-analysis/ale', { 'commit': 'e1789bc54483d76ac9ddb40b633d1645c8281914
 
 call plug#end()
 endif
+unlet s:vim_plug
 
 " ==============================================================================
 " Basic Settings
