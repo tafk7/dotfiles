@@ -112,6 +112,11 @@ declare -A TOOL_PLATFORM=()
 declare -A TOOL_ARCHES=()
 declare -A TOOL_OWNERSHIP_ROOTS=()
 declare -A TOOL_UPDATE_CONTRACT=()
+declare -A TOOL_UPDATE_SOURCE=(
+    [neovim]="neovim/neovim"
+    [tmux]="tmux/tmux"
+    [nvm]="nvm-sh/nvm"
+)
 declare -A TOOL_RELATIVE_BINARY=(
     [neovim]="bin/nvim"
 )
