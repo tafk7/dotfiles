@@ -811,12 +811,19 @@ install_eget_tools() {
     # org-managed binary on PATH.
     if [[ "${FORCE_REINSTALL:-false}" != "true" ]]; then
         local -a to_download=() existing binary
+        local verify_cmd
         for name in "${eget_tools[@]}"; do
             binary="${TOOL_BINARY[$name]}"
             existing="$(command -v "$binary" 2>/dev/null || true)"
             if [[ -n "$existing" && "$existing" != "$HOME/.local/bin/"* ]]; then
-                log "Skipping $name — system copy at $existing (use --force to override)"
-                [[ "${DRY_RUN:-false}" != "true" ]] && track_install "$name" skip
+                verify_cmd="$(tool_verify_command "$name")"
+                if eval "$verify_cmd"; then
+                    log "Skipping $name — system copy at $existing (use --force to override)"
+                    [[ "${DRY_RUN:-false}" != "true" ]] && track_install "$name" skip
+                else
+                    log "Ignoring incidental $name candidate at $existing"
+                    to_download+=("$name")
+                fi
             else
                 to_download+=("$name")
             fi
@@ -892,7 +899,7 @@ install_eget_tools() {
         ' "$config")"
         target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
         if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" ]]; then
-            current_output="$("$target" --version 2>/dev/null | head -n1 || true)"
+            current_output="$("$target" --version 2>/dev/null || true)"
             if [[ "$current_output" == *"${pinned#v}"* ]]; then
                 track_install "$name" skip
                 continue
