@@ -105,33 +105,21 @@ load_global_theme_state() {
     else
         # Preserve the old global state during migration. Reading never writes.
         local legacy_dir="${DOTFILES_LEGACY_GENERATED_DIR:-${DOTFILES_DIR:?}/generated}"
-        legacy="$legacy_dir/theme.sh"
-        if [[ -f "$legacy" ]]; then
+        for legacy in "$legacy_dir/theme.sh" "$legacy_dir/theme-state.sh" "$legacy_dir/theme-overrides.sh"; do
+            [[ -f "$legacy" ]] || continue
             while IFS='=' read -r key value; do
                 key="${key#export }"
-                case "$key" in DOTFILES_THEME|_DOTFILES_PREVIOUS_THEME) ;; *) continue ;; esac
-                value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
-                [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || continue
-                if [[ "$key" == DOTFILES_THEME ]]; then
-                    DOTFILES_THEME="$value"
-                else
-                    DOTFILES_THEME_PREVIOUS="$value"
-                fi
-            done < "$legacy"
-        fi
-        legacy="$legacy_dir/theme-overrides.sh"
-        if [[ -f "$legacy" ]]; then
-            while IFS='=' read -r key value; do
-                key="${key#export }"
-                [[ "$key" == DOTFILES_THEME_* ]] || continue
                 value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
                 [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || continue
                 case "$key" in
+                    DOTFILES_THEME) DOTFILES_THEME="$value" ;;
+                    DOTFILES_THEME_PREVIOUS|_DOTFILES_PREVIOUS_THEME) DOTFILES_THEME_PREVIOUS="$value" ;;
+                    DOTFILES_THEME_GENERATION) DOTFILES_THEME_GENERATION="$value" ;;
                     DOTFILES_THEME_CODE|DOTFILES_THEME_CHROME|DOTFILES_THEME_APPS|DOTFILES_THEME_VIM|DOTFILES_THEME_BAT|DOTFILES_THEME_DELTA|DOTFILES_THEME_TMUX|DOTFILES_THEME_STARSHIP|DOTFILES_THEME_FZF|DOTFILES_THEME_BTOP|DOTFILES_THEME_LAZYGIT)
                         printf -v "$key" '%s' "$value"; export "${key?}" ;;
                 esac
             done < "$legacy"
-        fi
+        done
     fi
 
     export DOTFILES_THEME="${DOTFILES_THEME:-$THEME_DEFAULT}"
