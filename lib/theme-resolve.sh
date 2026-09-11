@@ -9,6 +9,8 @@
 [[ -n "${_DOTFILES_THEME_RESOLVE_LOADED:-}" ]] && return 0
 _DOTFILES_THEME_RESOLVE_LOADED=1
 
+source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
+
 THEME_DEFAULT="${THEME_DEFAULT:-gruvbox}"
 
 list_all_groups() { printf '%s\n' code chrome apps; }
@@ -46,7 +48,7 @@ is_group() { list_surfaces_in_group "$1" >/dev/null 2>&1; }
 is_surface() { _theme_group_of "$1"; }
 is_theme_target() { [[ "$1" == default ]] || is_group "$1" || is_surface "$1"; }
 
-_theme_generated_dir() { printf '%s\n' "${DOTFILES_GENERATED_DIR:-${DOTFILES_DIR:?DOTFILES_DIR must be set}/generated}"; }
+_theme_generated_dir() { printf '%s\n' "${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"; }
 
 theme_tmux() {
     if [[ -n "${DOTFILES_TMUX_SERVER:-}" ]]; then
@@ -80,25 +82,56 @@ _theme_clear_prefix() {
 }
 
 load_global_theme_state() {
-    local state legacy key
+    local state legacy key value
     unset DOTFILES_THEME DOTFILES_THEME_GENERATION DOTFILES_THEME_PREVIOUS
     for key in code chrome apps vim bat delta tmux starship fzf btop lazygit; do
         unset "DOTFILES_THEME_${key^^}"
     done
 
-    state="${DOTFILES_GENERATED_DIR:-${DOTFILES_DIR:?DOTFILES_DIR must be set}/generated}/theme-state.sh"
-    if [[ -f "$state" ]]; then
-        # shellcheck source=/dev/null
-        source "$state"
-    elif [[ -z "${DOTFILES_GENERATED_DIR:-}" || "$DOTFILES_GENERATED_DIR" == "$DOTFILES_DIR/generated" ]]; then
+    state="$DOTFILES_THEME_STATE_FILE"
+    if [[ -f "$state" ]] && _state_validate_file "$state" theme 2 2>/dev/null; then
+        while IFS=$'\t' read -r key value; do
+            [[ "$key" == schema ]] && continue
+            case "$key" in
+                default) DOTFILES_THEME="$value" ;;
+                previous) DOTFILES_THEME_PREVIOUS="$value" ;;
+                generation) DOTFILES_THEME_GENERATION="$value" ;;
+                code|chrome|apps|vim|bat|delta|tmux|starship|fzf|btop|lazygit)
+                    printf -v "DOTFILES_THEME_${key^^}" '%s' "$value"
+                    export "DOTFILES_THEME_${key^^}"
+                    ;;
+            esac
+        done < "$state"
+    else
         # Preserve the old global state during migration. Reading never writes.
-        legacy="${DOTFILES_DIR:?}/generated/theme.sh"
+        local legacy_dir="${DOTFILES_LEGACY_GENERATED_DIR:-${DOTFILES_DIR:?}/generated}"
+        legacy="$legacy_dir/theme.sh"
         if [[ -f "$legacy" ]]; then
-            DOTFILES_THEME="$(grep -oP 'DOTFILES_THEME="\K[^"]+' "$legacy" 2>/dev/null | head -1 || true)"
-            DOTFILES_THEME_PREVIOUS="$(grep -oP '_DOTFILES_PREVIOUS_THEME="\K[^"]+' "$legacy" 2>/dev/null | head -1 || true)"
+            while IFS='=' read -r key value; do
+                key="${key#export }"
+                case "$key" in DOTFILES_THEME|_DOTFILES_PREVIOUS_THEME) ;; *) continue ;; esac
+                value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
+                [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || continue
+                if [[ "$key" == DOTFILES_THEME ]]; then
+                    DOTFILES_THEME="$value"
+                else
+                    DOTFILES_THEME_PREVIOUS="$value"
+                fi
+            done < "$legacy"
         fi
-        legacy="${DOTFILES_DIR:?}/generated/theme-overrides.sh"
-        [[ -f "$legacy" ]] && source "$legacy"
+        legacy="$legacy_dir/theme-overrides.sh"
+        if [[ -f "$legacy" ]]; then
+            while IFS='=' read -r key value; do
+                key="${key#export }"
+                [[ "$key" == DOTFILES_THEME_* ]] || continue
+                value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
+                [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || continue
+                case "$key" in
+                    DOTFILES_THEME_CODE|DOTFILES_THEME_CHROME|DOTFILES_THEME_APPS|DOTFILES_THEME_VIM|DOTFILES_THEME_BAT|DOTFILES_THEME_DELTA|DOTFILES_THEME_TMUX|DOTFILES_THEME_STARSHIP|DOTFILES_THEME_FZF|DOTFILES_THEME_BTOP|DOTFILES_THEME_LAZYGIT)
+                        printf -v "$key" '%s' "$value"; export "${key?}" ;;
+                esac
+            done < "$legacy"
+        fi
     fi
 
     export DOTFILES_THEME="${DOTFILES_THEME:-$THEME_DEFAULT}"

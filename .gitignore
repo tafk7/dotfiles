@@ -1,5 +1,7 @@
 # Machine-written runtime state
-generated/
+generated/*
+!generated/compatibility/
+!generated/compatibility/README.md
 
 # Development artifacts
 docs/archive/

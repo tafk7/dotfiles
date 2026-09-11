@@ -7,11 +7,14 @@ trap 'tmux -L dotfiles-theme-tests kill-server 2>/dev/null || true; rm -rf "$TMP
 
 export DOTFILES_DIR="$ROOT"
 export DOTFILES_GENERATED_DIR="$TMP_ROOT/generated"
+export DOTFILES_LEGACY_GENERATED_DIR="$TMP_ROOT/legacy-generated"
 export DOTFILES_TMUX_SERVER=dotfiles-theme-tests
 export TMUX_TMPDIR="$TMP_ROOT/tmux"
 export HOME="$TMP_ROOT/home"
 export TMUX=
-mkdir -p "$TMUX_TMPDIR" "$HOME"
+mkdir -p "$TMUX_TMPDIR" "$HOME" "$DOTFILES_LEGACY_GENERATED_DIR"
+printf 'export DOTFILES_THEME="gruvbox"\n_DOTFILES_PREVIOUS_THEME="nord"\n' > "$DOTFILES_LEGACY_GENERATED_DIR/theme.sh"
+printf 'export DOTFILES_THEME_CODE="catppuccin"\n' > "$DOTFILES_LEGACY_GENERATED_DIR/theme-overrides.sh"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'${3:+ ($3)}"; }
@@ -20,6 +23,8 @@ t() { tmux -L "$DOTFILES_TMUX_SERVER" "$@"; }
 
 # Standalone/global compatibility and precedence.
 theme --init
+assert_eq "$(theme resolve vim --global)" catppuccin "legacy global override migration"
+theme unset code >/dev/null
 theme tokyo-night >/dev/null
 theme --revert >/dev/null
 assert_eq "$(theme resolve tmux --global)" gruvbox "global revert compatibility"
@@ -177,9 +182,21 @@ diagnostic="$(TMUX=isolated theme diagnose)"
 
 # Multiple-client safety is represented by format-driven status values: tmux
 # expands the selected window's local options independently for each client.
-grep -Fq 'after-select-window[90]' "$ROOT/configs/tmux.conf" || fail "selected-window status hook missing"
+theme tmux-configure
+hooks="$(t show-hooks -g after-select-window)"
+[[ "$hooks" == *'after-select-window[90]'* ]] || fail "selected-window status hook missing"
 left_a="$(t display-message -p -t "$wid_fresh" '#{E:@dotfiles_status_left}')"
 left_b="$(t display-message -p -t "$wid_three" '#{E:@dotfiles_status_left}')"
 [[ "$left_a" != "$left_b" ]] || fail "window-local status palettes should differ"
+
+# Disable removes live hooks/styles but preserves scope choices for a reversible
+# re-enable. This is the explicit live migration path used at Gate B.
+theme disable >/dev/null
+if t show-hooks -g after-select-window | grep -Fq 'after-select-window[90]'; then
+    fail "theme disable left the selected-window hook wired"
+fi
+assert_eq "$(t show-options -qv -w -t "$wid_fresh" @dotfiles_theme_tmux)" github-light "disable removed window preference"
+theme enable >/dev/null
+assert_eq "$(theme resolve tmux --window="$wid_fresh")" github-light "re-enable lost window preference"
 
 printf 'theme-system: ok\n'

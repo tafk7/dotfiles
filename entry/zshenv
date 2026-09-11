@@ -17,7 +17,7 @@
 # cached `compinit -C` a redundant second pass. Opting out here — ~/.zshenv is
 # read before /etc/zsh/zshrc — leaves entry/zsh.sh as the single owner of
 # completion init. Documented escape hatch in /etc/zsh/zshrc itself.
-skip_global_compinit=1
+[[ $- == *i* ]] && skip_global_compinit=1
 
 # Symlink derivation locates the repo for a fresh clone, but a bind-mount/copy
 # (containers, WSL, rsync) flattens the symlink so readlink resolves to the file
@@ -35,10 +35,15 @@ DOTFILES_DIR="${_zshenv_self:A:h:h}"
 unset _zshenv_self
 export DOTFILES_DIR
 
-for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dotfiles/generated/bridge.sh"; do
+for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dev/dotfiles/generated/bridge.sh"; do
     [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
 done
 unset _bridge
 
 # POSIX baseline + env (mirrors the bash entry chain via ~/.bashrc → ~/.profile)
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
+
+# Layer 0 leaves no private implementation helpers in non-interactive shells.
+if [[ $- != *i* ]]; then
+    unfunction _dotfiles_dedupe_path 2>/dev/null || true
+fi

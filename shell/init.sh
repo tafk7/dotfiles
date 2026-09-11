@@ -8,12 +8,16 @@ if [[ -z "${DOTFILES_DIR:-}" ]]; then
     return 0
 fi
 
-# Always-fresh exports (point at generated/; intentionally un-guarded so
-# `reload` re-evaluates them after a theme switch)
+# Always-fresh Layer 0 exports; intentionally unguarded so `reload` refreshes
+# project activation.
 source "$DOTFILES_DIR/shell/env-runtime.sh"
 
 # Static exports (guarded by _DOTFILES_ENV_LOADED)
 source "$DOTFILES_DIR/shell/env.sh"
+
+# Optional features begin here. Layer 0 above remains independent of theme
+# state, rendering, tmux, and plugins.
+source "$DOTFILES_DIR/shell/interactive/theme-env.sh"
 
 # Tool initialization (interactive only — evals)
 [[ $- == *i* ]] && source "$DOTFILES_DIR/shell/tool-init.sh"
@@ -53,7 +57,10 @@ fi
 # Existing interactive shells adopt scoped changes at the next prompt. The
 # signature check avoids rebuilding or re-exporting anything when state is
 # unchanged; the only steady-state work in tmux is reading one user option.
-[[ -f "$DOTFILES_DIR/shell/theme-runtime.sh" ]] && source "$DOTFILES_DIR/shell/theme-runtime.sh"
+if [[ "${_DOTFILES_THEME_ACTIVE:-0}" == 1 && -f "$DOTFILES_DIR/shell/theme-runtime.sh" ]]; then
+    source "$DOTFILES_DIR/shell/theme-runtime.sh"
+fi
+unset _DOTFILES_THEME_ACTIVE
 
 # FZF key bindings + completion (fzf >= 0.48 generates its own shell integration)
 # zsh: deferred to entry/zsh.sh after compinit so tab completion integrates properly

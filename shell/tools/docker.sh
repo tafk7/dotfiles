@@ -39,11 +39,13 @@ denter() {
 
 # Stop all running containers
 dstopall() {
-    local containers
-    containers=$(docker ps -q)
-    if [[ -n "$containers" ]]; then
-        # shellcheck disable=SC2086  # intentional word-split of space-separated container IDs
-        docker stop $containers
+    local -a containers=()
+    local container
+    while IFS= read -r container; do
+        [[ -n "$container" ]] && containers+=("$container")
+    done < <(docker ps -q)
+    if (( ${#containers[@]} )); then
+        docker stop "${containers[@]}"
     else
         echo "No running containers"
     fi

@@ -1,15 +1,14 @@
 #!/bin/bash
 # Scoped theme manager for shells, tmux, Neovim, bat, Starship, Delta, btop,
-# lazygit, and fzf. Runtime state lives in generated/ and tmux user options.
+# lazygit, and fzf. Durable state lives under XDG state; rendered artifacts live
+# under XDG cache; tmux session/window overrides remain tmux user options.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"; export DOTFILES_DIR
 THEMES_DIR="$DOTFILES_DIR/themes"
-GENERATED_DIR="${DOTFILES_GENERATED_DIR:-$DOTFILES_DIR/generated}"
-STATE_FILE="$GENERATED_DIR/theme-state.sh"
-LEGACY_THEME_FILE="$GENERATED_DIR/theme.sh"
+GENERATED_DIR="${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/theme-resolve.sh"
@@ -25,35 +24,26 @@ theme_description() {
 theme_generation() { date +%s%N; }
 
 write_global_state() {
-    local tmp key var value
-    mkdir -p "$GENERATED_DIR"
-    tmp="$(mktemp "$STATE_FILE.XXXXXX")"
-    {
-        printf '# Auto-managed by bin/theme-switcher.\n'
-        printf '# Global values persist; session/window values live in tmux options.\n'
-        printf 'export DOTFILES_THEME=%q\n' "${DOTFILES_THEME:-$THEME_DEFAULT}"
-        printf 'export DOTFILES_THEME_PREVIOUS=%q\n' "${DOTFILES_THEME_PREVIOUS:-}"
-        printf 'export DOTFILES_THEME_GENERATION=%q\n' "${DOTFILES_THEME_GENERATION:-$(theme_generation)}"
-        for key in code chrome apps vim bat delta tmux starship fzf btop lazygit; do
-            var="DOTFILES_THEME_${key^^}"
-            value="${!var:-}"
-            [[ -n "$value" ]] && printf 'export %s=%q\n' "$var" "$value"
-        done
-    } > "$tmp"
-    mv "$tmp" "$STATE_FILE"
-
-    # Compatibility for scripts that only inspect the historical loader.
-    {
-        printf '# Compatibility loader; scoped values are resolved at runtime.\n'
-        printf 'export DOTFILES_THEME=%q\n' "$DOTFILES_THEME"
-        printf '_DOTFILES_PREVIOUS_THEME=%q\n' "${DOTFILES_THEME_PREVIOUS:-}"
-    } > "$LEGACY_THEME_FILE"
+    local key var value
+    local -a fields=(
+        default "${DOTFILES_THEME:-$THEME_DEFAULT}"
+        previous "${DOTFILES_THEME_PREVIOUS:-}"
+        generation "${DOTFILES_THEME_GENERATION:-$(theme_generation)}"
+    )
+    for key in code chrome apps vim bat delta tmux starship fzf btop lazygit; do
+        var="DOTFILES_THEME_${key^^}"
+        value="${!var:-}"
+        fields+=("$key" "$value")
+    done
+    theme_state_write_unlocked "${fields[@]}"
 }
 
 persist_global_change() {
     DOTFILES_THEME_GENERATION="$(theme_generation)"
     write_global_state
 }
+
+theme_feature_enabled() { feature_enabled theme; }
 
 load_palette() {
     local theme="$1"
@@ -145,9 +135,10 @@ ensure_theme_artifacts() {
 }
 
 ensure_shared_artifacts() {
-    local theme file tmp="$GENERATED_DIR/delta.gitconfig.tmp" changed=0
+    local theme file tmp changed=0
     local -A expected_bat=()
     mkdir -p "$GENERATED_DIR"
+    tmp="$(mktemp "${TMPDIR:-/tmp}/dotfiles-delta.XXXXXX")"
     : > "$tmp"
     printf '# Auto-generated; all Delta theme features are included.\n' >> "$tmp"
     for file in "$THEMES_DIR"/*/delta.gitconfig; do
@@ -319,6 +310,58 @@ tmux_sync_all() {
     tmux_bump_generation
 }
 
+tmux_wire() {
+    theme_tmux_available || return 0
+    local command_path="$DOTFILES_DIR/bin/theme-switcher"
+    theme_tmux set-hook -g 'session-created[90]' "run-shell '\"$command_path\" tmux-sync >/dev/null 2>&1'"
+    theme_tmux set-hook -g 'after-new-window[90]' "run-shell '\"$command_path\" tmux-sync-window \"#{window_id}\" \"#{session_id}\" >/dev/null 2>&1'"
+    theme_tmux set-hook -g 'after-select-window[90]' "run-shell '\"$command_path\" tmux-sync-status \"#{session_id}\" \"#{window_id}\" >/dev/null 2>&1'"
+    theme_tmux set-hook -g 'client-session-changed[90]' "run-shell '\"$command_path\" tmux-sync-status \"#{session_id}\" \"#{window_id}\" >/dev/null 2>&1'"
+    theme_tmux set-hook -g 'window-linked[90]' "run-shell '\"$command_path\" tmux-sync-window \"#{window_id}\" \"#{session_id}\" >/dev/null 2>&1'"
+    theme_tmux set-hook -g 'window-unlinked[90]' "run-shell '\"$command_path\" tmux-sync >/dev/null 2>&1'"
+    tmux_sync_all
+}
+
+tmux_unwire() {
+    theme_tmux_available || return 0
+    local hook session_id window_id pane option i
+    for hook in session-created after-new-window after-select-window \
+        client-session-changed window-linked window-unlinked; do
+        theme_tmux set-hook -gu "${hook}[90]" 2>/dev/null || true
+    done
+    while IFS= read -r session_id; do
+        [[ -n "$session_id" ]] || continue
+        theme_tmux set-option -q -u -t "$session_id" status-style || true
+        theme_tmux set-option -q -u -t "$session_id" message-style || true
+        theme_tmux set-option -q -u -t "$session_id" message-command-style || true
+        theme_tmux set-option -q -u -t "$session_id" display-panes-active-colour || true
+        theme_tmux set-option -q -u -t "$session_id" display-panes-colour || true
+        theme_tmux set-option -q -u -t "$session_id" @dotfiles_theme_effective || true
+    done < <(theme_tmux list-sessions -F '#{session_id}' 2>/dev/null)
+    while IFS= read -r window_id; do
+        [[ -n "$window_id" ]] || continue
+        for option in window-style window-active-style pane-border-style pane-active-border-style \
+            mode-style clock-mode-colour window-status-style window-status-current-style window-status-activity-style \
+            @dotfiles_theme_effective @dotfiles_theme_bg @dotfiles_theme_fg @dotfiles_theme_secondary \
+            @dotfiles_theme_surface @dotfiles_theme_border @dotfiles_theme_accent @dotfiles_status_left \
+            @dotfiles_status_right @dotfiles_theme_palette; do
+            theme_tmux set-option -q -u -w -t "$window_id" "$option" 2>/dev/null || true
+        done
+        for ((i = 0; i < 16; i++)); do
+            theme_tmux set-option -q -u -w -t "$window_id" "pane-colours[$i]" 2>/dev/null || true
+        done
+        while IFS= read -r pane; do
+            [[ -n "$pane" ]] || continue
+            theme_tmux set-option -q -u -p -t "$pane" window-style 2>/dev/null || true
+        done < <(theme_tmux list-panes -t "$window_id" -F '#{pane_id}' 2>/dev/null)
+    done < <(theme_tmux list-windows -a -F '#{window_id}' 2>/dev/null | sort -u)
+    theme_tmux set-option -q -g @dotfiles_theme_generation "$(theme_generation)"
+}
+
+tmux_configure() {
+    if theme_feature_enabled; then tmux_wire; else tmux_unwire; fi
+}
+
 tmux_resolve_target() {
     local scope="$1" requested="${2:-}" detected
     theme_tmux_available || { error "No tmux server is available for $scope scope"; return 1; }
@@ -403,15 +446,19 @@ cmd_set() {
     ensure_theme_artifacts "$theme"; ensure_shared_artifacts
 
     if [[ "$CMD_SCOPE" == global ]]; then
-        load_global_theme_state
-        if [[ "$target" == default ]]; then
-            DOTFILES_THEME_PREVIOUS="$DOTFILES_THEME"
-            DOTFILES_THEME="$theme"
-        else
-            var="DOTFILES_THEME_${target^^}"
-            printf -v "$var" '%s' "$theme"; export "${var?}"
-        fi
-        persist_global_change
+        (
+            _state_lock_acquire || exit 1
+            trap _state_lock_release EXIT INT TERM
+            load_global_theme_state
+            if [[ "$target" == default ]]; then
+                DOTFILES_THEME_PREVIOUS="$DOTFILES_THEME"
+                DOTFILES_THEME="$theme"
+            else
+                var="DOTFILES_THEME_${target^^}"
+                printf -v "$var" '%s' "$theme"; export "${var?}"
+            fi
+            persist_global_change
+        )
         tmux_sync_all
     else
         id="$(tmux_resolve_target "$CMD_SCOPE" "$CMD_SCOPE_ID")"
@@ -427,9 +474,14 @@ cmd_clear() {
     is_theme_target "$target" || { error "Unknown target: $target"; return 1; }
     if [[ "$CMD_SCOPE" == global ]]; then
         [[ "$target" != default ]] || { error "The global default cannot be cleared; set it to another theme"; return 1; }
-        load_global_theme_state
-        var="DOTFILES_THEME_${target^^}"; unset "$var"
-        persist_global_change; tmux_sync_all
+        (
+            _state_lock_acquire || exit 1
+            trap _state_lock_release EXIT INT TERM
+            load_global_theme_state
+            var="DOTFILES_THEME_${target^^}"; unset "$var"
+            persist_global_change
+        )
+        tmux_sync_all
     else
         id="$(tmux_resolve_target "$CMD_SCOPE" "$CMD_SCOPE_ID")"
         scope_option_clear "$CMD_SCOPE" "$id" "$target"
@@ -441,11 +493,16 @@ cmd_reset() {
     parse_scope "${1:-}"
     local id key var
     if [[ "$CMD_SCOPE" == global ]]; then
-        load_global_theme_state
-        for key in code chrome apps vim bat delta tmux starship fzf btop lazygit; do
-            var="DOTFILES_THEME_${key^^}"; unset "$var"
-        done
-        persist_global_change; tmux_sync_all
+        (
+            _state_lock_acquire || exit 1
+            trap _state_lock_release EXIT INT TERM
+            load_global_theme_state
+            for key in code chrome apps vim bat delta tmux starship fzf btop lazygit; do
+                var="DOTFILES_THEME_${key^^}"; unset "$var"
+            done
+            persist_global_change
+        )
+        tmux_sync_all
     else
         id="$(tmux_resolve_target "$CMD_SCOPE" "$CMD_SCOPE_ID")"
         scope_reset "$CMD_SCOPE" "$id"
@@ -495,6 +552,7 @@ cmd_show() {
 shell_quote_export() { printf 'export %s=%q\n' "$1" "$2"; }
 
 cmd_env() {
+    theme_feature_enabled || return 0
     local explicit=0 old_signature surface theme native tmux_gen signature fzf_theme detected
     local det_session det_window det_rest
     local -A prepared=()
@@ -759,6 +817,7 @@ Theme Switcher — global, tmux session, and tmux window theme scopes
   theme-switcher show [scope]
   theme-switcher explain [scope] [TOOL]
   theme-switcher diagnose
+  theme-switcher enable | disable
   theme-switcher --list | --current | --preview THEME | --revert | --init
 
 TARGET is default, code, chrome, apps, vim, bat, delta, tmux, starship, fzf,
@@ -781,14 +840,35 @@ main() {
         artifacts) ensure_all_artifacts ;;
         tint) shift; cmd_tint "$@" ;;
         diagnose) cmd_diagnose ;;
+        enabled) theme_feature_enabled ;;
+        enable)
+            preference_set feature.theme enabled
+            "$0" --init
+            ;;
+        disable)
+            preference_set feature.theme disabled
+            tmux_unwire
+            success "Theme feature disabled; existing overrides were preserved."
+            ;;
+        tmux-configure) tmux_configure ;;
+        tmux-unwire) tmux_unwire ;;
         tmux-sync) tmux_sync_all ;;
         tmux-sync-window) shift; tmux_apply_window "${1:?window id required}" "${2:-}"; tmux_sync_status_for_window "$1"; tmux_bump_generation ;;
         tmux-sync-status) shift; tmux_apply_status "${1:?session id required}" "${2:?window id required}" ;;
         --init)
-            load_global_theme_state
-            [[ -f "$STATE_FILE" ]] || { DOTFILES_THEME_GENERATION="$(theme_generation)"; write_global_state; }
+            theme_feature_enabled || return 0
+            if [[ ! -f "$DOTFILES_THEME_STATE_FILE" ]] \
+               || ! _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 2>/dev/null; then
+                (
+                    _state_lock_acquire || exit 1
+                    trap _state_lock_release EXIT INT TERM
+                    load_global_theme_state
+                    DOTFILES_THEME_GENERATION="$(theme_generation)"
+                    write_global_state
+                )
+            fi
             ensure_all_artifacts
-            tmux_sync_all
+            tmux_wire
             ;;
         --list|-l) list_themes ;;
         --current|-c) load_global_theme_state; printf 'Current theme: %s\n' "$DOTFILES_THEME" ;;

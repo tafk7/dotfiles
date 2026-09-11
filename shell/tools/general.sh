@@ -35,8 +35,12 @@ alias du='du -h'
 alias free='free -h'
 
 # Network
-alias ports='netstat -tulanp'
-alias myip='curl ifconfig.me'
+alias ports='ss -tulanp'
+myip() {
+    curl --fail --silent --show-error --max-time 10 --proto '=https' \
+        https://ifconfig.me/ip
+    printf '\n'
+}
 alias localip='hostname -I'
 
 # File viewing and editing
@@ -109,15 +113,22 @@ alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && ech
 # These applications accept a config path at launch, which keeps their theme
 # local to this shell's tmux context instead of patching a shared user file.
 btop() {
-    "$DOTFILES_DIR/bin/theme-switcher" prepare "${DOTFILES_THEME_BTOP_RESOLVED:?theme environment not loaded}" >/dev/null
-    command btop --config "${BTOP_THEME_CONFIG:?theme environment not loaded}" \
-        --themes-dir "${BTOP_THEME_DIR:?theme environment not loaded}" "$@"
+    if [[ -n "${DOTFILES_THEME_BTOP_RESOLVED:-}" && -n "${BTOP_THEME_CONFIG:-}" ]]; then
+        "$DOTFILES_DIR/bin/theme-switcher" prepare "$DOTFILES_THEME_BTOP_RESOLVED" >/dev/null
+        command btop --config "$BTOP_THEME_CONFIG" --themes-dir "${BTOP_THEME_DIR:?}" "$@"
+    else
+        command btop "$@"
+    fi
 }
 
 lazygit() {
-    local files="${LAZYGIT_THEME_CONFIG:?theme environment not loaded}"
-    [[ -f "$HOME/.config/lazygit/config.yml" ]] && files="$HOME/.config/lazygit/config.yml,$files"
-    command lazygit --use-config-file="$files" "$@"
+    local files="${LAZYGIT_THEME_CONFIG:-}"
+    if [[ -n "$files" ]]; then
+        [[ -f "$HOME/.config/lazygit/config.yml" ]] && files="$HOME/.config/lazygit/config.yml,$files"
+        command lazygit --use-config-file="$files" "$@"
+    else
+        command lazygit "$@"
+    fi
 }
 
 # Find and replace utility

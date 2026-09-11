@@ -14,10 +14,15 @@ mkcd() {
 # Iterate over existing project search roots from $PROJECTS_DIRS (colon-sep).
 # Echoes each existing directory on its own line. Used by proj/fzf-project/cproj.
 _dotfiles_iter_project_dirs() {
-    local IFS=':'
+    local roots="${PROJECTS_DIRS:-$HOME/projects:$HOME/work:$HOME/dev:$HOME/code:$HOME/src}"
     local dir
-    for dir in ${PROJECTS_DIRS:-$HOME/projects:$HOME/work:$HOME/dev:$HOME/code:$HOME/src}; do
+    while :; do
+        case "$roots" in
+            *:*) dir="${roots%%:*}"; roots="${roots#*:}" ;;
+            *) dir="$roots"; roots="" ;;
+        esac
         [[ -d "$dir" ]] && printf '%s\n' "$dir"
+        [[ -n "$roots" ]] || break
     done
 }
 
@@ -27,8 +32,11 @@ proj() {
         echo "Error: fzf is required for proj" >&2
         return 1
     fi
-    local dirs
-    mapfile -t dirs < <(_dotfiles_iter_project_dirs)
+    local -a dirs=()
+    local dir
+    while IFS= read -r dir; do
+        [[ -n "$dir" ]] && dirs+=("$dir")
+    done < <(_dotfiles_iter_project_dirs)
     if [[ ${#dirs[@]} -eq 0 ]]; then
         echo "proj: no project directories found in PROJECTS_DIRS" >&2
         return 1
@@ -46,18 +54,6 @@ add_to_path() {
     if [[ -d "$dir" ]] && [[ ":$PATH:" != *":$dir:"* ]]; then
         export PATH="$dir:$PATH"
     fi
-}
-
-# Remove duplicates from PATH
-dedupe_path() {
-    local new_path=""
-    local IFS=':'
-    for dir in $PATH; do
-        if [[ ":$new_path:" != *":$dir:"* ]]; then
-            new_path="${new_path:+$new_path:}$dir"
-        fi
-    done
-    export PATH="$new_path"
 }
 
 # Show PATH entries one per line

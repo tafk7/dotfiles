@@ -5,56 +5,54 @@
 " Vim-Plug Auto-Installation
 " ==============================================================================
 
-" Install vim-plug if not found
-if empty(glob('~/.config/nvim/autoload/plug.vim'))
-  silent !curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs
-    \ https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
-  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
-endif
+" Plugin installation is an explicit setup action. Ordinary editor startup
+" never downloads or executes remote code.
 
 " ==============================================================================
 " Plugins
 " ==============================================================================
 
+if exists('*plug#begin')
 call plug#begin('~/.config/nvim/plugged')
 
 " Color schemes
-Plug 'morhetz/gruvbox'                        " Retro groove color scheme
-Plug 'sainnhe/gruvbox-material'              " Softer variant of gruvbox
-Plug 'folke/tokyonight.nvim'                 " Tokyo Night color scheme
-Plug 'rebelot/kanagawa.nvim'                 " Kanagawa color scheme
-Plug 'catppuccin/vim', { 'as': 'catppuccin' } " Catppuccin color scheme (mocha + latte)
-Plug 'sainnhe/everforest'                    " Everforest color scheme
-Plug 'datsfilipe/vesper.nvim'                " Vesper color scheme (near-black)
-Plug 'projekt0n/github-nvim-theme'           " High-contrast neutral light theme
+Plug 'morhetz/gruvbox', { 'commit': '5d15b2765f59754d7ac263c88a0f6e3e58124951' }
+Plug 'sainnhe/gruvbox-material', { 'commit': '11d779b26a9ab2b3db8c22c6ac9fb6e8ed4fea79' }
+Plug 'folke/tokyonight.nvim', { 'commit': 'cdc07ac78467a233fd62c493de29a17e0cf2b2b6' }
+Plug 'rebelot/kanagawa.nvim', { 'commit': 'bb85e4bfc8d89b0e62c8fa53ccdd13d12e2f77b3' }
+Plug 'catppuccin/vim', { 'as': 'catppuccin', 'commit': 'ee7d87e1c3f753069dae41df139f7d3fd914f7e9' }
+Plug 'sainnhe/everforest', { 'commit': '85a86eb62409e3ec88713bff3d1b9d7374e112e4' }
+Plug 'datsfilipe/vesper.nvim', { 'commit': '1717b1ad657c94bec3fc2bdebb0c55452d9fe46d' }
+Plug 'projekt0n/github-nvim-theme', { 'commit': 'c106c9472154d6b2c74b74565616b877ae8ed31d' }
 
 " Essential tpope plugins
-Plug 'tpope/vim-fugitive'                     " Git integration
-Plug 'tpope/vim-surround'                     " Surround text objects
-Plug 'tpope/vim-commentary'                   " Quick commenting
-Plug 'tpope/vim-repeat'                       " Repeat plugin commands
-Plug 'tpope/vim-unimpaired'                   " Bracket mappings
+Plug 'tpope/vim-fugitive', { 'commit': '3b753cf8c6a4dcde6edee8827d464ba9b8c4a6f0' }
+Plug 'tpope/vim-surround', { 'commit': '3d188ed2113431cf8dac77be61b842acb64433d9' }
+Plug 'tpope/vim-commentary', { 'commit': '64a654ef4a20db1727938338310209b6a63f60c9' }
+Plug 'tpope/vim-repeat', { 'commit': '65846025c15494983dafe5e3b46c8f88ab2e9635' }
+Plug 'tpope/vim-unimpaired', { 'commit': 'db65482581a28e4ccf355be297f1864a4e66985c' }
 
 " File navigation
-Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
-Plug 'junegunn/fzf.vim'                       " FZF integration
+Plug 'junegunn/fzf', { 'commit': 'b224480a98a40c670c8ed89abd52d4216a470032', 'do': { -> fzf#install() } }
+Plug 'junegunn/fzf.vim', { 'commit': '8a0068127ac9ee23d71dab2944ce995726bef462' }
 
 " Git integration
-Plug 'airblade/vim-gitgutter'                 " Git diff in gutter
+Plug 'airblade/vim-gitgutter', { 'commit': '90b75207bd9b55d8ac4af15f72b4e935462014d0' }
 
 " Editing enhancements
-Plug 'jiangmiao/auto-pairs'                   " Auto close brackets
+Plug 'jiangmiao/auto-pairs', { 'commit': '39f06b873a8449af8ff6a3eee716d3da14d63a76' }
 
 " UI enhancements
-Plug 'vim-airline/vim-airline'                " Status line
-Plug 'vim-airline/vim-airline-themes'         " Airline themes
-Plug 'machakann/vim-highlightedyank'          " Highlight yanked text
+Plug 'vim-airline/vim-airline', { 'commit': 'ae24f4aca06731d5d7224df1fc5415975331b214' }
+Plug 'vim-airline/vim-airline-themes', { 'commit': '77aab8c6cf7179ddb8a05741da7e358a86b2c3ab' }
+Plug 'machakann/vim-highlightedyank', { 'commit': '285a61425e79742997bbde76a91be6189bc988fb' }
 
 " Syntax and language support
-Plug 'sheerun/vim-polyglot'                   " Language pack
-Plug 'dense-analysis/ale'                     " Async linting
+Plug 'sheerun/vim-polyglot', { 'commit': 'f061eddb7cdcc614c8406847b2bfb53099832a4e' }
+Plug 'dense-analysis/ale', { 'commit': 'e1789bc54483d76ac9ddb40b633d1645c8281914' }
 
 call plug#end()
+endif
 
 " ==============================================================================
 " Basic Settings
@@ -280,7 +278,9 @@ let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 if !exists('g:airline_theme')
     let g:airline_theme='gruvbox_material'
 endif
-let g:airline_powerline_fonts = 1
+" Portable default: do not assume a patched Powerline/Nerd Font. Users who
+" install one can set this back to 1 in ~/.config/nvim/init.local.vim.
+let g:airline_powerline_fonts = 0
 let g:airline#extensions#tabline#enabled = 1
 let g:airline#extensions#tabline#formatter = 'unique_tail'
 let g:airline#extensions#branch#enabled = 1
@@ -331,10 +331,22 @@ vnoremap <leader>/ :Commentary<CR>
 " ==============================================================================
 
 
-" Automatically remove trailing whitespace on save
+" Remove trailing whitespace only for formats where it is not semantic. Keep
+" the view and search register stable so saving does not move the user.
+function! StripTrailingWhitespace()
+    if index(['markdown', 'markdown.pandoc', 'text', 'gitcommit', 'diff'], &filetype) >= 0
+        return
+    endif
+    let l:view = winsaveview()
+    let l:search = @/
+    silent! keeppatterns %s/\s\+$//e
+    let @/ = l:search
+    call winrestview(l:view)
+endfunction
+
 augroup trim_whitespace
     autocmd!
-    autocmd BufWritePre * :%s/\s\+$//e
+    autocmd BufWritePre * call StripTrailingWhitespace()
 augroup END
 
 " Disable automatic comment insertion
@@ -425,12 +437,6 @@ function! ToggleNumber()
 endfunction
 nnoremap <leader>n :call ToggleNumber()<CR>
 
-" Strip trailing whitespace
-function! StripTrailingWhitespace()
-    let save_cursor = getpos(".")
-    %s/\s\+$//e
-    call setpos('.', save_cursor)
-endfunction
 nnoremap <leader>ss :call StripTrailingWhitespace()<CR>
 
 " ==============================================================================
