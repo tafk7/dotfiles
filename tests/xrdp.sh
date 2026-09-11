@@ -13,5 +13,10 @@ HOME="$HOME" XDG_STATE_HOME="$XDG_STATE_HOME" DOTFILES_DIR="$ROOT" \
     "$ROOT/installers/install-xrdp.sh" >/dev/null 2>&1 || rc=$?
 [[ $rc -ne 0 ]] || fail "xrdp accepted WSL without systemd"
 [[ ! -e "$HOME/.xsession" ]] || fail "xrdp mutated HOME before systemd preflight"
+grep -Fq 'safe_sudo gpasswd -a xrdp ssl-cert' "$ROOT/installers/install-xrdp.sh" \
+    || fail "xrdp group membership does not use the narrow gpasswd path"
+if grep -Fq 'safe_sudo adduser xrdp ssl-cert' "$ROOT/installers/install-xrdp.sh"; then
+    fail "xrdp group membership still invokes usermod through adduser"
+fi
 
 printf 'xrdp: ok\n'
