@@ -14,7 +14,8 @@ export HOME="$TMP_ROOT/home"
 export TMUX=
 mkdir -p "$TMUX_TMPDIR" "$HOME" "$DOTFILES_LEGACY_GENERATED_DIR"
 printf 'export DOTFILES_THEME="gruvbox"\n_DOTFILES_PREVIOUS_THEME="nord"\n' > "$DOTFILES_LEGACY_GENERATED_DIR/theme.sh"
-printf 'export DOTFILES_THEME_CODE="catppuccin"\n' > "$DOTFILES_LEGACY_GENERATED_DIR/theme-overrides.sh"
+printf 'export DOTFILES_THEME=gruvbox\nexport DOTFILES_THEME_PREVIOUS=nord\nexport DOTFILES_THEME_GENERATION=42\nexport DOTFILES_THEME_CODE=catppuccin\n' \
+    > "$DOTFILES_LEGACY_GENERATED_DIR/theme-state.sh"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'${3:+ ($3)}"; }
