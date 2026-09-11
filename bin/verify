@@ -113,6 +113,10 @@ for config in "${sorted_configs[@]}"; do
             if [[ -f "$portable_git" ]] \
                && git config --global --get-all include.path 2>/dev/null | grep -Fxq "$portable_git"; then
                 check_pass "$target includes portable dotfiles config"
+            elif [[ -f "$target" ]] \
+                 && grep -Fq '# This is a template file - values will be replaced during installation' "$target" \
+                 && ! grep -q '{{GIT_' "$target"; then
+                check_pass "$target uses the valid pre-migration dotfiles format"
             else
                 check_fail "$target missing portable include ($portable_git)"
             fi
