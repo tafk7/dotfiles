@@ -20,12 +20,43 @@ INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool fl
 AI_ALL=false           # --ai / --full: install every ai-tier tool.
 declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode / --pi.
 INSTALL_RDP=false      # Orthogonal: xrdp RDP server. Off by default; NOT implied by --full.
+THEME_REQUEST=""       # Empty preserves preference; enabled/disabled are explicit changes.
+AGENT_BADGE_REQUEST=""
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
 SHOW_HELP=false
 DRY_RUN=false
 NO_HOOKS=false
 NO_GIT=false          # --no-git: skip ~/.gitconfig entirely (no prompt, no write).
+PARSE_ERROR=false
+
+tier_rank() {
+    case "$1" in
+        config) echo 0 ;;
+        bash) echo 1 ;;
+        dev) echo 2 ;;
+        work) echo 3 ;;
+        *) return 1 ;;
+    esac
+}
+
+request_tier() {
+    local requested="$1" current_rank requested_rank
+    current_rank="$(tier_rank "$INSTALL_TIER")"
+    requested_rank="$(tier_rank "$requested")"
+    if (( requested_rank > current_rank )); then
+        INSTALL_TIER="$requested"
+    fi
+}
+
+require_option_value() {
+    local option="$1" value="${2:-}"
+    if [[ -z "$value" || "$value" == --* ]]; then
+        error "$option requires a value"
+        PARSE_ERROR=true
+        return 1
+    fi
+}
 
 # Git identity (optional; falls back to existing config or interactive prompt).
 # Read by process_git_config() in lib/install.sh.
@@ -39,24 +70,24 @@ parse_arguments() {
             --config)
                 # Reconcile action: lay down base configs + configs for whatever
                 # tools are currently installed. No package installs, no sudo.
-                INSTALL_TIER="config"
+                request_tier "config"
                 shift
                 ;;
             --bash)
-                INSTALL_TIER="bash"
+                request_tier "bash"
                 shift
                 ;;
             --dev)
-                INSTALL_TIER="dev"
+                request_tier "dev"
                 shift
                 ;;
             --work)
-                INSTALL_TIER="work"
+                request_tier "work"
                 shift
                 ;;
             --full)
                 # Convenience: everything. Equivalent to --work --ai.
-                INSTALL_TIER="work"
+                request_tier "work"
                 INSTALL_AI=true
                 AI_ALL=true
                 shift
@@ -80,6 +111,22 @@ parse_arguments() {
                 INSTALL_RDP=true
                 shift
                 ;;
+            --theme)
+                THEME_REQUEST="enabled"
+                shift
+                ;;
+            --no-theme)
+                THEME_REQUEST="disabled"
+                shift
+                ;;
+            --agent-badge)
+                AGENT_BADGE_REQUEST="enabled"
+                shift
+                ;;
+            --no-agent-badge)
+                AGENT_BADGE_REQUEST="disabled"
+                shift
+                ;;
             --force)
                 FORCE_OVERWRITE=true
                 FORCE_REINSTALL=true
@@ -98,10 +145,12 @@ parse_arguments() {
                 shift
                 ;;
             --git-name)
+                require_option_value "$1" "${2:-}" || { shift; continue; }
                 DOTFILES_GIT_NAME="$2"
                 shift 2
                 ;;
             --git-email)
+                require_option_value "$1" "${2:-}" || { shift; continue; }
                 DOTFILES_GIT_EMAIL="$2"
                 shift 2
                 ;;
@@ -111,11 +160,12 @@ parse_arguments() {
                 ;;
             *)
                 error "Unknown option: $1"
-                SHOW_HELP=true
+                PARSE_ERROR=true
                 shift
                 ;;
         esac
     done
+    [[ "$PARSE_ERROR" == "false" ]]
 }
 
 # Check if current tier includes the required tier level.
@@ -198,6 +248,10 @@ OPTIONS:
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
+    --theme             Enable the coordinated theme feature (default).
+    --no-theme          Persistently disable theme generation and runtime hooks.
+    --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
+    --no-agent-badge    Install AI CLIs without registering agent-badge.
     --git-name NAME     Set git user.name (for non-interactive installs)
     --git-email EMAIL   Set git user.email (for non-interactive installs)
     --help              Show this help message
@@ -252,28 +306,49 @@ EOF
 phase_verify_system() {
     log "Phase 1: System Verification"
 
-    # Check Ubuntu - soft requirement for config tier, hard for others
-    if ! command -v lsb_release >/dev/null 2>&1; then
-        if tier_includes "dev"; then
-            error "This script requires Ubuntu for APT package installation (dev tier and up)"
-            exit 1
-        else
-            warn "Not running on Ubuntu - APT installs unavailable (bash tier is eget-only, so this is usually fine)"
+    # Check the distribution identity, not merely whether lsb_release happens
+    # to be installed on an unrelated distribution.
+    local os_release="${DOTFILES_OS_RELEASE:-/etc/os-release}" os_id="" os_version=""
+    if [[ -r "$os_release" ]]; then
+        os_id="$(awk -F= '$1 == "ID" { gsub(/^"|"$/, "", $2); print $2; exit }' "$os_release")"
+        os_version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' "$os_release")"
+    fi
+    if [[ "$os_id" != "ubuntu" ]]; then
+        if tier_includes "dev" || [[ "$INSTALL_RDP" == "true" ]]; then
+            error "APT-backed tiers and --rdp require Ubuntu (detected: ${os_id:-unknown})"
+            return 1
         fi
+        warn "Ubuntu not detected - APT-backed features are unavailable"
+    elif [[ "$os_version" != 22.04 && "$os_version" != 24.04 && "$os_version" != 26.04 ]]; then
+        if tier_includes "dev" || [[ "$INSTALL_RDP" == true ]]; then
+            error "Unsupported Ubuntu release: ${os_version:-unknown} (supported: 22.04, 24.04, 26.04)"
+            return 1
+        fi
+        warn "Ubuntu ${os_version:-unknown} is outside the tested support matrix"
+    fi
+    get_arch >/dev/null || return 1
+    if is_wsl && [[ "$(wsl_version)" != 2 ]]; then
+        error "WSL1 is unsupported; use WSL2"
+        return 1
     fi
 
     # Check basic tools that should exist. The bash tier needs curl (eget
     # bootstrap + downloads) and git; apt is not involved until the dev tier.
-    for cmd in curl wget git; do
+    for cmd in curl git; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            if tier_includes "bash"; then
+            if tier_includes "bash" || { [[ "$cmd" == curl && "$INSTALL_AI" == true ]]; }; then
                 error "Required command not found: $cmd"
-                exit 1
+                return 1
             else
                 warn "Command not found: $cmd (not required for config tier)"
             fi
         fi
     done
+    if [[ "$INSTALL_RDP" == true ]]; then
+        for cmd in apt-get sudo systemctl; do
+            command -v "$cmd" >/dev/null 2>&1 || { error "--rdp requires: $cmd"; return 1; }
+        done
+    fi
 
     detect_environment
 
@@ -304,38 +379,42 @@ phase_install_packages() {
     fi
 
     if tier_includes "bash"; then
-        install_bash_packages
+        install_bash_packages || INSTALLATION_FAILED=true
     fi
 
     if tier_includes "dev"; then
-        install_dev_packages
+        install_dev_packages || INSTALLATION_FAILED=true
     fi
 
     if tier_includes "work"; then
-        install_work_packages
+        install_work_packages || INSTALLATION_FAILED=true
     fi
 
     # AI CLIs are orthogonal to the tier chain (--ai, or --full which implies it).
     if [[ "$INSTALL_AI" == "true" ]]; then
-        install_ai_packages
+        install_ai_packages || INSTALLATION_FAILED=true
     fi
 
     # RDP server is orthogonal too, and NOT implied by --full.
     if [[ "$INSTALL_RDP" == "true" ]]; then
-        install_rdp_packages
+        install_rdp_packages || INSTALLATION_FAILED=true
     fi
 
+    if [[ "$INSTALLATION_FAILED" == "true" ]]; then
+        error "One or more requested package operations failed"
+        return 1
+    fi
     success "Package installation complete"
 }
 
 # Phase 3: Configuration and Validation
 phase_setup_configs() {
     log "Phase 3: Configuration and Validation"
+    local failed=false
     
-    # Single backup directory for this installation
-    local backup_dir
-    backup_dir=$(create_backup_dir)
-    log "Backup directory: $backup_dir"
+    # Backups are created lazily by the first operation that actually displaces
+    # user data. Matching symlinks and dry-runs create no backup directories.
+    ACTIVE_BACKUP_DIR=""
     
     # Process configurations
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -384,17 +463,27 @@ phase_setup_configs() {
 
             case "$type" in
                 symlink)
-                    process_symlink "$source" "$target" "$backup_dir"
+                    if process_symlink "$source" "$target"; then
+                        ledger_record "config.${config//\//.}" yes dotfiles installed "" "$target" symlink || failed=true
+                    else
+                        failed=true
+                    fi
                     ;;
                 gitconfig)
                     if [[ "$NO_GIT" == "true" ]]; then
                         log "Skipping $target (--no-git)"
                     else
-                        process_git_config "$source" "$target" "$backup_dir" "$FORCE_OVERWRITE"
+                        if process_git_config "$source" "$target" "$FORCE_OVERWRITE"; then
+                            ledger_record config.git yes dotfiles installed "" \
+                                "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig" include || failed=true
+                        else
+                            failed=true
+                        fi
                     fi
                     ;;
                 *)
                     error "Unknown config type: $type for $config"
+                    failed=true
                     ;;
             esac
         done
@@ -402,17 +491,21 @@ phase_setup_configs() {
     
     # WSL-specific setup
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
-        setup_wsl_clipboard
-        setup_wsl_ssh_agent
+        setup_wsl_clipboard || failed=true
+        setup_wsl_ssh_agent || failed=true
     fi
 
-    # Initialize default theme if none is set (theme-switcher owns the default)
-    if [[ "$DRY_RUN" == "true" ]]; then
-        if [[ ! -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
-            log "[DRY RUN] Would initialize default theme"
+    # Initialize theme artifacts only when the feature is enabled. Persistent
+    # preference handling is centralized in lib/state.sh.
+    if feature_enabled theme; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log "[DRY RUN] Would initialize theme feature"
+        else
+            "$DOTFILES_DIR/bin/theme-switcher" --init || failed=true
         fi
     else
-        "$DOTFILES_DIR/bin/theme-switcher" --init
+        log "Theme feature disabled; skipping generated artifacts"
+        [[ "$DRY_RUN" == "true" ]] || "$DOTFILES_DIR/bin/theme-switcher" tmux-unwire || failed=true
     fi
 
     # Install pre-commit git hooks (default: on; opt out with --no-hooks).
@@ -422,21 +515,27 @@ phase_setup_configs() {
     elif [[ "$DRY_RUN" == "true" ]]; then
         log "[DRY RUN] Would install git hooks (use --no-hooks to skip)"
     else
-        "$DOTFILES_DIR/bin/install-git-hooks" --quiet || warn "git hooks install failed"
+        "$DOTFILES_DIR/bin/install-git-hooks" --quiet || { warn "git hooks install failed"; failed=true; }
     fi
 
     # Write install-time environment to generated/bridge.sh
-    write_dotfiles_env
+    write_dotfiles_env || failed=true
 
     # Cleanup
-    cleanup_old_backups 10
+    if [[ "$DRY_RUN" != "true" && -n "${ACTIVE_BACKUP_DIR:-}" ]]; then
+        cleanup_old_backups 10
+    fi
 
+    if [[ "$failed" == true ]]; then
+        error "Configuration reconciliation failed"
+        return 1
+    fi
     success "Configuration complete"
 }
 
 # Process symlink configuration
 process_symlink() {
-    local source="$1" target="$2" backup_dir="$3"
+    local source="$1" target="$2"
     
     if [[ "$DRY_RUN" == "true" ]]; then
         log "[DRY RUN] Would link $source -> $target"
@@ -457,17 +556,33 @@ process_symlink() {
         chmod 700 "$parent_dir/sockets"
     fi
     
-    safe_symlink "$source" "$target" "$backup_dir"
+    safe_symlink "$source" "$target"
 }
 
 # Main installation workflow
 run_installation() {
-    phase_verify_system
-    phase_install_packages
-    phase_setup_configs
+    INSTALLATION_FAILED=false
+    if journal_pending; then
+        warn "Recovering an interrupted component transaction before setup."
+        journal_reconcile || INSTALLATION_FAILED=true
+    fi
+    phase_verify_system || INSTALLATION_FAILED=true
+    if [[ "$INSTALLATION_FAILED" != "true" ]]; then
+        apply_feature_requests || INSTALLATION_FAILED=true
+    fi
+    if [[ "$INSTALLATION_FAILED" != "true" ]]; then
+        phase_install_packages || INSTALLATION_FAILED=true
+        phase_setup_configs || INSTALLATION_FAILED=true
+    fi
 
     # Show what happened with tool installs
     print_install_summary
+
+    if [[ "$INSTALLATION_FAILED" == "true" || ${#INSTALL_FAIL[@]} -gt 0 ]]; then
+        echo
+        error "Dotfiles installation incomplete; see the summary above."
+        return 1
+    fi
 
     # Success message
     echo
@@ -550,8 +665,12 @@ run_installation() {
         ((step++))
     fi
 
-    echo "$step. Switch theme (default: gruvbox):"
-    echo "   ./bin/theme-switcher"
+    if feature_enabled theme; then
+        echo "$step. Switch theme (default: gruvbox):"
+        echo "   ./bin/theme-switcher"
+    else
+        echo "$step. Theme feature is disabled (enable with: ./bin/dotfiles-feature enable theme)"
+    fi
 
     echo
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -578,7 +697,10 @@ main() {
     fi
 
     # Parse command line arguments
-    parse_arguments "$@"
+    if ! parse_arguments "$@"; then
+        show_help >&2
+        exit 64
+    fi
 
     # Show help if requested
     if [[ "$SHOW_HELP" == "true" ]]; then
@@ -593,7 +715,7 @@ main() {
     echo "Tier: $INSTALL_TIER"
     if [[ "$INSTALL_AI" == "true" ]]; then
         if [[ "$AI_ALL" == "true" ]]; then
-            echo "AI CLIs: all (claude, codex, opencode)"
+            echo "AI CLIs: all (claude, codex, opencode, pi)"
         else
             echo "AI CLIs: ${AI_TOOLS[*]}"
         fi
@@ -609,4 +731,6 @@ main() {
 }
 
 # Execute main function
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

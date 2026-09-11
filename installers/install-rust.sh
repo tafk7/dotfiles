@@ -16,7 +16,10 @@
 # PROFILE=/dev/null and opencode's --no-modify-path).
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -36,22 +39,28 @@ log "Installing Rust toolchain via rustup..."
 
 # Download the installer to a file first (inspectable, logged) rather than
 # piping the network straight into sh.
-rustup_installer="$(mktemp)"
-if ! curl -fsSL --proto '=https' --tlsv1.2 https://sh.rustup.rs -o "$rustup_installer"; then
+rustup_installer="${DOTFILES_RUSTUP_INSTALLER_SCRIPT:-}"
+downloaded_installer=false
+if [[ -z "$rustup_installer" ]]; then
+    rustup_installer="$(mktemp)"
+    downloaded_installer=true
+fi
+if [[ "$downloaded_installer" == true ]] && ! download_installer_script https://sh.rustup.rs "$rustup_installer"; then
     error "Failed to download rustup installer"
     rm -f "$rustup_installer"
     exit 1
 fi
+[[ -s "$rustup_installer" ]] || { error "Rust installer is missing or empty: $rustup_installer"; exit 1; }
 
 log "Running rustup installer from $rustup_installer"
 # -y: non-interactive, default profile/toolchain.
 # --no-modify-path: don't touch shell rc files (we own PATH via shell/env.sh).
 if ! sh "$rustup_installer" -y --no-modify-path; then
     error "rustup installation failed"
-    rm -f "$rustup_installer"
+    [[ "$downloaded_installer" == true ]] && rm -f "$rustup_installer"
     exit 1
 fi
-rm -f "$rustup_installer"
+[[ "$downloaded_installer" == true ]] && rm -f "$rustup_installer"
 
 # Safety net: --no-modify-path should mean no rc edits, but the rc files are
 # repo symlinks — warn if anything wrote through anyway.

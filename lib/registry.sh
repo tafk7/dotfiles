@@ -37,6 +37,9 @@ declare -A TOOL_BINARY=(
     [pi]=pi
     [wsl2-ssh-agent]=wsl2-ssh-agent
     [xrdp]=xrdp
+    [zsh]=zsh
+    [docker]=docker
+    [azure-cli]=az
 )
 
 # TOOL_METHOD: tool name → install method (eget|apt|installer|external)
@@ -69,6 +72,9 @@ declare -A TOOL_METHOD=(
     [pi]=installer
     [wsl2-ssh-agent]=eget
     [xrdp]=installer
+    [zsh]=apt
+    [docker]=apt
+    [azure-cli]=apt
 )
 
 # TOOL_EGET_REPO: tool name → eget.toml repo slug ("owner/repo")
@@ -95,7 +101,52 @@ declare -A TOOL_TIER=(
     [claude]=ai       [codex]=ai       [opencode]=ai    [pi]=ai
     [xrdp]=rdp
     [nvm]=work        [rust]=work
+    [zsh]=dev         [docker]=work       [azure-cli]=work
 )
+
+# Supported platform and architecture inventory. "ubuntu" includes native
+# Ubuntu and WSL; wsl is restricted to WSL2. Architecture values are explicit
+# so selection-only CI can validate ARM support without pretending to execute
+# ARM binaries on an x86 runner.
+declare -A TOOL_PLATFORM=()
+declare -A TOOL_ARCHES=()
+declare -A TOOL_OWNERSHIP_ROOTS=()
+declare -A TOOL_UPDATE_CONTRACT=()
+
+for _registry_name in "${!TOOL_BINARY[@]}"; do
+    TOOL_PLATFORM["$_registry_name"]="ubuntu"
+    TOOL_ARCHES["$_registry_name"]="x86_64,aarch64"
+done
+unset _registry_name
+TOOL_PLATFORM[wsl2-ssh-agent]="wsl"
+
+for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck wsl2-ssh-agent; do
+    TOOL_OWNERSHIP_ROOTS["$_registry_name"]="$HOME/.local/bin"
+    TOOL_UPDATE_CONTRACT["$_registry_name"]="staged-release"
+done
+unset _registry_name
+TOOL_OWNERSHIP_ROOTS[eget]="$HOME/.local/bin"
+TOOL_OWNERSHIP_ROOTS[neovim]="$HOME/.local"
+TOOL_OWNERSHIP_ROOTS[tmux]="$HOME/.local"
+TOOL_OWNERSHIP_ROOTS[nvm]="$HOME/.nvm"
+TOOL_OWNERSHIP_ROOTS[rust]="$HOME/.cargo|$HOME/.rustup"
+TOOL_OWNERSHIP_ROOTS[claude]="$HOME/.local/bin|$HOME/.local/share/claude"
+TOOL_OWNERSHIP_ROOTS[codex]="$HOME/.local/bin|$HOME/.codex/packages/standalone"
+TOOL_OWNERSHIP_ROOTS[opencode]="$HOME/.local/bin|$HOME/.opencode"
+TOOL_OWNERSHIP_ROOTS[pi]="$HOME/.local/bin|$HOME/.pi/agent/install"
+TOOL_UPDATE_CONTRACT[eget]="staged-release"
+TOOL_UPDATE_CONTRACT[neovim]="staged-release"
+TOOL_UPDATE_CONTRACT[tmux]="staged-build"
+TOOL_UPDATE_CONTRACT[nvm]="vendor-installer-preserve-existing"
+TOOL_UPDATE_CONTRACT[rust]="vendor-installer-in-place"
+TOOL_UPDATE_CONTRACT[claude]="moving-vendor-installer"
+TOOL_UPDATE_CONTRACT[codex]="moving-vendor-installer-preserve-launcher"
+TOOL_UPDATE_CONTRACT[opencode]="moving-vendor-installer"
+TOOL_UPDATE_CONTRACT[pi]="npm-prefix-in-place"
+TOOL_UPDATE_CONTRACT[zsh]="apt-in-place"
+TOOL_UPDATE_CONTRACT[docker]="apt-in-place"
+TOOL_UPDATE_CONTRACT[azure-cli]="apt-in-place"
+TOOL_UPDATE_CONTRACT[xrdp]="apt-and-service-in-place"
 
 # TOOL_VERIFY: tool name → verification command (exit 0 = pass)
 # Empty = use "command -v TOOL_BINARY[name]"
@@ -108,32 +159,32 @@ declare -A TOOL_VERIFY=(
     [pi]='command -v pi >/dev/null 2>&1 && pi --version >/dev/null 2>&1'
     # Binary present isn't success for a service — it must be running.
     [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
+    [ripgrep]='p=$(command -v rg 2>/dev/null || true); [[ -n "$p" && "$p" != */.codex/* && "$p" != */.vscode*/extensions/* ]]'
 )
 
 # TOOL_PATHS: tool name → space-separated paths to remove on uninstall
 # Empty = managed by install method (apt uses apt remove; eget uses ~/.local/bin/BINARY)
 declare -A TOOL_PATHS=(
-    [neovim]="\$HOME/.local/bin/nvim \$HOME/.local/nvim"
-    [nvm]="\$HOME/.nvm"
-    [rust]="\$HOME/.cargo \$HOME/.rustup"
-    [uv]="\$HOME/.local/bin/uv \$HOME/.local/bin/uvx"
-    [claude]="\$HOME/.local/bin/claude \$HOME/.local/share/claude"
-    [codex]="\$HOME/.local/bin/codex \$HOME/.codex/packages/standalone"
-    [opencode]="\$HOME/.local/bin/opencode \$HOME/.opencode"
+    [neovim]="$HOME/.local/bin/nvim|$HOME/.local/nvim"
+    [nvm]="$HOME/.nvm"
+    [rust]=""
+    [uv]="$HOME/.local/bin/uv|$HOME/.local/bin/uvx"
+    [claude]="$HOME/.local/bin/claude|$HOME/.local/share/claude"
+    [codex]="$HOME/.local/bin/codex|$HOME/.codex/packages/standalone"
+    [opencode]="$HOME/.local/bin/opencode|$HOME/.opencode"
     # Only the install/ subtree — ~/.pi/agent also holds settings.json,
     # sessions/, trust.json and models.json, which are user data.
-    [pi]="\$HOME/.local/bin/pi \$HOME/.pi/agent/install"
+    [pi]="$HOME/.local/bin/pi|$HOME/.pi/agent/install"
 )
 
 # TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
 # Only for tools that need manual steps beyond path deletion.
 declare -A TOOL_REMOVAL_INSTRUCTIONS=(
-    [nvm]="rm -rf \$HOME/.nvm  # then restart shell"
-    [rust]="rustup self uninstall -y  # removes \$HOME/.cargo and \$HOME/.rustup"
-    [claude]="rm -rf \$HOME/.local/share/claude  # ~/.claude config/sessions are preserved"
-    [codex]="rm -f \$HOME/.local/bin/codex && rm -rf \$HOME/.codex/packages/standalone  # ~/.codex config/sessions are preserved"
-    [opencode]="rm -f \$HOME/.local/bin/opencode  # ~/.config/opencode config is preserved"
-    [pi]="rm -f \$HOME/.local/bin/pi && rm -rf \$HOME/.pi/agent/install  # ~/.pi/agent settings and sessions are preserved"
+    [rust]="Run 'rustup self uninstall' after separately backing up any Cargo credentials/configuration."
+    [claude]="$HOME/.claude configuration and sessions are preserved"
+    [codex]="$HOME/.codex configuration and sessions outside packages/standalone are preserved"
+    [opencode]="$HOME/.config/opencode configuration is preserved"
+    [pi]="$HOME/.pi/agent settings, trust data, and sessions outside install/ are preserved"
     [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
 )
 
@@ -167,8 +218,43 @@ tool_verify_command() {
 tool_uninstall_paths() {
     local name="$1"
     if [[ -n "${TOOL_PATHS[$name]:-}" ]]; then
-        eval echo "${TOOL_PATHS[$name]}"
+        printf '%s\n' "${TOOL_PATHS[$name]}" | tr '|' '\n'
     elif [[ "${TOOL_METHOD[$name]}" == "eget" ]]; then
         echo "$HOME/.local/bin/${TOOL_BINARY[$name]}"
     fi
+}
+
+tool_platform() {
+    if [[ -n "${DOTFILES_TEST_PLATFORM:-}" ]]; then
+        printf '%s\n' "$DOTFILES_TEST_PLATFORM"
+    elif is_wsl; then
+        printf 'wsl\n'
+    else
+        printf 'ubuntu\n'
+    fi
+}
+
+tool_arch() {
+    [[ -n "${DOTFILES_TEST_ARCH:-}" ]] && printf '%s\n' "$DOTFILES_TEST_ARCH" || get_arch
+}
+
+tool_applicable() {
+    local name="$1" platform arch
+    platform="$(tool_platform)"; arch="$(tool_arch)" || return 1
+    case ",${TOOL_ARCHES[$name]:-}," in *",$arch,"*) ;; *) return 1 ;; esac
+    case "${TOOL_PLATFORM[$name]:-ubuntu}" in
+        ubuntu) [[ "$platform" == ubuntu || "$platform" == wsl ]] ;;
+        wsl) [[ "$platform" == wsl ]] ;;
+        *) return 1 ;;
+    esac
+}
+
+tool_owned_path() {
+    local name="$1" path="$2" roots root
+    roots="${TOOL_OWNERSHIP_ROOTS[$name]:-}"
+    while [[ -n "$roots" ]]; do
+        case "$roots" in *'|'*) root="${roots%%|*}"; roots="${roots#*|}" ;; *) root="$roots"; roots="" ;; esac
+        [[ "$path" == "$root" || "$path" == "$root/"* ]] && return 0
+    done
+    return 1
 }

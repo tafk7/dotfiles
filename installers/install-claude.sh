@@ -7,7 +7,10 @@
 # background auto-update, set DISABLE_AUTOUPDATER=1 in ~/.claude/settings.json.
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -61,6 +64,10 @@ provision_claude_settings() {
 # Never fatal: a badge is a convenience, and the plugin failing to install is not
 # a reason for the Claude installer to report failure.
 provision_agent_badge_plugin() {
+    [[ "${DOTFILES_AGENT_BADGE_ENABLED:-1}" == "1" ]] || {
+        log "Agent-badge disabled; skipping plugin registration."
+        return 0
+    }
     local claude_cmd="${1:-}"
     [[ -n "$claude_cmd" && -x "$claude_cmd" ]] || claude_cmd="$(command -v claude 2>/dev/null || true)"
     [[ -n "$claude_cmd" ]] || return 0
@@ -105,10 +112,22 @@ log "Installing Claude Code via claude.ai/install.sh..."
 # ~/.local/bin is already on PATH (shell/env.sh), so the installer should detect
 # that and skip editing shell rc files. Those rc files are dotfiles symlinks, so
 # if it edits them anyway it writes through into the tracked repo — warn if so.
-if ! curl -fsSL https://claude.ai/install.sh | bash; then
+claude_installer="${DOTFILES_CLAUDE_INSTALLER_SCRIPT:-}"
+downloaded_installer=false
+if [[ -z "$claude_installer" ]]; then
+    claude_installer="$(mktemp)"
+    downloaded_installer=true
+    download_installer_script https://claude.ai/install.sh "$claude_installer" || exit 1
+elif [[ ! -s "$claude_installer" ]]; then
+    error "DOTFILES_CLAUDE_INSTALLER_SCRIPT is missing or empty: $claude_installer"
+    exit 1
+fi
+if ! bash "$claude_installer"; then
+    [[ "$downloaded_installer" == true ]] && rm -f "$claude_installer"
     error "Claude Code installation failed"
     exit 1
 fi
+[[ "$downloaded_installer" == true ]] && rm -f "$claude_installer"
 
 if [[ -d "$DOTFILES_DIR/.git" ]] && ! git -C "$DOTFILES_DIR" diff --quiet -- entry/ shell/ 2>/dev/null; then
     warn "The Claude installer modified a shell rc file that is symlinked into the repo."

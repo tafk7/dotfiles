@@ -10,17 +10,22 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/registry.sh"
+source "$DOTFILES_DIR/lib/state.sh"
+
+DRY_RUN=false
+ASSUME_YES=false
 
 show_usage() {
     echo "Usage: uninstall-tool <name>"
     echo "       uninstall-tool --list"
+    echo "       uninstall-tool [--dry-run] [--yes] <name>"
     echo ""
     echo "Remove tools installed by the dotfiles system."
 }
 
 list_tools() {
-    echo "Tool              Status        Method    Location"
-    echo "────────────────  ────────────  ────────  ────────────────────────────────"
+    echo "Tool              Status        Method    Ownership   Removal"
+    echo "────────────────  ────────────  ────────  ──────────  ─────────────────────"
 
     local names
     readarray -t names < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
@@ -32,22 +37,43 @@ list_tools() {
         local paths
         paths="$(tool_uninstall_paths "$name")"
 
-        local status="not found"
-        local display_path=""
+        local status="not found" ownership="unrecorded" removal="manual"
 
         if eval "$verify_cmd"; then
             status="installed"
-            if [[ -n "$paths" ]]; then
-                # Show first path, abbreviated
-                local first_path="${paths%% *}"
-                display_path="${first_path/#$HOME/~}"
-            elif [[ "$method" == "apt" ]]; then
-                display_path="(apt package)"
-            fi
+            local ledger=""
+            ledger="$(ledger_line "$name" 2>/dev/null || true)"
+            [[ -n "$ledger" ]] && IFS=$'\t' read -r _ _ ownership _ _ _ _ _ <<< "$ledger"
+            if [[ "$ownership" == dotfiles && -n "$paths" ]]; then removal="owned paths"; fi
+            [[ "$method" == apt ]] && removal="apt (confirmation)"
         fi
 
-        printf "%-18s%-14s%-10s%s\n" "$name" "$status" "$method" "$display_path"
+        printf "%-18s%-14s%-10s%-12s%s\n" "$name" "$status" "$method" "$ownership" "$removal"
     done
+}
+
+confirm_removal() {
+    [[ "$ASSUME_YES" == true || "$DRY_RUN" == true ]] && return 0
+    local answer
+    read -rp "Remove dotfiles-owned component '$1'? [y/N] " answer
+    [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+assert_safe_owned_path() {
+    local name="$1" path="$2" parent canon home_canon dotfiles_canon root
+    [[ -n "$path" && "$path" == /* ]] || { error "Refusing invalid removal path: ${path:-<empty>}"; return 1; }
+    home_canon="$(realpath -e "$HOME")"
+    dotfiles_canon="$(realpath -e "$DOTFILES_DIR")"
+    case "$path" in
+        "$HOME"|"${XDG_CONFIG_HOME:-$HOME/.config}"|"${XDG_DATA_HOME:-$HOME/.local/share}"|"${XDG_STATE_HOME:-$HOME/.local/state}"|"${XDG_CACHE_HOME:-$HOME/.cache}")
+            error "Refusing broad removal target: $path"; return 1 ;;
+    esac
+    parent="$(dirname "$path")"
+    while [[ ! -e "$parent" && "$parent" != / ]]; do parent="$(dirname "$parent")"; done
+    canon="$(realpath -e "$parent")/${path#"$parent"/}"
+    [[ "$canon" != "$home_canon" && "$canon" != "$dotfiles_canon" && "$canon" != "$dotfiles_canon/"* ]] \
+        || { error "Refusing protected removal target: $canon"; return 1; }
+    tool_owned_path "$name" "$canon" || { error "Path is outside $name ownership roots: $canon"; return 1; }
 }
 
 uninstall_tool() {
@@ -62,9 +88,12 @@ uninstall_tool() {
     fi
 
     local method="${TOOL_METHOD[$name]}"
+    local ledger="" ownership="unrecorded"
+    ledger="$(ledger_line "$name" 2>/dev/null || true)"
+    [[ -n "$ledger" ]] && IFS=$'\t' read -r _ _ ownership _ _ _ _ _ <<< "$ledger"
 
     # Tools with removal instructions need manual steps
-    if [[ -n "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" ]]; then
+    if [[ -n "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" && -z "$(tool_uninstall_paths "$name")" ]]; then
         warn "$name requires manual removal:"
         echo "  ${TOOL_REMOVAL_INSTRUCTIONS[$name]}"
         exit 0
@@ -72,6 +101,11 @@ uninstall_tool() {
 
     case "$method" in
         apt)
+            if [[ "$ownership" != package-manager ]]; then
+                error "Refusing to remove $name: component ledger does not record a dotfiles-requested package install."
+                return 1
+            fi
+            confirm_removal "$name" || { warn "Removal cancelled"; return 1; }
             local binary="${TOOL_BINARY[$name]}"
             # Map binary name back to apt package name
             local apt_pkg="$name"
@@ -81,8 +115,13 @@ uninstall_tool() {
                 ripgrep) apt_pkg="ripgrep" ;;
                 direnv) apt_pkg="direnv" ;;
             esac
+            if [[ "$DRY_RUN" == true ]]; then
+                log "[DRY RUN] Would remove apt package: $apt_pkg"
+                return 0
+            fi
             log "Removing apt package: $apt_pkg"
             sudo apt-get remove -y "$apt_pkg"
+            ledger_record "$name" yes dotfiles removed "" "" "user data retained"
             success "$name uninstalled via apt"
             ;;
         eget|installer)
@@ -93,17 +132,31 @@ uninstall_tool() {
                 exit 1
             fi
 
-            local removed=false
-            for path in $paths; do
-                if [[ -e "$path" ]]; then
-                    rm -rf "$path"
+            if [[ "$ownership" != dotfiles ]]; then
+                error "Refusing to remove $name: component ledger does not record dotfiles ownership (${ownership})."
+                return 1
+            fi
+            confirm_removal "$name" || { warn "Removal cancelled"; return 1; }
+
+            local removed=false path
+            while IFS= read -r path; do
+                [[ -n "$path" ]] || continue
+                assert_safe_owned_path "$name" "$path" || return 1
+                if [[ -e "$path" || -L "$path" ]]; then
+                    if [[ "$DRY_RUN" == true ]]; then
+                        log "[DRY RUN] Would remove: $path"
+                    else
+                        rm -rf -- "$path"
+                    fi
                     log "Removed: $path"
                     removed=true
                 fi
-            done
+            done <<< "$paths"
 
             if [[ "$removed" == true ]]; then
                 success "$name uninstalled"
+                [[ "$DRY_RUN" == true ]] || ledger_record "$name" yes dotfiles removed "" "" "configuration and user data retained"
+                [[ -z "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" ]] || log "Retained user data: ${TOOL_REMOVAL_INSTRUCTIONS[$name]}"
             else
                 warn "$name was not installed (nothing to remove)"
             fi
@@ -115,20 +168,23 @@ uninstall_tool() {
     esac
 }
 
-# Main
-if [[ $# -eq 0 ]]; then
-    show_usage
-    exit 1
-fi
+main() {
+    local name=""
+    while (( $# )); do
+        case "$1" in
+            --list|-l) list_tools; return ;;
+            --help|-h) show_usage; return ;;
+            --dry-run) DRY_RUN=true ;;
+            --yes|-y) ASSUME_YES=true ;;
+            -*) error "Unknown option: $1"; show_usage; return 64 ;;
+            *) [[ -z "$name" ]] || { error "Only one component may be removed at a time"; return 64; }; name="$1" ;;
+        esac
+        shift
+    done
+    [[ -n "$name" ]] || { show_usage; return 1; }
+    uninstall_tool "$name"
+}
 
-case "$1" in
-    --list|-l)
-        list_tools
-        ;;
-    --help|-h)
-        show_usage
-        ;;
-    *)
-        uninstall_tool "$1"
-        ;;
-esac
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

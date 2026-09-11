@@ -8,6 +8,7 @@
 #   install-git-hooks --uninstall  Remove dotfiles-managed hooks only.
 #   install-git-hooks --check      Report state. Exits 0 if installed, 1 if not.
 #   install-git-hooks --force      Overwrite an unrelated existing hook.
+#   install-git-hooks --shared     Explicitly target a linked worktree's shared hooks.
 #   install-git-hooks --quiet      Suppress info output (still prints errors).
 #
 # Bypass any hook for a single commit with: git commit --no-verify
@@ -20,7 +21,6 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 source "$DOTFILES_DIR/lib/runtime.sh"
 
 readonly HOOKS_SRC_DIR="$DOTFILES_DIR/hooks"
-readonly GIT_HOOKS_DIR="$DOTFILES_DIR/.git/hooks"
 # All hook names we manage. Add new entries here when adding hooks/<name>.
 readonly MANAGED_HOOKS=(pre-commit)
 
@@ -28,6 +28,7 @@ MODE="install"
 USE_COPY=false
 FORCE=false
 QUIET=false
+ALLOW_SHARED=false
 
 usage() { sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; }
 
@@ -40,13 +41,23 @@ while [[ $# -gt 0 ]]; do
         --check)     MODE="check"; shift ;;
         --force)     FORCE=true; shift ;;
         --quiet|-q)  QUIET=true; shift ;;
+        --shared)    ALLOW_SHARED=true; shift ;;
         --help|-h)   usage; exit 0 ;;
         *)           error "Unknown flag: $1"; usage; exit 1 ;;
     esac
 done
 
-[[ -d "$DOTFILES_DIR/.git" ]] || { error ".git directory not found at $DOTFILES_DIR/.git"; exit 1; }
-mkdir -p "$GIT_HOOKS_DIR"
+git_dir="$(git -C "$DOTFILES_DIR" rev-parse --path-format=absolute --git-dir 2>/dev/null)" \
+    || { error "Not a Git worktree: $DOTFILES_DIR"; exit 1; }
+common_dir="$(git -C "$DOTFILES_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+if [[ "$git_dir" != "$common_dir" && "$ALLOW_SHARED" != true ]]; then
+    error "Refusing to modify shared hooks from linked worktree: $DOTFILES_DIR"
+    error "Shared hooks target: $common_dir/hooks"
+    error "Re-run with --shared only when that shared repository is the intended target."
+    exit 1
+fi
+readonly GIT_HOOKS_DIR="$common_dir/hooks"
+[[ "$MODE" == check ]] || mkdir -p "$GIT_HOOKS_DIR"
 
 # True if the file at $1 is one of ours (symlink into hooks/, or a copy
 # whose first comment line matches our marker).
@@ -88,9 +99,8 @@ install_one() {
         chmod +x "$dst"
         info_msg "  ✓ $name installed (copy)"
     else
-        local rel="../../hooks/$name"
-        ln -s "$rel" "$dst"
-        info_msg "  ✓ $name installed (symlink → $rel)"
+        ln -s "$src" "$dst"
+        info_msg "  ✓ $name installed (symlink → $src)"
     fi
 }
 

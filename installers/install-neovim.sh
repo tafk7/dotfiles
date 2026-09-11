@@ -5,7 +5,10 @@
 
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -74,17 +77,18 @@ TARBALL="nvim-linux-${NVIM_ARCH}.tar.gz"
 DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${VERSION}/${TARBALL}"
 
 log "Downloading Neovim v${VERSION}..."
-curl -Lo "$TARBALL" "$DOWNLOAD_URL"
+download_https "$DOWNLOAD_URL" "$TARBALL"
 
-# Remove old installation
-rm -rf "$HOME/.local/nvim"
-rm -f "$HOME/.local/bin/nvim"
+log "Extracting staged Neovim tree..."
+validate_tar_archive "$TARBALL"
+tar -C "$TEMP_DIR" -xzf "$TARBALL"
+STAGED_TREE="$TEMP_DIR/nvim-linux-${NVIM_ARCH}"
+[[ -x "$STAGED_TREE/bin/nvim" ]] || { error "Neovim archive did not contain the expected binary"; exit 1; }
+"$STAGED_TREE/bin/nvim" --version >/dev/null 2>&1 || { error "Staged Neovim binary does not run"; exit 1; }
+
 mkdir -p "$HOME/.local/bin" "$HOME/.local"
-
-log "Extracting to ~/.local/nvim..."
-tar -C "$HOME/.local" -xzf "$TARBALL"
-mv "$HOME/.local/nvim-linux-${NVIM_ARCH}" "$HOME/.local/nvim"
-ln -sf "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
+atomic_replace_tree neovim "$STAGED_TREE" "$HOME/.local/nvim" bin/nvim
+ln -sfn "$HOME/.local/nvim/bin/nvim" "$HOME/.local/bin/nvim"
 
 # Verify
 if "$HOME/.local/bin/nvim" --version >/dev/null 2>&1; then

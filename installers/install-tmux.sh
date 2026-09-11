@@ -5,7 +5,10 @@
 
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -40,15 +43,17 @@ TARBALL="tmux-${VERSION}.tar.gz"
 DOWNLOAD_URL="https://github.com/tmux/tmux/releases/download/${VERSION}/${TARBALL}"
 
 log "Downloading tmux $VERSION..."
-curl -Lo "$TARBALL" "$DOWNLOAD_URL"
+download_https "$DOWNLOAD_URL" "$TARBALL"
 
 log "Extracting..."
+validate_tar_archive "$TARBALL"
 tar -xzf "$TARBALL"
 cd "tmux-${VERSION}"
 
-log "Configuring (--prefix=$HOME/.local)..."
+STAGE_PREFIX="$TEMP_DIR/prefix"
+log "Configuring staged prefix..."
 BUILD_LOG="$TEMP_DIR/build.log"
-if ! ./configure --prefix="$HOME/.local" >"$BUILD_LOG" 2>&1; then
+if ! ./configure --prefix="$STAGE_PREFIX" >"$BUILD_LOG" 2>&1; then
     error "configure failed — build log:"
     tail -30 "$BUILD_LOG"
     exit 1
@@ -61,8 +66,12 @@ if ! make -j"$(nproc)" >>"$BUILD_LOG" 2>&1; then
     exit 1
 fi
 
-log "Installing to ~/.local/bin..."
+log "Installing into staging..."
 make install >>"$BUILD_LOG" 2>&1
+
+[[ -x "$STAGE_PREFIX/bin/tmux" ]] || { error "Staged tmux binary is missing"; exit 1; }
+"$STAGE_PREFIX/bin/tmux" -V >/dev/null 2>&1 || { error "Staged tmux binary does not run"; exit 1; }
+atomic_replace_binary tmux "$STAGE_PREFIX/bin/tmux" "$HOME/.local/bin/tmux"
 
 # Verify
 if "$HOME/.local/bin/tmux" -V >/dev/null 2>&1; then

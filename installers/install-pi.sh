@@ -25,7 +25,10 @@
 # variant detection to replicate, unlike opencode.
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -74,9 +77,8 @@ version_ge() {
 # is a standalone binary. Node comes from the work tier's NVM, but Pi sits in the
 # ai tier, so `--pi` on a fresh machine can legitimately arrive without it.
 #
-# Exit 2 (not 1): run_installer maps 2 to "skip", so this reports as skipped
-# rather than a failed install — the same convention the other AI installers use
-# when they decline to shadow an org-managed binary. Deliberately does NOT
+# This is a requested-install failure: setup must exit nonzero rather than call
+# a missing prerequisite "up to date". Deliberately does NOT
 # install Node itself: `--pi` must not silently become a partial `--work`.
 require_node() {
     local have
@@ -85,14 +87,14 @@ require_node() {
         warn "Install a Node toolchain first, then re-run:"
         warn "    ./setup.sh --work     # installs NVM"
         warn "    ./setup.sh --pi"
-        exit 2
+        exit 1
     fi
     have="$(node --version 2>/dev/null | sed 's/^v//')"
     if [[ -z "$have" ]] || ! version_ge "$have" "$PI_NODE_MIN"; then
         warn "Pi needs Node >= $PI_NODE_MIN; found ${have:-unknown}."
         warn "Upgrade Node, then re-run: ./setup.sh --pi"
         warn "    (with NVM: nvm install --lts && nvm alias default node)"
-        exit 2
+        exit 1
     fi
 }
 

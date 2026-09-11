@@ -97,16 +97,14 @@ inspect_one() {
             fi
             ;;
         gitconfig)
-            # Processed template: rendered into target with substitutions baked in.
-            # We can't compare bytewise, but we can report whether placeholders survived.
-            if grep -q '{{GIT_' "$target" 2>/dev/null; then
-                status_icon="${RED}❌ unresolved template${NC}"
-            elif [[ "$target" -nt "$source_path" ]]; then
-                status_icon="${CYAN}📝 template${NC}"
-                detail="(rendered; target newer than source)"
+            local portable="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
+            if [[ -f "$portable" ]] \
+               && git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable"; then
+                status_icon="${GREEN}✅ included${NC}"
+                detail="(portable base; user config preserved)"
             else
-                status_icon="${YELLOW}📝 template (stale)${NC}"
-                detail="(source newer than rendered target — re-run setup.sh --config)"
+                status_icon="${RED}❌ missing include${NC}"
+                detail="(run setup.sh --config)"
             fi
             ;;
         *)

@@ -16,6 +16,9 @@ DEST="${DOTFILES_DIR:-$HOME/dev/dotfiles}"
 log() { printf '\033[0;34m[bootstrap]\033[0m %s\n' "$*"; }
 die() { printf '\033[0;31m[bootstrap] error:\033[0m %s\n' "$*" >&2; exit 1; }
 
+os_id="$(awk -F= '$1 == "ID" { gsub(/^"|"$/, "", $2); print $2; exit }' /etc/os-release 2>/dev/null || true)"
+[[ "$os_id" == ubuntu ]] || die "unsupported distribution '${os_id:-unknown}'; this repository supports Ubuntu and Ubuntu-on-WSL"
+
 # 1. Ensure git is available.
 if ! command -v git >/dev/null 2>&1; then
     log "git not found — installing via apt"
