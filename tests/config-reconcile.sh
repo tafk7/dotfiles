@@ -6,6 +6,7 @@ TEST_REPO_ROOT="$ROOT"
 source "$ROOT/tests/lib/harness.sh"
 trap fixture_cleanup EXIT
 fixture_init
+printf '[custom]\n    preserved = yes\n' > "$HOME/.gitconfig"
 
 run_setup() {
     HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
@@ -17,13 +18,21 @@ run_setup() {
 
 run_setup
 [[ ! -d "$DOTFILES_BACKUP_PREFIX" ]] || fail "fresh config created an unnecessary backup directory"
+grep -q 'preserved = yes' "$HOME/.gitconfig" || fail "existing Git config was overwritten"
+grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig" "$HOME/.gitconfig" || fail "portable Git include missing"
 [[ ! -e "$XDG_CACHE_HOME/dotfiles/theme" ]] || fail "--no-theme generated theme artifacts"
 grep -Fq 'delta.gitconfig' "$XDG_CONFIG_HOME/dotfiles/gitconfig" \
     && fail "--no-theme left the Delta theme include enabled"
+source "$ROOT/lib/runtime.sh"
+source "$ROOT/lib/registry.sh"
+source "$ROOT/lib/state.sh"
+ledger_record docker yes package-manager installed 1 /usr/bin/docker apt-in-place
 first="$(fixture_managed_snapshot)"
 run_setup
 second="$(fixture_managed_snapshot)"
 assert_eq "$second" "$first" "second config run was not idempotent"
+[[ "$(ledger_line docker)" == $'docker\tyes\tpackage-manager\tinstalled\t1\t/usr/bin/docker\tapt-in-place\t'* ]] \
+    || fail "lower-tier reconciliation erased higher-tier ledger history"
 
 rm "$HOME/.editorconfig"
 printf 'user content\n' > "$HOME/.editorconfig"

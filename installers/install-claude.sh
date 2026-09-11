@@ -81,7 +81,7 @@ provision_agent_badge_plugin() {
         success "Plugin agent-badge installed (tmux window badges for agent sessions)."
         log "  Takes effect in new Claude sessions."
     else
-        warn "Could not install the agent-badge plugin; see plugins/agent-badge/README.md."
+        warn "Could not install the agent-badge plugin; see plugins/agent-badge-claude/README.md."
     fi
 }
 
@@ -95,13 +95,13 @@ fi
 
 # Don't shadow an externally-managed Claude. On org-managed machines the AI CLI
 # is provided elsewhere on PATH; installing our own copy at ~/.local/bin/claude
-# would silently override it (shell/env.sh prepends ~/.local/bin). Skip unless
-# forced. The shell wrapper resolves whatever `claude` is on PATH either way.
+# would silently override it (shell/env.sh prepends ~/.local/bin). The shell
+# wrapper resolves whatever `claude` is on PATH either way.
 EXTERNAL_CLAUDE="$(command -v claude 2>/dev/null || true)"
-if [[ "$FORCE" != true && -n "$EXTERNAL_CLAUDE" && "$EXTERNAL_CLAUDE" != "$CLAUDE_BIN" ]]; then
+if [[ -n "$EXTERNAL_CLAUDE" && "$EXTERNAL_CLAUDE" != "$CLAUDE_BIN" ]]; then
     warn "Found an externally-managed claude on PATH: $EXTERNAL_CLAUDE"
     warn "Skipping install to avoid a shadow copy at $CLAUDE_BIN."
-    warn "Re-run with --force to install the dotfiles-managed copy anyway."
+    warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
     # Still a working Claude, so still worth the plugin.
     provision_agent_badge_plugin "$EXTERNAL_CLAUDE"
     exit 2
@@ -122,7 +122,7 @@ elif [[ ! -s "$claude_installer" ]]; then
     error "DOTFILES_CLAUDE_INSTALLER_SCRIPT is missing or empty: $claude_installer"
     exit 1
 fi
-if ! bash "$claude_installer"; then
+if ! env PROFILE=/dev/null bash "$claude_installer"; then
     [[ "$downloaded_installer" == true ]] && rm -f "$claude_installer"
     error "Claude Code installation failed"
     exit 1

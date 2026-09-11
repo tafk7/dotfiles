@@ -26,7 +26,11 @@ if command -v claude >/dev/null 2>&1; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         claude() { command claude ${=CLAUDE_FLAGS} "$@"; }
     else
-        claude() { command claude ${CLAUDE_FLAGS:-} "$@"; }
+        claude() {
+            local -a flags=()
+            read -r -a flags <<< "${CLAUDE_FLAGS:-}"
+            command claude "${flags[@]}" "$@"
+        }
     fi
 else
     claude() {

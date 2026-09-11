@@ -120,7 +120,7 @@ provision_agent_badge_plugin() {
         log "  Run /hooks inside Codex once to review and trust them."
         log "  Until you do, they are skipped silently and no badges appear."
     else
-        warn "Could not install the agent-badge plugin; see plugins/agent-badge/README.md."
+        warn "Could not install the agent-badge plugin; see plugins/agent-badge-codex/README.md."
     fi
 }
 
@@ -151,7 +151,7 @@ run_official_installer() {
     fi
 
     local rc=0
-    sh "$installer_path" || rc=$?
+    env PROFILE=/dev/null sh "$installer_path" || rc=$?
     [[ "$downloaded" == true ]] && rm -f "$installer_path"
     if [[ "$rc" != 0 ]]; then
         error "The official Codex installer failed (exit $rc)"

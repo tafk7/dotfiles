@@ -25,7 +25,11 @@ if command -v codex >/dev/null 2>&1; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         codex() { command codex ${=CODEX_FLAGS} "$@"; }
     else
-        codex() { command codex ${CODEX_FLAGS:-} "$@"; }
+        codex() {
+            local -a flags=()
+            read -r -a flags <<< "${CODEX_FLAGS:-}"
+            command codex "${flags[@]}" "$@"
+        }
     fi
 else
     codex() {

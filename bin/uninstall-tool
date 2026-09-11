@@ -65,7 +65,7 @@ assert_safe_owned_path() {
     home_canon="$(realpath -e "$HOME")"
     dotfiles_canon="$(realpath -e "$DOTFILES_DIR")"
     case "$path" in
-        "$HOME"|"${XDG_CONFIG_HOME:-$HOME/.config}"|"${XDG_DATA_HOME:-$HOME/.local/share}"|"${XDG_STATE_HOME:-$HOME/.local/state}"|"${XDG_CACHE_HOME:-$HOME/.cache}")
+        "$HOME"|"$HOME/.local"|"$HOME/.config"|"$HOME/.cache"|"$HOME/.ssh"|"${XDG_CONFIG_HOME:-$HOME/.config}"|"${XDG_DATA_HOME:-$HOME/.local/share}"|"${XDG_STATE_HOME:-$HOME/.local/state}"|"${XDG_CACHE_HOME:-$HOME/.cache}")
             error "Refusing broad removal target: $path"; return 1 ;;
     esac
     parent="$(dirname "$path")"
@@ -125,6 +125,10 @@ uninstall_tool() {
             success "$name uninstalled via apt"
             ;;
         eget|installer)
+            if [[ "${TOOL_PATHS[$name]:-}" == *$'\n'* || "${TOOL_PATHS[$name]:-}" == *$'\r'* ]]; then
+                error "Refusing malformed uninstall path list for $name"
+                return 1
+            fi
             local paths
             paths="$(tool_uninstall_paths "$name")"
             if [[ -z "$paths" ]]; then
@@ -147,14 +151,18 @@ uninstall_tool() {
                         log "[DRY RUN] Would remove: $path"
                     else
                         rm -rf -- "$path"
+                        log "Removed: $path"
                     fi
-                    log "Removed: $path"
                     removed=true
                 fi
             done <<< "$paths"
 
             if [[ "$removed" == true ]]; then
-                success "$name uninstalled"
+                if [[ "$DRY_RUN" == true ]]; then
+                    success "$name removal preview complete"
+                else
+                    success "$name uninstalled"
+                fi
                 [[ "$DRY_RUN" == true ]] || ledger_record "$name" yes dotfiles removed "" "" "configuration and user data retained"
                 [[ -z "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" ]] || log "Retained user data: ${TOOL_REMOVAL_INSTRUCTIONS[$name]}"
             else

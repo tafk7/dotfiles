@@ -55,6 +55,10 @@ for dir in themes/*; do
 done
 
 plugins/sync-shared.sh --check
+if grep -Fq 'plugins/shared/agent-badge.tmux' configs/tmux.conf; then
+    echo "base tmux config directly wires optional agent-badge" >&2
+    exit 1
+fi
 systemd-analyze verify configs/wsl2-ssh-agent.service
 for manifest in .claude-plugin/marketplace.json .agents/plugins/marketplace.json \
     plugins/agent-badge-claude/.claude-plugin/plugin.json \

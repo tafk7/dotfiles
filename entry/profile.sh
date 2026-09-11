@@ -66,9 +66,10 @@ if [ -z "${_DOTFILES_BASE_ENV:-}" ]; then
     # TZ is intentionally NOT forced — the OS timezone applies. Set TZ in
     # ~/.shell.local (or configure the OS) if you want a fixed zone such as UTC.
 
-    export XDG_CONFIG_HOME="$HOME/.config"
-    export XDG_DATA_HOME="$HOME/.local/share"
-    export XDG_CACHE_HOME="$HOME/.cache"
+    export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+    export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+    export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+    export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
     export TERM="${TERM:-xterm-256color}"
     export PAGER=less

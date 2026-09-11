@@ -17,6 +17,10 @@ function! s:ThemePalette(theme) abort
 endfunction
 
 function! DotfilesThemeReload(...) abort
+  if exists('$DOTFILES_THEME_ENABLED') && $DOTFILES_THEME_ENABLED ==# '0'
+    silent! colorscheme default
+    return
+  endif
   if !exists('$DOTFILES_DIR') || !executable($DOTFILES_DIR . '/bin/theme-switcher')
     silent! colorscheme default
     return

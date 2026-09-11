@@ -121,14 +121,14 @@ fi
 # Don't shadow an externally-managed pi. On org-managed machines the CLI may be
 # provided elsewhere on PATH; installing our own copy would silently override it
 # (shell/env.sh prepends ~/.local/bin). Our own symlink and our prefix are not
-# "external" — anything else is. Skip unless forced.
+# "external" — anything else is always preserved.
 EXTERNAL_PI="$(command -v pi 2>/dev/null || true)"
-if [[ "$FORCE" != true && -n "$EXTERNAL_PI" \
+if [[ -n "$EXTERNAL_PI" \
       && "$EXTERNAL_PI" != "$PI_LINK" \
       && "$EXTERNAL_PI" != "$PI_REAL" ]]; then
     warn "Found an externally-managed pi on PATH: $EXTERNAL_PI"
     warn "Skipping install to avoid a shadow copy at $PI_LINK."
-    warn "Re-run with --force to install the dotfiles-managed copy anyway."
+    warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
     exit 2
 fi
 

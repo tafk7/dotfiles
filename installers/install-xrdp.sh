@@ -45,7 +45,8 @@ EOF
 }
 
 # xrdp is a systemd service; without systemd there is nothing to manage.
-if is_wsl && [[ ! -d /run/systemd/system ]]; then
+if is_wsl && { [[ "${DOTFILES_TEST_SYSTEMD_RUNNING:-}" == 0 ]] \
+    || { [[ -z "${DOTFILES_TEST_SYSTEMD_RUNNING:-}" ]] && [[ ! -d /run/systemd/system ]]; }; }; then
     error "xrdp requires systemd, which is not running in this WSL distro."
     error "Enable it in /etc/wsl.conf:"
     error "    [boot]"

@@ -54,6 +54,9 @@ export EGET_TEST_FAIL=1
 if install_eget_tools >/dev/null 2>&1; then fail "failed staged download reported success"; fi
 assert_eq "$(sha256sum "$HOME/.local/bin/demo" | awk '{print $1}')" "$old_hash" "failed update replaced working binary"
 assert_eq "$("$HOME/.local/bin/demo" --version)" "demo old"
+failed_line="$(ledger_line demo)"
+[[ "$failed_line" == $'demo\tyes\tdotfiles\tupdate-failed\t'* ]] \
+    || fail "failed update did not retain observed working component"
 
 export EGET_TEST_FAIL=0
 INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()

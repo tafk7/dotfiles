@@ -6,8 +6,8 @@
 # against the installed binary's mtime), so re-running setup.sh no longer
 # re-downloads everything. To move to a newer release, bump its `tag` and
 # re-run — the newer release date triggers the download. To force a clean
-# re-download (repair or downgrade), use `./setup.sh --bash --force`, which
-# clears the binaries first so eget fetches them fresh.
+# re-download (repair or downgrade), use `./setup.sh --bash --force`; downloads
+# are staged and verified before atomically replacing the working binary.
 
 [global]
 target = "~/.local/bin"

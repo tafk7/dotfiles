@@ -32,4 +32,15 @@ output="$(run_installation 2>&1)" && fail "failed installation returned zero"
 [[ "$output" != *'Dotfiles installation complete!'* ]] || fail "success banner printed after failure"
 [[ "$output" == *'Installation Summary'* ]] || fail "failure omitted final summary"
 
+python3 - "$TEST_ROOT/unsafe.tar" <<'PY'
+import io, sys, tarfile
+with tarfile.open(sys.argv[1], "w") as archive:
+    info = tarfile.TarInfo("../escape")
+    data = b"bad"
+    info.size = len(data)
+    archive.addfile(info, io.BytesIO(data))
+PY
+validate_tar_archive "$TEST_ROOT/unsafe.tar" >/dev/null 2>&1 \
+    && fail "unsafe archive path was accepted"
+
 printf 'install-failures: ok\n'

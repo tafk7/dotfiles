@@ -5,17 +5,10 @@
 #   1. the badge placeholder #{E:@cc_win_badge} in the window status formats
 #   2. the pane-focus-in / pane-exited hooks that keep badges honest
 #
-# Called from two places, deliberately:
-#
-#   PRIMARY -- ~/.tmux.conf does `run-shell "<plugin>/agent-badge.tmux"`.
-#     Explicit, greppable, and runs once at config load. This is the supported
-#     path on a machine that has the dotfiles.
-#
-#   FALLBACK -- agent-status.sh calls this when it notices the badge is missing
-#     from window-status-format. That covers two cases: a machine where only the
-#     plugin is installed and tmux.conf knows nothing about it, and a `prefix+r`
-#     reload, which resets window-status-format to the file's value and so
-#     strips the badge (verified: source-file overwrites the option outright).
+# Called by agent-status.sh when a SessionStart/focus event notices that the
+# badge is missing from window-status-format. Base tmux configuration has no
+# dependency on this optional plugin. A `prefix+r` reload can reset the format;
+# the next plugin event wires it again.
 #
 # Everything here is idempotent, because both callers can fire repeatedly --
 # SessionStart alone re-fires on every compaction and resume.

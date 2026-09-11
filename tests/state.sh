@@ -27,6 +27,13 @@ printf '99999999\n' > "$DOTFILES_STATE_LOCK/pid"
 preference_set feature.theme enabled
 assert_eq "$(preference_get feature.theme)" enabled "stale lock recovery"
 
+mkdir -p "$DOTFILES_STATE_LOCK"
+printf '%s\n' "$$" > "$DOTFILES_STATE_LOCK/pid"
+DOTFILES_STATE_LOCK_ATTEMPTS=2 preference_set feature.theme disabled >/dev/null 2>&1 \
+    && fail "live state lock was stolen"
+[[ -d "$DOTFILES_STATE_LOCK" ]] || fail "live state lock was removed"
+rm -rf "$DOTFILES_STATE_LOCK"
+
 ledger_record demo yes dotfiles installed 1.0 "$HOME/.local/bin/demo" ok
 line="$(ledger_line demo)"
 [[ "$line" == $'demo\tyes\tdotfiles\tinstalled\t1.0\t'* ]] || fail "ledger record malformed"
@@ -58,5 +65,9 @@ source "$ROOT/lib/theme-resolve.sh"
 unset DOTFILES_THEME
 load_global_theme_state
 assert_eq "$DOTFILES_THEME" gruvbox "corrupt theme state did not fall back"
+
+printf 'schema\t1\nfeature.theme\t$(touch %s)\n' "$TEST_ROOT/executed" > "$DOTFILES_PREFERENCES_FILE"
+preference_get feature.theme >/dev/null
+[[ ! -e "$TEST_ROOT/executed" ]] || fail "state data was evaluated as shell code"
 
 printf 'state: ok\n'

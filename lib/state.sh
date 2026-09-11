@@ -134,12 +134,11 @@ preference_set() {
 feature_enabled() {
     local feature="$1" request="" value=""
     case "$feature" in
-        theme) request="${THEME_REQUEST:-}"; value="${DOTFILES_THEME_ENABLED:-}" ;;
-        agent-badge) request="${AGENT_BADGE_REQUEST:-}"; value="${DOTFILES_AGENT_BADGE_ENABLED:-}" ;;
+        theme) request="${THEME_REQUEST:-}" ;;
+        agent-badge) request="${AGENT_BADGE_REQUEST:-}" ;;
         *) return 1 ;;
     esac
     case "$request" in enabled) return 0 ;; disabled) return 1 ;; esac
-    case "$value" in 1|true|enabled|yes) return 0 ;; 0|false|disabled|no) return 1 ;; esac
     value="$(preference_get "feature.$feature" 2>/dev/null || true)"
     [[ "$value" != "disabled" ]]
 }
@@ -280,13 +279,21 @@ journal_reconcile() {
 
     if [[ ! -e "$new_path" && -e "$old_path" && "$old_path" != "$new_path" ]]; then
         mv "$old_path" "$new_path"
+        case "$(basename "$(dirname "$old_path")")" in
+            .dotfiles-*-rollback) rmdir "$(dirname "$old_path")" 2>/dev/null || true ;;
+        esac
     fi
 
     binary="${TOOL_BINARY[$component]:-}"
     observed="${binary:+$(command -v "$binary" 2>/dev/null || true)}"
-    if [[ -e "$new_path" || -n "$observed" ]]; then
+    [[ -n "$observed" || ! -x "$new_path" ]] || observed="$new_path"
+    if [[ -z "$observed" && -n "${TOOL_RELATIVE_BINARY[$component]:-}" \
+       && -x "$new_path/${TOOL_RELATIVE_BINARY[$component]}" ]]; then
+        observed="$new_path/${TOOL_RELATIVE_BINARY[$component]}"
+    fi
+    if [[ -n "$observed" ]] && "$observed" --version >/dev/null 2>&1; then
         [[ -n "$observed" ]] && version="$("$observed" --version 2>/dev/null | head -n1 || true)"
-        ledger_record "$component" yes dotfiles installed "$version" "${observed:-$new_path}" "recovered interrupted transaction"
+        ledger_record "$component" yes dotfiles installed "$version" "$observed" "recovered interrupted transaction"
     else
         ledger_record "$component" yes unknown failed "" "$new_path" "interrupted transaction artifact missing"
     fi
@@ -295,7 +302,8 @@ journal_reconcile() {
 
 record_install_path() {
     local path="$1"
-    [[ "$path" == /* && -d "$path" ]] || { _state_error "Invalid dotfiles install path: $path"; return 1; }
+    [[ "$path" == /* && "$path" != *$'\n'* && "$path" != *$'\r'* && -d "$path" ]] \
+        || { _state_error "Invalid dotfiles install path: $path"; return 1; }
     if [[ -f "$DOTFILES_STATE_DIR/install-path" ]] \
        && [[ "$(<"$DOTFILES_STATE_DIR/install-path")" == "$path" ]]; then
         return 0

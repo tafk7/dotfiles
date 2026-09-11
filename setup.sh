@@ -563,8 +563,12 @@ process_symlink() {
 run_installation() {
     INSTALLATION_FAILED=false
     if journal_pending; then
-        warn "Recovering an interrupted component transaction before setup."
-        journal_reconcile || INSTALLATION_FAILED=true
+        if [[ "$DRY_RUN" == true ]]; then
+            warn "Incomplete component transaction detected; dry-run will not reconcile it."
+        else
+            warn "Recovering an interrupted component transaction before setup."
+            journal_reconcile || INSTALLATION_FAILED=true
+        fi
     fi
     phase_verify_system || INSTALLATION_FAILED=true
     if [[ "$INSTALLATION_FAILED" != "true" ]]; then

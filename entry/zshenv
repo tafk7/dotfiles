@@ -22,7 +22,8 @@
 # Symlink derivation locates the repo for a fresh clone, but a bind-mount/copy
 # (containers, WSL, rsync) flattens the symlink so readlink resolves to the file
 # itself → a wrong dir. generated/bridge.sh holds the install-time truth, so let
-# it OVERRIDE the guess: try the derived path, then the conventional location.
+# it OVERRIDE the guess. New installs use the data-only XDG install-path file;
+# generated/bridge.sh remains a read-only compatibility fallback.
 #
 # zsh parameter modifiers, not `readlink -f` + two `dirname` calls: :A resolves
 # symlinks to an absolute path (what readlink -f does) and :h takes the dirname.
@@ -33,11 +34,19 @@
 _zshenv_self=~/.zshenv
 DOTFILES_DIR="${_zshenv_self:A:h:h}"
 unset _zshenv_self
+if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
+    _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
+    if [[ -r "$_dotfiles_path_file" ]]; then
+        IFS= read -r DOTFILES_DIR < "$_dotfiles_path_file"
+    else
+        DOTFILES_DIR="$HOME/dev/dotfiles"
+    fi
+    unset _dotfiles_path_file
+fi
 export DOTFILES_DIR
 
-for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dev/dotfiles/generated/bridge.sh"; do
-    [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
-done
+_bridge="$DOTFILES_DIR/generated/bridge.sh"
+[[ -f "$_bridge" ]] && source "$_bridge"
 unset _bridge
 
 # POSIX baseline + env (mirrors the bash entry chain via ~/.bashrc → ~/.profile)

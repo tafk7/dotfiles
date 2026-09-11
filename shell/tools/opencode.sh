@@ -17,7 +17,11 @@ if [[ -n "$_OPENCODE_BIN" ]]; then
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         opencode() { command opencode ${=OPENCODE_FLAGS} "$@"; }
     else
-        opencode() { command opencode ${OPENCODE_FLAGS:-} "$@"; }
+        opencode() {
+            local -a flags=()
+            read -r -a flags <<< "${OPENCODE_FLAGS:-}"
+            command opencode "${flags[@]}" "$@"
+        }
     fi
 else
     opencode() {

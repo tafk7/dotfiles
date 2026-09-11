@@ -17,6 +17,10 @@ mkdir -p "$HOME/.local/demo"
 printf 'keep outside\n' > "$HOME/keep"
 ledger_record demo yes dotfiles installed 1 "$HOME/.local/demo" test
 ASSUME_YES=true
+DRY_RUN=true
+uninstall_tool demo >/dev/null
+[[ -d "$HOME/.local/demo" ]] || fail "uninstall dry-run removed owned path"
+DRY_RUN=false
 uninstall_tool demo >/dev/null
 [[ ! -e "$HOME/.local/demo" ]] || fail "owned path not removed"
 [[ -f "$HOME/keep" ]] || fail "uninstall removed unrelated data"
@@ -31,5 +35,15 @@ mkdir -p "$TEST_ROOT/outside"
 ledger_record demo yes dotfiles installed 1 "$TEST_ROOT/outside" malicious
 if uninstall_tool demo >/dev/null 2>&1; then fail "outside ownership root accepted"; fi
 [[ -d "$TEST_ROOT/outside" ]] || fail "outside path was deleted"
+
+mkdir -p "$TEST_ROOT/outside-tree"
+ln -s "$TEST_ROOT/outside-tree" "$HOME/.local/escape"
+TOOL_PATHS[demo]="$HOME/.local/escape/child"
+ledger_record demo yes dotfiles installed 1 "$HOME/.local/escape/child" malicious
+if uninstall_tool demo >/dev/null 2>&1; then fail "symlink escape accepted"; fi
+[[ -d "$TEST_ROOT/outside-tree" ]] || fail "symlink escape removed outside tree"
+
+TOOL_PATHS[demo]="$HOME/.local/safe"$'\n'"$TEST_ROOT/outside-tree"
+if uninstall_tool demo >/dev/null 2>&1; then fail "newline path injection accepted"; fi
 
 printf 'uninstall-safety: ok\n'

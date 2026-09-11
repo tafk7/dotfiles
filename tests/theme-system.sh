@@ -39,6 +39,11 @@ assert_eq "$(theme resolve vim --global)" catppuccin "clear restores group"
 theme reset >/dev/null
 assert_eq "$(theme resolve vim --global)" tokyo-night "legacy reset clears overrides"
 
+relocated="$TMP_ROOT/relocated dotfiles"
+cp -a "$ROOT" "$relocated"
+assert_eq "$(DOTFILES_DIR="$relocated" "$relocated/bin/theme-switcher" resolve vim --global)" \
+    tokyo-night "repository relocation lost durable theme state"
+
 # A running interactive shell refreshes exports and FZF options from the
 # generation signature without manual variable-by-variable exports.
 # env-runtime.sh resolves the theme for interactive shells only; this test

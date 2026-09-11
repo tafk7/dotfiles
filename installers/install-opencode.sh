@@ -100,14 +100,14 @@ fi
 # Don't shadow an externally-managed opencode. On org-managed machines the CLI
 # is provided elsewhere on PATH; installing our own copy would silently override
 # it (shell/env.sh prepends ~/.local/bin). Our own symlink and opencode's own
-# default install dir are not "external" — anything else is. Skip unless forced.
+# default install dir are not "external" — anything else is always preserved.
 EXTERNAL_OPENCODE="$(command -v opencode 2>/dev/null || true)"
-if [[ "$FORCE" != true && -n "$EXTERNAL_OPENCODE" \
+if [[ -n "$EXTERNAL_OPENCODE" \
       && "$EXTERNAL_OPENCODE" != "$OPENCODE_LINK" \
       && "$EXTERNAL_OPENCODE" != "$OPENCODE_REAL" ]]; then
     warn "Found an externally-managed opencode on PATH: $EXTERNAL_OPENCODE"
     warn "Skipping install to avoid a shadow copy at $OPENCODE_LINK."
-    warn "Re-run with --force to install the dotfiles-managed copy anyway."
+    warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
     exit 2
 fi
 
