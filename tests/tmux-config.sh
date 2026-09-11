@@ -7,7 +7,8 @@ SERVER="dotfiles-config-$RANDOM-$$"
 trap 'TMUX_TMPDIR="$TEST_ROOT/tmux" tmux -L "$SERVER" kill-server 2>/dev/null || true; rm -rf "$TEST_ROOT"' EXIT
 mkdir -p "$TEST_ROOT/home/dev" "$TEST_ROOT/tmux" "$TEST_ROOT/state" "$TEST_ROOT/cache"
 SPACED="$TEST_ROOT/home/dev/dotfiles with spaces"
-cp -a "$ROOT" "$SPACED"
+mkdir -p "$SPACED"
+git -C "$ROOT" archive HEAD | tar -x -C "$SPACED"
 
 HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" XDG_CACHE_HOME="$TEST_ROOT/cache" \
     XDG_CONFIG_HOME="$TEST_ROOT/config" DOTFILES_DIR="$SPACED" \
