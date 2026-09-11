@@ -12,9 +12,10 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
 # Source declarative config (PACKAGES, CONFIG_MAP)
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 
-# Backup directory
-DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
+# Backups are machine state, not repository content.
+DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
 
 # ==============================================================================
 # Install Result Tracking
@@ -23,6 +24,8 @@ DOTFILES_BACKUP_PREFIX="$DOTFILES_DIR/.backups"
 INSTALL_OK=()
 INSTALL_SKIP=()
 INSTALL_FAIL=()
+INSTALL_NA=()
+ACTIVE_BACKUP_DIR=""
 
 track_install() {
     local name="$1" status="$2"
@@ -30,17 +33,58 @@ track_install() {
         ok)   INSTALL_OK+=("$name") ;;
         skip) INSTALL_SKIP+=("$name") ;;
         fail) INSTALL_FAIL+=("$name") ;;
+        not-applicable) INSTALL_NA+=("$name") ;;
     esac
+    if [[ "${DRY_RUN:-false}" != "true" && -n "${TOOL_BINARY[$name]:-}" ]]; then
+        record_component_outcome "$name" "$status" || {
+            INSTALL_FAIL+=("state:$name")
+            return 1
+        }
+    fi
+}
+
+record_component_outcome() {
+    local name="$1" result="$2" binary path="" ownership="unknown" version="" status
+    binary="${TOOL_BINARY[$name]}"
+    path="$(command -v "$binary" 2>/dev/null || true)"
+    [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+    if [[ -z "$path" && "$result" != fail ]]; then
+        local candidate
+        while IFS= read -r candidate; do
+            if [[ -e "$candidate" || -L "$candidate" ]]; then
+                path="$candidate"
+                break
+            fi
+        done < <(tool_uninstall_paths "$name")
+    fi
+    if [[ -n "$path" ]]; then
+        if tool_owned_path "$name" "$path"; then ownership="dotfiles"; else ownership="external"; fi
+        version="$("$path" --version 2>/dev/null | head -n1 || true)"
+    fi
+    if [[ "${TOOL_METHOD[$name]:-}" == apt && "$result" == ok ]]; then
+        ownership="package-manager"
+    fi
+    case "$result" in
+        ok) status=installed ;;
+        skip) if [[ "$ownership" == dotfiles ]]; then status=installed; else status=present; fi ;;
+        not-applicable) status=not-applicable ;;
+        fail)
+            if [[ -n "$path" && -x "$path" ]]; then status=update-failed; else status=failed; fi
+            ;;
+        *) status="$result" ;;
+    esac
+    ledger_record "$name" yes "$ownership" "$status" "$version" "$path" "${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
 }
 
 print_install_summary() {
-    [[ ${#INSTALL_OK[@]} -eq 0 && ${#INSTALL_SKIP[@]} -eq 0 && ${#INSTALL_FAIL[@]} -eq 0 ]] && return 0
+    [[ ${#INSTALL_OK[@]} -eq 0 && ${#INSTALL_SKIP[@]} -eq 0 && ${#INSTALL_FAIL[@]} -eq 0 && ${#INSTALL_NA[@]} -eq 0 ]] && return 0
 
     echo
     echo "Installation Summary"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     [[ ${#INSTALL_OK[@]} -gt 0 ]]   && echo -e "  ${GREEN}✓${NC} ${INSTALL_OK[*]}"
     [[ ${#INSTALL_SKIP[@]} -gt 0 ]] && echo -e "  ${DIM}─ ${INSTALL_SKIP[*]} (up to date)${NC}"
+    [[ ${#INSTALL_NA[@]} -gt 0 ]]   && echo -e "  ${DIM}⊘ ${INSTALL_NA[*]} (not applicable)${NC}"
     [[ ${#INSTALL_FAIL[@]} -gt 0 ]] && echo -e "  ${RED}✗${NC} ${INSTALL_FAIL[*]}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
@@ -88,7 +132,8 @@ github_latest_version() {
     [[ "${2:-}" == "--strip-v" ]] && strip_v=true
 
     local tag
-    tag=$(curl -sf "https://api.github.com/repos/${repo}/releases/latest" \
+    tag=$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --max-time 30 \
+        "https://api.github.com/repos/${repo}/releases/latest" \
         | grep -Po '"tag_name": "\K[^"]*')
 
     if [[ -z "$tag" ]]; then
@@ -101,6 +146,73 @@ github_latest_version() {
     else
         echo "$tag"
     fi
+}
+
+download_https() {
+    local url="$1" destination="$2"
+    [[ "$url" == https://* ]] || { error "Refusing non-HTTPS download: $url"; return 1; }
+    curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+        --connect-timeout 10 --max-time "${DOTFILES_DOWNLOAD_TIMEOUT:-300}" \
+        --output "$destination" "$url"
+    [[ -s "$destination" ]] || { error "Downloaded artifact is empty: $url"; return 1; }
+}
+
+download_installer_script() {
+    local url="$1" destination="$2"
+    download_https "$url" "$destination" || return 1
+    if ! head -n1 "$destination" | grep -Eq '^#!.*(sh|bash)([[:space:]]|$)'; then
+        error "Downloaded installer does not begin with a shell shebang: $url"
+        return 1
+    fi
+    chmod 700 "$destination"
+}
+
+validate_tar_archive() {
+    local archive="$1"
+    tar -tf "$archive" | awk '
+        /^\// { bad=1 }
+        /(^|\/)\.\.($|\/)/ { bad=1 }
+        END { exit bad ? 1 : 0 }
+    ' || { error "Archive contains an unsafe path: $archive"; return 1; }
+}
+
+atomic_replace_binary() {
+    local component="$1" staged="$2" target="$3"
+    [[ -x "$staged" ]] || { error "Staged $component binary is not executable: $staged"; return 1; }
+    mkdir -p "$(dirname "$target")"
+    local pending="${target}.dotfiles-new.$$"
+    journal_begin "$component" "$target" "$staged" "$target"
+    mv "$staged" "$pending"
+    mv -f "$pending" "$target"
+    local version
+    version="$("$target" --version 2>/dev/null | head -n1 || true)"
+    ledger_record "$component" yes dotfiles installed "$version" "$target" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
+    journal_clear
+}
+
+atomic_replace_tree() {
+    local component="$1" staged="$2" target="$3" verify_relative="$4"
+    [[ -d "$staged" && -x "$staged/$verify_relative" ]] \
+        || { error "Staged $component tree is incomplete: $staged"; return 1; }
+    "$staged/$verify_relative" --version >/dev/null 2>&1 \
+        || { error "Staged $component tree failed verification"; return 1; }
+    mkdir -p "$(dirname "$target")"
+    local rollback="${target}.dotfiles-rollback.$$" version
+    journal_begin "$component" "$rollback" "$staged" "$target"
+    if [[ -e "$target" ]]; then mv "$target" "$rollback"; fi
+    if ! mv "$staged" "$target"; then
+        [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
+        return 1
+    fi
+    if ! "$target/$verify_relative" --version >/dev/null 2>&1; then
+        rm -rf "$target"
+        [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
+        return 1
+    fi
+    version="$("$target/$verify_relative" --version 2>/dev/null | head -n1 || true)"
+    ledger_record "$component" yes dotfiles installed "$version" "$target" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
+    rm -rf "$rollback"
+    journal_clear
 }
 
 # Get Windows username for WSL operations
@@ -204,28 +316,22 @@ setup_wsl_ssh_agent() {
         || wsl_log "ssh-agent bridge: for boot-start without a login, run:  sudo loginctl enable-linger $USER"
 }
 
-# Write install-time environment to generated/bridge.sh
+# Record the checkout path in durable machine state. Shell entrypoints normally
+# derive it from their symlink; this handles flattened copies/bind mounts.
 write_dotfiles_env() {
-    local bridge_file="$DOTFILES_DIR/generated/bridge.sh"
+    local path_file="$DOTFILES_STATE_DIR/install-path"
 
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log "[DRY RUN] Would write $bridge_file"
+        log "[DRY RUN] Would record install path in $path_file"
         return 0
     fi
 
-    mkdir -p "$(dirname "$bridge_file")"
-
-    cat > "$bridge_file" << EOF
-# DO NOT EDIT — written by setup.sh write_dotfiles_env()
-export DOTFILES_DIR="$DOTFILES_DIR"
-EOF
-
+    record_install_path "$DOTFILES_DIR"
     if is_wsl; then
-        echo "export DOTFILES_WSL=1" >> "$bridge_file"
-        echo "export WIN_USER=\"$(get_windows_username)\"" >> "$bridge_file"
+        preference_set platform.wsl enabled
+        preference_set machine.win_user "$(get_windows_username)"
     fi
-
-    success "Wrote install-time environment to $bridge_file"
+    success "Recorded install path in $path_file"
 }
 
 # ==============================================================================
@@ -234,10 +340,15 @@ EOF
 
 create_backup_dir() {
     mkdir -p "$DOTFILES_BACKUP_PREFIX"
-    local backup_dir
-    backup_dir="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$backup_dir"
-    echo "$backup_dir"
+    ACTIVE_BACKUP_DIR="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$ACTIVE_BACKUP_DIR"
+}
+
+ensure_backup_dir() {
+    if [[ -z "${ACTIVE_BACKUP_DIR:-}" ]]; then
+        create_backup_dir
+        log "Backup directory: $ACTIVE_BACKUP_DIR"
+    fi
 }
 
 # Compute a backup destination that preserves the target's path structure
@@ -285,11 +396,16 @@ assert_safe_home_target() {
 safe_symlink() {
     local source="$1"
     local target="$2"
-    local backup_dir="$3"
 
     if [[ ! -e "$source" ]]; then
         error "Source file does not exist: $source"
         return 1
+    fi
+
+    if [[ -L "$target" ]] \
+       && [[ "$(readlink -f "$target" 2>/dev/null || true)" == "$(readlink -f "$source")" ]]; then
+        log "Symlink already current: $target"
+        return 0
     fi
 
     if [[ "${FORCE_OVERWRITE:-false}" == "true" && -e "$target" ]]; then
@@ -300,14 +416,16 @@ safe_symlink() {
             # Even under --force, preserve real files/dirs in the backup rather
             # than destroying them with rm -rf.
             local dest
-            dest="$(backup_dest "$target" "$backup_dir")"
+            ensure_backup_dir
+            dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
             mkdir -p "$(dirname "$dest")"
             log "Force overwrite: backing up $target -> $dest"
             mv "$target" "$dest"
         fi
     elif [[ -e "$target" && ! -L "$target" ]]; then
         local dest
-        dest="$(backup_dest "$target" "$backup_dir")"
+        ensure_backup_dir
+        dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
         mkdir -p "$(dirname "$dest")"
         log "Backing up existing $target -> $dest"
         mv "$target" "$dest"
@@ -316,7 +434,8 @@ safe_symlink() {
         link_target="$(readlink -f "$target" 2>/dev/null || true)"
         if [[ -n "$link_target" && -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
             local dest
-            dest="$(backup_dest "$target" "$backup_dir")"
+            ensure_backup_dir
+            dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
             mkdir -p "$(dirname "$dest")"
             log "Backing up symlink target $target -> $link_target"
             cp "$link_target" "$dest"
@@ -368,107 +487,75 @@ cleanup_old_backups() {
 process_git_config() {
     local source="$1"
     local target="$2"
-    local backup_dir="$3"
-    local force="${4:-false}"
+    local force="${3:-false}"
+    local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+    local portable="$portable_dir/gitconfig"
+    local rendered git_version conflict_style="diff3" theme_cache
 
-    local git_name git_email
-    # Explicit identity via --git-name/--git-email or DOTFILES_GIT_NAME/EMAIL
-    # takes precedence over everything else.
-    git_name="${DOTFILES_GIT_NAME:-}"
-    git_email="${DOTFILES_GIT_EMAIL:-}"
+    mkdir -p "$portable_dir"
+    rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")"
 
-    local existing_name existing_email
-    existing_name=$(git config --global user.name 2>/dev/null || true)
-    existing_email=$(git config --global user.email 2>/dev/null || true)
-
-    if [[ -t 0 ]]; then
-        if [[ -n "$git_name" && -n "$git_email" ]]; then
-            success "Using provided git config (user.name: $git_name, user.email: $git_email)"
-        elif [[ -n "$existing_name" && -n "$existing_email" && "$force" != "true" ]]; then
-            git_name="$existing_name"
-            git_email="$existing_email"
-            success "Using existing git config (user.name: $git_name, user.email: $git_email)"
-        else
-            local def_name="${git_name:-$existing_name}"
-            local def_email="${git_email:-$existing_email}"
-            if [[ -n "$def_name" ]]; then
-                read -p "Enter your git name [$def_name]: " git_name
-                git_name="${git_name:-$def_name}"
-            else
-                read -p "Enter your git name: " git_name
-            fi
-
-            if [[ -n "$def_email" ]]; then
-                read -p "Enter your git email [$def_email]: " git_email
-                git_email="${git_email:-$def_email}"
-            else
-                read -p "Enter your git email: " git_email
-            fi
-        fi
-    else
-        # Non-interactive: explicit values, then existing config, else skip.
-        # Never silently fabricate $USER@$HOSTNAME — that produces bogus commits.
-        [[ -z "$git_name" ]] && git_name="$existing_name"
-        [[ -z "$git_email" ]] && git_email="$existing_email"
-        if [[ -z "$git_name" || -z "$git_email" ]]; then
-            # Skip rather than abort. The rest of the gitconfig (delta pager,
-            # aliases, colors) is worth having, but we won't write a template
-            # with unresolved {{GIT_NAME}} placeholders. A no-sudo bootstrap on a
-            # managed box (curl | bash, no tty, no identity yet) must not hard-fail
-            # the whole install over this — leave any existing ~/.gitconfig intact
-            # and let the user set identity, then re-run.
-            warn "Git identity not provided — skipping ~/.gitconfig."
-            warn "Set it with --git-name/--git-email (or DOTFILES_GIT_NAME/DOTFILES_GIT_EMAIL) and re-run."
-            return 0
-        fi
-        log "Using git identity: $git_name <$git_email>"
-    fi
-
-    if [[ ! "$git_email" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
-        warn "Email format looks incorrect: $git_email"
-    fi
-
-    if [[ -f "$target" && ! -L "$target" ]]; then
-        local dest
-        dest="$(backup_dest "$target" "$backup_dir")"
-        mkdir -p "$(dirname "$dest")"
-        log "Backing up existing git config -> $dest"
-        mv "$target" "$dest"
-    elif [[ -L "$target" ]]; then
-        rm "$target"
-    fi
-
-    # First clause: escape regex metachars so the value is safe as-is on the
-    # search side. Second clause: escape `&`, which means "matched text" on the
-    # *replacement* side of sed. Without the second pass, a name like
-    # "Smith & Co" would expand to "Smith {{GIT_NAME}} Co" in the output.
-    # Order matters — the first clause uses `\&` as a backreference, so adding
-    # `&` to its character class would break that escape.
-    git_name_escaped=$(printf '%s' "$git_name" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
-    git_email_escaped=$(printf '%s' "$git_email" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
-    dotfiles_dir_escaped=$(printf '%s' "$DOTFILES_DIR" | sed -e 's/[][\\.*^$()+?{}|]/\\&/g' -e 's/&/\\\&/g')
-
-    # merge.conflictstyle=zdiff3 needs git 2.35+ (Ubuntu 22.04 ships 2.34.1).
-    # An unrecognised style makes *every* git command exit with
-    #   fatal: unknown style 'zdiff3' given for 'merge.conflictstyle'
-    # so this can't be left to fail at merge time. Fall back to diff3, which
-    # is the same three-way view minus the common-line hoisting.
-    local git_version conflict_style="diff3"
-    git_version=$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)
+    git_version=$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)
     if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
         conflict_style="zdiff3"
     fi
+    theme_cache="${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"
 
-    sed -e "s|{{GIT_NAME}}|$git_name_escaped|g" \
-        -e "s|{{GIT_EMAIL}}|$git_email_escaped|g" \
-        -e "s|{{DOTFILES_DIR}}|$dotfiles_dir_escaped|g" \
-        -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" \
-        "$source" > "$target"
+    sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
+        if feature_enabled theme; then
+            awk -v path="$theme_cache/delta.gitconfig" '
+                $0 == "{{THEME_INCLUDE}}" {
+                    print "[include]"
+                    print "    # Optional theme feature index."
+                    print "    path = \"" path "\""
+                    next
+                }
+                { print }
+            '
+        else
+            awk '$0 != "{{THEME_INCLUDE}}" { print }'
+        fi > "$rendered"
 
-    success "Git config created: $target"
+    if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
+        mv "$rendered" "$portable"
+        chmod 600 "$portable"
+        success "Portable Git config updated: $portable"
+    else
+        rm -f "$rendered"
+        log "Portable Git config already current: $portable"
+    fi
+
+    # Preserve the user's global file and identity. Only add our include entries
+    # when absent; no timestamp backup or whole-file rendering is needed.
+    local existing
+    existing="$(git config --file "$target" --get-all include.path 2>/dev/null || true)"
+    if ! grep -Fxq "$portable" <<< "$existing"; then
+        git config --file "$target" --add include.path "$portable"
+    fi
+    if ! grep -Fxq "$HOME/.gitconfig.local" <<< "$existing"; then
+        git config --file "$target" --add include.path "$HOME/.gitconfig.local"
+    fi
+
+    if [[ -n "${DOTFILES_GIT_NAME:-}" ]]; then
+        [[ "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || true)" == "$DOTFILES_GIT_NAME" ]] \
+            || git config --file "$HOME/.gitconfig.local" user.name "$DOTFILES_GIT_NAME"
+    fi
+    if [[ -n "${DOTFILES_GIT_EMAIL:-}" ]]; then
+        [[ "$(git config --file "$HOME/.gitconfig.local" user.email 2>/dev/null || true)" == "$DOTFILES_GIT_EMAIL" ]] \
+            || git config --file "$HOME/.gitconfig.local" user.email "$DOTFILES_GIT_EMAIL"
+    fi
+
+    if [[ -z "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || git config --global user.name 2>/dev/null || true)" \
+       || -z "$(git config --file "$HOME/.gitconfig.local" user.email 2>/dev/null || git config --global user.email 2>/dev/null || true)" ]]; then
+        warn "Git identity is not configured; set it in ~/.gitconfig.local or pass --git-name/--git-email."
+    fi
+
+    # force is accepted for command compatibility; portable reconciliation is
+    # content-addressed and never overwrites unrelated user settings.
+    : "$target" "$force"
 }
-
 # ==============================================================================
+
 # Package Management
 # ==============================================================================
 
@@ -492,18 +579,29 @@ install_apt() {
         return 0
     fi
 
-    update_packages
+    if ! update_packages; then
+        track_install "$label apt" fail
+        return 1
+    fi
     log "Installing $label APT packages: ${missing[*]}"
     if safe_sudo apt-get install -y "${missing[@]}"; then
         success "$label APT packages installed"
     else
-        warn "Some $label packages failed to install"
+        error "Some $label packages failed to install"
+        track_install "$label apt" fail
+        return 1
     fi
 }
 
 update_packages() {
     log "Updating package lists..."
-    safe_sudo apt-get update 2>&1 | grep -v '^W:' || true
+    local output rc=0
+    output="$(safe_sudo apt-get update 2>&1)" || rc=$?
+    printf '%s\n' "$output" | grep -v '^W:' || true
+    if (( rc != 0 )); then
+        error "APT package index update failed"
+        return "$rc"
+    fi
 }
 
 ensure_docker_repo() {
@@ -528,11 +626,22 @@ ensure_docker_repo() {
         fi
     done
 
-    safe_sudo apt-get install -y ca-certificates curl gnupg
+    safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
 
-    safe_sudo install -m 0755 -d /etc/apt/keyrings
+    safe_sudo install -m 0755 -d /etc/apt/keyrings || return 1
     if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | safe_sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        local docker_key docker_keyring fingerprint
+        docker_key="$(mktemp)"; docker_keyring="$(mktemp)"
+        download_https https://download.docker.com/linux/ubuntu/gpg "$docker_key" || return 1
+        fingerprint="$(gpg --batch --show-keys --with-colons "$docker_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
+        if [[ "$fingerprint" != 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]]; then
+            rm -f "$docker_key" "$docker_keyring"
+            error "Docker repository key fingerprint mismatch: ${fingerprint:-missing}"
+            return 1
+        fi
+        gpg --batch --dearmor --output "$docker_keyring" "$docker_key" || return 1
+        safe_sudo install -m 0644 "$docker_keyring" /etc/apt/keyrings/docker.gpg || return 1
+        rm -f "$docker_key" "$docker_keyring"
         safe_sudo chmod a+r /etc/apt/keyrings/docker.gpg
     fi
 
@@ -541,7 +650,7 @@ ensure_docker_repo() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" | \
         safe_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    update_packages
+    update_packages || return 1
     success "Docker apt repository configured"
 }
 
@@ -560,13 +669,22 @@ install_azure_cli() {
     fi
 
     log "Installing Azure CLI from Microsoft's signed apt repository..."
-    safe_sudo apt-get install -y ca-certificates curl gnupg
-    safe_sudo install -m 0755 -d /etc/apt/keyrings
+    safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
+    safe_sudo install -m 0755 -d /etc/apt/keyrings || return 1
 
     if [[ ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
-        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-            | gpg --dearmor \
-            | safe_sudo tee /etc/apt/keyrings/microsoft.gpg > /dev/null
+        local microsoft_key microsoft_keyring fingerprint
+        microsoft_key="$(mktemp)"; microsoft_keyring="$(mktemp)"
+        download_https https://packages.microsoft.com/keys/microsoft.asc "$microsoft_key" || return 1
+        fingerprint="$(gpg --batch --show-keys --with-colons "$microsoft_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
+        if [[ "$fingerprint" != BC528686B50D79E339D3721CEB3E94ADBE1229CF ]]; then
+            rm -f "$microsoft_key" "$microsoft_keyring"
+            error "Microsoft repository key fingerprint mismatch: ${fingerprint:-missing}"
+            return 1
+        fi
+        gpg --batch --dearmor --output "$microsoft_keyring" "$microsoft_key" || return 1
+        safe_sudo install -m 0644 "$microsoft_keyring" /etc/apt/keyrings/microsoft.gpg || return 1
+        rm -f "$microsoft_key" "$microsoft_keyring"
         safe_sudo chmod a+r /etc/apt/keyrings/microsoft.gpg
     fi
 
@@ -575,7 +693,7 @@ install_azure_cli() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $codename main" | \
         safe_sudo tee /etc/apt/sources.list.d/azure-cli.list > /dev/null
 
-    update_packages
+    update_packages || return 1
     install_apt "azure-cli" azure-cli
 }
 
@@ -588,6 +706,7 @@ install_azure_cli() {
 run_installer() {
     local name="$1"
     local critical="${2:-false}"
+    : "$critical"  # retained for compatibility with older callers
     local script="$DOTFILES_DIR/installers/install-$name.sh"
 
     if [[ ! -f "$script" ]]; then
@@ -616,12 +735,8 @@ run_installer() {
         2) track_install "$name" skip ;;
         *)
             track_install "$name" fail
-            if [[ "$critical" == "true" ]]; then
-                error "$name installation failed"
-                exit 1
-            else
-                warn "$name installation failed"
-            fi
+            error "$name installation failed"
+            return 1
             ;;
     esac
 }
@@ -646,6 +761,10 @@ install_eget_tools() {
         [[ "${TOOL_METHOD[$name]}" == "eget" ]] || continue
         if declare -F tier_includes >/dev/null 2>&1; then
             tier_includes "${TOOL_TIER[$name]}" || continue
+        fi
+        if ! tool_applicable "$name"; then
+            [[ "${DRY_RUN:-false}" == "true" ]] || track_install "$name" not-applicable
+            continue
         fi
         eget_tools+=("$name")
     done
@@ -683,15 +802,8 @@ install_eget_tools() {
         return 0
     fi
 
-    run_installer "eget" true
+    run_installer "eget" true || return 1
     log "Installing binary tools via eget..."
-
-    if [[ "${FORCE_REINSTALL:-false}" == "true" ]]; then
-        log "Force reinstall: clearing eget-managed binaries..."
-        for name in "${eget_tools[@]}"; do
-            rm -f "$HOME/.local/bin/${TOOL_BINARY[$name]}"
-        done
-    fi
 
     if [[ ${#eget_tools[@]} -eq 0 ]]; then
         log "All eget tools already provided by the system — nothing to download"
@@ -736,7 +848,42 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
-        EGET_CONFIG="$config" "$eget_bin" "$slug" || true
+        local pinned current_output target
+        pinned="$(awk -v section="[\"$slug\"]" '
+            $0 == section { active=1; next }
+            active && /^\[/ { exit }
+            active && /^[[:space:]]*tag[[:space:]]*=/ {
+                line=$0; sub(/^[^"]*"/, "", line); sub(/".*$/, "", line); print line; exit
+            }
+        ' "$config")"
+        target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
+        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" ]]; then
+            current_output="$("$target" --version 2>/dev/null | head -n1 || true)"
+            if [[ "$current_output" == *"${pinned#v}"* ]]; then
+                track_install "$name" skip
+                continue
+            fi
+        fi
+
+        local stage_home stage_config staged
+        stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")"
+        stage_config="$stage_home/eget.toml"
+        sed "s|~/.local/bin|$stage_home/.local/bin|g" "$config" > "$stage_config"
+        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "$slug"; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        staged="$stage_home/.local/bin/${TOOL_BINARY[$name]}"
+        if [[ ! -x "$staged" ]] || ! "$staged" --version >/dev/null 2>&1; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        atomic_replace_binary "$name" "$staged" "$target"
+        rm -rf "$stage_home"
         # Judge by the binary on disk at our prefix, NOT command -v: on a fresh
         # machine ~/.local/bin isn't on PATH yet, so a PATH lookup would report
         # every just-installed tool as failed. eget lands each tool at
@@ -750,7 +897,8 @@ install_eget_tools() {
         fi
     done
     if [[ "$any_missing" == true ]]; then
-        warn "Some eget tools are missing after install (see summary)"
+        error "Some eget tools are missing after install (see summary)"
+        return 1
     fi
     return 0
 }
@@ -769,7 +917,7 @@ install_bash_packages() {
     command -v git >/dev/null 2>&1 || \
         warn "git not found — install it (sudo apt install git) for full functionality"
 
-    install_eget_tools
+    install_eget_tools || return 1
 
     success "Bash tier installation complete"
 }
@@ -788,11 +936,16 @@ install_dev_packages() {
     # shellcheck disable=SC2206
     is_wsl && packages+=(${PACKAGES[wsl]})
 
-    install_apt "dev" "${packages[@]}"
+    install_apt "dev" "${packages[@]}" || return 1
+    if [[ "${DRY_RUN:-false}" != "true" ]]; then
+        if command -v zsh >/dev/null 2>&1; then track_install zsh ok; else track_install zsh fail; return 1; fi
+    fi
 
     log "Installing dev tier tools via scripts..."
-    run_installer "tmux"
-    run_installer "neovim"
+    local failed=false
+    run_installer "tmux" || failed=true
+    run_installer "neovim" || failed=true
+    [[ "$failed" == "false" ]] || return 1
 
     success "Dev tier installation complete"
 }
@@ -806,6 +959,7 @@ install_dev_packages() {
 # an external binary already on PATH.
 install_ai_packages() {
     local -a tools=()
+    local failed=false
     if [[ "${AI_ALL:-false}" == "true" ]]; then
         readarray -t tools < <(tools_for_tier ai)
     else
@@ -822,8 +976,10 @@ install_ai_packages() {
     log "Installing AI CLIs: ${tools[*]}"
     local t
     for t in "${tools[@]}"; do
-        run_installer "$t"
+        run_installer "$t" || failed=true
     done
+
+    [[ "$failed" == "false" ]] || return 1
 
     success "AI CLIs installation complete"
 }
@@ -871,7 +1027,7 @@ install_rdp_packages() {
     # apt run. DEBIAN_FRONTEND=noninteractive suppresses the dialog; DEBIAN_PRIORITY
     # =critical is a second guard so only critical questions could ever surface.
     # env, not a bare assignment, because sudo resets the environment.
-    update_packages
+    update_packages || { track_install "xrdp" fail; return 1; }
     # shellcheck disable=SC2086
     if safe_sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
         apt-get install -y ${PACKAGES[rdp]}; then
@@ -890,20 +1046,36 @@ install_rdp_packages() {
 
 install_work_packages() {
     log "Installing work tier packages..."
+    local failed=false
 
     # Azure CLI
-    install_azure_cli
+    if install_azure_cli; then
+        if [[ "${DRY_RUN:-false}" != "true" ]]; then
+            command -v az >/dev/null 2>&1 && track_install azure-cli ok || { track_install azure-cli fail; failed=true; }
+        fi
+    else
+        track_install azure-cli fail
+        failed=true
+    fi
 
     # Azure DevOps git credential helper
     if [[ -f "$DOTFILES_DIR/bin/git-credential-azdo" ]]; then
-        mkdir -p "$HOME/.local/bin"
-        ln -sf "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
-        success "Azure DevOps credential helper linked"
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
+            log "[DRY RUN] Would link the Azure DevOps credential helper"
+        else
+            mkdir -p "$HOME/.local/bin"
+            ln -sf "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
+            success "Azure DevOps credential helper linked"
+        fi
     fi
 
     # Docker
-    ensure_docker_repo
-    install_apt "full" python3-dev python3-venv ${PACKAGES[docker]}
+    ensure_docker_repo || failed=true
+    # shellcheck disable=SC2086
+    install_apt "work" python3-dev python3-venv ${PACKAGES[docker]} || failed=true
+    if [[ "${DRY_RUN:-false}" != "true" ]]; then
+        if command -v docker >/dev/null 2>&1; then track_install docker ok; else track_install docker fail; failed=true; fi
+    fi
 
     if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
         log "Adding $USER to docker group..."
@@ -935,10 +1107,12 @@ install_work_packages() {
     fi
 
     # Version managers (Python is handled by uv, installed in the shell tier)
-    run_installer "nvm" true
+    run_installer "nvm" || failed=true
     # Rust toolchain (userspace, no sudo). Non-critical: unlike node (which
     # underpins the AI CLIs), nothing else in setup depends on it.
-    run_installer "rust"
+    run_installer "rust" || failed=true
+
+    [[ "$failed" == "false" ]] || return 1
 
     success "Work tier installation complete"
 }

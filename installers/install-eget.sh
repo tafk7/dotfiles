@@ -4,7 +4,10 @@
 
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 EGET_VERSION="1.3.4"
 
@@ -36,11 +39,14 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
 log "Downloading eget v${EGET_VERSION}..."
-curl -fLSso eget.tar.gz "https://github.com/zyedidia/eget/releases/download/v${EGET_VERSION}/eget-${EGET_VERSION}-linux_${EGET_ARCH}.tar.gz"
+download_https "https://github.com/zyedidia/eget/releases/download/v${EGET_VERSION}/eget-${EGET_VERSION}-linux_${EGET_ARCH}.tar.gz" eget.tar.gz
 
+validate_tar_archive eget.tar.gz
 tar xf eget.tar.gz
-mkdir -p "$HOME/.local/bin"
-install -D "eget-${EGET_VERSION}-linux_${EGET_ARCH}/eget" "$HOME/.local/bin/eget"
+STAGED_EGET="$TEMP_DIR/eget-${EGET_VERSION}-linux_${EGET_ARCH}/eget"
+chmod +x "$STAGED_EGET"
+"$STAGED_EGET" --version >/dev/null 2>&1 || { error "Staged eget binary does not run"; exit 1; }
+atomic_replace_binary eget "$STAGED_EGET" "$HOME/.local/bin/eget"
 
 # Verify the binary we just wrote, by absolute path — NOT via command -v. On a
 # fresh machine ~/.local/bin isn't on PATH yet (Ubuntu's ~/.profile only adds it

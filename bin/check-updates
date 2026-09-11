@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
+source "$DOTFILES_DIR/lib/registry.sh"
 
 readonly EGET_TOML="$DOTFILES_DIR/eget.toml"
 
@@ -230,6 +231,23 @@ emit_table() {
     fi
 }
 
+emit_other_contracts() {
+    local name method contract installed
+    echo
+    echo "Other managed components"
+    echo "────────────────────────────────────────────────────────────"
+    printf '%-14s  %-10s  %-38s\n' "Tool" "Method" "Update contract"
+    while IFS= read -r name; do
+        method="${TOOL_METHOD[$name]}"
+        [[ "$method" != eget ]] || continue
+        [[ -z "$FILTER_TOOL" || "$FILTER_TOOL" == "$name" ]] || continue
+        installed="not installed"
+        eval "$(tool_verify_command "$name")" && installed="installed"
+        contract="${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
+        printf '%-14s  %-10s  %-38s  %s\n' "$name" "$method" "$contract" "$installed"
+    done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
+}
+
 main() {
     resolve_github_auth
     local rows
@@ -239,6 +257,7 @@ main() {
         echo "$rows" | emit_json
     else
         echo "$rows" | emit_table
+        emit_other_contracts
     fi
 
     # Non-zero exit when --outdated finds matches (useful in CI / scripts).

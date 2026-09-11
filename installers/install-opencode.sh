@@ -28,7 +28,10 @@
 # set — see configs/opencode.json and docs/opencode-secure.md.
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -112,10 +115,22 @@ log "Installing opencode via opencode.ai/install..."
 
 # --no-modify-path: don't touch shell rc files (we own PATH via shell/env.sh and
 # the symlink below). Args are passed to the piped script via `bash -s --`.
-if ! curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path; then
+opencode_installer="${DOTFILES_OPENCODE_INSTALLER_SCRIPT:-}"
+downloaded_installer=false
+if [[ -z "$opencode_installer" ]]; then
+    opencode_installer="$(mktemp)"
+    downloaded_installer=true
+    download_installer_script https://opencode.ai/install "$opencode_installer" || exit 1
+elif [[ ! -s "$opencode_installer" ]]; then
+    error "DOTFILES_OPENCODE_INSTALLER_SCRIPT is missing or empty: $opencode_installer"
+    exit 1
+fi
+if ! bash "$opencode_installer" --no-modify-path; then
+    [[ "$downloaded_installer" == true ]] && rm -f "$opencode_installer"
     error "opencode installation failed"
     exit 1
 fi
+[[ "$downloaded_installer" == true ]] && rm -f "$opencode_installer"
 
 if [[ ! -x "$OPENCODE_REAL" ]]; then
     error "opencode installer ran but $OPENCODE_REAL is missing"

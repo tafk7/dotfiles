@@ -10,7 +10,10 @@
 # re-run with --force to reapply configuration.
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true

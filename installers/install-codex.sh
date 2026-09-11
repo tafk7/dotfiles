@@ -7,7 +7,10 @@
 # the official installer to update or repair it without deleting its launcher.
 set -euo pipefail
 
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -96,6 +99,10 @@ provision_codex_config() {
 #
 # Never fatal: a badge is a convenience, not a reason to fail the Codex install.
 provision_agent_badge_plugin() {
+    [[ "${DOTFILES_AGENT_BADGE_ENABLED:-1}" == "1" ]] || {
+        log "Agent-badge disabled; skipping plugin registration."
+        return 0
+    }
     local codex_cmd="${1:-}"
     [[ -n "$codex_cmd" && -x "$codex_cmd" ]] || codex_cmd="$(command -v codex 2>/dev/null || true)"
     [[ -n "$codex_cmd" ]] || return 0
@@ -136,15 +143,9 @@ run_official_installer() {
 
         installer_path="$(mktemp)"
         downloaded=true
-        if ! curl --proto '=https' --tlsv1.2 -fsSL \
-            "$CODEX_INSTALLER_URL" -o "$installer_path"; then
+        if ! download_installer_script "$CODEX_INSTALLER_URL" "$installer_path"; then
             rm -f "$installer_path"
             error "Could not download the official Codex installer"
-            return 1
-        fi
-        if [[ ! -s "$installer_path" ]]; then
-            rm -f "$installer_path"
-            error "The downloaded Codex installer is empty"
             return 1
         fi
     fi

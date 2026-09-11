@@ -38,7 +38,7 @@ declare -A CONFIG_MAP=(
     [config/fd]="$HOME/.config/fd:symlink:fd"
     [ssh_config]="$HOME/.ssh/config:symlink:"
     # starship.toml: NOT a symlink. theme-switcher generates immutable
-    # generated/themes/<theme>/starship.toml files; STARSHIP_CONFIG selects one
+    # cached themes/<theme>/starship.toml files; STARSHIP_CONFIG selects one
     # for the current shell's global/session/window context.
 
     # Special handling

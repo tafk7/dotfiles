@@ -83,12 +83,22 @@ is_wsl() {
 # Normalize architecture to x86_64 or aarch64
 get_arch() {
     local arch
-    arch=$(uname -m)
+    arch="${DOTFILES_TEST_ARCH:-$(uname -m)}"
     case "$arch" in
         x86_64|amd64) echo "x86_64" ;;
         aarch64|arm64) echo "aarch64" ;;
         *) error "Unsupported architecture: $arch"; return 1 ;;
     esac
+}
+
+wsl_version() {
+    [[ -n "${DOTFILES_TEST_WSL_VERSION:-}" ]] && { printf '%s\n' "$DOTFILES_TEST_WSL_VERSION"; return; }
+    is_wsl || { printf '0\n'; return; }
+    if grep -qiE 'microsoft-standard-WSL2|WSL2' /proc/sys/kernel/osrelease /proc/version 2>/dev/null; then
+        printf '2\n'
+    else
+        printf '1\n'
+    fi
 }
 
 # Parse system glibc version (e.g. "2.31")

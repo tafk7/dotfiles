@@ -38,7 +38,7 @@ tag = "v1.4.6"
 tag = "v5.36.1"
 # The release ships one binary per platform, each named for its target. The
 # amd64 static build's name is a unique substring among the assets.
-asset_filters = ["gdu_linux_amd64_static"]
+asset_filters = ["gdu_linux_", "_static"]
 # The archive's binary is named gdu_linux_amd64_static; a file-path target
 # renames it to plain `gdu` on install.
 target = "~/.local/bin/gdu"
@@ -52,7 +52,7 @@ tag = "v0.59.0"
 
 ["cli/cli"]
 tag = "v2.100.0"
-asset_filters = ["linux_amd64", ".tar.gz"]
+asset_filters = ["linux_", ".tar.gz"]
 
 ["astral-sh/uv"]
 tag = "0.10.0"
@@ -60,31 +60,31 @@ asset_filters = [".tar.gz", "gnu"]
 
 ["chmln/sd"]
 tag = "v1.1.0"
-asset_filters = ["x86_64-unknown-linux-musl"]
+asset_filters = ["unknown-linux-musl"]
 
 ["sharkdp/bat"]
 tag = "v0.26.1"
-asset_filters = ["x86_64-unknown-linux-gnu", ".tar.gz"]
+asset_filters = ["unknown-linux-gnu", ".tar.gz"]
 
 ["sharkdp/fd"]
 tag = "v10.4.2"
-asset_filters = ["x86_64-unknown-linux-gnu", ".tar.gz"]
+asset_filters = ["unknown-linux-gnu", ".tar.gz"]
 
 ["BurntSushi/ripgrep"]
 tag = "15.2.0"
 # Upstream ships only a musl build for x86_64 Linux (no gnu asset).
-asset_filters = ["x86_64-unknown-linux-musl", ".tar.gz"]
+asset_filters = ["unknown-linux-", ".tar.gz"]
 
 ["direnv/direnv"]
 tag = "v2.37.1"
 # Release ships bare per-arch binaries (direnv.linux-amd64); a file-path
 # target renames it to plain `direnv` on install (same trick as gdu).
-asset_filters = ["direnv.linux-amd64"]
+asset_filters = ["direnv.linux-"]
 target = "~/.local/bin/direnv"
 
 ["koalaman/shellcheck"]
 tag = "v0.11.0"
-asset_filters = [".linux.x86_64.tar.xz"]
+asset_filters = [".linux.", ".tar.xz"]
 
 # NOTE: Codex is an "ai" tier tool and is intentionally NOT listed here. Its
 # dedicated installer uses OpenAI's standalone installer so that `--bash`'s
@@ -93,5 +93,5 @@ asset_filters = [".linux.x86_64.tar.xz"]
 ["mame/wsl2-ssh-agent"]
 tag = "v0.9.7"
 # Release ships bare binaries: wsl2-ssh-agent (x86_64) and wsl2-ssh-agent-arm64.
-# "^arm64" drops the ARM asset; the remaining match is the x86_64 binary.
-asset_filters = ["wsl2-ssh-agent", "^arm64"]
+# eget applies its native architecture selector to the amd64/arm64 assets.
+asset_filters = ["wsl2-ssh-agent"]

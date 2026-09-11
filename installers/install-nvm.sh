@@ -5,7 +5,13 @@
 set -eo pipefail  # Remove -u flag to avoid NVM's unbound variable issues
 
 # Source common functions
-source "${DOTFILES_DIR:-$HOME/dotfiles}/lib/install.sh"
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
+export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/install.sh"
+
+FORCE=false
+[[ "${1:-}" == "--force" ]] && FORCE=true
 
 # Helper function to run NVM commands safely
 # NVM uses unbound variables internally, so we need to temporarily disable -u checking
@@ -30,7 +36,7 @@ if [[ -n "${PATH:-}" ]]; then
 fi
 
 # Check if already installed
-if [[ -d "$NVM_DIR" ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
+if [[ "$FORCE" != true && -d "$NVM_DIR" ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
     log "NVM is already installed at $NVM_DIR"
     # Source NVM to check version
     run_nvm_command . "$NVM_DIR/nvm.sh"
@@ -51,16 +57,28 @@ else
     # Download the installer to a file first (inspectable, logged) rather than
     # piping the network straight into bash. The version tag is pinned upstream.
     log "Downloading NVM installer (v0.40.4)..."
-    nvm_installer="$(mktemp)"
-    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh" -o "$nvm_installer"
+    nvm_installer="${DOTFILES_NVM_INSTALLER_SCRIPT:-}"
+    downloaded_installer=false
+    if [[ -z "$nvm_installer" ]]; then
+        nvm_installer="$(mktemp)"
+        downloaded_installer=true
+        download_installer_script "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh" "$nvm_installer"
+    elif [[ ! -s "$nvm_installer" ]]; then
+        error "DOTFILES_NVM_INSTALLER_SCRIPT is missing or empty: $nvm_installer"
+        exit 1
+    fi
     log "Running NVM installer from $nvm_installer"
     # PROFILE=/dev/null tells nvm's installer not to edit any shell rc file.
     # Our rc files are dotfiles symlinks — editing them writes through into the
     # tracked repo — and nvm is already wired up by shell/lazy/nvm.sh (lazy load)
     # plus the $NVM_DIR/default symlink below, so the block nvm would append is
     # unwanted and redundant (it also eagerly loads nvm, defeating lazy startup).
-    run_nvm_command env PROFILE=/dev/null bash "$nvm_installer"
-    rm -f "$nvm_installer"
+    if ! run_nvm_command env PROFILE=/dev/null bash "$nvm_installer"; then
+        [[ "$downloaded_installer" == true ]] && rm -f "$nvm_installer"
+        error "NVM installer failed; any prior installation was left in place"
+        exit 1
+    fi
+    [[ "$downloaded_installer" == true ]] && rm -f "$nvm_installer"
 
     # Verify installation
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
