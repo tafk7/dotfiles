@@ -15,8 +15,8 @@ alias py='python3'
 alias ipy='ipython'
 
 # Testing
-alias pytest='python -m pytest'
-alias pyt='python -m pytest -v'
+alias pytest='python3 -m pytest'
+alias pyt='python3 -m pytest -v'
 
 # Code quality (if installed)
 command -v black >/dev/null 2>&1 && alias fmt='black .'
@@ -26,7 +26,7 @@ if command -v ruff >/dev/null 2>&1; then
 fi
 
 # Quick server
-alias pyserver='python -m http.server'
+alias pyserver='python3 -m http.server'
 
 # uv shortcuts — uv owns interpreters, venvs, deps, and tools.
 # Native commands cover the rest: `uv python list/install/pin`, `uv venv`.

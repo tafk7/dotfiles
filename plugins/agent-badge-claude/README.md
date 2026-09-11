@@ -71,28 +71,9 @@ the badge does not appear.
 
 **tmux**
 
-Nothing required. The plugin wires the tmux server itself, from its
-`SessionStart` hook, the first time it notices the badge is missing.
-
-If you do have the dotfiles, `configs/tmux.conf` calls it explicitly instead:
-
-```tmux
-if-shell '[ -x "$HOME/dotfiles/plugins/shared/agent-badge.tmux" ]' \
-    'run-shell "$HOME/dotfiles/plugins/shared/agent-badge.tmux wire"'
-```
-
-The badge then exists from the moment tmux starts rather than from the first
-agent session, and the wiring stays greppable from the config file. Requires
-tmux 3.2+ for `#{E:...}`; below that the plugin no-ops rather than printing the
-placeholder across every window.
-
-Prefer this line when you have the dotfiles, for a reason beyond taste. Plugin
-caches are version-pinned (`cache/<marketplace>/<plugin>/<version>/`) and the old
-directory is swept on update, so hooks the plugin wires from a cache copy point
-at a path that will eventually vanish. `wire` re-points stale entries when it
-next runs, but the config line sidesteps it entirely by pinning tmux to the
-working tree, which is never swept. Self-wiring stays the fallback for machines
-that have the plugin and nothing else.
+Nothing is required in the base tmux configuration. The installed plugin is
+self-contained and wires the running tmux server from its `SessionStart` hook.
+Reinstalling/updating the plugin refreshes cached paths before the next session.
 
 ## Why two plugins
 
@@ -130,7 +111,7 @@ claude plugin uninstall agent-badge@tafk7
 codex plugin remove agent-badge@tafk7
 ```
 
-`unwire` has to be run by hand: neither harness fires a hook on plugin removal,
+`unwire` must be run before plugin removal: neither harness fires a hook on removal,
 and without it the tmux server keeps invoking a deleted path on every pane focus
 until it restarts.
 

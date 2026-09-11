@@ -1,0 +1,52 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"; export DOTFILES_DIR
+source "$DOTFILES_DIR/lib/runtime.sh"
+source "$DOTFILES_DIR/lib/state.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: dotfiles-feature [status | enable FEATURE | disable FEATURE]
+
+Features: theme, agent-badge
+EOF
+}
+
+feature_status() {
+    local feature
+    for feature in theme agent-badge; do
+        if feature_enabled "$feature"; then
+            printf '%-14s enabled\n' "$feature"
+        else
+            printf '%-14s disabled\n' "$feature"
+        fi
+    done
+}
+
+set_feature() {
+    local feature="$1" value="$2"
+    case "$feature" in theme|agent-badge) ;; *) error "Unknown feature: $feature"; return 64 ;; esac
+    preference_set "feature.$feature" "$value"
+    case "$feature:$value" in
+        theme:enabled) "$DOTFILES_DIR/bin/theme-switcher" --init ;;
+        theme:disabled) "$DOTFILES_DIR/bin/theme-switcher" tmux-unwire ;;
+        agent-badge:disabled)
+            if [[ -x "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" ]]; then
+                "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" unwire || true
+            fi
+            ;;
+    esac
+    success "$feature is now $value"
+}
+
+case "${1:-status}" in
+    status) feature_status ;;
+    enable|disable)
+        [[ -n "${2:-}" ]] || { error "$1 requires a feature name"; usage >&2; exit 64; }
+        set_feature "$2" "$([[ "$1" == enable ]] && echo enabled || echo disabled)"
+        ;;
+    --help|-h) usage ;;
+    *) error "Unknown command: $1"; usage >&2; exit 64 ;;
+esac

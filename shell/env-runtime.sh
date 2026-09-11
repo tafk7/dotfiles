@@ -1,11 +1,8 @@
 #!/bin/bash
 # Always-fresh exports — safe to re-source on every shell start and on `reload`.
 #
-# Two categories live here, with DIFFERENT guards — see each section:
-#   1. Scoped theme artifacts and launch variables that may change when the
-#      tmux window/session cascade changes. `reload` and fresh shells resolve
-#      them again instead of retaining another context's paths. INTERACTIVE
-#      ONLY (see below) — nothing non-interactive renders a themed surface.
+# Two categories live here:
+#   1. PATH normalization shared by login and interactive startup.
 #   2. CWD-sensitive exports (direnv .envrc activation) that must
 #      re-fire in every subprocess. The exported guard on env.sh causes
 #      child shells to skip env.sh's body entirely, so direnv has to
@@ -72,30 +69,6 @@ _dotfiles_dedupe_path() {
     [[ -n "$out" ]] && export PATH="$out"
     return 0
 }
-
-# Resolve the current tmux window/session (or the global standalone scope) into
-# launch-time paths and tool variables. Artifacts are keyed by theme, so this
-# never rewrites another context's active configuration.
-#
-# Interactive shells only. This file is reached from ~/.zshenv (via ~/.profile)
-# for EVERY zsh context, including `zsh -c "cmd"`, script shebangs, and agent
-# subprocesses — none of which draw a prompt, an fzf window, or a tmux status
-# line. Resolution used to run there unconditionally and cost ~1s per
-# subprocess. Non-interactive shells still inherit whatever theme variables
-# their parent exported, plus the static fallbacks in shell/env.sh.
-# Set DOTFILES_FORCE_THEME_ENV=1 to opt a non-interactive shell back in.
-#
-# The signature argument lets theme-switcher short-circuit when nothing has
-# changed. An interactive shell reaches this file twice (~/.zshenv, then
-# ~/.zshrc -> shell/init.sh); the second pass inherits the signature the first
-# pass exported and returns almost immediately. A theme switch bumps
-# DOTFILES_THEME_GENERATION, which changes the signature and forces a full
-# re-resolve, so `reload` and the precmd hook still pick up changes.
-# `unset DOTFILES_THEME_CONTEXT_SIGNATURE` forces an unconditional re-resolve.
-if [[ $- == *i* || -n "${DOTFILES_FORCE_THEME_ENV:-}" ]] \
-   && [[ -n "${DOTFILES_DIR:-}" && -x "$DOTFILES_DIR/bin/theme-switcher" ]]; then
-    eval "$("$DOTFILES_DIR/bin/theme-switcher" env "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" 2>/dev/null)"
-fi
 
 # ==============================================================================
 # direnv .envrc activation (every shell, including subprocesses)

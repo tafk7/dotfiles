@@ -162,7 +162,7 @@ shell│du│Directory size (human readable)│du -h
 shell│du1│Directory size one level deep│du -h --max-depth=1
 shell│free│Memory usage (human readable)│free -h
 shell│top│System monitor (btop)│btop
-shell│ports│List open network ports│netstat -tulanp
+shell│ports│List open network ports│ss -tulanp
 shell│myip│Show public IP address│curl ifconfig.me
 shell│localip│Show local network IP│hostname -I
 shell│psg│Search running processes by name│ps aux | grep
@@ -183,7 +183,7 @@ shell│ducks│Show largest items in current directory│du -cks * | sort -rn |
 shell│fixmouse│Reset stale terminal mouse-reporting modes│disable DEC/Xterm mouse modes
 # Configuration
 shell│reload│Reload shell configuration│source ~/.bashrc
-shell│themes│List available themes and show usage│ls $DOTFILES_DIR/configs/themes/
+shell│themes│List available themes and show usage│ls $DOTFILES_DIR/themes/
 shell│theme│Apply theme globally / interactive picker│theme [name]
 shell│theme-set│Override a group or surface theme│theme set <target> <theme>
 shell│theme-unset│Remove one theme override│theme unset <target>
@@ -261,15 +261,15 @@ python│py│Python 3 interpreter│python3
 python│ipy│IPython interpreter│ipython
 python│vactivate│Activate virtual environment (.venv)│vactivate
 # Testing and code quality
-python│pytest│Run tests│python -m pytest
-python│pyt│Run tests with verbose output│python -m pytest -v
+python│pytest│Run tests│python3 -m pytest
+python│pyt│Run tests with verbose output│python3 -m pytest -v
 python│fmt│Format code with black│black .
 python│lint│Check code with ruff│ruff check .
 python│lintf│Auto-fix ruff issues│ruff check . --fix
 # Virtual environments
 python│venv│Create .venv (uses uv if available)│uv venv .venv / python3 -m venv .venv
 python│pipreqs│Install from requirements.txt│pip install -r requirements.txt
-python│pyserver│Start HTTP server in current directory│python -m http.server
+python│pyserver│Start HTTP server in current directory│python3 -m http.server
 python│pip install -e│Install package in editable/dev mode│pip install -e .
 # uv shortcuts
 python│uvs│Sync project dependencies│uv sync
@@ -289,7 +289,8 @@ node│nrd│Run dev server│npm run dev
 node│nrb│Run build│npm run build
 node│nrt│Run tests│npm run test
 node│nrs│Run start│npm run start
-node│nrm│Delete node_modules and lockfile│rm -rf node_modules package-lock.json
+node│nrm│Delete node_modules (preserve lockfiles)│rm -rf node_modules
+node│nuke-node│Delete node_modules and lockfiles explicitly│rm -rf node_modules package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml
 node│nclean│Clean reinstall (delete + install)│nrm && npm install
 
 # VS Code shortcuts

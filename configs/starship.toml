@@ -1,7 +1,7 @@
 # Starship Configuration — palette-aware, dotfiles-managed
 #
 # This is a TEMPLATE. bin/theme-switcher generates one immutable
-# generated/themes/<theme>/starship.toml by substituting the palette marker.
+# the XDG theme cache by substituting the palette marker.
 # STARSHIP_CONFIG selects the artifact for the current window/session.
 #
 # Palette blocks live at the bottom of this file. To add a new theme,

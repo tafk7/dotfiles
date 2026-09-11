@@ -15,8 +15,11 @@ cproj() {
         return 1
     fi
 
-    local dirs
-    mapfile -t dirs < <(_dotfiles_iter_project_dirs)
+    local -a dirs=()
+    local project_root
+    while IFS= read -r project_root; do
+        [[ -n "$project_root" ]] && dirs+=("$project_root")
+    done < <(_dotfiles_iter_project_dirs)
     dirs+=("$HOME/.config")
     local dir
     dir=$(find "${dirs[@]}" -maxdepth 2 -type d 2>/dev/null | fzf --preview 'ls -la {}')

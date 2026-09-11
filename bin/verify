@@ -8,9 +8,63 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
 source "$DOTFILES_DIR/lib/theme-resolve.sh"
+source "$DOTFILES_DIR/lib/state.sh"
 
-# Load persistent global state before resolving the current scoped context.
-load_theme_overrides
+VERIFY_MODE=installed
+VERIFY_TIER=""
+
+usage() {
+    cat <<'EOF'
+Usage: verify [--installed | --tier config|bash|dev|work|ai|rdp | --all]
+
+  --installed   Verify recorded machine state (default).
+  --tier TIER   Verify the named package tier/feature against current reality.
+  --all         Verify every applicable registry component.
+EOF
+}
+
+while (( $# )); do
+    case "$1" in
+        --installed) VERIFY_MODE=installed; VERIFY_TIER="" ;;
+        --tier)
+            [[ -n "${2:-}" ]] || { error "--tier requires a value"; exit 64; }
+            VERIFY_MODE=tier; VERIFY_TIER="$2"; shift
+            case "$VERIFY_TIER" in config|bash|dev|work|ai|rdp) ;; *) error "Unknown tier: $VERIFY_TIER"; exit 64 ;; esac
+            ;;
+        --all) VERIFY_MODE=all; VERIFY_TIER="" ;;
+        --help|-h) usage; exit 0 ;;
+        *) error "Unknown option: $1"; usage >&2; exit 64 ;;
+    esac
+    shift
+done
+
+tier_rank() {
+    case "$1" in config) echo 0 ;; bash) echo 1 ;; dev) echo 2 ;; work) echo 3 ;; *) echo 99 ;; esac
+}
+
+component_expected() {
+    local name="$1" tool_tier line status
+    tool_tier="${TOOL_TIER[$name]}"
+    case "$VERIFY_MODE" in
+        all) tool_applicable "$name" ;;
+        tier)
+            tool_applicable "$name" || return 1
+            if [[ "$VERIFY_TIER" == ai || "$VERIFY_TIER" == rdp ]]; then
+                [[ "$tool_tier" == "$VERIFY_TIER" ]]
+            elif [[ "$tool_tier" == ai || "$tool_tier" == rdp ]]; then
+                return 1
+            else
+                (( $(tier_rank "$tool_tier") <= $(tier_rank "$VERIFY_TIER") ))
+            fi
+            ;;
+        installed)
+            line="$(ledger_line "$name" 2>/dev/null || true)"
+            [[ -n "$line" ]] || return 1
+            IFS=$'\t' read -r _ _ _ status _ _ _ _ <<< "$line"
+            [[ "$status" != removed && "$status" != not-applicable ]]
+            ;;
+    esac
+}
 
 # Counters
 PASS=0
@@ -31,9 +85,12 @@ echo "────────────────────────�
 readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
 for config in "${sorted_configs[@]}"; do
     local_mapping="${CONFIG_MAP[$config]}"
-    target="${local_mapping%%:*}"
-    type="${local_mapping##*:}"
+    IFS=: read -r target type owner <<< "$local_mapping"
     source_path="$(config_source_path "$config")"
+
+    if [[ -n "$owner" ]] && ! config_owner_present "$owner"; then
+        continue
+    fi
 
     case "$type" in
         symlink)
@@ -52,14 +109,12 @@ for config in "${sorted_configs[@]}"; do
             fi
             ;;
         gitconfig)
-            if [[ -f "$target" ]]; then
-                if grep -q '{{GIT_' "$target" 2>/dev/null; then
-                    check_fail "$target (has unresolved template placeholders)"
-                else
-                    check_pass "$target (processed template)"
-                fi
+            portable_git="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
+            if [[ -f "$portable_git" ]] \
+               && git config --global --get-all include.path 2>/dev/null | grep -Fxq "$portable_git"; then
+                check_pass "$target includes portable dotfiles config"
             else
-                check_fail "$target (missing)"
+                check_fail "$target missing portable include ($portable_git)"
             fi
             ;;
     esac
@@ -78,6 +133,18 @@ for tier in bash dev work ai rdp; do
     echo "─────────────────────────────────────"
 
     for name in "${tier_tools[@]}"; do
+        if ! tool_applicable "$name"; then
+            [[ "$VERIFY_MODE" == all ]] && check_pass "$name (not applicable on $(tool_platform)/$(tool_arch))"
+            continue
+        fi
+        expected=false
+        component_expected "$name" && expected=true
+        if [[ "$VERIFY_MODE" == tier && "$VERIFY_TIER" == config ]]; then
+            continue
+        fi
+        if [[ "$expected" != true && "$VERIFY_MODE" != all ]]; then
+            continue
+        fi
         verify_cmd="$(tool_verify_command "$name")"
         binary="${TOOL_BINARY[$name]}"
         label="$name"
@@ -86,18 +153,10 @@ for tier in bash dev work ai rdp; do
         if eval "$verify_cmd"; then
             check_pass "$label"
         else
-            # Only the bash tier is the guaranteed baseline (its eget binaries
-            # install with no sudo, so any --bash+ run should have them). Every
-            # tier above bash is opt-in — verify can't know which tier you chose —
-            # so a missing dev/work/ai/rdp tool warns rather than fails:
-            #   - dev tier (neovim/tmux/shellcheck) only present with --dev+
-            #   - work tier (nvm/docker/azure) is opt-in
-            #   - ai tier (claude/codex) is opt-in and may be org-managed
-            #   - rdp tier (xrdp) is opt-in per machine
-            if [[ "$tier" != "bash" ]]; then
-                check_warn "$label (not installed)"
-            else
+            if [[ "$expected" == true ]]; then
                 check_fail "$label (not found)"
+            elif [[ "$VERIFY_MODE" == all ]]; then
+                check_warn "$label (not installed)"
             fi
         fi
     done
@@ -120,7 +179,8 @@ else
 fi
 
 # Pre-commit hook (info-level — never fail verify if absent).
-hook_path="$DOTFILES_DIR/.git/hooks/pre-commit"
+git_common_dir="$(git -C "$DOTFILES_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+hook_path="${git_common_dir:-$DOTFILES_DIR/.git}/hooks/pre-commit"
 if [[ -L "$hook_path" ]]; then
     resolved="$(readlink -f "$hook_path" 2>/dev/null || true)"
     if [[ "$resolved" == "$DOTFILES_DIR/hooks/"* ]]; then
@@ -185,18 +245,33 @@ echo
 echo "Environment"
 echo "─────────────────────────────────────"
 
-if [[ -f "$DOTFILES_DIR/generated/bridge.sh" ]]; then
-    check_pass "generated/bridge.sh"
+if state_validate; then
+    check_pass "machine-state schema"
 else
-    check_warn "bridge file missing (run setup.sh)"
+    check_fail "machine-state schema invalid"
+fi
+if journal_pending; then
+    check_fail "incomplete component transaction requires reconciliation: $DOTFILES_JOURNAL_FILE"
+else
+    check_pass "no incomplete component transaction"
 fi
 
-if [[ -f "$DOTFILES_DIR/generated/theme-state.sh" || -f "$DOTFILES_DIR/generated/theme.sh" ]]; then
-    load_theme_context
-    theme="$DOTFILES_THEME"
-    check_pass "global theme: $theme"
+if [[ -f "$DOTFILES_STATE_DIR/install-path" ]] && [[ "$(<"$DOTFILES_STATE_DIR/install-path")" == "$DOTFILES_DIR" ]]; then
+    check_pass "durable install path"
 else
-    check_warn "no theme set (run: bin/theme-switcher <theme>)"
+    check_warn "durable install path missing or stale (run setup.sh --config)"
+fi
+
+if feature_enabled theme; then
+    if load_theme_context; then
+        theme="$DOTFILES_THEME"
+        check_pass "global theme: $theme"
+    else
+        check_fail "theme state is invalid"
+        theme=""
+    fi
+else
+    check_pass "theme feature disabled"
     theme=""
 fi
 
@@ -223,8 +298,8 @@ if [[ -n "$theme" ]]; then
         bat_files=("$DOTFILES_DIR/themes/$r_bat/bat"/*.tmTheme)
         if [[ -e "${bat_files[0]}" ]]; then
             check_pass "bat [$r_bat]: vendored ${#bat_files[@]} .tmTheme file(s)"
-            if [[ -f "$DOTFILES_DIR/generated/bat/cache/themes.bin" ]]; then
-                check_pass "bat: isolated cache built (generated/bat/cache/themes.bin)"
+            if [[ -f "$(_theme_generated_dir)/bat/cache/themes.bin" ]]; then
+                check_pass "bat: isolated XDG cache built"
             else
                 check_warn "bat: isolated cache missing (run bin/theme-switcher $r_bat)"
             fi
@@ -236,7 +311,7 @@ if [[ -n "$theme" ]]; then
     fi
 
     # starship: immutable per-theme generated config
-    starship_config="$DOTFILES_DIR/generated/themes/$r_starship/starship.toml"
+    starship_config="$(_theme_generated_dir)/themes/$r_starship/starship.toml"
     if [[ -f "$starship_config" ]]; then
         if grep -q "^palette = \"$r_starship\"" "$starship_config"; then
             check_pass "starship [$r_starship]: scoped artifact ready"
@@ -248,25 +323,25 @@ if [[ -n "$theme" ]]; then
     fi
 
     # delta: one shared definition index; DELTA_FEATURES selects per process.
-    if [[ -f "$DOTFILES_DIR/generated/delta.gitconfig" ]]; then
-        if grep -Fq "path = $DOTFILES_DIR/themes/$r_delta/delta.gitconfig" "$DOTFILES_DIR/generated/delta.gitconfig"; then
+    if [[ -f "$(_theme_generated_dir)/delta.gitconfig" ]]; then
+        if grep -Fq "path = $DOTFILES_DIR/themes/$r_delta/delta.gitconfig" "$(_theme_generated_dir)/delta.gitconfig"; then
             check_pass "delta [$r_delta]: feature definition indexed"
         else
             check_warn "delta: generated index is missing '$r_delta'"
         fi
-        if git config --global --get-all include.path 2>/dev/null | grep -Fxq "$DOTFILES_DIR/generated/delta.gitconfig"; then
-            check_pass "delta: ~/.gitconfig includes generated/delta.gitconfig"
+        if git config --global --get-all include.path 2>/dev/null | grep -Fxq "$(_theme_generated_dir)/delta.gitconfig"; then
+            check_pass "delta: ~/.gitconfig includes the XDG theme cache"
         else
-            check_warn "delta: ~/.gitconfig missing include for generated/delta.gitconfig"
+            check_warn "delta: ~/.gitconfig missing the XDG theme-cache include"
         fi
     else
         if [[ -f "$DOTFILES_DIR/themes/$r_delta/delta.gitconfig" ]]; then
-            check_warn "delta: generated/delta.gitconfig missing"
+            check_warn "delta: XDG theme-cache index missing"
         fi
     fi
 
     # btop and lazygit use launch-time config paths and never patch user files.
-    if [[ -f "$DOTFILES_DIR/generated/themes/$r_btop/btop.conf" ]]; then
+    if [[ -f "$(_theme_generated_dir)/themes/$r_btop/btop.conf" ]]; then
         check_pass "btop [$r_btop]: scoped config ready"
     else
         check_warn "btop [$r_btop]: scoped config missing"

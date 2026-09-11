@@ -13,7 +13,7 @@ if [[ -z "${DOTFILES_DIR:-}" ]]; then
     # truth — try the derived path, then the conventional location.
     DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
     export DOTFILES_DIR
-    for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dotfiles/generated/bridge.sh"; do
+    for _bridge in "$DOTFILES_DIR/generated/bridge.sh" "$HOME/dev/dotfiles/generated/bridge.sh"; do
         [[ -f "$_bridge" ]] && { source "$_bridge"; break; }
     done
     unset _bridge
@@ -69,7 +69,7 @@ source "$DOTFILES_DIR/shell/init.sh"
 # These files are `#compdef`-style autoload stubs, so compinit only records the
 # name; zsh parses the (6000+ line, for uv) body the first time you actually
 # complete that command. Sourcing them at startup instead cost ~80ms per shell.
-_dotfiles_compdir="${DOTFILES_DIR:-$HOME/dotfiles}/generated/zsh/completions"
+_dotfiles_compdir="${DOTFILES_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles}/zsh/completions"
 _dotfiles_comp_dirty=0
 
 # uv: regenerate only when the binary is newer than the cached function.

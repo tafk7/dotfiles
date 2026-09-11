@@ -7,7 +7,7 @@
 #   - shell/init.sh (interactive shells)
 # Always AFTER shell/env-runtime.sh, which holds the always-fresh exports
 # (STARSHIP_CONFIG, BAT_CACHE_PATH, scoped theme state) that point at
-# generated/ files and must re-evaluate on `reload`.
+# generated cache files and must re-evaluate on `reload`.
 #
 # Safe to source multiple times — guarded by _DOTFILES_ENV_LOADED below.
 # `reload` (in shell/tools/general.sh) unsets the guard so guarded exports
@@ -67,6 +67,7 @@ export VISUAL="${VISUAL:-nvim}"
 # Python
 export PYTHONDONTWRITEBYTECODE=1
 export PIP_REQUIRE_VIRTUALENV=false
+export RIPGREP_CONFIG_PATH="${RIPGREP_CONFIG_PATH:-$HOME/.ripgreprc}"
 
 # Node.js
 # NODE_OPTIONS is intentionally NOT set globally — forcing
@@ -78,16 +79,8 @@ export PIP_REQUIRE_VIRTUALENV=false
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-# Bat / Starship / Delta defaults (themes' shell.sh overrides these)
-export BAT_THEME="${BAT_THEME:-gruvbox-dark}"
-export STARSHIP_PALETTE="${STARSHIP_PALETTE:-gruvbox}"
-export DELTA_FEATURE="${DELTA_FEATURE:-gruvbox}"
-
-# Note: STARSHIP_CONFIG and BAT_CACHE_PATH are set in shell/env-runtime.sh
-# (the un-guarded sibling) so they re-resolve on `reload` after a theme
-# switch and so subprocesses see fresh values. Don't duplicate them here.
-
-export PROJECTS_DIR="$HOME/projects"
+# Theme-specific variables are deliberately absent from Layer 0. Interactive
+# startup adds them only when the optional theme feature is enabled.
 
 # Project search roots — colon-separated, like PATH. Used by `proj`,
 # `fzf-project`, and `cproj`. Override per-machine via your shell rc.
@@ -119,10 +112,18 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
         export PATH
     fi
 
-    # WIN_USER set at install time in generated/bridge.sh
+    # WIN_USER is recorded as data-only machine state at install time.
     if [[ -z "${WIN_USER:-}" ]]; then
-        [[ -z "${_WIN_USER_WARNED:-}" ]] && echo "Warning: WIN_USER not set — run setup.sh to configure WSL environment." >&2
-        _WIN_USER_WARNED=1
+        _dotfiles_preferences="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/preferences.tsv"
+        if [[ -r "$_dotfiles_preferences" ]]; then
+            WIN_USER="$(awk -F '\t' '$1 == "machine.win_user" { print $2; exit }' "$_dotfiles_preferences")"
+            [[ -z "$WIN_USER" ]] || export WIN_USER
+        fi
+        unset _dotfiles_preferences
+        if [[ -z "${WIN_USER:-}" ]]; then
+            [[ -z "${_WIN_USER_WARNED:-}" ]] && echo "Warning: WIN_USER not set — run setup.sh to configure WSL environment." >&2
+            _WIN_USER_WARNED=1
+        fi
     fi
 
     # Windows paths (derived from WIN_USER)

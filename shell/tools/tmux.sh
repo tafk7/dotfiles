@@ -30,6 +30,11 @@ pane-tint() {
 
     local level="${1:-}"
 
+    if ! "$DOTFILES_DIR/bin/theme-switcher" enabled 2>/dev/null; then
+        echo "Theme feature is disabled"
+        return 1
+    fi
+
     if [[ -z "$level" ]]; then
         echo "Usage: pane-tint <0|1|2|3>"
         return 0

@@ -200,7 +200,7 @@ show_shortcut_detail() {
                 echo "${DIM}💡 Tip: Type 'cheat git' for all git shortcuts${RESET}"
                 ;;
             tmux)
-                echo "${DIM}💡 Tip: Prefix is Ctrl+a (change with TMUX_PREFIX)${RESET}"
+                echo "${DIM}💡 Tip: Prefix is Ctrl+a (edit configs/tmux.conf to change it)${RESET}"
                 ;;
             vim)
                 echo "${DIM}💡 Tip: Leader key is comma (,)${RESET}"

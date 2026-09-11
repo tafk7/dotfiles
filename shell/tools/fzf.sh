@@ -38,8 +38,11 @@ fzf-rg() {
 
 # Project finder — any subdir under PROJECTS_DIRS (not git-only)
 fzf-project() {
-    local dirs
-    mapfile -t dirs < <(_dotfiles_iter_project_dirs)
+    local -a dirs=()
+    local dir
+    while IFS= read -r dir; do
+        [[ -n "$dir" ]] && dirs+=("$dir")
+    done < <(_dotfiles_iter_project_dirs)
     if [[ ${#dirs[@]} -eq 0 ]]; then
         echo "fzf-project: no project directories found in PROJECTS_DIRS" >&2
         return 1

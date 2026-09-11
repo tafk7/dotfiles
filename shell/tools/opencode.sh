@@ -14,13 +14,11 @@ _OPENCODE_BIN=$(command -v opencode 2>/dev/null || true)
 [[ -n "$_OPENCODE_BIN" && -x "$_OPENCODE_BIN" ]] || _OPENCODE_BIN=""
 
 if [[ -n "$_OPENCODE_BIN" ]]; then
-    opencode() {
-        # Resolve via PATH at call time (`command` bypasses this function) rather
-        # than capturing $_OPENCODE_BIN — it's unset just below, so a captured
-        # reference would expand to "" and try to run the empty string.
-        # OPENCODE_FLAGS intentionally unquoted — allows multiple space-separated flags
-        command opencode ${OPENCODE_FLAGS:-} "$@"
-    }
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        opencode() { command opencode ${=OPENCODE_FLAGS} "$@"; }
+    else
+        opencode() { command opencode ${OPENCODE_FLAGS:-} "$@"; }
+    fi
 else
     opencode() {
         echo "opencode not found." >&2

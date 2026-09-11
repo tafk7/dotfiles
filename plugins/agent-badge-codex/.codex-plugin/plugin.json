@@ -6,9 +6,8 @@
     "name": "tkeller",
     "url": "https://github.com/tafk7"
   },
-  "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/agent-badge",
+  "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/agent-badge-codex",
   "repository": "https://github.com/tafk7/dotfiles",
-  "license": "MIT",
   "keywords": [
     "tmux",
     "status",

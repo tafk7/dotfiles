@@ -17,6 +17,15 @@ function! s:ThemePalette(theme) abort
 endfunction
 
 function! DotfilesThemeReload(...) abort
+  if !exists('$DOTFILES_DIR') || !executable($DOTFILES_DIR . '/bin/theme-switcher')
+    silent! colorscheme default
+    return
+  endif
+  call system(shellescape($DOTFILES_DIR . '/bin/theme-switcher') . ' enabled')
+  if v:shell_error != 0
+    silent! colorscheme default
+    return
+  endif
   let l:force = a:0 ? a:1 : 0
   let l:theme = exists('$DOTFILES_THEME_VIM_RESOLVED') ? $DOTFILES_THEME_VIM_RESOLVED : ''
   if l:force || empty(l:theme)

@@ -13,10 +13,16 @@ psg() {
 
 # Find and kill process (requires fzf)
 fkill() {
-    local pid
+    local signal=TERM pid
+    if [[ "${1:-}" == "--force" || "${1:-}" == "-f" ]]; then
+        signal=KILL
+        shift
+    fi
     pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
     if [[ -n $pid ]]; then
-        echo "$pid" | xargs kill -"${1:-9}"
+        while IFS= read -r selected; do
+            [[ "$selected" =~ ^[0-9]+$ ]] && kill -s "$signal" "$selected"
+        done <<< "$pid"
     fi
 }
 
@@ -58,13 +64,13 @@ killport() {
     echo "  $details"
 
     if $force; then
-        kill -9 "$pid"
-        echo "Killed PID $pid"
+        kill -KILL "$pid"
+        echo "Force-killed PID $pid"
     else
         read -rp "Kill this process? [y/N] " answer
         if [[ "$answer" =~ ^[Yy]$ ]]; then
-            kill -9 "$pid"
-            echo "Killed PID $pid"
+            kill -TERM "$pid"
+            echo "Sent TERM to PID $pid"
         else
             echo "Aborted"
         fi
@@ -77,6 +83,8 @@ extract() {
         case $1 in
             *.tar.bz2)   tar xjf "$1"     ;;
             *.tar.gz)    tar xzf "$1"     ;;
+            *.tar.xz)    tar xJf "$1"     ;;
+            *.tar.zst)   tar --zstd -xf "$1" ;;
             *.bz2)       bunzip2 "$1"     ;;
             *.rar)       unrar x "$1"     ;;
             *.gz)        gunzip "$1"      ;;
@@ -87,6 +95,7 @@ extract() {
             *.Z)         uncompress "$1"  ;;
             *.7z)        7z x "$1"        ;;
             *.xz)        unxz "$1"        ;;
+            *.zst)       unzstd "$1"      ;;
             *.lzma)      unlzma "$1"      ;;
             *)           echo "'$1' cannot be extracted via extract()" ;;
         esac
