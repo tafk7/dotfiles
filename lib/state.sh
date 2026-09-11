@@ -50,7 +50,8 @@ state_validate() {
 }
 
 _state_lock_acquire() {
-    local attempts="${DOTFILES_STATE_LOCK_ATTEMPTS:-100}" holder="" i empty_seen=0
+    local attempts="${DOTFILES_STATE_LOCK_ATTEMPTS:-100}" holder="" i lock_age lock_mtime
+    local stale_seconds="${DOTFILES_STATE_LOCK_STALE_SECONDS:-2}"
     local owner="${BASHPID:-$$}"
     mkdir -p "$DOTFILES_STATE_DIR"
     for ((i = 0; i < attempts; i++)); do
@@ -60,10 +61,10 @@ _state_lock_acquire() {
         fi
         if [[ -r "$DOTFILES_STATE_LOCK/pid" ]]; then
             read -r holder < "$DOTFILES_STATE_LOCK/pid" || holder=""
-            empty_seen=0
         else
-            empty_seen=$((empty_seen + 1))
-            if (( empty_seen < 5 )); then
+            lock_mtime="$(stat -c %Y "$DOTFILES_STATE_LOCK" 2>/dev/null || date +%s)"
+            lock_age=$(( $(date +%s) - lock_mtime ))
+            if (( lock_age < stale_seconds )); then
                 sleep 0.05
                 continue
             fi

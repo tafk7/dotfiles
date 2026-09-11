@@ -20,6 +20,8 @@ run_setup
 [[ ! -d "$DOTFILES_BACKUP_PREFIX" ]] || fail "fresh config created an unnecessary backup directory"
 grep -q 'preserved = yes' "$HOME/.gitconfig" || fail "existing Git config was overwritten"
 grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig" "$HOME/.gitconfig" || fail "portable Git include missing"
+assert_eq "$(stat -c %a "$HOME/.ssh")" 700 "SSH directory permissions"
+assert_eq "$(stat -c %a "$HOME/.ssh/sockets")" 700 "SSH socket directory permissions"
 [[ ! -e "$XDG_CACHE_HOME/dotfiles/theme" ]] || fail "--no-theme generated theme artifacts"
 grep -Fq 'delta.gitconfig' "$XDG_CONFIG_HOME/dotfiles/gitconfig" \
     && fail "--no-theme left the Delta theme include enabled"
