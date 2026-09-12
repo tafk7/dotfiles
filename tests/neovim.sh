@@ -51,4 +51,17 @@ HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME"
 grep -q '   $' "$TEST_ROOT/code.py" && fail "Python trailing spaces were retained"
 [[ ! -s "$DOTFILES_MUTATION_LOG" ]] || fail "Neovim startup attempted a network download"
 
+# A selected plugin-backed theme must start cleanly before optional plugins are
+# installed. The repository palette remains active over Neovim's built-in
+# scheme and exposes the missing scheme for diagnostics.
+export DOTFILES_THEME_ENABLED=1
+export DOTFILES_THEME_VIM_RESOLVED=catppuccin
+theme_output="$(HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+    XDG_CACHE_HOME="$XDG_CACHE_HOME" DOTFILES_DIR="$ROOT" PATH="$PATH" \
+    "$NVIM_BIN" --headless -u "$ROOT/configs/init.vim" \
+        '+if !get(g:, "dotfiles_theme_fallback", 0) | cquit 32 | endif' \
+        '+if get(g:, "dotfiles_theme_fallback_scheme", "") !=# "catppuccin_mocha" | cquit 33 | endif' \
+        '+quit' 2>&1)" || fail "pluginless Catppuccin startup failed: $theme_output"
+[[ "$theme_output" != *'E185'* ]] || fail "pluginless Catppuccin emitted E185"
+
 printf 'neovim: ok\n'

@@ -244,6 +244,12 @@ Comments, line numbers, search, selection, and Airline are normalized after the
 scheme loads using the theme's exact palette. The Airline adapter replaces the
 former unrelated `deus` and shared `minimalist` mappings.
 
+On a fresh machine where optional Neovim colorscheme plugins have not been
+installed, startup uses Neovim's built-in default plus the selected dotfiles
+palette highlights. It does not download plugins or emit `E185`. Inspect
+`g:dotfiles_theme_fallback_scheme` to see which optional scheme is missing;
+install plugins explicitly with `vplug` after vim-plug is available.
+
 Bat uses exact bundled or built-in themes. Delta 0.18.2 exposes only its
 embedded bat themes and does not load the external bat cache, so exact custom
 syntax themes remain unavailable there. Delta's diff chrome uses exact palette
