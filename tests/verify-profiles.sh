@@ -73,6 +73,28 @@ PATH="$TEST_ROOT/bin:$PATH" "$ROOT/bin/verify" --tier config > "$TEST_ROOT/no-fu
 grep -Fq 'no dotfiles interactive/private functions leak' "$TEST_ROOT/no-functions.log" \
     || fail "empty function inventory was not verified"
 
+# Adoption must not expose a false ownership failure for agent-private rg.
+mkdir -p "$HOME/.local/bin" "$TEST_ROOT/.codex/private"
+cp /usr/bin/true "$HOME/.local/bin/rg"
+cp /usr/bin/true "$TEST_ROOT/.codex/private/rg"
+ledger_record ripgrep yes dotfiles installed 1 "$HOME/.local/bin/rg" test
+PATH="$TEST_ROOT/.codex/private:$HOME/.local/bin:$PATH" "$ROOT/bin/verify" --installed \
+    > "$TEST_ROOT/private-rg.log" 2>&1 || true
+# Other discovered host services can fail readiness in this temporary profile.
+# Assert the component result rather than unrelated machine-wide readiness.
+grep -Fq '✅ ripgrep (rg)' "$TEST_ROOT/private-rg.log" \
+    || { cat "$TEST_ROOT/private-rg.log" >&2; fail "private rg shadowed the verified owned installation"; }
+grep -Fq 'present outside recorded ownership' "$TEST_ROOT/private-rg.log" \
+    && fail "private rg was used for ownership verification"
+
+# Distinguish a missing companion from a missing primary executable.
+cp /usr/bin/true "$HOME/.local/bin/uv"
+ledger_record uv yes dotfiles installed 1 "$HOME/.local/bin/uv" test
+PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH" "$ROOT/bin/verify" --installed \
+    > "$TEST_ROOT/missing-uvx.log" 2>&1 && fail "missing companion was accepted"
+grep -Fq 'uv (missing companion: uvx)' "$TEST_ROOT/missing-uvx.log" \
+    || fail "missing companion was reported as a missing primary"
+
 ledger_record starship yes dotfiles installed 1 "$HOME/.local/bin/starship" test
 if HOME="$HOME" XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" PATH="$TEST_SYSTEM_PATH" \
     "$ROOT/bin/verify" --installed >/dev/null 2>&1; then
