@@ -70,6 +70,9 @@ make one tmux context query when inside tmux; they do not launch the full resolv
   contexts, KVM, and `sbx`. They validate local-versus-remote Docker, pending
   login state, precise smoke cleanup, and forbidden broad/cloud operations.
   They do not execute a microVM or enroll a Tailscale node.
+- The minimal-Ubuntu fixture verifies locale ordering, noninteractive APT, and
+  bounded lock waiting. AI installer fixtures verify Codex prompt suppression
+  and narrow Pi warning filtering without hiding unrelated npm diagnostics.
 
 ## Manual WSL2 checklist
 

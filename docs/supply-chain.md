@@ -14,9 +14,9 @@ from the network into a shell and are never executed with `sudo`.
 | NVM | pinned installer v0.40.4 | HTTPS-trusted installer file; no shell-RC modification; prior tree retained on installer failure |
 | Rust | moving rustup installer | HTTPS-trusted installer file; in-place upstream mutation; recover with `rustup update`/`rustup self uninstall` |
 | Claude Code | moving official installer | HTTPS-trusted installer file; verified owned launcher after execution |
-| Codex | moving official installer | HTTPS-trusted installer file; official release layout preserves the prior launcher on failed migration |
+| Codex | moving official installer | HTTPS-trusted installer file; official `CODEX_NON_INTERACTIVE=1` mode; release layout preserves the prior launcher on failed migration |
 | opencode | moving official installer | HTTPS-trusted installer file with `--no-modify-path`; verified owned binary and launcher |
-| Pi | npm package | npm registry trust, isolated prefix, lifecycle scripts disabled, verified launcher |
+| Pi | npm package | npm registry trust, isolated prefix, lifecycle scripts disabled, verified launcher; one exact known transitive `node-domexception@1.0.0` deprecation line is filtered while all other npm diagnostics remain visible |
 | Ubuntu/Docker/Azure packages | APT | package-manager in-place transaction; Docker and Microsoft repository keys are fingerprint checked |
 | Docker Sandboxes | Docker signed APT repository | `docker-sbx`; executable check; sandbox state and credentials preserved |
 | Tailscale | Tailscale signed APT repository | release-specific official keyring/list; no enrollment or auth-key handling |
@@ -30,6 +30,11 @@ provide. A failed staged replacement leaves the previous dotfiles-owned binary
 or tree runnable. APT and vendor-managed in-place updates may leave partial
 upstream state; rerun the same setup selection after correcting the reported
 cause.
+
+APT runs noninteractively and waits a bounded 120 seconds for package-manager
+locks (`DOTFILES_APT_LOCK_TIMEOUT` overrides this). The dev tier installs
+`locales` before generating `en_US.UTF-8`, which keeps minimal Ubuntu images
+from failing an early `locale-gen` call. Lock files are never deleted.
 
 Repository configuration and package migration are separate. Adding Docker's
 repository for `sbx` never removes existing container runtimes. Docker Engine

@@ -64,7 +64,7 @@ else
 fi
 
 if [[ "$FORCE" == true ]] && dpkg-query -W tailscale >/dev/null 2>&1; then
-    safe_sudo apt-get install --reinstall -y tailscale || exit 1
+    safe_apt_get install --reinstall -y tailscale || exit 1
 else
     install_apt tailscale tailscale || exit 1
 fi

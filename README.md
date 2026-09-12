@@ -43,6 +43,10 @@ the APT layer (zsh, build tools, clipboard) and require sudo. On the bash tier a
 tool already installed system-wide is left in place (use `--force` to install our
 pinned copy over it).
 
+APT-backed selections run noninteractively and wait up to 120 seconds for an
+existing package-manager operation instead of deleting lock files. Override the
+wait with `DOTFILES_APT_LOCK_TIMEOUT`.
+
 Because local sandbox execution is part of `work`, that tier requires native
 Ubuntu 24.04/26.04 with KVM. The config, bash, and dev tiers retain Ubuntu
 22.04 and WSL support.

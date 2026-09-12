@@ -30,7 +30,7 @@ if command -v aws >/dev/null 2>&1; then
         exit 2
     fi
 fi
-safe_sudo apt-get install -y ca-certificates curl gnupg unzip || exit 1
+safe_apt_get install -y ca-certificates curl gnupg unzip || exit 1
 case "$(get_arch)" in x86_64) aws_arch=x86_64 ;; aarch64) aws_arch=aarch64 ;;
     *) error "Unsupported AWS CLI architecture"; exit 1 ;; esac
 tmpdir="$(mktemp -d)"; trap 'rm -rf "$tmpdir"' EXIT INT TERM
