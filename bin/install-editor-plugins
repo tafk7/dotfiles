@@ -1,0 +1,32 @@
+#!/bin/bash
+# Explicitly bootstrap vim-plug and install the pinned Neovim plugins.
+set -euo pipefail
+if [[ "${1:-}" == --help || "${1:-}" == -h ]]; then
+    echo 'Usage: install-editor-plugins'
+    echo 'Downloads vim-plug if absent, then installs the plugins declared in configs/init.vim.'
+    exit 0
+fi
+[[ $# == 0 ]] || { echo 'No options supported (use --help).' >&2; exit 64; }
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+source "$DOTFILES_DIR/lib/install.sh"
+command -v nvim >/dev/null 2>&1 || { error 'Neovim is required (setup.sh --dev).'; exit 1; }
+command -v git >/dev/null 2>&1 || { error 'Git is required.'; exit 1; }
+
+config_dir="$(nvim --headless -u NONE -i NONE -c 'lua io.write(vim.fn.stdpath("config"))' -c qall)"
+[[ "$config_dir" == /* ]] || { error 'Neovim returned an invalid config directory'; exit 1; }
+plug="$config_dir/autoload/plug.vim"
+if [[ ! -f "$plug" ]]; then
+    revision=88e31471818e9a29a8a20a0ee61360cfd7bdc1cd
+    staged="$(mktemp)"
+    trap 'rm -f "$staged"' EXIT
+    download_https "https://raw.githubusercontent.com/junegunn/vim-plug/$revision/plug.vim" "$staged"
+    grep -q '^function! plug#begin' "$staged" || { error 'Unexpected vim-plug artifact'; exit 1; }
+    mkdir -p "$config_dir/autoload"
+    install -m 0644 "$staged" "$plug"
+fi
+
+nvim --headless -u "$DOTFILES_DIR/configs/init.vim" -i NONE \
+    -c 'PlugInstall --sync' \
+    -c 'if !empty(filter(values(g:plugs), "!isdirectory(v:val.dir . \"/.git\")")) | cquit 1 | endif' \
+    -c qall
+success 'Neovim plugin installation complete. Restart Neovim to load the plugins.'

@@ -10,7 +10,7 @@ if command -v nvim >/dev/null 2>&1; then
 fi
 
 # Quick edit common files
-alias vimrc='nvim ~/.config/nvim/init.vim'
+alias vimrc='nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"'
 
 # Quick plugin management
 alias vplug='nvim +PlugInstall +qall'

@@ -190,7 +190,7 @@ shell│theme-unset│Remove one theme override│theme unset <target>
 shell│theme-reset│Clear ALL theme overrides│theme reset
 shell│theme-show│Show effective theme cascade tree│theme show
 shell│pane-tint│Tint current tmux pane background│pane-tint <0|1|2|3>
-shell│vimrc│Edit neovim config│nvim ~/.config/nvim/init.vim
+shell│vimrc│Edit neovim config│nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
 shell│vplug│Install vim plugins│nvim +PlugInstall +qall
 shell│vplugup│Update vim plugins│nvim +PlugUpdate +qall
 # FZF tools
