@@ -1,7 +1,7 @@
 # September 2026 refinement — adoption review
 
-Status: implemented and validated in an isolated clone; not adopted into the
-live checkout. Baseline: `ce7ddf2270875ed141125bae70ee0ef8b7aaa066`.
+This report records isolated validation followed by pilot adoption on 2026-09-12.
+Baseline: `ce7ddf2270875ed141125bae70ee0ef8b7aaa066`.
 
 ## Changes
 
@@ -84,10 +84,30 @@ acceptance remain outside this validation.
 
 Review the candidate before integrating into the live symlink-target checkout.
 Configuration reconciliation and package/plugin installation are separate rollout
-actions; follow [maintenance](../maintenance.md). The candidate has not changed
-live symlinks, preferences, plugin caches, services, or installed executables.
+actions; follow [maintenance](../maintenance.md). Isolated validation did not
+change live symlinks, preferences, plugin caches, services, or installed executables.
 
 Keep legacy state readers until all personal/work machines are accounted for.
 Older ledger ownership cannot be reconstructed automatically. The meaning of
 `--work`/`--full`, including sbx/KVM, remains unchanged pending the separate
 [sandbox selection decision](../../issues/work-tier-sandbox-boundary.md).
+
+## Pilot adoption — 2026-09-12
+
+The approved candidate was fast-forwarded into the pilot's live `main` checkout.
+The disposable ownership migration adopted 27 existing installations and saved
+an exact ledger backup. `setup.sh --config` reconciled configuration and refreshed
+the theme cache and existing WSL integration.
+
+Scoped dependency repairs installed missing jq 1.8.1 and restored the complete
+uv/uvx 0.10.0 release. No additional package tier was selected. A verifier fix,
+tested in isolation before integration, makes ownership checks follow the existing
+durable-ripgrep rule when an agent-private rg shadows PATH. Missing companions
+now get a precise diagnostic instead of claiming the primary tool is absent.
+
+Final live verification: **67 passed, 0 warnings, 0 errors**. Fresh Bash and Zsh
+login shells loaded the live checkout, tools, and theme successfully; live Neovim
+started successfully. The migration preview then reported nothing left to adopt.
+The previous code remains on `backup/pre-refinement-20260912`. The disposable
+migration directory is retained for the other systems. Publication and fleet
+rollout were not performed as part of this pilot adoption.
