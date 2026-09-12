@@ -34,8 +34,9 @@ environment, while `bash -lc` refreshes through the login chain.
 
 ## Installation dimensions
 
-The cumulative package tiers are `config -> bash -> dev -> work`. AI tools and
-RDP are orthogonal selections. The theme feature is enabled by default but can
+The cumulative package tiers are `config -> bash -> dev -> work`; work includes
+Docker, local sbx/KVM readiness, NVM, and Rust. AI tools, RDP, Tailscale, and
+cloud CLIs are orthogonal selections. The theme feature is enabled by default but can
 be persistently disabled. Agent-badge is enabled by default when a supported AI
 CLI is installed and can be independently disabled.
 
@@ -44,10 +45,14 @@ CLI is installed and can be independently disabled.
 ./setup.sh --dev --ai
 ./setup.sh --bash --no-theme
 ./setup.sh --ai --no-agent-badge
+./setup.sh --full --tail --gcloud
 ```
 
 Multiple tier flags select the highest tier, independent of argument order.
-`--full` always means `--work --ai`; it never enables RDP.
+`--full` always means `--work --ai`; it never enables Tailscale, RDP, or cloud
+CLIs. Orthogonal selections retain the config baseline and never promote the
+cumulative tier. Component-ledger outcomes retain partial Tailscale failures
+without turning later config reconciliation into package installation.
 
 ## State and ownership
 
@@ -90,11 +95,18 @@ user's existing `~/.gitconfig`. Identity and machine-local overrides stay in
 reporting, and uninstall. Each component records a binary/service check,
 installation method, tier/feature, platform, supported architectures, ownership
 roots, update contract, and uninstall paths where automated removal is safe.
+`TOOL_TIER` records only cumulative membership. Composable, comma-separated
+`TOOL_CAPABILITIES` records AI, RDP, Tailscale, and cloud membership. Docker and
+sbx are ordinary work-tier components.
 
 Eget downloads are staged and executed before an atomic replacement. Neovim and
 tmux also stage their artifacts/builds before replacing the working executable.
 APT and moving vendor installers have explicit in-place failure contracts and
 are never described as rollback-safe.
+
+Read-only KVM, group, local Docker endpoint, sandbox daemon, systemd, and
+Tailscale checks live in `lib/work-host.sh`. Host mutation stays in
+`lib/install.sh`; neither layer is sourced during shell startup.
 
 Uninstall requires recorded dotfiles ownership and validates every target
 against the component's allowlisted roots. It rejects empty paths, HOME, broad

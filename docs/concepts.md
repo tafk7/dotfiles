@@ -52,9 +52,9 @@ so the modern shell works on managed machines you can't `sudo` on.
 | `config` | Symlinks only (reconciled to installed tools) | No |
 | `bash`   | Modern CLI tools via eget → `~/.local/bin`: starship, eza, fzf, zoxide, delta, btop, gdu, glow, lazygit, uv, bat, fd, ripgrep, direnv, sd | No |
 | `dev`    | zsh, build tools, clipboard, neovim, tmux, shellcheck | Yes |
-| `work`   | NVM, Docker, Azure CLI, Rust | Yes |
+| `work`   | NVM, Docker, local sbx/KVM readiness, Rust | Yes |
 
-Three extras sit outside the cumulative chain:
+Additional selections sit outside the cumulative chain:
 
 - `--ai` — an **orthogonal** flag that installs the AI CLIs (Claude Code,
   Codex, opencode, Pi) into `~/.local/bin`. Pick individual tools with `--claude`,
@@ -66,12 +66,15 @@ Three extras sit outside the cumulative chain:
   server with an XFCE session (see `issues/xrdp-remote-desktop.md`). Opt-in per
   machine and deliberately NOT implied by `--full`: no tier should silently
   open a network listener.
-- `--full` — shorthand for `--work --ai` (everything except `--rdp`).
+- `--full` — shorthand for `--work --ai` (no Tailscale, RDP, or cloud CLIs).
+- `--tail` — Tailscale package/service without enrollment, routing, SSH, or
+  firewall configuration. It composes with any tier.
+- `--azure`, `--gcloud`, `--aws` — explicit cloud CLIs. None is selected from
+  provider detection. These require sudo independently of the tier.
 
-Tier membership is data, not code. Each tool's tier lives in
-`TOOL_TIER` in `lib/registry.sh` (the AI CLIs use the `ai` tier value; xrdp
-uses `rdp`). To move a tool between tiers, edit that table — no other change
-required.
+Tier and capability membership are data. `TOOL_TIER` contains only cumulative
+membership; `TOOL_CAPABILITIES` contains comma-separated orthogonal membership.
+Docker and sbx belong to `work`; Tailscale uses the `tail` capability.
 
 ### 2. CONFIG_MAP — *what* gets symlinked
 
@@ -101,6 +104,7 @@ time, `bin/diff-config` walks it too. **Three tools, one source of truth.**
 TOOL_BINARY[fzf]=fzf            # what to look for in PATH
 TOOL_METHOD[fzf]=eget           # how it gets installed (eget|apt|installer)
 TOOL_TIER[fzf]=bash            # min tier that installs it
+TOOL_CAPABILITIES[fzf]=...     # optional: ai, rdp, tail, azure, gcloud, aws
 TOOL_PATHS[fzf]=...             # owned paths eligible for guarded uninstall
 TOOL_VERIFY[fzf]=...            # custom verify command (optional)
 TOOL_PLATFORM[fzf]=ubuntu       # ubuntu or wsl

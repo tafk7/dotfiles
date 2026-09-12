@@ -29,14 +29,16 @@ declare -A PACKAGES=(
 )
 ```
 
-All APT packages install at the dev tier or above — the bash tier is sudo-free
-(eget only). Groups are mapped to tiers in `lib/install.sh`:
+Tier-owned APT packages start at dev, while orthogonal Tailscale/RDP/cloud
+selections can require APT independently. The bash tier remains sudo-free
+(eget only). Groups are mapped to selections in `lib/install.sh`:
 
 - `install_bash_packages`  → (no apt; eget binaries only, plus a git-present check)
 - `install_dev_packages`   → core + development + languages + terminal + diagramming (+ wsl on WSL); then tmux + neovim installers
-- `install_work_packages`  → docker (+ nvm/node and the rust toolchain via installers)
+- `install_work_packages`  → NVM/node, Docker, sbx/KVM host access, and Rust
 - `install_ai_packages`    → (no apt packages; runs the claude + codex installers)
 - `install_rdp_packages`   → rdp (then runs the xrdp config installer)
+- `install_tail_packages` → optional Tailscale package/service without enrollment
 
 ## Adding a New Binary Tool (eget)
 
@@ -51,7 +53,8 @@ All APT packages install at the dev tier or above — the bash tier is sudo-free
    ```bash
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=eget
-   TOOL_TIER[mytool]=bash      # bash|dev|work|ai|rdp
+   TOOL_TIER[mytool]=bash      # bash|dev|work; omit for capability-only tools
+   TOOL_CAPABILITIES[mytool]=tail    # optional comma-separated selections
    ```
 
 3. Run `./setup.sh --bash` (or just `eget --download-all`) to install.
@@ -308,6 +311,11 @@ install_apt "label" pkg1 pkg2 ...   # idempotent, batches missing pkgs
 run_installer "name" [critical]     # runs installers/install-name.sh
 track_install "name" ok|skip|fail   # contributes to the summary
 ```
+
+Work-host mutations, including group and service changes, belong in
+`lib/install.sh`. Shared KVM/service/group/daemon observations belong in
+`lib/work-host.sh`, which is safe for verification commands. Do not add these
+probes to shell startup.
 
 Available everywhere (sourced by `lib/runtime.sh`):
 

@@ -66,6 +66,10 @@ make one tmux context query when inside tmux; they do not launch the full resolv
 - xrdp has immutable dry-run and preflight unit coverage. Starting a real
   listener and validating an RDP desktop session is periodic/manual and requires
   Gate C approval on the target host.
+- Work-host tests use mocked APT repositories, sudo, services, groups, Docker
+  contexts, KVM, and `sbx`. They validate local-versus-remote Docker, pending
+  login state, precise smoke cleanup, and forbidden broad/cloud operations.
+  They do not execute a microVM or enroll a Tailscale node.
 
 ## Manual WSL2 checklist
 
@@ -84,3 +88,13 @@ After Gate C approval, run the requested `--rdp` setup on a disposable VM,
 verify the selected port, TLS configuration, desktop session, and service state,
 then run `bin/verify --tier rdp`. Confirm rollback from the timestamped xrdp
 configuration backup before considering the live service test complete.
+
+## Manual persistent work-host checklist
+
+On an authorized disposable Ubuntu 24.04/26.04 VM or bare-metal host, expose
+KVM/nested virtualization before setup. Run `setup.sh --full --tail`, log out
+and reconnect after group changes, enroll Tailscale manually, authenticate
+`sbx`, and run `bin/verify --tier work --tail --smoke`. Then validate a complete SSH
+disconnect/reconnect and a reboot: `tailscaled` and Docker must return, group
+access must stay active, and a new local sandbox must execute. This real-host
+gate is required before claiming persistent work-host acceptance.
