@@ -18,6 +18,10 @@ from the network into a shell and are never executed with `sudo`.
 | opencode | moving official installer | HTTPS-trusted installer file with `--no-modify-path`; verified owned binary and launcher |
 | Pi | npm package | npm registry trust, isolated prefix, lifecycle scripts disabled, verified launcher |
 | Ubuntu/Docker/Azure packages | APT | package-manager in-place transaction; Docker and Microsoft repository keys are fingerprint checked |
+| Docker Sandboxes | Docker signed APT repository | `docker-sbx`; executable check; sandbox state and credentials preserved |
+| Tailscale | Tailscale signed APT repository | release-specific official keyring/list; no enrollment or auth-key handling |
+| Google Cloud CLI | Google signed APT repository | official `google-cloud-cli` package; credentials preserved |
+| AWS CLI v2 | signed AWS distribution | amd64/arm64 ZIP plus detached signature verified with the AWS CLI Team key and pinned fingerprint; `/usr/local/aws-cli` ownership explicit |
 
 Some upstream projects do not publish stable checksums or signatures for every
 asset. This repository records that limitation instead of embedding hashes from
@@ -26,3 +30,12 @@ provide. A failed staged replacement leaves the previous dotfiles-owned binary
 or tree runnable. APT and vendor-managed in-place updates may leave partial
 upstream state; rerun the same setup selection after correcting the reported
 cause.
+
+Repository configuration and package migration are separate. Adding Docker's
+repository for `sbx` never removes existing container runtimes. Docker Engine
+conflicts produce a manual migration diagnostic. The bundled AWS CLI Team key
+and fingerprint must be reviewed together when AWS rotates its signing key.
+As checked on 2026-09-11, AWS's current install page and current detached ZIP
+signature still use `FB5DB77FD5C118B80511ADA8A6310ACC4672475C`; `gpgv`
+validated that day's artifact even though the key's displayed expiration is
+2026-07-07. Treat any signer change or verification failure as a hard stop.
