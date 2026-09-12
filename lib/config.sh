@@ -33,9 +33,9 @@ declare -A CONFIG_MAP=(
     [tmux.conf]="$HOME/.tmux.conf:symlink:tmux"
     [editorconfig]="$HOME/.editorconfig:symlink:"
     [ripgreprc]="$HOME/.ripgreprc:symlink:ripgrep"
-    [init.vim]="$HOME/.config/nvim/init.vim:symlink:neovim"
-    [config/bat]="$HOME/.config/bat:symlink:bat"
-    [config/fd]="$HOME/.config/fd:symlink:fd"
+    [init.vim]="${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim:symlink:neovim"
+    [config/bat]="${XDG_CONFIG_HOME:-$HOME/.config}/bat:symlink:bat"
+    [config/fd]="${XDG_CONFIG_HOME:-$HOME/.config}/fd:symlink:fd"
     [ssh_config]="$HOME/.ssh/config:symlink:"
     # starship.toml: NOT a symlink. theme-switcher generates immutable
     # cached themes/<theme>/starship.toml files; STARSHIP_CONFIG selects one

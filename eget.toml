@@ -86,6 +86,12 @@ target = "~/.local/bin/direnv"
 tag = "v0.11.0"
 asset_filters = [".linux.", ".tar.xz"]
 
+# Installed on demand when a supported agent-badge CLI is selected.
+["jqlang/jq"]
+tag = "jq-1.8.1"
+asset_filters = ["jq-linux-"]
+target = "~/.local/bin/jq"
+
 # NOTE: Codex is an "ai" tier tool and is intentionally NOT listed here. Its
 # dedicated installer uses OpenAI's standalone installer so that `--bash`'s
 # `eget --download-all` never pulls it in — AI CLIs install only under --ai/--full.

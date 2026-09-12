@@ -49,6 +49,7 @@ DOTFILES_DIR="$TEST_ROOT/repo"
 mkdir -p "$DOTFILES_DIR"
 cp "$config" "$DOTFILES_DIR/eget.toml"
 FORCE_REINSTALL=true
+ledger_record demo yes dotfiles installed old "$HOME/.local/bin/demo" test
 
 export EGET_TEST_FAIL=1
 if install_eget_tools >/dev/null 2>&1; then fail "failed staged download reported success"; fi
