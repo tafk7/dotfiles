@@ -93,7 +93,8 @@ jobs:
             tests/uninstall-safety.sh tests/git-hooks.sh tests/registry.sh tests/agent-badge.sh \
             tests/agent-shell.sh tests/project-environment.sh tests/shell-behavior.sh tests/features.sh tests/theme-system.sh tests/theme-refresh.sh \
             tests/tmux-config.sh tests/verify-profiles.sh tests/wsl.sh \
-            tests/xrdp.sh tests/validate-structured.sh; do
+            tests/xrdp.sh tests/work-selection.sh tests/work-installers.sh \
+            tests/work-verify.sh tests/work-smoke.sh tests/validate-structured.sh; do
             bash "$test_file"
           done
           python3 tests/startup-benchmark-test.py
