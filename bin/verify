@@ -188,6 +188,11 @@ for tier in bash dev work capabilities; do
                 ledger="$(ledger_line "$name" 2>/dev/null || true)"
                 IFS=$'\t' read -r _ _ recorded_owner recorded_status _ recorded_path _ _ <<< "$ledger"
                 observed_path="$(command -v "$binary" 2>/dev/null || true)"
+                # Match TOOL_VERIFY[ripgrep] and installer discovery: the
+                # durable rg takes precedence over an agent-private PATH copy.
+                if [[ "$name" == ripgrep && -x "$HOME/.local/bin/rg" ]]; then
+                    observed_path="$HOME/.local/bin/rg"
+                fi
                 [[ -z "$observed_path" ]] || observed_path="$(readlink -f "$observed_path" 2>/dev/null || printf '%s' "$observed_path")"
                 if [[ "$recorded_status" == update-failed ]]; then
                     check_warn "$label (prior installation works; last update failed)"
@@ -206,7 +211,15 @@ for tier in bash dev work capabilities; do
             fi
         else
             if [[ "$expected" == true ]]; then
-                check_fail "$label (not found)"
+                missing_companions=""
+                for companion in ${TOOL_COMPANIONS[$name]:-}; do
+                    command -v "$companion" >/dev/null 2>&1 || missing_companions+=" $companion"
+                done
+                if command -v "$binary" >/dev/null 2>&1 && [[ -n "$missing_companions" ]]; then
+                    check_fail "$label (missing companion:${missing_companions})"
+                else
+                    check_fail "$label (not found or verification failed)"
+                fi
             elif [[ "$VERIFY_MODE" == all ]]; then
                 check_warn "$label (not installed)"
             fi
