@@ -45,12 +45,23 @@ fi
 if grep -REn 'cp .*(\.claude|\.codex|\.config/opencode|\.pi)' "$ROOT/installers" "$ROOT/lib"; then
     fail "work/tail automation copies host AI credential/configuration state"
 fi
+
+# Docker conflict discovery must not depend on host state or execute package
+# probes during a dry-run. A developer machine with Docker installed used to
+# hide this path while clean CI containers exposed it.
+package_probe_log="$TEST_ROOT/package-probes.log"
+dpkg-query() { printf 'dpkg-query\t%s\n' "$*" >> "$package_probe_log"; return 1; }
+dpkg() { printf 'dpkg\t%s\n' "$*" >> "$package_probe_log"; return 1; }
+DRY_RUN=true
+install_docker_engine >/dev/null
+[[ ! -s "$package_probe_log" ]] || fail "Docker dry-run executed package probes"
+DRY_RUN=false
+
 grep -Fq 'gpgv --keyring' "$ROOT/installers/install-aws-cli.sh" \
     || fail "AWS CLI installer does not verify the detached signature"
 grep -Fq 'FB5DB77FD5C118B80511ADA8A6310ACC4672475C' "$ROOT/installers/install-aws-cli.sh" \
     || fail "AWS CLI signer fingerprint is not pinned"
 
-dpkg_query_saved="$(declare -f dpkg-query 2>/dev/null || true)"
 dpkg-query() { return 1; }
 dpkg() { [[ "$2" == containerd ]]; }
 command() { [[ "$1" == -v && "$2" == docker ]] && return 1; builtin command "$@"; }

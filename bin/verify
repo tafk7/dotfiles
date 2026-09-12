@@ -163,9 +163,6 @@ for tier in bash dev work capabilities; do
             for capability in "${!VERIFY_CAPABILITIES[@]}"; do
                 tool_has_capability "$name" "$capability" && explicitly_requested=true
             done
-            if [[ "$VERIFY_MODE" == tier ]] && tool_in_cumulative_tier "$name" "$VERIFY_TIER"; then
-                explicitly_requested=true
-            fi
             if [[ "$explicitly_requested" == true ]]; then
                 check_fail "$name (requested capability is unsupported on $(tool_platform)/$(tool_arch))"
             elif [[ "$VERIFY_MODE" == all ]]; then
