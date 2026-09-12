@@ -20,6 +20,17 @@ HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     "$ROOT/bin/verify" --tier config >/dev/null \
     || fail "config-only verification failed"
 
+# A cumulative tier includes the subset applicable to the current platform.
+# Native Ubuntu must not fail because the bash tier also registers a WSL-only
+# SSH bridge.
+HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
+    XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+    DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_OS_VERSION=24.04 DOTFILES_TEST_ARCH=x86_64 \
+    "$ROOT/bin/verify" --tier bash > "$TEST_ROOT/native-bash.log" 2>&1 || true
+if grep -Fq 'wsl2-ssh-agent (requested capability is unsupported' "$TEST_ROOT/native-bash.log"; then
+    fail "native bash verification required the WSL-only SSH bridge"
+fi
+
 # Theme includes are nested through the portable Git config, not written
 # directly into ~/.gitconfig. Verification must follow include chains.
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \

@@ -19,14 +19,20 @@ install_tail_packages() { calls+=" tail"; }
 install_cloud_capability() { calls+=" cloud:$1"; }
 
 reset_selection; INSTALL_TIER=work; INSTALL_AI=true; INSTALL_TAIL=true; INSTALL_GCLOUD=true
+# setup.sh is sourced above; ShellCheck 0.9 otherwise binds these calls to the
+# failure-injection override near the end of this test instead of the sourced
+# production function.
+# shellcheck disable=SC2218
 phase_install_packages >/dev/null
 assert_eq "$calls" " bash dev work ai tail cloud:gcloud" "composed work/tail/cloud install order"
 
 calls=""; reset_selection; INSTALL_TIER=work
+# shellcheck disable=SC2218
 phase_install_packages >/dev/null
 assert_eq "$calls" " bash dev work" "work unexpectedly selected Tailscale/cloud"
 
 calls=""; reset_selection; INSTALL_TAIL=true
+# shellcheck disable=SC2218
 phase_install_packages >/dev/null
 assert_eq "$calls" " tail" "--tail did not retain config baseline independence"
 

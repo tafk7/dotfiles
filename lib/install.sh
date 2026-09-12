@@ -1232,6 +1232,18 @@ docker_conflicting_packages() {
 }
 
 install_docker_engine() {
+    # A dry-run describes the requested package path without probing installed
+    # runtimes. Besides keeping the preview host-independent, this prevents the
+    # conflict scan below from invoking even read-only package commands under
+    # the repository's strict no-command dry-run contract.
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        ensure_docker_repo || return 1
+        # shellcheck disable=SC2206
+        local dry_run_packages=(${PACKAGES[docker]})
+        install_apt docker "${dry_run_packages[@]}"
+        return
+    fi
+
     if dpkg-query -W "${TOOL_APT_PACKAGE[docker]}" >/dev/null 2>&1; then
         log "Docker Engine package already installed"
         track_install docker skip
