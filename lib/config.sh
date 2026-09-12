@@ -74,7 +74,7 @@ config_owner_present() {
 # tier is sudo-free (eget only). bat/fd/ripgrep/direnv moved to eget, so no
 # [modern] group and no direnv here.
 declare -A PACKAGES=(
-    [core]="git build-essential"
+    [core]="git build-essential locales"
     [development]="zsh bison libevent-dev libncurses-dev xclip lsof psmisc"
     [terminal]="htop tree"
     [languages]="python3-pip"

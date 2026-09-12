@@ -44,7 +44,7 @@ else
     log "Google Cloud apt repository already configured; reusing existing definition"
 fi
 if [[ "$FORCE" == true ]] && dpkg-query -W google-cloud-cli >/dev/null 2>&1; then
-    safe_sudo apt-get install --reinstall -y google-cloud-cli || exit 1
+    safe_apt_get install --reinstall -y google-cloud-cli || exit 1
 else
     install_apt gcloud google-cloud-cli || exit 1
 fi

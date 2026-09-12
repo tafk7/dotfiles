@@ -46,6 +46,8 @@ EOF
 cat > "$TEST_ROOT/bin/npm" <<'EOF'
 #!/bin/sh
 set -eu
+printf '%s\n' "npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead" >&2
+printf '%s\n' "npm warn retained-warning: diagnostic must remain visible" >&2
 prefix=""
 while [ "$#" -gt 0 ]; do
     [ "$1" = --prefix ] && { prefix="$2"; shift 2; continue; }
@@ -59,7 +61,9 @@ BIN
 chmod +x "$prefix/bin/pi"
 EOF
 chmod +x "$TEST_ROOT/bin/node" "$TEST_ROOT/bin/npm"
-"$ROOT/installers/install-pi.sh" >/dev/null
+pi_output="$("$ROOT/installers/install-pi.sh" 2>&1)"
+[[ "$pi_output" != *'node-domexception@1.0.0'* ]] || fail "known Pi transitive deprecation warning leaked"
+[[ "$pi_output" == *'retained-warning'* ]] || fail "Pi installer hid an unrelated npm warning"
 "$HOME/.local/bin/pi" --version >/dev/null || fail "Pi installer output"
 
 # Every installer must preserve an externally managed binary rather than

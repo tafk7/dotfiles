@@ -30,7 +30,7 @@ fi
 
 ensure_docker_repo || exit 1
 if [[ "$FORCE" == true ]] && dpkg-query -W "${TOOL_APT_PACKAGE[sbx]}" >/dev/null 2>&1; then
-    safe_sudo apt-get install --reinstall -y "${TOOL_APT_PACKAGE[sbx]}" || exit 1
+    safe_apt_get install --reinstall -y "${TOOL_APT_PACKAGE[sbx]}" || exit 1
 else
     install_apt sbx "${TOOL_APT_PACKAGE[sbx]}" || exit 1
 fi

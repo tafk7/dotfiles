@@ -151,7 +151,10 @@ run_official_installer() {
     fi
 
     local rc=0
-    env PROFILE=/dev/null sh "$installer_path" || rc=$?
+    # The official installer documents CODEX_NON_INTERACTIVE=1 as its prompt
+    # suppression control. This prevents the post-install "Start Codex now?"
+    # prompt without launching Codex, consuming stdin, or faking a response.
+    env PROFILE=/dev/null CODEX_NON_INTERACTIVE=1 sh "$installer_path" || rc=$?
     [[ "$downloaded" == true ]] && rm -f "$installer_path"
     if [[ "$rc" != 0 ]]; then
         error "The official Codex installer failed (exit $rc)"

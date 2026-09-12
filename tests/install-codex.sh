@@ -19,6 +19,8 @@ cat > "$STUB_INSTALLER" <<'INSTALLER'
 #!/bin/sh
 set -eu
 
+printf '%s\t%s\n' "${CODEX_NON_INTERACTIVE:-}" "${PROFILE:-}" > "$TEST_STATE/environment"
+
 count_file="$TEST_STATE/count"
 count=0
 if [ -f "$count_file" ]; then
@@ -83,6 +85,8 @@ grep -qx 'model = "gpt-6-astra"' "$HOME/.codex/config.toml" \
 grep -qx '# BEGIN DOTFILES-MANAGED CODEX CONFIG' "$HOME/.codex/config.toml" \
     || fail "fresh config has no managed block"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "fresh install invocation count"
+[[ "$(cat "$TEST_STATE/environment")" == $'1\t/dev/null' ]] \
+    || fail "official installer was not invoked noninteractively with profile writes disabled"
 
 # An ordinary rerun refreshes the managed block, preserves local state, and does
 # not call upstream.

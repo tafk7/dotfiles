@@ -136,6 +136,20 @@ require_node
 
 log "Installing Pi ($PI_PACKAGE) into $PI_PREFIX..."
 
+# Pi 0.85.1 still reaches node-domexception@1.0.0 through its Google auth
+# dependency chain. Upstream tracks this known transitive warning; it is not an
+# actionable installer failure. Filter only that exact message while preserving
+# every other npm warning and error.
+filter_pi_npm_stderr() {
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            'npm warn deprecated node-domexception@1.0.0: Use your platform'*) ;;
+            *) printf '%s\n' "$line" >&2 ;;
+        esac
+    done
+}
+
 # -g --prefix: put the package under $PI_PREFIX/lib and its bin shim in
 # $PI_PREFIX/bin, isolated from whichever Node version NVM currently defaults to
 # (a plain `npm install -g` would land in ~/.nvm/versions/node/<ver>/bin and
@@ -145,7 +159,8 @@ log "Installing Pi ($PI_PACKAGE) into $PI_PREFIX..."
 # --ignore-scripts is upstream's own documented recommendation and costs nothing
 # here: the package declares no install/postinstall lifecycle scripts.
 mkdir -p "$PI_PREFIX"
-if ! npm install -g --prefix "$PI_PREFIX" --ignore-scripts "$PI_PACKAGE"; then
+if ! npm install -g --prefix "$PI_PREFIX" --ignore-scripts "$PI_PACKAGE" \
+    2> >(filter_pi_npm_stderr); then
     error "Pi installation failed (npm install $PI_PACKAGE)"
     exit 1
 fi

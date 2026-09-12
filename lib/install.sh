@@ -158,6 +158,13 @@ safe_sudo() {
     fi
 }
 
+# Consistent APT invocation for unattended bootstrap/setup runs. A bounded lock
+# wait handles apt-daily overlap without deleting locks or hanging forever.
+safe_apt_get() {
+    safe_sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
+        apt-get -o "DPkg::Lock::Timeout=${DOTFILES_APT_LOCK_TIMEOUT:-120}" "$@"
+}
+
 # Detect Ubuntu version and WSL
 detect_environment() {
     local ubuntu_version ubuntu_codename
@@ -687,7 +694,7 @@ install_apt() {
         return 1
     fi
     log "Installing $label APT packages: ${missing[*]}"
-    if safe_sudo apt-get install -y "${missing[@]}"; then
+    if safe_apt_get install -y "${missing[@]}"; then
         success "$label APT packages installed"
     else
         error "Some $label packages failed to install"
@@ -699,7 +706,7 @@ install_apt() {
 update_packages() {
     log "Updating package lists..."
     local output rc=0
-    output="$(safe_sudo apt-get update 2>&1)" || rc=$?
+    output="$(safe_apt_get update 2>&1)" || rc=$?
     printf '%s\n' "$output" | grep -v '^W:' || true
     if (( rc != 0 )); then
         error "APT package index update failed"
@@ -736,7 +743,7 @@ ensure_docker_repo() {
 
     log "Adding Docker official apt repository..."
 
-    safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
+    safe_apt_get install -y ca-certificates curl gnupg || return 1
 
     safe_sudo install -m 0755 -d "$keyrings_dir" || return 1
     if [[ ! -f "$keyrings_dir/docker.gpg" ]]; then
@@ -783,7 +790,7 @@ install_azure_cli() {
     fi
 
     log "Installing Azure CLI from Microsoft's signed apt repository..."
-    safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
+    safe_apt_get install -y ca-certificates curl gnupg || return 1
     local sources_dir="${DOTFILES_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
     local keyrings_dir="${DOTFILES_APT_KEYRINGS_DIR:-/etc/apt/keyrings}"
     safe_sudo install -m 0755 -d "$keyrings_dir" "$sources_dir" || return 1
@@ -815,7 +822,7 @@ install_azure_cli() {
 
     update_packages || return 1
     if [[ "${FORCE_REINSTALL:-false}" == true ]] && dpkg-query -W azure-cli >/dev/null 2>&1; then
-        safe_sudo apt-get install --reinstall -y azure-cli
+        safe_apt_get install --reinstall -y azure-cli
     else
         install_apt "azure-cli" azure-cli
     fi
@@ -1076,6 +1083,24 @@ install_bash_packages() {
     success "Bash tier installation complete"
 }
 
+configure_locale() {
+    locale -a 2>/dev/null | grep -qi '^en_US\.utf8$' && return 0
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        log "[DRY RUN] Would generate en_US.UTF-8 after installing locales"
+        return 0
+    fi
+    if ! command -v locale-gen >/dev/null 2>&1 || ! command -v update-locale >/dev/null 2>&1; then
+        warn "The locales package installed, but locale-gen/update-locale are unavailable"
+        return 0
+    fi
+    log "Generating en_US.UTF-8 locale..."
+    if safe_sudo locale-gen en_US.UTF-8 && safe_sudo update-locale LANG=en_US.UTF-8; then
+        success "Locale generated"
+    else
+        warn "Locale generation failed - some shell features may not work correctly"
+    fi
+}
+
 # dev tier: first apt layer (sudo). Everything that needs root lives here or
 # above — zsh, build toolchain, clipboard, and the tmux build deps that
 # install-tmux.sh compiles against.
@@ -1094,6 +1119,7 @@ install_dev_packages() {
         [[ "${DRY_RUN:-false}" == "true" ]] || track_install zsh fail
         return 1
     fi
+    configure_locale
     if [[ "${DRY_RUN:-false}" != "true" ]]; then
         if command -v zsh >/dev/null 2>&1; then track_install zsh ok; else track_install zsh fail; return 1; fi
     fi
@@ -1180,14 +1206,11 @@ install_rdp_packages() {
     # Pin the display-manager answer before apt can ask (see helper above).
     preserve_default_display_manager || { track_install "xrdp" fail; return 1; }
 
-    # Deliberately not install_apt: we need a preseeded, fully non-interactive
-    # apt run. DEBIAN_FRONTEND=noninteractive suppresses the dialog; DEBIAN_PRIORITY
-    # =critical is a second guard so only critical questions could ever surface.
-    # env, not a bare assignment, because sudo resets the environment.
+    # Deliberately not install_apt: this path must preseed the display-manager
+    # answer before the shared noninteractive APT invocation.
     update_packages || { track_install "xrdp" fail; return 1; }
     # shellcheck disable=SC2086
-    if safe_sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
-        apt-get install -y ${PACKAGES[rdp]}; then
+    if safe_apt_get install -y ${PACKAGES[rdp]}; then
         success "rdp APT packages installed"
     else
         error "rdp APT package installation failed"

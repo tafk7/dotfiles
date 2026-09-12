@@ -310,6 +310,8 @@ OPTIONS:
 ENVIRONMENT:
     DOTFILES_GIT_NAME   Same as --git-name
     DOTFILES_GIT_EMAIL  Same as --git-email
+    DOTFILES_APT_LOCK_TIMEOUT
+                        Seconds APT waits for another package operation (default: 120)
 
 EXAMPLES:
     ./setup.sh                       # Prints this help; changes nothing
@@ -426,19 +428,6 @@ phase_verify_system() {
     done
 
     detect_environment
-
-    # Generate locale if not present. Requires sudo, so only at the dev tier and
-    # up — the bash tier is deliberately sudo-free.
-    if tier_includes "dev" && [[ "$DRY_RUN" != "true" ]]; then
-        if ! locale -a | grep -qi "en_US.utf8"; then
-            log "Generating en_US.UTF-8 locale..."
-            if safe_sudo locale-gen en_US.UTF-8 && safe_sudo update-locale LANG=en_US.UTF-8; then
-                success "Locale generated"
-            else
-                warn "Locale generation failed - some shell features may not work correctly"
-            fi
-        fi
-    fi
 
     success "System verification complete"
 }
