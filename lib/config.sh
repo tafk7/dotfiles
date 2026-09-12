@@ -63,7 +63,7 @@ config_source_path() {
 config_owner_present() {
     local owner="$1"
     [[ -z "$owner" ]] && return 0
-    if [[ -n "${TOOL_TIER[$owner]:-}" ]]; then
+    if [[ -n "${TOOL_BINARY[$owner]:-}" ]]; then
         eval "$(tool_verify_command "$owner")"
     else
         command -v "$owner" >/dev/null 2>&1
@@ -79,7 +79,7 @@ declare -A PACKAGES=(
     [terminal]="htop tree"
     [languages]="python3-pip"
     [wsl]="socat wslu sox libsox-fmt-pulse"  # sox + pulse backend: mic capture for Claude Code /voice via WSLg (plain sox pulls ALSA, which has no /dev/snd in WSL)
-    [docker]="docker-ce docker-ce-cli containerd.io docker-compose-plugin"
+    [docker]="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
     [diagramming]="graphviz"
     [rdp]="xrdp xorgxrdp xfce4 xfce4-goodies"  # RDP server + Xorg backend + XFCE session (xrdp ships no desktop)
 )

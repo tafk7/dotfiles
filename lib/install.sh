@@ -13,6 +13,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
 # Source declarative config (PACKAGES, CONFIG_MAP)
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/work-host.sh"
 
 # Backups are machine state, not repository content.
 DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
@@ -566,7 +567,7 @@ process_git_config() {
     local force="${3:-false}"
     local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
     local portable="$portable_dir/gitconfig"
-    local rendered git_version conflict_style="diff3" theme_cache
+    local rendered git_version conflict_style="diff3" theme_cache azure_portable azure_enabled=false
 
     mkdir -p "$portable_dir"
     rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")"
@@ -576,6 +577,21 @@ process_git_config() {
         conflict_style="zdiff3"
     fi
     theme_cache="${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"
+    azure_portable="$portable_dir/gitconfig-azure"
+    local azure_present=false
+    case "${DOTFILES_TEST_AZURE_PRESENT:-}" in
+        1) azure_present=true ;;
+        0) azure_present=false ;;
+        *) command -v az >/dev/null 2>&1 && azure_present=true ;;
+    esac
+    if [[ "${INSTALL_AZURE:-false}" == true || "$azure_present" == true ]]; then
+        azure_enabled=true
+        mkdir -p "$HOME/.local/bin"
+        safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
+        if [[ ! -f "$azure_portable" ]] || ! cmp -s "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable"; then
+            install -m 0600 "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable"
+        fi
+    fi
 
     sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
         if feature_enabled theme; then
@@ -590,7 +606,18 @@ process_git_config() {
             '
         else
             awk '$0 != "{{THEME_INCLUDE}}" { print }'
-        fi > "$rendered"
+        fi |
+        awk -v enabled="$azure_enabled" -v path="$azure_portable" '
+            $0 == "{{AZURE_INCLUDE}}" {
+                if (enabled == "true") {
+                    print "[include]"
+                    print "    # Optional Azure DevOps credential integration."
+                    print "    path = \"" path "\""
+                }
+                next
+            }
+            { print }
+        ' > "$rendered"
 
     if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
         mv "$rendered" "$portable"
@@ -686,46 +713,56 @@ ensure_docker_repo() {
         return 0
     fi
 
-    if [[ -f /etc/apt/sources.list.d/docker.list ]]; then
-        return 0
+    local sources_dir="${DOTFILES_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+    local keyrings_dir="${DOTFILES_APT_KEYRINGS_DIR:-/etc/apt/keyrings}"
+    local main_list="${DOTFILES_APT_MAIN_LIST:-/etc/apt/sources.list}" codename source_file
+
+    codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
+    [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Docker repository"; return 1; }
+
+    # Reuse either legacy .list or current deb822 .sources definitions. Repository
+    # preparation is also used by sbx and must never migrate container runtimes.
+    source_file="$(grep -RslE '^[[:space:]]*(deb .*|URIs:[[:space:]]*)https://download\.docker\.com/linux/ubuntu' \
+        "$sources_dir" "$main_list" 2>/dev/null | head -n1 || true)"
+    if [[ -n "$source_file" ]]; then
+        if grep -Eq "(^|[[:space:]])${codename}([[:space:]]|$)|^Suites:[[:space:]]*${codename}([[:space:]]|$)" "$source_file"; then
+            log "Docker apt repository already configured; reusing existing definition"
+            return 0
+        fi
+        error "Existing Docker repository does not target Ubuntu codename '$codename': $source_file"
+        error "Correct or remove that repository definition manually, then re-run setup."
+        return 1
     fi
 
     log "Adding Docker official apt repository..."
 
-    # Remove conflicting distro packages that shadow Docker CE (per Docker's
-    # official install guidance). Only removes packages that are present.
-    local pkg
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-        if dpkg -s "$pkg" &>/dev/null; then
-            log "Removing conflicting package: $pkg"
-            safe_sudo apt-get remove -y "$pkg" || warn "Could not remove $pkg"
-        fi
-    done
-
     safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
 
-    safe_sudo install -m 0755 -d /etc/apt/keyrings || return 1
-    if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-        local docker_key docker_keyring fingerprint
-        docker_key="$(mktemp)"; docker_keyring="$(mktemp)"
-        download_https https://download.docker.com/linux/ubuntu/gpg "$docker_key" || return 1
-        fingerprint="$(gpg --batch --show-keys --with-colons "$docker_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
+    safe_sudo install -m 0755 -d "$keyrings_dir" || return 1
+    if [[ ! -f "$keyrings_dir/docker.gpg" ]]; then
+        local docker_key docker_keyring fingerprint docker_tmp
+        docker_tmp="$(mktemp -d)"
+        mkdir -m 0700 "$docker_tmp/gnupg"
+        docker_key="$docker_tmp/docker.asc"; docker_keyring="$docker_tmp/docker.gpg"
+        download_https https://download.docker.com/linux/ubuntu/gpg "$docker_key" \
+            || { rm -rf "$docker_tmp"; return 1; }
+        fingerprint="$(GNUPGHOME="$docker_tmp/gnupg" gpg --batch --show-keys --with-colons "$docker_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
         if [[ "$fingerprint" != 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]]; then
-            rm -f "$docker_key" "$docker_keyring"
+            rm -rf "$docker_tmp"
             error "Docker repository key fingerprint mismatch: ${fingerprint:-missing}"
             return 1
         fi
-        gpg --batch --dearmor --output "$docker_keyring" "$docker_key" || return 1
-        safe_sudo install -m 0644 "$docker_keyring" /etc/apt/keyrings/docker.gpg || return 1
-        rm -f "$docker_key" "$docker_keyring"
-        safe_sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        GNUPGHOME="$docker_tmp/gnupg" gpg --batch --dearmor --output "$docker_keyring" "$docker_key" \
+            || { rm -rf "$docker_tmp"; return 1; }
+        safe_sudo install -m 0644 "$docker_keyring" "$keyrings_dir/docker.gpg" \
+            || { rm -rf "$docker_tmp"; return 1; }
+        rm -rf "$docker_tmp"
+        safe_sudo chmod a+r "$keyrings_dir/docker.gpg"
     fi
 
-    local codename
-    codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
-    [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Docker repository"; return 1; }
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" | \
-        safe_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    printf 'deb [arch=%s signed-by=%s/docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' \
+        "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | \
+        safe_sudo tee "$sources_dir/docker.list" > /dev/null
 
     update_packages || return 1
     success "Docker apt repository configured"
@@ -735,7 +772,7 @@ ensure_docker_repo() {
 # Replaces the previous `curl https://aka.ms/InstallAzureCLIDeb | sudo bash`,
 # which executed an unpinned remote script as root.
 install_azure_cli() {
-    if command -v az >/dev/null 2>&1; then
+    if [[ "${FORCE_REINSTALL:-false}" != true ]] && command -v az >/dev/null 2>&1; then
         log "Azure CLI already installed"
         return 0
     fi
@@ -747,32 +784,41 @@ install_azure_cli() {
 
     log "Installing Azure CLI from Microsoft's signed apt repository..."
     safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
-    safe_sudo install -m 0755 -d /etc/apt/keyrings || return 1
+    local sources_dir="${DOTFILES_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+    local keyrings_dir="${DOTFILES_APT_KEYRINGS_DIR:-/etc/apt/keyrings}"
+    safe_sudo install -m 0755 -d "$keyrings_dir" "$sources_dir" || return 1
 
-    if [[ ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
+    if [[ ! -f "$keyrings_dir/microsoft.gpg" ]]; then
         local microsoft_key microsoft_keyring fingerprint
         microsoft_key="$(mktemp)"; microsoft_keyring="$(mktemp)"
         download_https https://packages.microsoft.com/keys/microsoft.asc "$microsoft_key" || return 1
-        fingerprint="$(gpg --batch --show-keys --with-colons "$microsoft_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
+        local microsoft_gnupg
+        microsoft_gnupg="$(mktemp -d)"; chmod 700 "$microsoft_gnupg"
+        fingerprint="$(GNUPGHOME="$microsoft_gnupg" gpg --batch --show-keys --with-colons "$microsoft_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
         if [[ "$fingerprint" != BC528686B50D79E339D3721CEB3E94ADBE1229CF ]]; then
-            rm -f "$microsoft_key" "$microsoft_keyring"
+            rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"
             error "Microsoft repository key fingerprint mismatch: ${fingerprint:-missing}"
             return 1
         fi
-        gpg --batch --dearmor --output "$microsoft_keyring" "$microsoft_key" || return 1
-        safe_sudo install -m 0644 "$microsoft_keyring" /etc/apt/keyrings/microsoft.gpg || return 1
-        rm -f "$microsoft_key" "$microsoft_keyring"
-        safe_sudo chmod a+r /etc/apt/keyrings/microsoft.gpg
+        GNUPGHOME="$microsoft_gnupg" gpg --batch --dearmor --output "$microsoft_keyring" "$microsoft_key" \
+            || { rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"; return 1; }
+        safe_sudo install -m 0644 "$microsoft_keyring" "$keyrings_dir/microsoft.gpg" || return 1
+        rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"
+        safe_sudo chmod a+r "$keyrings_dir/microsoft.gpg"
     fi
 
     local codename
     codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
     [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Azure CLI repository"; return 1; }
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $codename main" | \
-        safe_sudo tee /etc/apt/sources.list.d/azure-cli.list > /dev/null
+    printf 'deb [arch=%s signed-by=%s/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ %s main\n' \
+        "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | safe_sudo tee "$sources_dir/azure-cli.list" > /dev/null
 
     update_packages || return 1
-    install_apt "azure-cli" azure-cli
+    if [[ "${FORCE_REINSTALL:-false}" == true ]] && dpkg-query -W azure-cli >/dev/null 2>&1; then
+        safe_sudo apt-get install --reinstall -y azure-cli
+    else
+        install_apt "azure-cli" azure-cli
+    fi
 }
 
 # ==============================================================================
@@ -1064,7 +1110,7 @@ install_dev_packages() {
 # AI CLIs (Claude Code, Codex, opencode). Orthogonal to the tier chain —
 # installed only when --ai/--full or a per-tool flag (--claude/--codex/
 # --opencode) is passed. Which tools run is driven by setup.sh's AI_ALL /
-# AI_TOOLS globals; AI_ALL expands to every ai-tier tool in the registry, so a
+# AI_TOOLS globals; AI_ALL expands to every AI-capability tool in the registry, so a
 # new AI CLI is picked up automatically once registered. Kept separate so an
 # org-managed install can be left untouched — each installer refuses to shadow
 # an external binary already on PATH.
@@ -1072,7 +1118,7 @@ install_ai_packages() {
     local -a tools=()
     local failed=false
     if [[ "${AI_ALL:-false}" == "true" ]]; then
-        readarray -t tools < <(tools_for_tier ai)
+        readarray -t tools < <(tools_for_capability ai)
     else
         # Individual selections, de-duplicated while preserving order.
         local t
@@ -1155,67 +1201,129 @@ install_rdp_packages() {
     success "RDP server installation complete"
 }
 
+docker_conflicting_packages() {
+    local pkg
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 docker-buildx podman-docker containerd runc; do
+        dpkg -s "$pkg" >/dev/null 2>&1 && printf '%s\n' "$pkg"
+    done
+}
+
+install_docker_engine() {
+    if dpkg-query -W "${TOOL_APT_PACKAGE[docker]}" >/dev/null 2>&1; then
+        log "Docker Engine package already installed"
+        track_install docker skip
+        return 0
+    fi
+
+    # An already usable non-Docker-CE installation belongs to its administrator.
+    # Keep it and its daemon configuration untouched.
+    if command -v docker >/dev/null 2>&1; then
+        local endpoint
+        endpoint="$(work_docker_endpoint)"
+        if ! work_docker_endpoint_is_local "$endpoint"; then
+            error "Existing Docker CLI uses a remote endpoint ($endpoint); it does not satisfy local Engine installation."
+            error "Select a local context or resolve the external CLI before re-running setup."
+            track_install docker fail
+            return 1
+        fi
+        warn "Keeping externally managed Docker installation: $(command -v docker)"
+        track_install docker skip
+        return 0
+    fi
+
+    local -a conflicts=()
+    readarray -t conflicts < <(docker_conflicting_packages)
+    if (( ${#conflicts[@]} )); then
+        error "Docker Engine migration required; conflicting packages are installed: ${conflicts[*]}"
+        error "Review Docker's migration guidance and container data, remove conflicts manually, then re-run setup."
+        track_install docker fail
+        return 1
+    fi
+
+    ensure_docker_repo || { track_install docker fail; return 1; }
+    # shellcheck disable=SC2206
+    local packages=(${PACKAGES[docker]})
+    install_apt docker "${packages[@]}" || { track_install docker fail; return 1; }
+    if [[ "${DRY_RUN:-false}" != true ]]; then
+        command -v docker >/dev/null 2>&1 \
+            && track_install docker ok \
+            || { track_install docker fail; return 1; }
+    fi
+}
+
+ensure_account_group() {
+    local group="$1" account state
+    account="$(host_account)" || { warn "Cannot resolve the invoking account for $group membership"; return 0; }
+    getent group "$group" >/dev/null 2>&1 || { warn "$group group is unavailable; host configuration remains incomplete"; return 0; }
+    state="$(host_group_state "$group")"
+    case "$state" in
+        active) log "$account has active $group group membership" ;;
+        pending) warn "$account has $group membership, but this process needs a new login" ;;
+        *)
+            log "Adding $account to $group group..."
+            if safe_sudo usermod -aG "$group" "$account"; then
+                warn "$group membership added; sign out and reconnect before verification"
+            else
+                warn "Could not add $account to $group (try: sudo usermod -aG $group $account)"
+            fi
+            ;;
+    esac
+}
+
+configure_docker_host_access() {
+    command -v docker >/dev/null 2>&1 || return 0
+    local endpoint
+    endpoint="$(work_docker_endpoint)"
+    if [[ "$endpoint" == unix:///run/user/*/docker.sock ]]; then
+        log "Rootless Docker endpoint detected; docker-group membership is unnecessary"
+    else
+        ensure_account_group docker
+        warn "Membership in the docker group grants root-equivalent access to this host."
+    fi
+    if host_systemd_running && [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
+        safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
+    fi
+}
+
+configure_work_host() {
+    log "Configuring work-tier Docker and KVM access..."
+    configure_docker_host_access
+    if work_kvm_device_present || work_kernel_has_kvm; then
+        ensure_account_group kvm
+    else
+        warn "KVM unavailable; enable hardware/nested virtualization outside this machine, then verify /dev/kvm"
+    fi
+    if ! work_kvm_device_present; then
+        warn "/dev/kvm is missing; sbx is installed but local sandboxes cannot start"
+    elif ! work_kvm_accessible; then
+        warn "/dev/kvm permission denied; reconnect after kvm group membership is applied"
+    fi
+    host_systemd_running || warn "systemd is not managing this host; Docker service readiness must be handled manually"
+    success "Work host configuration checked (package success and host readiness are reported separately)"
+}
+
+install_tail_packages() {
+    log "Installing the optional Tailscale capability..."
+    run_installer tailscale || return 1
+    success "Tailscale capability installation complete"
+}
+
+install_cloud_capability() {
+    local capability="$1" tool
+    tool="$(tools_for_capability "$capability" | head -n1)"
+    [[ -n "$tool" ]] || { error "No component registered for --$capability"; return 1; }
+    run_installer "$tool"
+}
+
 install_work_packages() {
     log "Installing work tier packages..."
     local failed=false
 
-    # Azure CLI
-    if install_azure_cli; then
-        if [[ "${DRY_RUN:-false}" != "true" ]]; then
-            command -v az >/dev/null 2>&1 && track_install azure-cli ok || { track_install azure-cli fail; failed=true; }
-        fi
-    else
-        track_install azure-cli fail
-        failed=true
-    fi
+    install_apt "work" python3-dev python3-venv || failed=true
 
-    # Azure DevOps git credential helper
-    if [[ -f "$DOTFILES_DIR/bin/git-credential-azdo" ]]; then
-        if [[ "${DRY_RUN:-false}" == "true" ]]; then
-            log "[DRY RUN] Would link the Azure DevOps credential helper"
-        else
-            mkdir -p "$HOME/.local/bin"
-            ln -sf "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
-            success "Azure DevOps credential helper linked"
-        fi
-    fi
-
-    # Docker
-    ensure_docker_repo || failed=true
-    # shellcheck disable=SC2086
-    install_apt "work" python3-dev python3-venv ${PACKAGES[docker]} || failed=true
-    if [[ "${DRY_RUN:-false}" != "true" ]]; then
-        if command -v docker >/dev/null 2>&1; then track_install docker ok; else track_install docker fail; failed=true; fi
-    fi
-
-    if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
-        log "Adding $USER to docker group..."
-        if safe_sudo usermod -aG docker "$USER"; then
-            success "Added to docker group (restart shell to activate)"
-            # Security disclosure: the docker group is root-equivalent — its
-            # members can mount the host filesystem and run privileged containers.
-            warn "Note: membership in the 'docker' group grants root-equivalent access to this host."
-        else
-            warn "Could not add to docker group (try: sudo usermod -aG docker $USER)"
-        fi
-    fi
-
-    # Enable and start the daemon when systemd is managing the system (native
-    # Linux, or WSL with systemd=true). No-op when systemd isn't running.
-    if command -v docker >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
-        safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
-    fi
-
-    # Verify the daemon is reachable. Non-fatal: docker group membership only
-    # takes effect on a new login, and WSL without systemd may need
-    # `sudo service docker start`.
-    if command -v docker >/dev/null 2>&1 && [[ "${DRY_RUN:-false}" != "true" ]]; then
-        if docker info >/dev/null 2>&1; then
-            success "Docker daemon is running"
-        else
-            warn "Docker installed but 'docker info' failed — start the daemon and re-login for group access"
-        fi
-    fi
+    install_docker_engine || failed=true
+    run_installer "sbx" || failed=true
+    configure_work_host
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" || failed=true

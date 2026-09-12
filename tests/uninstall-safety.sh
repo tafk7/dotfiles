@@ -46,4 +46,14 @@ if uninstall_tool demo >/dev/null 2>&1; then fail "symlink escape accepted"; fi
 TOOL_PATHS[demo]="$HOME/.local/safe"$'\n'"$TEST_ROOT/outside-tree"
 if uninstall_tool demo >/dev/null 2>&1; then fail "newline path injection accepted"; fi
 
+TOOL_BINARY[sbx]=sbx
+TOOL_METHOD[sbx]=apt
+TOOL_APT_PACKAGE[sbx]=docker-sbx
+TOOL_PATHS[sbx]=""
+TOOL_OWNERSHIP_ROOTS[sbx]=""
+ledger_record sbx yes package-manager installed 1 /usr/bin/sbx apt
+DRY_RUN=true
+output="$(uninstall_tool sbx)"
+[[ "$output" == *"apt package: docker-sbx"* ]] || fail "APT uninstall ignored TOOL_APT_PACKAGE for sbx"
+
 printf 'uninstall-safety: ok\n'

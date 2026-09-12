@@ -232,11 +232,11 @@ emit_table() {
 }
 
 emit_other_contracts() {
-    local name method contract installed latest source
+    local name method contract installed latest source selection
     echo
     echo "Other managed components"
     echo "────────────────────────────────────────────────────────────"
-    printf '%-14s  %-10s  %-38s  %-14s  %s\n' "Tool" "Method" "Update contract" "Latest" "Observed"
+    printf '%-14s  %-10s  %-18s  %-38s  %-14s  %s\n' "Tool" "Method" "Selection" "Update contract" "Latest" "Observed"
     while IFS= read -r name; do
         method="${TOOL_METHOD[$name]}"
         [[ "$method" != eget ]] || continue
@@ -244,10 +244,12 @@ emit_other_contracts() {
         installed="not installed"
         eval "$(tool_verify_command "$name")" && installed="installed"
         contract="${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
+        selection="${TOOL_TIER[$name]:--}"
+        [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || selection+="/${TOOL_CAPABILITIES[$name]}"
         source="${TOOL_UPDATE_SOURCE[$name]:-}"
         latest="n/a"
         [[ -z "$source" ]] || latest="$(gh_latest_tag "$source" || printf 'check failed')"
-        printf '%-14s  %-10s  %-38s  %-14s  %s\n' "$name" "$method" "$contract" "$latest" "$installed"
+        printf '%-14s  %-10s  %-18s  %-38s  %-14s  %s\n' "$name" "$method" "$selection" "$contract" "$latest" "$installed"
     done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
 }
 

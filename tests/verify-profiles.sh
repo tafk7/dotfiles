@@ -68,4 +68,19 @@ if HOME="$HOME" XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME
     fail "installed verification ignored missing recorded component"
 fi
 
+rc=0
+HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+    XDG_CACHE_HOME="$XDG_CACHE_HOME" PATH="$TEST_SYSTEM_PATH" DOTFILES_TEST_PLATFORM=ubuntu \
+    DOTFILES_TEST_OS_VERSION=24.04 DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_SYSTEMD_RUNNING=0 \
+    "$ROOT/bin/verify" --tier work --tail > "$TEST_ROOT/work-profile.log" 2>&1 || rc=$?
+[[ $rc -ne 64 ]] || fail "composed --tier work --tail verification was rejected by the parser"
+grep -Fq 'Work local-execution readiness' "$TEST_ROOT/work-profile.log" || fail "work readiness verification did not run"
+grep -Fq 'Tailscale readiness' "$TEST_ROOT/work-profile.log" || fail "Tailscale verification did not run"
+
+rc=0
+HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+    XDG_CACHE_HOME="$XDG_CACHE_HOME" PATH="$TEST_SYSTEM_PATH" \
+    "$ROOT/bin/verify" --tier ai >/dev/null 2>&1 || rc=$?
+[[ $rc -ne 64 ]] || fail "legacy --tier ai compatibility alias was rejected"
+
 printf 'verify-profiles: ok\n'
