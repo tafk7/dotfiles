@@ -28,4 +28,13 @@ PATH="$TEST_ROOT/bin:$PATH" TMUX=test "$ROOT/plugins/shared/agent-badge.tmux" un
 [[ "$(t show-hooks -g pane-focus-in)" != *'agent-reconcile.sh'* ]] \
     || { echo 'FAIL: badge hook was not unwired' >&2; exit 1; }
 
+# A standalone plugin installation without jq must give a clear diagnostic,
+# never emit hook protocol output or fail the calling agent session.
+PATH="$TEST_ROOT/bin" TMUX=test TMUX_PANE=%1 \
+    "$ROOT/plugins/shared/scripts/agent-status.sh" session-start \
+    > "$TEST_ROOT/hook.out" 2> "$TEST_ROOT/hook.err"
+[[ ! -s "$TEST_ROOT/hook.out" ]] || { echo 'FAIL: hook wrote stdout' >&2; exit 1; }
+grep -Fq 'jq is required on PATH' "$TEST_ROOT/hook.err" \
+    || { echo 'FAIL: missing jq was silent' >&2; exit 1; }
+
 printf 'agent-badge: ok\n'
