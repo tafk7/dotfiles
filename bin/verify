@@ -9,17 +9,25 @@ source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
 source "$DOTFILES_DIR/lib/theme-resolve.sh"
 source "$DOTFILES_DIR/lib/state.sh"
+source "$DOTFILES_DIR/lib/work-host.sh"
 
 VERIFY_MODE=installed
 VERIFY_TIER=""
+declare -A VERIFY_CAPABILITIES=()
+WORK_DIAGNOSE=false
+RUN_SMOKE=false
 
 usage() {
     cat <<'EOF'
 Usage: verify [--installed | --tier config|bash|dev|work|ai|rdp | --all]
+              [--tail] [--azure] [--gcloud] [--aws] [--diagnose] [--smoke]
 
   --installed   Verify recorded machine state (default).
   --tier TIER   Verify the named package tier/feature against current reality.
   --all         Verify every applicable registry component.
+  --tail        Require Tailscale service and enrollment readiness.
+  --diagnose    Add bounded local sbx diagnostics; never uploads.
+  --smoke       Create, execute in, and precisely remove one local shell sandbox.
 EOF
 }
 
@@ -29,9 +37,18 @@ while (( $# )); do
         --tier)
             [[ -n "${2:-}" ]] || { error "--tier requires a value"; exit 64; }
             VERIFY_MODE=tier; VERIFY_TIER="$2"; shift
-            case "$VERIFY_TIER" in config|bash|dev|work|ai|rdp) ;; *) error "Unknown tier: $VERIFY_TIER"; exit 64 ;; esac
+            case "$VERIFY_TIER" in
+                config|bash|dev|work) ;;
+                ai|rdp) VERIFY_CAPABILITIES["$VERIFY_TIER"]=true; VERIFY_TIER=config ;;
+                *) error "Unknown tier: $VERIFY_TIER"; exit 64 ;;
+            esac
             ;;
         --all) VERIFY_MODE=all; VERIFY_TIER="" ;;
+        --tail|--azure|--gcloud|--aws)
+            VERIFY_CAPABILITIES["${1#--}"]=true
+            ;;
+        --diagnose) WORK_DIAGNOSE=true ;;
+        --smoke) RUN_SMOKE=true ;;
         --help|-h) usage; exit 0 ;;
         *) error "Unknown option: $1"; usage >&2; exit 64 ;;
     esac
@@ -43,19 +60,15 @@ tier_rank() {
 }
 
 component_expected() {
-    local name="$1" tool_tier line status
-    tool_tier="${TOOL_TIER[$name]}"
+    local name="$1" line status capability
+    for capability in "${!VERIFY_CAPABILITIES[@]}"; do
+        tool_has_capability "$name" "$capability" && tool_applicable "$name" && return 0
+    done
     case "$VERIFY_MODE" in
         all) tool_applicable "$name" ;;
         tier)
             tool_applicable "$name" || return 1
-            if [[ "$VERIFY_TIER" == ai || "$VERIFY_TIER" == rdp ]]; then
-                [[ "$tool_tier" == "$VERIFY_TIER" ]]
-            elif [[ "$tool_tier" == ai || "$tool_tier" == rdp ]]; then
-                return 1
-            else
-                (( $(tier_rank "$tool_tier") <= $(tier_rank "$VERIFY_TIER") ))
-            fi
+            tool_in_cumulative_tier "$name" "$VERIFY_TIER"
             ;;
         installed)
             line="$(ledger_line "$name" 2>/dev/null || true)"
@@ -128,22 +141,41 @@ done
 # 2. Managed tools — single loop over registry, grouped by tier
 # ==============================================================================
 
-for tier in bash dev work ai rdp; do
-    readarray -t tier_tools < <(tools_for_tier "$tier")
+for tier in bash dev work capabilities; do
+    if [[ "$tier" == capabilities ]]; then
+        readarray -t tier_tools < <(
+            for name in "${!TOOL_BINARY[@]}"; do
+                [[ -z "${TOOL_TIER[$name]:-}" ]] && printf '%s\n' "$name"
+            done | sort
+        )
+    else
+        readarray -t tier_tools < <(tools_for_tier "$tier")
+    fi
     [[ ${#tier_tools[@]} -eq 0 ]] && continue
 
     echo
-    echo "Tools [$tier tier]"
+    [[ "$tier" == capabilities ]] && echo "Tools [orthogonal capabilities]" || echo "Tools [$tier tier]"
     echo "─────────────────────────────────────"
 
     for name in "${tier_tools[@]}"; do
         if ! tool_applicable "$name"; then
-            [[ "$VERIFY_MODE" == all ]] && check_pass "$name (not applicable on $(tool_platform)/$(tool_arch))"
+            explicitly_requested=false
+            for capability in "${!VERIFY_CAPABILITIES[@]}"; do
+                tool_has_capability "$name" "$capability" && explicitly_requested=true
+            done
+            if [[ "$VERIFY_MODE" == tier ]] && tool_in_cumulative_tier "$name" "$VERIFY_TIER"; then
+                explicitly_requested=true
+            fi
+            if [[ "$explicitly_requested" == true ]]; then
+                check_fail "$name (requested capability is unsupported on $(tool_platform)/$(tool_arch))"
+            elif [[ "$VERIFY_MODE" == all ]]; then
+                check_pass "$name (not applicable on $(tool_platform)/$(tool_arch))"
+            fi
             continue
         fi
         expected=false
         component_expected "$name" && expected=true
-        if [[ "$VERIFY_MODE" == tier && "$VERIFY_TIER" == config ]]; then
+        if [[ "$VERIFY_MODE" == tier && "$VERIFY_TIER" == config && ${#VERIFY_CAPABILITIES[@]} -eq 0 ]]; then
             continue
         fi
         if [[ "$expected" != true && "$VERIFY_MODE" != all ]]; then
@@ -201,6 +233,20 @@ else
     check_warn "user not configured"
 fi
 
+azure_git_expected=false
+command -v az >/dev/null 2>&1 && azure_git_expected=true
+component_expected azure-cli && azure_git_expected=true
+if [[ "$azure_git_expected" == true ]]; then
+    azure_git="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig-azure"
+    portable_git="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
+    if [[ -f "$azure_git" ]] && grep -Fq "$azure_git" "$portable_git" 2>/dev/null \
+       && command -v git-credential-azdo >/dev/null 2>&1; then
+        check_pass "Azure DevOps portable credential integration"
+    else
+        check_fail "Azure CLI present/requested but portable Git integration is incomplete (run: setup.sh --config)"
+    fi
+fi
+
 # Pre-commit hook (info-level — never fail verify if absent).
 git_common_dir="$(git -C "$DOTFILES_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
 hook_path="${git_common_dir:-$DOTFILES_DIR/.git}/hooks/pre-commit"
@@ -220,27 +266,40 @@ else
 fi
 
 # ==============================================================================
-# 4. Docker
+# 4. Work-tier local execution and optional Tailscale readiness
 # ==============================================================================
 
-if command -v docker >/dev/null 2>&1; then
+verify_work_host=false
+if [[ "$VERIFY_MODE" == tier && "$VERIFY_TIER" == work ]]; then
+    verify_work_host=true
+elif [[ "$VERIFY_MODE" == installed ]] && component_expected sbx; then
+    verify_work_host=true
+elif [[ "$RUN_SMOKE" == true ]]; then
+    verify_work_host=true
+fi
+if [[ "$verify_work_host" == true ]]; then
     echo
-    echo "Docker"
+    echo "Work local-execution readiness"
     echo "─────────────────────────────────────"
+    work_verify_checks true
+fi
 
-    # Ground truth for "can I use docker now" is the current process's groups
-    # (id -nG with no arg), which reflects login-time membership resolved via
-    # nsswitch. Don't grep /etc/group or do a fresh `id -nG "$USER"` lookup:
-    # directory-backed setups (LDAP/SSS/AD) supply docker membership outside the
-    # local file, and a by-name lookup can even return a different set than the
-    # live session, so both false-negative. getent catches the "added but not yet
-    # active in this session" case (membership exists but login predates it).
-    if id -nG 2>/dev/null | grep -qw docker; then
-        check_pass "docker group (active)"
-    elif getent group docker 2>/dev/null | grep -qw "$USER"; then
-        check_warn "docker group (added — restart shell to activate)"
+if [[ "${VERIFY_CAPABILITIES[tail]:-false}" == true ]] \
+   || { [[ "$VERIFY_MODE" == installed ]] && component_expected tailscale; }; then
+    echo
+    echo "Tailscale readiness"
+    echo "─────────────────────────────────────"
+    tail_verify_checks true
+fi
+
+if [[ "$RUN_SMOKE" == true ]]; then
+    echo
+    echo "Local sbx smoke test"
+    echo "─────────────────────────────────────"
+    if work_smoke_test; then
+        check_pass "mountless local shell sandbox create/exec/cleanup"
     else
-        check_fail "not in docker group (sudo usermod -aG docker $USER)"
+        check_fail "local sandbox smoke test failed"
     fi
 fi
 

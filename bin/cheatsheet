@@ -114,22 +114,15 @@ show_tools() {
     # shellcheck source=../lib/registry.sh
     source "$DOTFILES_DIR/lib/registry.sh"
 
-    local tier_label
-    for tier_label in bash dev work; do
-        echo
-        echo "${BOLD}Tier: ${tier_label}${RESET}"
-        local name verify_cmd status
-        # Sort tools alphabetically within each tier
-        while IFS= read -r name; do
-            verify_cmd="$(tool_verify_command "$name")"
-            if eval "$verify_cmd" >/dev/null 2>&1; then
-                status="${YELLOW}${TOOL_BINARY[$name]}${RESET} ${DIM}(${TOOL_METHOD[$name]}, installed)${RESET}"
-            else
-                status="${YELLOW}${TOOL_BINARY[$name]}${RESET} ${DIM}(${TOOL_METHOD[$name]}, not installed)${RESET}"
-            fi
-            printf "    %-18s %s\n" "$name" "$status"
-        done < <(tools_for_tier "$tier_label")
-    done
+    local name verify_cmd status membership
+    while IFS= read -r name; do
+        verify_cmd="$(tool_verify_command "$name")"
+        membership="tier=${TOOL_TIER[$name]:--}"
+        [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || membership+="; cap=${TOOL_CAPABILITIES[$name]}"
+        if eval "$verify_cmd" >/dev/null 2>&1; then status=installed; else status="not installed"; fi
+        printf "    %-18s ${YELLOW}%-12s${RESET} ${DIM}(%s, %s, %s)${RESET}\n" \
+            "$name" "${TOOL_BINARY[$name]}" "${TOOL_METHOD[$name]}" "$membership" "$status"
+    done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
 }
 
 # Show bin/ utility scripts (auto-generated — each script's line 2 is its

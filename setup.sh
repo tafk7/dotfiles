@@ -17,9 +17,13 @@ source "$SCRIPT_DIR/lib/install.sh"
 # Installation options
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool flag).
-AI_ALL=false           # --ai / --full: install every ai-tier tool.
+AI_ALL=false           # --ai / --full: install every AI-capability tool.
 declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode / --pi.
 INSTALL_RDP=false      # Orthogonal: xrdp RDP server. Off by default; NOT implied by --full.
+INSTALL_TAIL=false     # Orthogonal: Tailscale package/service; no enrollment.
+INSTALL_AZURE=false
+INSTALL_GCLOUD=false
+INSTALL_AWS=false
 THEME_REQUEST=""       # Empty preserves preference; enabled/disabled are explicit changes.
 AGENT_BADGE_REQUEST=""
 FORCE_OVERWRITE=false
@@ -86,7 +90,7 @@ parse_arguments() {
                 shift
                 ;;
             --full)
-                # Convenience: everything. Equivalent to --work --ai.
+                # Convenience: exactly --work --ai.
                 request_tier "work"
                 INSTALL_AI=true
                 AI_ALL=true
@@ -94,7 +98,7 @@ parse_arguments() {
                 ;;
             --ai)
                 # Orthogonal opt-in; combines with any tier. Installs every
-                # ai-tier tool; use the per-tool flags below to pick individually.
+                # AI-capability tool; use the per-tool flags below to pick individually.
                 INSTALL_AI=true
                 AI_ALL=true
                 shift
@@ -109,6 +113,22 @@ parse_arguments() {
                 # Orthogonal opt-in; combines with any tier. Never implied by
                 # --full — installing it opens a network listener.
                 INSTALL_RDP=true
+                shift
+                ;;
+            --tail)
+                INSTALL_TAIL=true
+                shift
+                ;;
+            --azure)
+                INSTALL_AZURE=true
+                shift
+                ;;
+            --gcloud)
+                INSTALL_GCLOUD=true
+                shift
+                ;;
+            --aws)
+                INSTALL_AWS=true
                 shift
                 ;;
             --theme)
@@ -183,6 +203,27 @@ tier_includes() {
     esac
 }
 
+capability_selected() {
+    case "$1" in
+        ai) [[ "$INSTALL_AI" == true ]] ;;
+        rdp) [[ "$INSTALL_RDP" == true ]] ;;
+        tail) [[ "$INSTALL_TAIL" == true ]] ;;
+        azure) [[ "$INSTALL_AZURE" == true ]] ;;
+        gcloud) [[ "$INSTALL_GCLOUD" == true ]] ;;
+        aws) [[ "$INSTALL_AWS" == true ]] ;;
+        *) return 1 ;;
+    esac
+}
+
+component_selected() {
+    local name="$1" capability
+    tool_in_cumulative_tier "$name" "$INSTALL_TIER" && return 0
+    for capability in ai rdp tail azure gcloud aws; do
+        capability_selected "$capability" && tool_has_capability "$name" "$capability" && return 0
+    done
+    return 1
+}
+
 # Show help information
 show_help() {
     cat << 'EOF'
@@ -211,12 +252,14 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Adds APT: zsh, build tools, clipboard, graphviz, etc.
                         Adds: neovim, tmux
 
-    --work              Dev + heavier environment tooling. Requires sudo.
-                        Adds: NVM, Docker, Azure CLI, Rust
-                        (Everything except the AI CLIs — for machines where an
-                        org manages the Claude/Codex install.)
+    --work              Dev + local development/agent execution. Requires sudo.
+                        Adds: NVM, Docker, sbx, KVM host access, Rust
+                        Requires native Ubuntu 24.04/26.04 with KVM available
+                        for local sandbox readiness.
+                        AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave
+                        AI off where an organization manages those CLIs.
 
-    --full              Everything: --work plus the AI CLIs. Requires sudo.
+    --full              Work tier plus all AI CLIs. Requires sudo.
                         Equivalent to: --work --ai
 
 AI TOOLING (orthogonal - combines with any tier):
@@ -240,6 +283,15 @@ RDP SERVER (orthogonal - combines with any tier):
                         WSL: listens on localhost:3390 for the Windows host
                         (connect with mstsc). Native: port 3389 — keep it
                         behind a VPN/firewall. See issues/xrdp-remote-desktop.md.
+
+TAILSCALE AND CLOUD (orthogonal - combine with any tier):
+    --tail              Install Tailscale and enable tailscaled under systemd.
+                        Does not enroll, configure routes/SSH, or change firewall
+                        policy. Requires sudo on Ubuntu 22.04/24.04/26.04.
+    --azure             Azure CLI + Azure DevOps Git credential integration.
+    --gcloud            Google Cloud CLI from Google's signed APT repository.
+    --aws               AWS CLI v2 from AWS's signature-verified distribution.
+                        These selections require sudo independently of the tier.
 
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
@@ -267,8 +319,12 @@ EXAMPLES:
     ./setup.sh --dev --ai            # Development setup + all AI CLIs
     ./setup.sh --dev --claude        # Development setup + only Claude Code
     ./setup.sh --claude --opencode   # Config + just those two AI CLIs
-    ./setup.sh --work                # Full environment, org manages AI
-    ./setup.sh --full                # Absolutely everything (--work --ai)
+    ./setup.sh --work                # Local work environment, AI stays separate
+    ./setup.sh --full                # Exactly --work --ai
+    ./setup.sh --work --tail         # Local sbx work environment + Tailscale
+    ./setup.sh --work --claude --codex --tail
+    ./setup.sh --full --tail --gcloud
+    ./setup.sh --work --azure        # Former --work cloud-tool behavior
     ./setup.sh --dev --rdp           # Dev setup + RDP into this machine's desktop
     ./setup.sh --bash --dry-run      # Preview bash tier installation
 
@@ -281,14 +337,17 @@ TIER SUMMARY:
     │          │   gdu, glow, lazygit, gh, uv, sd, bat, fd,      │           │
     │          │   ripgrep, direnv  (all to ~/.local/bin)        │           │
     │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
-    │ work     │ + NVM, Docker, Azure CLI, Rust                  │ Yes       │
+    │ work     │ + NVM, Docker, sbx, KVM access, Rust            │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
     │ --ai     │ + Claude Code, Codex, opencode, Pi (orthogonal) │ No        │
     │          │   (or --claude/--codex/--opencode/--pi singly)  │           │
     │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
-    │ --full   │ = work + ai (everything except --rdp)           │ Yes       │
+    │ --tail   │ + Tailscale package/service (no enrollment)     │ Yes       │
+    │ cloud    │ --azure / --gcloud / --aws                      │ Yes       │
+    │ --full   │ = work + ai (no Tailscale, RDP, or cloud CLIs)  │ Yes       │
     └──────────┴─────────────────────────────────────────────────┴───────────┘
-    The sudo boundary is at dev: config + bash need no root; dev + work do.
+    The tier sudo boundary is at dev. Tailscale, RDP, and APT-backed cloud
+    selections require sudo independently of the selected tier.
 
 The script will:
 1. Verify system requirements
@@ -313,13 +372,13 @@ phase_verify_system() {
         os_version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' "$os_release")"
     fi
     if [[ "$os_id" != "ubuntu" ]]; then
-        if tier_includes "dev" || [[ "$INSTALL_RDP" == "true" ]]; then
-            error "APT-backed tiers and --rdp require Ubuntu (detected: ${os_id:-unknown})"
+        if tier_includes "dev" || [[ "$INSTALL_RDP" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ]]; then
+            error "APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: ${os_id:-unknown})"
             return 1
         fi
         warn "Ubuntu not detected - APT-backed features are unavailable"
     elif [[ "$os_version" != 22.04 && "$os_version" != 24.04 && "$os_version" != 26.04 ]]; then
-        if tier_includes "dev" || [[ "$INSTALL_RDP" == true ]]; then
+        if tier_includes "dev" || [[ "$INSTALL_RDP" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ]]; then
             error "Unsupported Ubuntu release: ${os_version:-unknown} (supported: 22.04, 24.04, 26.04)"
             return 1
         fi
@@ -335,7 +394,7 @@ phase_verify_system() {
     # bootstrap + downloads) and git; apt is not involved until the dev tier.
     for cmd in curl git; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            if tier_includes "bash" || { [[ "$cmd" == curl && "$INSTALL_AI" == true ]]; }; then
+            if tier_includes "bash" || { [[ "$cmd" == curl && ( "$INSTALL_AI" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ) ]]; }; then
                 error "Required command not found: $cmd"
                 return 1
             else
@@ -343,11 +402,28 @@ phase_verify_system() {
             fi
         fi
     done
-    if [[ "$INSTALL_RDP" == true ]]; then
+    if [[ "$INSTALL_RDP" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ]]; then
         for cmd in apt-get sudo systemctl; do
-            command -v "$cmd" >/dev/null 2>&1 || { error "--rdp requires: $cmd"; return 1; }
+            [[ "$cmd" != systemctl || "$INSTALL_RDP" == true ]] || continue
+            command -v "$cmd" >/dev/null 2>&1 || { error "Requested APT/service capability requires: $cmd"; return 1; }
         done
     fi
+
+    local capability component
+    if tier_includes work && ! tool_applicable sbx; then
+        error "--work requires native Ubuntu 24.04/26.04 with supported KVM architecture"
+        return 1
+    fi
+
+    for capability in tail azure gcloud aws; do
+        capability_selected "$capability" || continue
+        while IFS= read -r component; do
+            tool_applicable "$component" || {
+                error "--$capability is unsupported on ${os_id:-unknown} ${os_version:-unknown}/$(tool_arch 2>/dev/null || printf unknown) ($component is not applicable)"
+                return 1
+            }
+        done < <(tools_for_capability "$capability")
+    done
 
     detect_environment
 
@@ -372,7 +448,7 @@ phase_install_packages() {
     log "Phase 2: Package Installation"
 
     # Nothing to install for a bare config tier with no orthogonal flags.
-    if ! tier_includes "bash" && [[ "$INSTALL_AI" != "true" && "$INSTALL_RDP" != "true" ]]; then
+    if ! tier_includes "bash" && [[ "$INSTALL_AI" != true && "$INSTALL_RDP" != true && "$INSTALL_TAIL" != true && "$INSTALL_AZURE" != true && "$INSTALL_GCLOUD" != true && "$INSTALL_AWS" != true ]]; then
         log "Config tier: skipping package installation"
         return 0
     fi
@@ -398,6 +474,12 @@ phase_install_packages() {
     if [[ "$INSTALL_RDP" == "true" ]]; then
         install_rdp_packages || INSTALLATION_FAILED=true
     fi
+
+    [[ "$INSTALL_TAIL" != true ]] || install_tail_packages || INSTALLATION_FAILED=true
+
+    [[ "$INSTALL_AZURE" != true ]] || install_cloud_capability azure || INSTALLATION_FAILED=true
+    [[ "$INSTALL_GCLOUD" != true ]] || install_cloud_capability gcloud || INSTALLATION_FAILED=true
+    [[ "$INSTALL_AWS" != true ]] || install_cloud_capability aws || INSTALLATION_FAILED=true
 
     if [[ "$INSTALLATION_FAILED" == "true" ]]; then
         error "One or more requested package operations failed"
@@ -590,7 +672,7 @@ run_installation() {
 
     # Success message
     echo
-    success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == "true" ]] && echo " +ai")$([[ "$INSTALL_RDP" == "true" ]] && echo " +rdp"))"
+    success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == true ]] && echo " +ai")$([[ "$INSTALL_RDP" == true ]] && echo " +rdp")$([[ "$INSTALL_TAIL" == true ]] && echo " +tail")$([[ "$INSTALL_AZURE" == true ]] && echo " +azure")$([[ "$INSTALL_GCLOUD" == true ]] && echo " +gcloud")$([[ "$INSTALL_AWS" == true ]] && echo " +aws"))"
     echo
 
     # Post-installation instructions
@@ -603,12 +685,15 @@ run_installation() {
 
     # Check if Docker group was added (work tier only)
     if tier_includes "work" && command -v docker >/dev/null 2>&1; then
-        if grep "^docker:" /etc/group | grep -q "\b$USER\b"; then
-            if ! groups | grep -q docker; then
+        if [[ "$(host_group_state docker)" == pending ]]; then
                 echo "* Docker group membership requires restart"
                 needs_restart=true
-            fi
         fi
+    fi
+
+    if tier_includes "work" && [[ "$(host_group_state kvm)" == pending ]]; then
+        echo "* KVM group membership requires a new login"
+        needs_restart=true
     fi
 
     # Check if NVM was installed (work tier only)
@@ -637,9 +722,32 @@ run_installation() {
     fi
 
     echo "$step. Verify installation:"
-    echo "   ./bin/verify"
+    if tier_includes "work"; then
+        if [[ "$INSTALL_TAIL" == true ]]; then
+            echo "   ./bin/verify --tier work --tail"
+        else
+            echo "   ./bin/verify --tier work"
+        fi
+    else
+        echo "   ./bin/verify"
+    fi
     echo
     ((step++))
+
+    if tier_includes "work"; then
+        echo "$step. Authenticate and smoke-test local sandboxes manually:"
+        echo "   sbx login"
+        echo "   ./bin/verify --tier work --smoke"
+        echo
+        ((step++))
+    fi
+
+    if [[ "$INSTALL_TAIL" == true ]]; then
+        echo "$step. Enroll Tailscale with your intended routing/SSH policy:"
+        echo "   sudo tailscale up"
+        echo
+        ((step++))
+    fi
 
     # RDP connect instructions (port/security depend on WSL vs native).
     if [[ "$INSTALL_RDP" == "true" ]]; then
@@ -727,6 +835,10 @@ main() {
         echo "AI CLIs: none"
     fi
     [[ "$INSTALL_RDP" == "true" ]] && echo "RDP server (xrdp): yes (--rdp)"
+    [[ "$INSTALL_TAIL" == true ]] && echo "Tailscale: yes (--tail)"
+    [[ "$INSTALL_AZURE" == true ]] && echo "Azure CLI: yes (--azure)"
+    [[ "$INSTALL_GCLOUD" == true ]] && echo "Google Cloud CLI: yes (--gcloud)"
+    [[ "$INSTALL_AWS" == true ]] && echo "AWS CLI v2: yes (--aws)"
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     

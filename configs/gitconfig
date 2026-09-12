@@ -145,9 +145,4 @@
     # each shell/window, activates exactly one without rewriting this file.
 
 {{THEME_INCLUDE}}
-
-[credential "https://msasg.visualstudio.com"]
-    helper = azdo
-
-[credential "https://dev.azure.com"]
-    helper = azdo
+{{AZURE_INCLUDE}}
