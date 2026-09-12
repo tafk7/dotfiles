@@ -23,8 +23,8 @@ export DOTFILES_THEME_ENABLED=0
 # An installed vim-plug is an autoload function: exists('*plug#begin') is false
 # until the file is loaded. Provide a minimal fixture to prove init.vim calls
 # the installed manager without downloading it.
-mkdir -p "$HOME/.config/nvim/autoload"
-cat > "$HOME/.config/nvim/autoload/plug.vim" <<'EOF'
+mkdir -p "$XDG_CONFIG_HOME/nvim/autoload"
+cat > "$XDG_CONFIG_HOME/nvim/autoload/plug.vim" <<'EOF'
 function! plug#begin(...) abort
   let g:dotfiles_test_plug_begin = 1
   command! -nargs=+ Plug call plug#register(<q-args>)

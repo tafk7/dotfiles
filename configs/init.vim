@@ -12,10 +12,10 @@
 " Plugins
 " ==============================================================================
 
-let s:vim_plug = expand('~/.config/nvim/autoload/plug.vim')
+let s:vim_plug = stdpath('config') . '/autoload/plug.vim'
 if filereadable(s:vim_plug)
 execute 'source ' . fnameescape(s:vim_plug)
-call plug#begin('~/.config/nvim/plugged')
+call plug#begin(stdpath('data') . '/plugged')
 
 " Color schemes
 Plug 'morhetz/gruvbox', { 'commit': '5d15b2765f59754d7ac263c88a0f6e3e58124951' }
@@ -210,7 +210,7 @@ set nowritebackup
 " Keep undo history across sessions
 if has('persistent_undo')
     set undofile
-    set undodir=~/.config/nvim/undo
+    let &undodir = stdpath('state') . '/undo'
     if !isdirectory(&undodir)
         call mkdir(&undodir, 'p')
     endif
@@ -447,6 +447,6 @@ nnoremap <leader>ss :call StripTrailingWhitespace()<CR>
 " ==============================================================================
 
 " Source local configuration if it exists
-if filereadable(expand("~/.config/nvim/init.local.vim"))
-    source ~/.config/nvim/init.local.vim
+if filereadable(stdpath('config') . '/init.local.vim')
+    execute 'source ' . fnameescape(stdpath('config') . '/init.local.vim')
 endif
