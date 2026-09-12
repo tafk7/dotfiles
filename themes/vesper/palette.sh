@@ -12,3 +12,7 @@ THEME_RED_HEX='#ff8080'
 THEME_YELLOW_HEX='#ffcfa8'
 THEME_GREEN_HEX='#99ffe4'
 THEME_ANSI=('#232323' '#ff8080' '#99ffe4' '#ffcfa8' '#7dcfff' '#ffc799' '#99ffe4' '#d0d0d0' '#777777' '#ff9a9a' '#b2ffec' '#ffdbbd' '#9bd9ff' '#ffd2ad' '#b2ffec' '#ffffff')
+# Pane tint backgrounds.
+export THEME_TINT_1='#0A0A0A'  # deeper than bg
+export THEME_TINT_2='#1C1C1C'  # bg_alt
+export THEME_TINT_3='#232323'  # selection

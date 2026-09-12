@@ -12,3 +12,7 @@ THEME_RED_HEX='#b40f36'
 THEME_YELLOW_HEX='#8a5800'
 THEME_GREEN_HEX='#287a1d'
 THEME_ANSI=('#4c4f69' '#a80f32' '#287a1d' '#795600' '#1e5ab6' '#7130b8' '#116a70' '#5c5f77' '#5c5f77' '#b40f36' '#287a1d' '#825d00' '#1e66d0' '#7b35ca' '#14777e' '#3b3d52')
+# Pane tint backgrounds.
+export THEME_TINT_1='#E6E9EF'  # mantle
+export THEME_TINT_2='#CCD0DA'  # surface0
+export THEME_TINT_3='#BCC0CC'  # surface1

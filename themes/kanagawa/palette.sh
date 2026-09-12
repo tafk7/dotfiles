@@ -12,3 +12,7 @@ THEME_RED_HEX='#e82424'
 THEME_YELLOW_HEX='#e6c384'
 THEME_GREEN_HEX='#98bb6c'
 THEME_ANSI=('#16161d' '#c34043' '#76946a' '#c0a36e' '#7e9cd8' '#957fb8' '#6a9589' '#c8c093' '#727169' '#e82424' '#98bb6c' '#e6c384' '#7fb4ca' '#938aa9' '#7aa89f' '#dcd7ba')
+# Pane tint backgrounds.
+export THEME_TINT_1='#16161D'  # sumiInk0
+export THEME_TINT_2='#2A2A37'  # sumiInk4
+export THEME_TINT_3='#363646'  # sumiInk5

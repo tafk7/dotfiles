@@ -50,14 +50,15 @@ load_palette() {
     theme_exists "$theme" || { error "Theme not found: $theme"; return 1; }
     unset THEME_BG_HEX THEME_FG_HEX THEME_SECONDARY_HEX THEME_SURFACE_HEX \
         THEME_SURFACE_2_HEX THEME_BORDER_HEX THEME_ACCENT_HEX THEME_ACCENT_2_HEX \
-        THEME_RED_HEX THEME_YELLOW_HEX THEME_GREEN_HEX THEME_ANSI
+        THEME_RED_HEX THEME_YELLOW_HEX THEME_GREEN_HEX THEME_ANSI \
+        THEME_TINT_1 THEME_TINT_2 THEME_TINT_3
     # shellcheck source=/dev/null
     source "$THEMES_DIR/$theme/palette.sh"
 }
 
 validate_theme() {
     local theme="$1" file missing=0
-    for file in meta.sh palette.sh vim.vim tmux.conf shell.sh colors.sh starship.palette.toml delta.gitconfig btop.theme lazygit.yml; do
+    for file in meta.sh palette.sh vim.vim shell.sh starship.palette.toml delta.gitconfig btop.theme lazygit.yml; do
         if [[ ! -f "$THEMES_DIR/$theme/$file" ]]; then
             error "$theme is missing $file"
             missing=1
@@ -96,16 +97,19 @@ ensure_theme_artifacts() {
     mkdir -p "$dir"
 
     base="$DOTFILES_DIR/configs/starship.toml"
-    if [[ ! -f "$dir/starship.toml" || "$base" -nt "$dir/starship.toml" ]]; then
+    if [[ ! -f "$dir/starship.toml" || "$base" -nt "$dir/starship.toml" \
+          || "$THEMES_DIR/$theme/starship.palette.toml" -nt "$dir/starship.toml" ]]; then
         tmp="$(mktemp "$dir/starship.toml.tmp.XXXXXX")"
         sed "s|__DOTFILES_PALETTE__|$theme|g" "$base" > "$tmp"
+        printf '\n' >> "$tmp"
+        cat "$THEMES_DIR/$theme/starship.palette.toml" >> "$tmp"
         mv "$tmp" "$dir/starship.toml"
     fi
 
     if [[ ! -f "$dir/dotfiles-$theme.theme" ]] || ! cmp -s "$THEMES_DIR/$theme/btop.theme" "$dir/dotfiles-$theme.theme"; then
         cp "$THEMES_DIR/$theme/btop.theme" "$dir/dotfiles-$theme.theme"
     fi
-    source_config="${BTOP_BASE_CONFIG:-$HOME/.config/btop/btop.conf}"
+    source_config="${BTOP_BASE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/btop/btop.conf}"
     config="$dir/btop.conf"
     # Skip when the output is already newer than its only input — the awk +
     # cmp + rm round trip ran on EVERY resolve (~30ms) just to rewrite a file
@@ -255,8 +259,6 @@ tmux_apply_window() {
     theme_tmux "${commands[@]}"
     tmux_set_window_palette "$window_id"
 
-    # colors.sh remains the pane-tint source of truth.
-    source "$THEMES_DIR/$theme/colors.sh"
     tmux_apply_tints "$window_id"
 }
 
@@ -631,7 +633,7 @@ cmd_env() {
     fzf_theme="--color=bg+:$THEME_SURFACE_HEX,bg:$THEME_BG_HEX,spinner:$THEME_ACCENT_2_HEX,hl:$THEME_ACCENT_HEX --color=fg:$THEME_FG_HEX,header:$THEME_SECONDARY_HEX,info:$THEME_SECONDARY_HEX,pointer:$THEME_ACCENT_2_HEX --color=marker:$THEME_GREEN_HEX,fg+:$THEME_FG_HEX,prompt:$THEME_ACCENT_HEX,hl+:$THEME_ACCENT_HEX"
     shell_quote_export FZF_THEME_COLORS "$fzf_theme"
 
-    resolve_surface_theme_into tmux; theme="$_THEME_REPLY"; load_palette "$theme"; source "$THEMES_DIR/$theme/colors.sh"
+    resolve_surface_theme_into tmux; theme="$_THEME_REPLY"; load_palette "$theme"
     shell_quote_export THEME_TINT_1 "$THEME_TINT_1"
     shell_quote_export THEME_TINT_2 "$THEME_TINT_2"
     shell_quote_export THEME_TINT_3 "$THEME_TINT_3"
@@ -672,7 +674,7 @@ cmd_tint() {
     fi
     [[ "$level" =~ ^[123]$ ]] || { error "Tint must be 0, 1, 2, or 3"; return 1; }
     load_theme_context "" "$(theme_tmux display-message -p -t "$pane" '#{window_id}')"
-    theme="$(resolve_surface_theme tmux)"; load_palette "$theme"; source "$THEMES_DIR/$theme/colors.sh"
+    theme="$(resolve_surface_theme tmux)"; load_palette "$theme"
     tint="THEME_TINT_$level"
     theme_tmux set-option -q -p -t "$pane" @dotfiles_pane_tint "$level"
     theme_tmux set-option -q -p -t "$pane" window-style "bg=${!tint},fg=$THEME_FG_HEX"
