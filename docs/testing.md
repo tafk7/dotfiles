@@ -10,6 +10,7 @@ Run the local suite:
 for test_file in tests/*.sh; do bash "$test_file"; done
 python3 tests/startup-benchmark-test.py
 python3 tests/theme-contrast.py
+python3 tests/documentation.py
 ```
 
 Run the base-versus-candidate startup regression check from an isolated copy of
@@ -17,6 +18,8 @@ the base revision:
 
 ```bash
 python3 tests/startup-benchmark.py /path/to/base /path/to/candidate
+python3 tests/startup-benchmark.py /path/to/base /path/to/candidate --theme disabled
+python3 tests/startup-benchmark.py /path/to/base /path/to/candidate --tools installed
 ```
 
 The benchmark copies both revisions without live generated state and links the
@@ -39,6 +42,18 @@ It fails when the candidate regression exceeds both 10 ms and 15%, and also
 enforces a two-second catastrophic ceiling. These are warm-cache shell/config
 measurements with controlled tools, not benchmarks of real tool releases,
 Windows IPC, first prompt rendering, or model/tool transport latency.
+
+`--tools installed` uses local direnv, Starship, uv, fzf, and zoxide binaries in
+the same isolated profiles. It authorizes only the fixture's disposable project.
+Report both modes and retain their JSON results; use `--theme disabled` with
+either. Performance changes require owner review before live adoption, including
+changes below the automated threshold. See [rollout](maintenance.md).
+
+`transaction-failures.sh`, `companion-artifacts.sh`, `fresh-config.sh`, and
+`check-updates.sh` exercise conditional-call failures, incomplete component
+releases, relocated XDG config, external installation preservation, and upstream
+lookup failures. `editor-plugins.sh` requires Neovim and uses a fake download and
+plugin manager; it never fetches plugins. CI discovers all `tests/*.sh` files.
 
 `tests/project-environment.sh` requires direnv and tests actual authorized
 project activation in fresh Bash/Zsh subprocesses, including a changed working
@@ -65,7 +80,7 @@ make one tmux context query when inside tmux; they do not launch the full resolv
   cannot validate Windows interop, the Windows agent pipe, or WSL lifecycle.
 - xrdp has immutable dry-run and preflight unit coverage. Starting a real
   listener and validating an RDP desktop session is periodic/manual and requires
-  Gate C approval on the target host.
+  explicit authorization on the target host.
 - Work-host tests use mocked APT repositories, sudo, services, groups, Docker
   contexts, KVM, and `sbx`. They validate local-versus-remote Docker, pending
   login state, precise smoke cleanup, and forbidden broad/cloud operations.
@@ -87,7 +102,7 @@ make one tmux context query when inside tmux; they do not launch the full resolv
 
 ## Manual RDP checklist
 
-After Gate C approval, run the requested `--rdp` setup on a disposable VM,
+On an authorized disposable VM, run the requested `--rdp` setup,
 verify the selected port, TLS configuration, desktop session, and service state,
 then run `bin/verify --tier rdp`. Confirm rollback from the timestamped xrdp
 configuration backup before considering the live service test complete.

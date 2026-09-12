@@ -56,6 +56,12 @@ class StartupBenchmarkTest(unittest.TestCase):
             with self.subTest(mode=mode), self.assertRaises(RuntimeError):
                 self.fixture.sample("bash", mode)
 
+    def test_disabled_theme_startup(self):
+        fixture = benchmark.Fixture(ROOT, theme_enabled=False)
+        self.addCleanup(fixture.close)
+        for shell in ("bash", "zsh"):
+            fixture.sample(shell, "interactive")
+
 
 if __name__ == "__main__":
     unittest.main()

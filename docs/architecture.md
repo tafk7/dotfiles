@@ -99,6 +99,11 @@ roots, update contract, and uninstall paths where automated removal is safe.
 `TOOL_CAPABILITIES` records AI, RDP, Tailscale, and cloud membership. Docker and
 sbx are ordinary work-tier components.
 
+Companion executables are declared in `TOOL_COMPANIONS` and participate in
+installation, verification, and uninstall. Successful installation establishes
+ownership; observing or skipping a local binary does not. See the
+[ownership and recovery contract](maintenance.md#updates-and-ownership).
+
 Eget downloads are staged and executed before an atomic replacement. Neovim and
 tmux also stage their artifacts/builds before replacing the working executable.
 APT and moving vendor installers have explicit in-place failure contracts and
@@ -160,7 +165,8 @@ Host-mutating commands are faked in unit tests. Hook tests use disposable
 standalone repositories. Architecture jobs explicitly label ARM checks as
 selection-only unless an ARM binary was actually executed.
 
-Development occurs in a separate worktree. Integration into the live checkout,
-durable state migration/live-process synchronization, and host-level mutations
-are separate approval gates described in
-[`repository-improvement-plan.md`](repository-improvement-plan.md).
+Development occurs in an isolated checkout. Performance measurement and owner
+review precede adoption into the live symlink-target checkout. Integration,
+configuration reconciliation, and host changes are separate actions described in
+[maintenance and rollout](maintenance.md). The earlier implementation program is
+retained as [history](history/2026-09-improvement-plan.md).

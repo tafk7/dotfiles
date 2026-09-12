@@ -8,7 +8,7 @@ trap 'TMUX_TMPDIR="$TEST_ROOT/tmux" tmux -L "$SERVER" kill-server 2>/dev/null ||
 mkdir -p "$TEST_ROOT/home/dev" "$TEST_ROOT/tmux" "$TEST_ROOT/state" "$TEST_ROOT/cache"
 SPACED="$TEST_ROOT/home/dev/dotfiles with spaces"
 mkdir -p "$SPACED"
-git -C "$ROOT" archive HEAD | tar -x -C "$SPACED"
+tar -C "$ROOT" --exclude=.git --exclude=generated --exclude=.backups -cf - . | tar -x -C "$SPACED"
 
 HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" XDG_CACHE_HOME="$TEST_ROOT/cache" \
     XDG_CONFIG_HOME="$TEST_ROOT/config" DOTFILES_DIR="$SPACED" \

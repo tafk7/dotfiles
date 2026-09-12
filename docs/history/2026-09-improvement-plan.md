@@ -1,6 +1,10 @@
-# Dotfiles improvement plan
+# Historical dotfiles improvement plan — September 2026
 
-Status: implemented in an isolated worktree; Gate A live-checkout approval pending.
+This document preserves the original implementation plan and its recorded status.
+It is not the current architecture or an operational approval policy. See
+[architecture](../architecture.md) and [maintenance](../maintenance.md).
+
+Original recorded status: implemented in an isolated worktree; Gate A live-checkout approval pending.
 
 This plan turns the September 2026 repository review into an ordered implementation
 program. The goal is not merely to fix individual defects. It is to make the repository

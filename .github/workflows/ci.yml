@@ -58,13 +58,13 @@ jobs:
       - name: Install validation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-yaml zsh tmux direnv
+          sudo apt-get install -y python3-yaml zsh tmux direnv neovim jq
 
       - name: Theme catalog parses
         run: |
           set -euo pipefail
           # `--list` walks every themes/<name>/meta.sh and prints the catalog.
-          # If a theme dir is malformed (missing meta.sh / colors.sh / shell.sh),
+          # If a theme dir is malformed (missing meta.sh / palette.sh / shell.sh),
           # this fails before any installation step.
           ./bin/theme-switcher --list
 
@@ -86,18 +86,12 @@ jobs:
       - name: Hermetic behavior and safety suite
         run: |
           set -euo pipefail
-          for test_file in \
-            tests/argument-parsing.sh tests/state.sh tests/setup-safety.sh \
-            tests/config-reconcile.sh tests/eget-staging.sh tests/install-failures.sh tests/minimal-ubuntu.sh \
-            tests/install-ai.sh tests/install-toolchains.sh tests/neovim.sh \
-            tests/uninstall-safety.sh tests/git-hooks.sh tests/registry.sh tests/agent-badge.sh \
-            tests/agent-shell.sh tests/project-environment.sh tests/shell-behavior.sh tests/features.sh tests/theme-system.sh tests/theme-refresh.sh \
-            tests/tmux-config.sh tests/verify-profiles.sh tests/wsl.sh \
-            tests/xrdp.sh tests/work-selection.sh tests/work-installers.sh \
-            tests/work-verify.sh tests/work-smoke.sh tests/validate-structured.sh; do
+          for test_file in tests/*.sh; do
             bash "$test_file"
           done
           python3 tests/startup-benchmark-test.py
+          python3 tests/theme-contrast.py
+          python3 tests/documentation.py
 
       - name: Cheatsheet TSV is well-formed
         run: |
@@ -289,6 +283,7 @@ jobs:
           mkdir -p /tmp/dotfiles-baseline
           git archive "$BASE_SHA" | tar -x -C /tmp/dotfiles-baseline
           python3 tests/startup-benchmark.py /tmp/dotfiles-baseline "$PWD"
+          python3 tests/startup-benchmark.py /tmp/dotfiles-baseline "$PWD" --theme disabled
 
   architecture-selection:
     name: Registry selection (${{ matrix.arch }} / ${{ matrix.platform }})

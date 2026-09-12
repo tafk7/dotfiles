@@ -195,7 +195,7 @@ A worked example: **adding a new tool `helix`**.
    TOOL_TIER[helix]=dev
    ```
 2. Add a release block to `eget.toml`.
-3. Run `./setup.sh --dev` (or `eget --download-all`).
+3. Run `./setup.sh --dev` so selection, staging, and ownership checks apply.
 
 That's it. **All of these update automatically:**
 
