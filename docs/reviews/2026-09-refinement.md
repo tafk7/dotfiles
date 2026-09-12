@@ -17,7 +17,8 @@ live checkout. Baseline: `ce7ddf2270875ed141125bae70ee0ef8b7aaa066`.
   keeps its existing fast path.
 - Neovim, bat, fd, and btop configuration respects XDG paths. The explicit
   `install-editor-plugins` command bootstraps pinned vim-plug; editor startup
-  remains offline. Existing plugin trees are retained when moving to XDG data.
+  remains offline. Existing plugin/undo directories continue working; fresh
+  profiles use XDG data/state without forcing a migration on existing machines.
 - Supported agent selections with badges enabled install missing jq without
   sudo. Standalone plugin installs declare the dependency and report its absence.
 - Update checks preserve upstream errors and return correct empty JSON results.

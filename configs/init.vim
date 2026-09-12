@@ -15,7 +15,11 @@
 let s:vim_plug = stdpath('config') . '/autoload/plug.vim'
 if filereadable(s:vim_plug)
 execute 'source ' . fnameescape(s:vim_plug)
-call plug#begin(stdpath('data') . '/plugged')
+" Preserve existing installations; new profiles use the XDG data directory.
+let s:plug_dir = isdirectory(stdpath('config') . '/plugged')
+      \ ? stdpath('config') . '/plugged' : stdpath('data') . '/plugged'
+call plug#begin(s:plug_dir)
+unlet s:plug_dir
 
 " Color schemes
 Plug 'morhetz/gruvbox', { 'commit': '5d15b2765f59754d7ac263c88a0f6e3e58124951' }
@@ -210,7 +214,8 @@ set nowritebackup
 " Keep undo history across sessions
 if has('persistent_undo')
     set undofile
-    let &undodir = stdpath('state') . '/undo'
+    let &undodir = isdirectory(stdpath('config') . '/undo')
+          \ ? stdpath('config') . '/undo' : stdpath('state') . '/undo'
     if !isdirectory(&undodir)
         call mkdir(&undodir, 'p')
     endif

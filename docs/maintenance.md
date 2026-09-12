@@ -73,8 +73,10 @@ selection is tracked as a [separate decision](../issues/work-tier-sandbox-bounda
 
 After `setup.sh --dev`, run `bin/install-editor-plugins` explicitly to bootstrap
 the pinned vim-plug revision and install the configured plugins. Ordinary editor
-startup remains offline. Existing vim-plug files are preserved. Plugin trees use
-Neovim's XDG data directory; older trees can be retained while reinstalling there.
+startup remains offline. Existing vim-plug files are preserved. Existing plugin
+and undo directories under Neovim's config root continue to be used; fresh
+profiles use XDG data for plugins and XDG state for undo. Directory relocation
+is not required for adoption.
 
 Agent-badge requires `jq`, Bash, tmux, and GNU `timeout`; see its
 [dependency instructions](../plugins/shared/README.md#install). Setup installs jq

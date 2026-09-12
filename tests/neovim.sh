@@ -27,6 +27,7 @@ mkdir -p "$XDG_CONFIG_HOME/nvim/autoload"
 cat > "$XDG_CONFIG_HOME/nvim/autoload/plug.vim" <<'EOF'
 function! plug#begin(...) abort
   let g:dotfiles_test_plug_begin = 1
+  let g:dotfiles_test_plug_dir = a:1
   command! -nargs=+ Plug call plug#register(<q-args>)
 endfunction
 function! plug#register(...) abort
@@ -39,14 +40,17 @@ printf 'markdown keeps two spaces  \n' > "$TEST_ROOT/note.md"
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
     XDG_CACHE_HOME="$XDG_CACHE_HOME" DOTFILES_DIR="$ROOT" PATH="$PATH" \
     "$NVIM_BIN" --headless -u "$ROOT/configs/init.vim" "$TEST_ROOT/note.md" \
-        '+if !get(g:, "dotfiles_test_plug_begin", 0) | cquit 30 | endif' '+write' '+quit'
+        '+if !get(g:, "dotfiles_test_plug_begin", 0) | cquit 30 | endif' \
+        '+if g:dotfiles_test_plug_dir !=# stdpath("data") . "/plugged" | cquit 34 | endif' '+write' '+quit'
 grep -q '  $' "$TEST_ROOT/note.md" || fail "Markdown trailing spaces were removed"
 
 printf 'python removes spaces   \nsecond line\n' > "$TEST_ROOT/code.py"
+mkdir -p "$XDG_CONFIG_HOME/nvim/plugged" "$XDG_CONFIG_HOME/nvim/undo"
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
     XDG_CACHE_HOME="$XDG_CACHE_HOME" DOTFILES_DIR="$ROOT" PATH="$PATH" \
     "$NVIM_BIN" --headless -u "$ROOT/configs/init.vim" "$TEST_ROOT/code.py" \
         '+call cursor(2, 3)' '+let @/="needle"' '+write' \
+        '+if g:dotfiles_test_plug_dir !=# stdpath("config") . "/plugged" || &undodir !=# stdpath("config") . "/undo" | cquit 35 | endif' \
         '+if line(".") != 2 || @/ !=# "needle" | cquit 31 | endif' '+quit'
 grep -q '   $' "$TEST_ROOT/code.py" && fail "Python trailing spaces were retained"
 [[ ! -s "$DOTFILES_MUTATION_LOG" ]] || fail "Neovim startup attempted a network download"
