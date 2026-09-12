@@ -43,7 +43,7 @@ for key in "${!CONFIG_MAP[@]}"; do
         || { echo "CONFIG_MAP[$key] has unknown owner: $owner" >&2; exit 1; }
 done
 
-required=(meta.sh palette.sh vim.vim tmux.conf shell.sh colors.sh starship.palette.toml delta.gitconfig btop.theme lazygit.yml)
+required=(meta.sh palette.sh vim.vim shell.sh starship.palette.toml delta.gitconfig btop.theme lazygit.yml)
 for dir in themes/*; do
     [[ -d "$dir" ]] || continue
     theme="${dir##*/}"

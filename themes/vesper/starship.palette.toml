@@ -1,6 +1,6 @@
 # Vesper — Starship palette
 # Vesper defines only three accents; blue/purple reuse existing colors rather
-# than inventing new ones. See themes/vesper/colors.sh for the rationale.
+# than inventing new ones. See palette.sh for the semantic roles.
 [palettes.vesper]
 bg          = "#101010"
 bg_dim      = "#0a0a0a"
