@@ -358,6 +358,15 @@ fi
 # 6b. Theme integration — per-surface wiring (cascade-aware)
 # ==============================================================================
 
+if feature_enabled agent-badge \
+   && { component_expected claude || component_expected codex; }; then
+    if command -v jq >/dev/null 2>&1; then
+        check_pass 'agent-badge JSON dependency (jq)'
+    else
+        check_warn 'agent-badge requires jq on PATH (see plugins/shared/README.md)'
+    fi
+fi
+
 if [[ -n "$theme" ]]; then
     # Resolve the current shell's window/session when inside tmux, otherwise
     # verify the standalone global scope.

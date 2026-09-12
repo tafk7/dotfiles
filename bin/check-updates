@@ -131,20 +131,14 @@ compare_tags() {
 
 # Short tool name from a "owner/repo" — used for --filter and display.
 short_name() {
-    local repo="$1"
-    case "$repo" in
-        starship/starship)         echo "starship" ;;
-        eza-community/eza)         echo "eza" ;;
-        junegunn/fzf)              echo "fzf" ;;
-        ajeetdsouza/zoxide)        echo "zoxide" ;;
-        dandavison/delta)          echo "delta" ;;
-        aristocratos/btop)         echo "btop" ;;
-        charmbracelet/glow)        echo "glow" ;;
-        jesseduffield/lazygit)     echo "lazygit" ;;
-        astral-sh/uv)              echo "uv" ;;
-        chmln/sd)                  echo "sd" ;;
-        *)                         echo "${repo##*/}" ;;
-    esac
+    local repo="$1" name
+    for name in "${!TOOL_EGET_REPO[@]}"; do
+        if [[ "${TOOL_EGET_REPO[$name]}" == "$repo" ]]; then
+            printf '%s\n' "$name"
+            return
+        fi
+    done
+    printf '%s\n' "${repo##*/}"
 }
 
 # Build the rows: name|repo|pinned|latest|status
@@ -162,7 +156,7 @@ collect_rows() {
         else
             status="$(compare_tags "$pinned" "$latest")"
         fi
-        if [[ "$ONLY_OUTDATED" == "true" && "$status" != "outdated" ]]; then
+        if [[ "$ONLY_OUTDATED" == "true" && "$status" != "outdated" && "$status" != error ]]; then
             continue
         fi
         printf '%s|%s|%s|%s|%s\n' "$name" "$repo" "$pinned" "$latest" "$status"
@@ -174,6 +168,7 @@ emit_json() {
     local name repo pinned latest status
     echo "["
     while IFS='|' read -r name repo pinned latest status; do
+        [[ -n "$name" ]] || continue
         [[ "$first" == "true" ]] && first=false || echo ","
         printf '  {"name":"%s","repo":"%s","pinned":"%s","latest":"%s","status":"%s"}' \
             "$name" "$repo" "$pinned" "$latest" "$status"
@@ -222,7 +217,7 @@ emit_table() {
     local auth_note=" (auth: $GH_AUTH_SOURCE)"
     if [[ "$outdated_count" -gt 0 ]]; then
         warn "$outdated_count of $total tool(s) have updates available.${auth_note}"
-        echo "  Bump the tag in $EGET_TOML and run: eget --download-all"
+        echo "  Bump the tag in $EGET_TOML and rerun setup.sh with the component's tier."
     elif [[ "$error_count" -gt 0 ]]; then
         warn "$error_count of $total check(s) failed.${auth_note}"
         [[ "$GH_AUTH_SOURCE" == "none" ]] && echo "  Likely rate-limited. Set GITHUB_TOKEN or install gh."
@@ -233,6 +228,7 @@ emit_table() {
 
 emit_other_contracts() {
     local name method contract installed latest source selection
+    local failed=false
     echo
     echo "Other managed components"
     echo "────────────────────────────────────────────────────────────"
@@ -248,27 +244,34 @@ emit_other_contracts() {
         [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || selection+="/${TOOL_CAPABILITIES[$name]}"
         source="${TOOL_UPDATE_SOURCE[$name]:-}"
         latest="n/a"
-        [[ -z "$source" ]] || latest="$(gh_latest_tag "$source" || printf 'check failed')"
+        if [[ -n "$source" ]] && ! latest="$(gh_latest_tag "$source")"; then
+            latest='check failed'
+            failed=true
+        fi
         printf '%-14s  %-10s  %-18s  %-38s  %-14s  %s\n' "$name" "$method" "$selection" "$contract" "$latest" "$installed"
     done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
+    [[ "$failed" == false ]]
 }
 
 main() {
     resolve_github_auth
-    local rows
+    local rows contracts_failed=false
     rows="$(collect_rows)"
 
     if [[ "$JSON_OUTPUT" == "true" ]]; then
         echo "$rows" | emit_json
     else
         echo "$rows" | emit_table
-        emit_other_contracts
+        emit_other_contracts || contracts_failed=true
     fi
 
     # Non-zero exit when --outdated finds matches (useful in CI / scripts).
+    if [[ "$rows" == *'|error'* || "$contracts_failed" == true ]]; then
+        return 1
+    fi
     if [[ "$ONLY_OUTDATED" == "true" && -n "$rows" ]]; then
-        exit 2
+        return 2
     fi
 }
 
-main
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main; fi

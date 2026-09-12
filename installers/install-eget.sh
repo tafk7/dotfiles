@@ -15,6 +15,7 @@ FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing eget v${EGET_VERSION}..."
+if preserve_existing_tool eget "$FORCE"; then exit 2; fi
 
 # Check existing installation
 if [[ "$FORCE" != true ]] && verify_binary eget; then

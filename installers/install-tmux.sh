@@ -14,6 +14,7 @@ FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
 
 log "Installing tmux..."
+if preserve_existing_tool tmux "$FORCE"; then exit 2; fi
 
 VERSION=$(github_latest_version "tmux/tmux" --strip-v)
 

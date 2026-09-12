@@ -45,7 +45,7 @@ track_install() {
 }
 
 record_component_outcome() {
-    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes note existing_record existing_note
+    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes note existing_record existing_note prior_owner prior_path
     binary="${TOOL_BINARY[$name]}"
     if [[ "${TOOL_METHOD[$name]:-}" == eget && -x "$HOME/.local/bin/$binary" ]]; then
         path="$HOME/.local/bin/$binary"
@@ -63,8 +63,19 @@ record_component_outcome() {
         done < <(tool_uninstall_paths "$name")
     fi
     if [[ -n "$path" ]]; then
-        if tool_owned_path "$name" "$path"; then ownership="dotfiles"; else ownership="external"; fi
-        version="$("$path" --version 2>/dev/null | head -n1 || true)"
+        if ! tool_owned_path "$name" "$path"; then
+            ownership="external"
+        elif [[ "$result" == ok ]]; then
+            ownership="dotfiles"
+        else
+            existing_record="$(ledger_line "$name" 2>/dev/null || true)"
+            IFS=$'\t' read -r _ _ prior_owner _ _ prior_path _ _ <<< "$existing_record"
+            if [[ "$prior_owner" == dotfiles && "$prior_path" != - ]] \
+               && [[ "$(realpath -m -- "$prior_path")" == "$path" ]]; then
+                ownership=dotfiles
+            fi
+        fi
+        version="$("$path" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null | head -n1 || true)"
     fi
     if [[ "${TOOL_METHOD[$name]:-}" == apt && "$result" == ok ]] \
        && dpkg-query -W "${TOOL_APT_PACKAGE[$name]:-$name}" >/dev/null 2>&1; then
@@ -113,7 +124,7 @@ reconcile_observed_components() {
     for name in "${!TOOL_BINARY[@]}"; do
         ledger_line "$name" >/dev/null 2>&1 && continue
         tool_applicable "$name" || {
-            ledger_record "$name" no unknown not-applicable "" "" "platform/architecture"
+            ledger_record "$name" no unknown not-applicable "" "" "platform/architecture" || return 1
             continue
         }
         verify_cmd="$(tool_verify_command "$name")"
@@ -123,7 +134,7 @@ reconcile_observed_components() {
         version="$(observed_component_version "$name" "$path")"
         ownership=unknown
         [[ -n "$path" ]] && ! tool_owned_path "$name" "$path" && ownership=external
-        ledger_record "$name" yes "$ownership" present "$version" "$path" "observed during reconciliation; ownership unclaimed"
+        ledger_record "$name" yes "$ownership" present "$version" "$path" "observed during reconciliation; ownership unclaimed" || return 1
     done
 }
 
@@ -206,7 +217,7 @@ download_https() {
     [[ "$url" == https://* ]] || { error "Refusing non-HTTPS download: $url"; return 1; }
     curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
         --connect-timeout 10 --max-time "${DOTFILES_DOWNLOAD_TIMEOUT:-300}" \
-        --output "$destination" "$url"
+        --output "$destination" "$url" || return 1
     [[ -s "$destination" ]] || { error "Downloaded artifact is empty: $url"; return 1; }
 }
 
@@ -232,16 +243,16 @@ validate_tar_archive() {
 atomic_replace_binary() {
     local component="$1" staged="$2" target="$3" metadata="${4:-}"
     [[ -x "$staged" ]] || { error "Staged $component binary is not executable: $staged"; return 1; }
-    mkdir -p "$(dirname "$target")"
+    mkdir -p "$(dirname "$target")" || return 1
     local pending="${target}.dotfiles-new.$$"
-    journal_begin "$component" "$target" "$staged" "$target"
-    mv "$staged" "$pending"
-    mv -f "$pending" "$target"
+    journal_begin "$component" "$target" "$pending" "$target" || return 1
+    mv "$staged" "$pending" || return 1
+    mv -f "$pending" "$target" || return 1
     local version
-    version="$("$target" --version 2>/dev/null | head -n1 || true)"
+    version="$("$target" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | head -n1 || true)"
     local note="${TOOL_UPDATE_CONTRACT[$component]:-staged}"
     [[ -z "$metadata" ]] || note+=" $metadata"
-    ledger_record "$component" yes dotfiles installed "$version" "$target" "$note"
+    ledger_record "$component" yes dotfiles installed "$version" "$target" "$note" || return 1
     journal_clear
 }
 
@@ -251,23 +262,23 @@ atomic_replace_tree() {
         || { error "Staged $component tree is incomplete: $staged"; return 1; }
     "$staged/$verify_relative" --version >/dev/null 2>&1 \
         || { error "Staged $component tree failed verification"; return 1; }
-    mkdir -p "$(dirname "$target")"
+    mkdir -p "$(dirname "$target")" || return 1
     local rollback_root rollback version
     rollback_root="$(dirname "$target")/.dotfiles-${component}-rollback"
     rollback="$rollback_root/${BASHPID:-$$}"
-    mkdir -p "$rollback_root"
-    journal_begin "$component" "$rollback" "$staged" "$target"
-    if [[ -e "$target" ]]; then mv "$target" "$rollback"; fi
+    mkdir -p "$rollback_root" || return 1
+    journal_begin "$component" "$rollback" "$staged" "$target" || return 1
+    if [[ -e "$target" ]]; then mv "$target" "$rollback" || return 1; fi
     if ! mv "$staged" "$target"; then
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
         return 1
     fi
     if [[ -n "$link_path" ]]; then
-        mkdir -p "$(dirname "$link_path")"
-        ln -sfn "$target/$verify_relative" "$link_path"
+        mkdir -p "$(dirname "$link_path")" || return 1
+        ln -sfn "$target/$verify_relative" "$link_path" || return 1
     fi
     if ! "${link_path:-$target/$verify_relative}" --version >/dev/null 2>&1; then
-        rm -rf "$target"
+        rm -rf "$target" || return 1
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
         if [[ -n "$link_path" ]]; then
             if [[ -e "$target/$verify_relative" ]]; then
@@ -279,8 +290,8 @@ atomic_replace_tree() {
         return 1
     fi
     version="$("${link_path:-$target/$verify_relative}" --version 2>/dev/null | head -n1 || true)"
-    ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
-    rm -rf "$rollback"
+    ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}" || return 1
+    rm -rf "$rollback" || return 1
     rmdir "$rollback_root" 2>/dev/null || true
     journal_clear
 }
@@ -423,14 +434,13 @@ write_dotfiles_env() {
 # ==============================================================================
 
 create_backup_dir() {
-    mkdir -p "$DOTFILES_BACKUP_PREFIX"
-    ACTIVE_BACKUP_DIR="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$ACTIVE_BACKUP_DIR"
+    mkdir -p "$DOTFILES_BACKUP_PREFIX" || return 1
+    ACTIVE_BACKUP_DIR="$(mktemp -d "$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S).XXXXXX")"
 }
 
 ensure_backup_dir() {
     if [[ -z "${ACTIVE_BACKUP_DIR:-}" ]]; then
-        create_backup_dir
+        create_backup_dir || return 1
         log "Backup directory: $ACTIVE_BACKUP_DIR"
     fi
 }
@@ -459,19 +469,25 @@ assert_safe_home_target() {
         exit 1
     fi
 
-    local home_canon parent_canon canon
+    local home_canon parent_canon canon config_canon
     home_canon="$(cd "$HOME" 2>/dev/null && pwd -P)" || { error "Cannot resolve \$HOME"; exit 1; }
     parent_canon="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || {
         error "Cannot resolve parent of target: $target"
         exit 1
     }
     canon="$parent_canon/$(basename "$target")"
+    config_canon="$(realpath -m -- "${XDG_CONFIG_HOME:-$HOME/.config}")" || return 1
 
     if [[ "$canon" == "$home_canon" ]]; then
         error "Refusing to delete \$HOME itself: $canon"
         exit 1
     fi
     if [[ "$canon" != "$home_canon"/* ]]; then
+        # XDG configuration may intentionally live outside HOME. Only children
+        # of that configured root are eligible, never the root itself or /.
+        if [[ "$config_canon" != / && "$canon" == "$config_canon/"* ]]; then
+            return 0
+        fi
         error "Refusing to delete target outside \$HOME: $canon"
         exit 1
     fi
@@ -493,41 +509,41 @@ safe_symlink() {
     fi
 
     if [[ "${FORCE_OVERWRITE:-false}" == "true" && -e "$target" ]]; then
-        assert_safe_home_target "$target"
+        assert_safe_home_target "$target" || return 1
         if [[ -L "$target" ]]; then
-            rm -f "$target"
+            rm -f "$target" || return 1
         else
             # Even under --force, preserve real files/dirs in the backup rather
             # than destroying them with rm -rf.
             local dest
-            ensure_backup_dir
+            ensure_backup_dir || return 1
             dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
-            mkdir -p "$(dirname "$dest")"
+            mkdir -p "$(dirname "$dest")" || return 1
             log "Force overwrite: backing up $target -> $dest"
-            mv "$target" "$dest"
+            mv "$target" "$dest" || return 1
         fi
     elif [[ -e "$target" && ! -L "$target" ]]; then
         local dest
-        ensure_backup_dir
+        ensure_backup_dir || return 1
         dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
-        mkdir -p "$(dirname "$dest")"
+        mkdir -p "$(dirname "$dest")" || return 1
         log "Backing up existing $target -> $dest"
-        mv "$target" "$dest"
+        mv "$target" "$dest" || return 1
     elif [[ -L "$target" ]]; then
         local link_target
         link_target="$(readlink -f "$target" 2>/dev/null || true)"
         if [[ -n "$link_target" && -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
             local dest
-            ensure_backup_dir
+            ensure_backup_dir || return 1
             dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
-            mkdir -p "$(dirname "$dest")"
+            mkdir -p "$(dirname "$dest")" || return 1
             log "Backing up symlink target $target -> $link_target"
-            cp "$link_target" "$dest"
+            cp "$link_target" "$dest" || return 1
         fi
-        rm "$target"
+        rm "$target" || return 1
     fi
 
-    ln -s "$source" "$target"
+    ln -s "$source" "$target" || return 1
     success "Linked $source -> $target"
 }
 
@@ -575,9 +591,12 @@ process_git_config() {
     local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
     local portable="$portable_dir/gitconfig"
     local rendered git_version conflict_style="diff3" theme_cache azure_portable azure_enabled=false
+    local has_nvim=0 has_delta=0
+    command -v nvim >/dev/null 2>&1 && has_nvim=1
+    command -v delta >/dev/null 2>&1 && has_delta=1
 
-    mkdir -p "$portable_dir"
-    rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")"
+    mkdir -p "$portable_dir" || return 1
+    rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")" || return 1
 
     git_version=$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)
     if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
@@ -593,14 +612,19 @@ process_git_config() {
     esac
     if [[ "${INSTALL_AZURE:-false}" == true || "$azure_present" == true ]]; then
         azure_enabled=true
-        mkdir -p "$HOME/.local/bin"
-        safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
+        mkdir -p "$HOME/.local/bin" || return 1
+        safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo" || return 1
         if [[ ! -f "$azure_portable" ]] || ! cmp -s "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable"; then
-            install -m 0600 "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable"
+            install -m 0600 "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable" || return 1
         fi
     fi
 
     sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
+        awk -v nvim="$has_nvim" -v delta="$has_delta" '
+            !nvim && /^[[:space:]]*(editor = nvim|tool = nvimdiff)$/ { next }
+            !delta && /^[[:space:]]*(pager = delta|diffFilter = delta --color-only)$/ { next }
+            { print }
+        ' |
         if feature_enabled theme; then
             awk -v path="$theme_cache/delta.gitconfig" '
                 $0 == "{{THEME_INCLUDE}}" {
@@ -624,11 +648,11 @@ process_git_config() {
                 next
             }
             { print }
-        ' > "$rendered"
+        ' > "$rendered" || { rm -f "$rendered"; return 1; }
 
     if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
-        mv "$rendered" "$portable"
-        chmod 600 "$portable"
+        chmod 600 "$rendered" || return 1
+        mv "$rendered" "$portable" || return 1
         success "Portable Git config updated: $portable"
     else
         rm -f "$rendered"
@@ -640,19 +664,19 @@ process_git_config() {
     local existing
     existing="$(git config --file "$target" --get-all include.path 2>/dev/null || true)"
     if ! grep -Fxq "$portable" <<< "$existing"; then
-        git config --file "$target" --add include.path "$portable"
+        git config --file "$target" --add include.path "$portable" || return 1
     fi
     if ! grep -Fxq "$HOME/.gitconfig.local" <<< "$existing"; then
-        git config --file "$target" --add include.path "$HOME/.gitconfig.local"
+        git config --file "$target" --add include.path "$HOME/.gitconfig.local" || return 1
     fi
 
     if [[ -n "${DOTFILES_GIT_NAME:-}" ]]; then
         [[ "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || true)" == "$DOTFILES_GIT_NAME" ]] \
-            || git config --file "$HOME/.gitconfig.local" user.name "$DOTFILES_GIT_NAME"
+            || git config --file "$HOME/.gitconfig.local" user.name "$DOTFILES_GIT_NAME" || return 1
     fi
     if [[ -n "${DOTFILES_GIT_EMAIL:-}" ]]; then
         [[ "$(git config --file "$HOME/.gitconfig.local" user.email 2>/dev/null || true)" == "$DOTFILES_GIT_EMAIL" ]] \
-            || git config --file "$HOME/.gitconfig.local" user.email "$DOTFILES_GIT_EMAIL"
+            || git config --file "$HOME/.gitconfig.local" user.email "$DOTFILES_GIT_EMAIL" || return 1
     fi
 
     if [[ -z "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || git config --global user.name 2>/dev/null || true)" \
@@ -832,18 +856,35 @@ install_azure_cli() {
 # Installer Runner
 # ==============================================================================
 
+# Presence is not provenance. Refresh only recorded installations by default;
+# --force may explicitly adopt a binary already inside a declared local prefix.
+preserve_existing_tool() {
+    local name="$1" force="${2:-false}" path line owner recorded_path
+    path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
+    [[ -n "$path" ]] || return 1
+    "$path" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1 || return 1
+    if tool_owned_path "$name" "$path"; then
+        [[ "$force" == true ]] && return 1
+        line="$(ledger_line "$name" 2>/dev/null || true)"
+        IFS=$'\t' read -r _ _ owner _ _ recorded_path _ _ <<< "$line"
+        if [[ "$owner" == dotfiles && "$recorded_path" != - ]] \
+           && [[ "$(realpath -m -- "$recorded_path")" == "$(realpath -m -- "$path")" ]]; then
+            return 1
+        fi
+    fi
+    log "Preserving unowned $name at $path; manage it with its original installer"
+    return 0
+}
+
 # Run installer script with consistent error handling
 # Exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
 run_installer() {
     local name="$1"
-    local critical="${2:-false}"
-    : "$critical"  # retained for compatibility with older callers
     local script="$DOTFILES_DIR/installers/install-$name.sh"
 
     if [[ ! -f "$script" ]]; then
         error "Installer script not found: $script"
         track_install "$name" fail
-        [[ "$critical" == "true" ]] && exit 1
         return 1
     fi
 
@@ -875,6 +916,7 @@ run_installer() {
 # Install all binary tools declared in eget.toml
 install_eget_tools() {
     local config="$DOTFILES_DIR/eget.toml"
+    local requested="${1:-}"
     if [[ ! -f "$config" ]]; then
         error "eget.toml not found at $config"
         return 1
@@ -890,7 +932,10 @@ install_eget_tools() {
     local name
     for name in "${!TOOL_METHOD[@]}"; do
         [[ "${TOOL_METHOD[$name]}" == "eget" ]] || continue
-        if declare -F tier_includes >/dev/null 2>&1; then
+        if [[ -n "$requested" ]]; then
+            [[ "$name" == "$requested" ]] || continue
+        elif declare -F tier_includes >/dev/null 2>&1; then
+            [[ -n "${TOOL_TIER[$name]:-}" ]] || continue
             tier_includes "${TOOL_TIER[$name]}" || continue
         fi
         if ! tool_applicable "$name"; then
@@ -926,6 +971,8 @@ install_eget_tools() {
                     log "Ignoring incidental $name candidate at $existing"
                     to_download+=("$name")
                 fi
+            elif [[ -n "$existing" ]] && preserve_existing_tool "$name" false; then
+                track_install "$name" skip
             else
                 to_download+=("$name")
             fi
@@ -945,7 +992,7 @@ install_eget_tools() {
         return 0
     fi
 
-    run_installer "eget" true || return 1
+    run_installer "eget" || return 1
     log "Installing binary tools via eget..."
 
     if [[ ${#eget_tools[@]} -eq 0 ]]; then
@@ -991,7 +1038,7 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
-        local pinned current_output target existing_record recorded_note recorded_hash actual_hash
+        local pinned current_output target existing_record recorded_note recorded_hash actual_hash companion_ready companion_output companion
         pinned="$(awk -v section="[\"$slug\"]" '
             $0 == section { active=1; next }
             active && /^\[/ { exit }
@@ -1000,7 +1047,12 @@ install_eget_tools() {
             }
         ' "$config")"
         target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
-        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" ]]; then
+        companion_ready=true
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            companion_output="$("$HOME/.local/bin/$companion" --version 2>/dev/null || true)"
+            [[ -n "$pinned" && "$companion_output" == *"${pinned#v}"* ]] || companion_ready=false
+        done
+        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" && "$companion_ready" == true ]]; then
             existing_record="$(ledger_line "$name" 2>/dev/null || true)"
             recorded_note=""
             if [[ -n "$existing_record" ]]; then
@@ -1021,12 +1073,14 @@ install_eget_tools() {
             fi
         fi
 
-        local stage_home stage_config staged staged_hash
+        local stage_home stage_config staged staged_hash companion companions_ok
         stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")"
         stage_config="$stage_home/eget.toml"
         mkdir -p "$stage_home/.local/bin"
         sed "s|~/.local/bin|$stage_home/.local/bin|g" "$config" > "$stage_config"
-        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "$slug"; then
+        local -a extract_args=()
+        [[ -z "${TOOL_COMPANIONS[$name]:-}" ]] || extract_args+=(--all)
+        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "${extract_args[@]}" "$slug"; then
             rm -rf "$stage_home"
             track_install "$name" fail
             any_missing=true
@@ -1039,8 +1093,31 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
+        companions_ok=true
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            [[ -x "$stage_home/.local/bin/$companion" ]] \
+                && "$stage_home/.local/bin/$companion" --version >/dev/null 2>&1 || companions_ok=false
+        done
+        if [[ "$companions_ok" != true ]]; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        # Promote verified companions before the primary. Each replacement is
+        # recoverable; a multi-executable release is not a filesystem-wide transaction.
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            atomic_replace_binary "$name" "$stage_home/.local/bin/$companion" "$HOME/.local/bin/$companion" \
+                || { companions_ok=false; break; }
+        done
         staged_hash="$(sha256sum "$staged" | awk '{print $1}')"
-        atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"
+        if [[ "$companions_ok" != true ]] \
+           || ! atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
         PATH="$HOME/.local/bin:$PATH"
         export PATH
         hash -r
@@ -1155,6 +1232,11 @@ install_ai_packages() {
     fi
 
     [[ ${#tools[@]} -eq 0 ]] && return 0
+
+    if feature_enabled agent-badge && [[ " ${tools[*]} " == *' claude '* || " ${tools[*]} " == *' codex '* ]] \
+       && ! command -v jq >/dev/null 2>&1; then
+        install_eget_tools jq || failed=true
+    fi
 
     log "Installing AI CLIs: ${tools[*]}"
     local t

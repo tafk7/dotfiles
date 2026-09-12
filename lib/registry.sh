@@ -24,6 +24,7 @@ declare -A TOOL_BINARY=(
     [fd]=fd
     [ripgrep]=rg
     [direnv]=direnv
+    [jq]=jq
     [eget]=eget
     [sd]=sd
     [shellcheck]=shellcheck
@@ -63,6 +64,7 @@ declare -A TOOL_METHOD=(
     [fd]=eget
     [ripgrep]=eget
     [direnv]=eget
+    [jq]=eget
     [eget]=installer
     [sd]=eget
     [shellcheck]=eget
@@ -117,6 +119,7 @@ declare -A TOOL_CAPABILITIES=(
     [xrdp]=rdp
     [tailscale]=tail
     [azure-cli]=azure [gcloud]=gcloud  [aws-cli]=aws
+    [jq]=agent-badge
 )
 
 # Supported platform and architecture inventory. "ubuntu" includes native
@@ -136,6 +139,9 @@ declare -A TOOL_UPDATE_SOURCE=(
 declare -A TOOL_RELATIVE_BINARY=(
     [neovim]="bin/nvim"
 )
+# Companion executables are part of installation, verification, and removal.
+declare -A TOOL_COMPANIONS=([uv]="uvx")
+declare -A TOOL_VERSION_FLAG=([tmux]="-V" [sbx]="version")
 declare -A TOOL_REMOVAL_MODE=(
     [xrdp]="manual"
 )
@@ -167,7 +173,7 @@ TOOL_UBUNTU_VERSIONS[azure-cli]="22.04,24.04"
 TOOL_UBUNTU_VERSIONS[gcloud]="22.04,24.04,26.04"
 TOOL_UBUNTU_VERSIONS[aws-cli]="22.04,24.04,26.04"
 
-for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck wsl2-ssh-agent; do
+for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv jq sd shellcheck wsl2-ssh-agent; do
     TOOL_OWNERSHIP_ROOTS["$_registry_name"]="$HOME/.local/bin"
     TOOL_UPDATE_CONTRACT["$_registry_name"]="staged-release"
 done
@@ -223,7 +229,6 @@ declare -A TOOL_PATHS=(
     [tmux]="$HOME/.local/bin/tmux"
     [nvm]="$HOME/.nvm"
     [rust]=""
-    [uv]="$HOME/.local/bin/uv|$HOME/.local/bin/uvx"
     [claude]="$HOME/.local/bin/claude|$HOME/.local/share/claude"
     [codex]="$HOME/.local/bin/codex|$HOME/.codex/packages/standalone"
     [opencode]="$HOME/.local/bin/opencode|$HOME/.opencode"
@@ -295,7 +300,12 @@ tool_verify_command() {
     if [[ -n "${TOOL_VERIFY[$name]:-}" ]]; then
         echo "${TOOL_VERIFY[$name]}"
     else
-        echo "command -v ${TOOL_BINARY[$name]} >/dev/null 2>&1"
+        printf 'command -v %s >/dev/null 2>&1' "${TOOL_BINARY[$name]}"
+        local companion
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            printf ' && command -v %s >/dev/null 2>&1' "$companion"
+        done
+        printf '\n'
     fi
 }
 
@@ -307,6 +317,10 @@ tool_uninstall_paths() {
         printf '%s\n' "${TOOL_PATHS[$name]}" | tr '|' '\n'
     elif [[ "${TOOL_METHOD[$name]}" == "eget" ]]; then
         echo "$HOME/.local/bin/${TOOL_BINARY[$name]}"
+        local companion
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            printf '%s/.local/bin/%s\n' "$HOME" "$companion"
+        done
     fi
 }
 

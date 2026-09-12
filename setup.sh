@@ -617,14 +617,14 @@ process_symlink() {
     local parent_dir
     parent_dir="$(dirname "$target")"
     if [[ ! -d "$parent_dir" ]]; then
-        mkdir -p "$parent_dir"
+        mkdir -p "$parent_dir" || return 1
     fi
 
     # SSH directory requires strict permissions
     if [[ "$parent_dir" == *"/.ssh"* || "$parent_dir" == *"/.ssh" ]]; then
-        chmod 700 "$parent_dir"
-        mkdir -p "$parent_dir/sockets"
-        chmod 700 "$parent_dir/sockets"
+        chmod 700 "$parent_dir" || return 1
+        mkdir -p "$parent_dir/sockets" || return 1
+        chmod 700 "$parent_dir/sockets" || return 1
     fi
     
     safe_symlink "$source" "$target"
