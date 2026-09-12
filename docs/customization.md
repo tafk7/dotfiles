@@ -36,7 +36,7 @@ selections can require APT independently. The bash tier remains sudo-free
 - `install_bash_packages`  → (no apt; eget binaries only, plus a git-present check)
 - `install_dev_packages`   → core + development + languages + terminal + diagramming (+ wsl on WSL); then tmux + neovim installers
 - `install_work_packages`  → NVM/node, Docker, sbx/KVM host access, and Rust
-- `install_ai_packages`    → (no apt packages; runs the claude + codex installers)
+- `install_ai_packages`    → selected Claude, Codex, opencode, and Pi installers
 - `install_rdp_packages`   → rdp (then runs the xrdp config installer)
 - `install_tail_packages` → optional Tailscale package/service without enrollment
 
@@ -49,15 +49,24 @@ selections can require APT independently. The bash tier remains sudo-free
    asset_filters = [".tar.gz", "gnu"]
    ```
 
-2. Register the tool in `lib/registry.sh` (all five arrays):
+2. Register the tool in `lib/registry.sh`:
    ```bash
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=eget
    TOOL_TIER[mytool]=bash      # bash|dev|work; omit for capability-only tools
-   TOOL_CAPABILITIES[mytool]=tail    # optional comma-separated selections
+   TOOL_PLATFORM[mytool]=ubuntu
+   TOOL_ARCHES[mytool]='x86_64,aarch64'
+   TOOL_OWNERSHIP_ROOTS[mytool]="$HOME/.local/bin"
+   TOOL_UPDATE_CONTRACT[mytool]=staged-release
+   TOOL_COMPANIONS[mytool]='helper'  # only when the release includes one
    ```
 
-3. Run `./setup.sh --bash` (or just `eget --download-all`) to install.
+   Put entries into the existing tables/default loops. Capability-only tools
+   also need `TOOL_CAPABILITIES`; omit their cumulative tier. Companion names
+   automatically participate in verification and removal. Use `TOOL_EGET_REPO`
+   when the short tool name differs from the repository basename.
+
+3. Run `./setup.sh --bash` to install through selection, staging, and the ledger.
 4. `bin/verify` and `bin/uninstall-tool` automatically pick up the new tool.
 
 ## Adding a New Tool With a Custom Installer
@@ -86,13 +95,19 @@ For tools that need more than `eget`:
    TOOL_BINARY[mytool]=mytool
    TOOL_METHOD[mytool]=installer
    TOOL_TIER[mytool]=dev
-   TOOL_PATHS[mytool]="\$HOME/.local/bin/mytool"   # for bin/uninstall-tool
+   TOOL_PATHS[mytool]="$HOME/.local/bin/mytool"
+   TOOL_OWNERSHIP_ROOTS[mytool]="$HOME/.local/bin"
+   TOOL_UPDATE_CONTRACT[mytool]=staged-release
    ```
 3. Call it from the appropriate `install_*_packages` function in `lib/install.sh`:
    ```bash
-   run_installer "mytool"           # non-critical; warn-only on failure
-   run_installer "mytool" true      # critical; abort setup on failure
+   run_installer "mytool" || failed=true
    ```
+   The caller propagates `failed` as a nonzero return; requested installation
+   failures make setup incomplete. A function called through `if`, `!`, or `||`
+   cannot rely on `set -e` internally: check each required mutation explicitly.
+   The runner records outcomes; standalone staged helpers record committed
+   artifacts. Never claim ownership merely because a skipped tool is local.
 
 ## Adding a New Config File
 
@@ -101,17 +116,18 @@ Edit `lib/config.sh` and add to `CONFIG_MAP`:
 ```bash
 declare -A CONFIG_MAP=(
     ...
-    [your-config]="$HOME/.your-config:symlink"
-    [config/your-app]="$HOME/.config/your-app:symlink"
+    [your-config]="$HOME/.your-config:symlink:"
+    [config/your-app]="${XDG_CONFIG_HOME:-$HOME/.config}/your-app:symlink:your-app"
 )
 ```
 
 - Source path is resolved by `config_source_path()`:
-  - `bash.sh|zsh.sh|profile.sh|bash_profile` → `entry/`
+  - `bash.sh|zsh.sh|zshenv|zprofile|profile.sh|bash_profile` → `entry/`
   - everything else → `configs/`
 - Place the file at the resolved source path, then run `./setup.sh --config`.
-- Type `gitconfig` is special-cased for template processing (`{{GIT_NAME}}`,
-  `{{GIT_EMAIL}}`).
+- Type `gitconfig` renders portable behavior and includes it from the user's
+  existing global file. Identity remains in `~/.gitconfig.local`; missing
+  Neovim/Delta integrations are omitted according to tool availability.
 
 ## Adding Custom Aliases or Functions
 
@@ -137,8 +153,8 @@ Add to an existing file when your function fits a domain. Create a new
 `shell/tools/<domain>.sh` only when there's a clear new domain (e.g. `kube.sh`).
 All `*.sh` in `shell/tools/` are sourced automatically by `shell/init.sh`.
 
-For WSL-specific code, use `shell/platform/wsl.sh` (only sourced when
-`is_wsl` is true). For Linux-specific (non-WSL), use `shell/platform/linux.sh`.
+For WSL-specific code, use `shell/platform/wsl.sh`. Additional platform adapters
+require an explicit loading condition in `shell/init.sh`.
 
 ## Adding a `bin/` Utility Command
 
@@ -308,7 +324,7 @@ wsl_log "WSL-specific message"
 
 safe_sudo apt-get install -y foo    # honors DRY_RUN, logs the command
 install_apt "label" pkg1 pkg2 ...   # idempotent, batches missing pkgs
-run_installer "name" [critical]     # runs installers/install-name.sh
+run_installer "name" || failed=true # runs installers/install-name.sh
 track_install "name" ok|skip|fail   # contributes to the summary
 ```
 
@@ -324,14 +340,13 @@ is_wsl                # 0 if on WSL
 command_exists git
 verify_binary nvim    # exists AND --version works
 get_arch              # x86_64 | aarch64
-get_glibc_version     # 2.35
 version_gte "$a" "$b" # 0 if a >= b
 ```
 
 ## Adding a Theme
 
 See [`docs/theme-system.md`](./theme-system.md). Short version: create
-`themes/<name>/` with `meta.sh`, `palette.sh`, `vim.vim`, `tmux.conf`, `shell.sh`, `colors.sh`
+`themes/<name>/` with `meta.sh`, `palette.sh`, `vim.vim`, `shell.sh`
 plus the per-tool palette files (`bat/<name>.tmTheme`, `starship.palette.toml`,
 `delta.gitconfig`, `btop.theme`, `lazygit.yml`). The theme is auto-discovered
 on next `bin/theme-switcher` invocation.
@@ -358,9 +373,9 @@ tests/theme-system.sh
   `lib/`, `installers/`, or `shell/`.
 - **Don't `set EDITOR` outside `shell/env.sh`** — it's the single source of
   truth (verified by `bin/verify`).
-- **Don't add side effects to `lib/runtime.sh` or `lib/config.sh`** — they're
-  sourced on every shell start.
-- **Use `track_install`** in installers so the install summary stays accurate.
+- **Keep install libraries out of shell startup.** Runtime helpers are used by
+  commands; the shell entry chain loads the environment layers directly.
+- **Use the installer runner** so outcomes and ownership are recorded consistently.
 - **Pin tool versions in `eget.toml`** — bump explicitly, not implicitly.
 
 ## Getting Help
