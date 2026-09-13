@@ -38,6 +38,13 @@ pane="${2:-$TMUX_PANE}"
 # Not in tmux (plain terminal, SSH without tmux, CI) -> nothing to do.
 [[ -n "$TMUX" && -n "$pane" ]] || exit 0
 
+if ! command -v jq >/dev/null 2>&1; then
+    if [[ "$state" == session-start ]]; then
+        printf 'agent-badge: jq is required on PATH; see the plugin README.\n' >&2
+    fi
+    exit 0
+fi
+
 # Self-heal the tmux wiring. The badge placeholder living in
 # window-status-format is the one piece of state that gets destroyed routinely:
 # `source-file ~/.tmux.conf` (bound to prefix+r) resets the option to whatever

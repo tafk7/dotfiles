@@ -1,0 +1,8 @@
+# Optional Azure DevOps integration. Included from the portable base only when
+# --azure is selected or an existing Azure CLI installation is present.
+
+[credential "https://msasg.visualstudio.com"]
+    helper = azdo
+
+[credential "https://dev.azure.com"]
+    helper = azdo

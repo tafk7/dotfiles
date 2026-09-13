@@ -97,7 +97,8 @@ def execute(argv: list[str], env: dict[str, str], cwd: pathlib.Path, interactive
 class Fixture:
     """Copy code, never the operator's generated state, profiles or environment."""
 
-    def __init__(self, source: pathlib.Path):
+    def __init__(self, source: pathlib.Path, theme_enabled: bool = True, installed_tools: bool = False):
+        self.theme_enabled = theme_enabled
         self.temp = tempfile.TemporaryDirectory(prefix="dotfiles-benchmark-")
         self.root = pathlib.Path(self.temp.name)
         self.tree = self.root / "checkout"
@@ -123,6 +124,10 @@ class Fixture:
         }
         for name in ("home", "bin", "config", "data", "state", "cache", "tmp", "tmux", "legacy"):
             (self.root / name).mkdir()
+        if not theme_enabled:
+            state = self.root / "state/dotfiles"
+            state.mkdir()
+            (state / "preferences.tsv").write_text("schema\t1\nfeature.theme\tdisabled\n")
         # Suppress Ubuntu's first-shell sudo tutorial in this disposable HOME.
         (self.root / "home/.sudo_as_admin_successful").touch()
         for source_name, target in {
@@ -139,8 +144,20 @@ class Fixture:
         }
         for name, body in scripts.items():
             p = self.root / "bin" / name
-            p.write_text("#!/bin/bash\n" + body + "\n")
-            p.chmod(0o755)
+            if installed_tools:
+                binary = shutil.which(name)
+                if not binary:
+                    raise RuntimeError(f"Installed-tool benchmark requires {name} on PATH")
+                p.symlink_to(binary)
+            else:
+                p.write_text("#!/bin/bash\n" + body + "\n")
+                p.chmod(0o755)
+        if installed_tools:
+            # Authorize only this disposable project. No operator config/state
+            # enters the fixture; the actual installed tools exercise startup.
+            (self.tree / ".envrc").write_text('export DOTFILES_BENCH_PROJECT="$PWD"\n')
+            subprocess.run([str(self.root / "bin/direnv"), "allow", str(self.tree)],
+                           env=self.env, cwd=self.tree, capture_output=True, check=True)
 
         # The benchmark measures warm-cache startup. Seed both the controlled
         # uv completion and a valid compinit dump before timing. `compinit -i`
@@ -193,7 +210,8 @@ class Fixture:
             checks.append('[[ "${_PROFILE_LOADED:-}" == 1 ]] || exit 85')
         if mode == "interactive":
             checks += ['typeset -f reload >/dev/null || exit 86',
-                       '[[ -n "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" ]] || exit 87',
+                       ('[[ -n "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" ]] || exit 87' if self.theme_enabled
+                        else '[[ "${DOTFILES_THEME_ENABLED:-}" == 0 && -z "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" ]] || exit 87'),
                        'unset HISTFILE']
         checks.append('printf "DOTFILES_BENCH_OK\\n"')
         env = self.env if mode == "first-env" else self.inherited[shell]
@@ -208,12 +226,15 @@ def main() -> int:
     parser.add_argument("baseline", type=pathlib.Path)
     parser.add_argument("candidate", type=pathlib.Path)
     parser.add_argument("--json", type=pathlib.Path, help="Save sample distributions and summaries")
+    parser.add_argument("--theme", choices=("enabled", "disabled"), default="enabled")
+    parser.add_argument("--tools", choices=("fixture", "installed"), default="fixture")
     args = parser.parse_args()
     failed = False
     results = {}
     rng = random.Random(20260911)
     with contextlib.ExitStack() as stack:
-        fixtures = [Fixture(path.resolve()) for path in (args.baseline, args.candidate)]
+        fixtures = [Fixture(path.resolve(), args.theme == "enabled", args.tools == "installed")
+                    for path in (args.baseline, args.candidate)]
         for fixture in fixtures:
             stack.callback(fixture.close)
         cases = [(shell, mode) for shell in ("bash", "zsh") for mode in ("first-env", "inherited", "interactive")]
@@ -232,7 +253,8 @@ def main() -> int:
             percent = delta / old * 100
             p95 = [sorted(s)[int(.95 * (len(s) - 1))] for s in samples]
             print(f"{shell:4} {mode:11} median {old:7.2f} -> {new:7.2f} ms; p95 {p95[0]:7.2f} -> {p95[1]:7.2f} ms; {percent:+.1f}%", flush=True)
-            results[f"{shell}/{mode}"] = {"baseline_ms": samples[0], "candidate_ms": samples[1], "baseline_median_ms": old, "candidate_median_ms": new}
+            results[f"{shell}/{mode}"] = {"baseline_ms": samples[0], "candidate_ms": samples[1], "baseline_median_ms": old, "candidate_median_ms": new,
+                                         "theme": args.theme, "tools": args.tools}
             if new > 2000 or (delta > 10 and percent > 15):
                 failed = True
     if args.json:

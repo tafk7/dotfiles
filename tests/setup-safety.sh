@@ -23,6 +23,7 @@ run_dry() {
     local output rc=0
     output="$(HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
         XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" TMPDIR="$TMPDIR" \
+        DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_OS_VERSION=24.04 DOTFILES_TEST_ARCH=x86_64 \
         DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" PATH="$PATH" \
         "$ROOT/setup.sh" "$@" --dry-run --no-hooks --no-git 2>&1)" || rc=$?
     [[ $rc -eq 0 ]] || fail "dry-run failed ($rc): $output"
@@ -36,6 +37,9 @@ run_dry --dev
 run_dry --work
 run_dry --ai
 run_dry --rdp --no-theme
+run_dry --tail --no-theme
+run_dry --azure --gcloud --aws --no-theme
+run_dry --full --tail --gcloud --no-theme --no-agent-badge
 run_dry --full --no-theme --no-agent-badge
 
 [[ ! -s "$DOTFILES_MUTATION_LOG" ]] || fail "dry-run invoked mutating commands: $(cat "$DOTFILES_MUTATION_LOG")"

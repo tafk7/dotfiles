@@ -24,8 +24,8 @@ show_usage() {
 }
 
 list_tools() {
-    echo "Tool              Status        Method    Ownership   Removal"
-    echo "────────────────  ────────────  ────────  ──────────  ─────────────────────"
+    echo "Tool              Status        Method    Selection          Ownership   Removal"
+    echo "────────────────  ────────────  ────────  ─────────────────  ──────────  ─────────────────────"
 
     local names
     readarray -t names < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
@@ -48,7 +48,9 @@ list_tools() {
             [[ "$method" == apt ]] && removal="apt (confirmation)"
         fi
 
-        printf "%-18s%-14s%-10s%-12s%s\n" "$name" "$status" "$method" "$ownership" "$removal"
+        local selection="${TOOL_TIER[$name]:--}"
+        [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || selection+="/${TOOL_CAPABILITIES[$name]}"
+        printf "%-18s%-14s%-10s%-19s%-12s%s\n" "$name" "$status" "$method" "$selection" "$ownership" "$removal"
     done
 }
 
@@ -93,7 +95,8 @@ uninstall_tool() {
     [[ -n "$ledger" ]] && IFS=$'\t' read -r _ _ ownership _ _ _ _ _ <<< "$ledger"
 
     # Tools with removal instructions need manual steps
-    if [[ -n "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" && -z "$(tool_uninstall_paths "$name")" ]]; then
+    if [[ ( "$method" != apt || "${TOOL_REMOVAL_MODE[$name]:-}" == manual ) \
+       && -n "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" && -z "$(tool_uninstall_paths "$name")" ]]; then
         warn "$name requires manual removal:"
         echo "  ${TOOL_REMOVAL_INSTRUCTIONS[$name]}"
         exit 0
@@ -106,23 +109,18 @@ uninstall_tool() {
                 return 1
             fi
             confirm_removal "$name" || { warn "Removal cancelled"; return 1; }
-            local binary="${TOOL_BINARY[$name]}"
-            # Map binary name back to apt package name
-            local apt_pkg="$name"
-            case "$name" in
-                bat) apt_pkg="bat" ;;
-                fd)  apt_pkg="fd-find" ;;
-                ripgrep) apt_pkg="ripgrep" ;;
-                direnv) apt_pkg="direnv" ;;
-            esac
+            local apt_pkg="${TOOL_APT_PACKAGE[$name]:-}"
+            [[ -n "$apt_pkg" ]] || { error "Registry is missing TOOL_APT_PACKAGE[$name]"; return 1; }
             if [[ "$DRY_RUN" == true ]]; then
                 log "[DRY RUN] Would remove apt package: $apt_pkg"
                 return 0
             fi
             log "Removing apt package: $apt_pkg"
             sudo apt-get remove -y "$apt_pkg"
-            ledger_record "$name" yes dotfiles removed "" "" "user data retained"
+            ledger_record "$name" yes package-manager removed "" "" "user data retained"
             success "$name uninstalled via apt"
+            [[ -z "${TOOL_REMOVAL_INSTRUCTIONS[$name]:-}" ]] \
+                || log "Retained state: ${TOOL_REMOVAL_INSTRUCTIONS[$name]}"
             ;;
         eget|installer)
             if [[ "${TOOL_PATHS[$name]:-}" == *$'\n'* || "${TOOL_PATHS[$name]:-}" == *$'\r'* ]]; then
@@ -150,7 +148,11 @@ uninstall_tool() {
                     if [[ "$DRY_RUN" == true ]]; then
                         log "[DRY RUN] Would remove: $path"
                     else
-                        rm -rf -- "$path"
+                        if [[ "${TOOL_REMOVAL_REQUIRES_SUDO[$name]:-}" == yes ]]; then
+                            sudo rm -rf -- "$path"
+                        else
+                            rm -rf -- "$path"
+                        fi
                         log "Removed: $path"
                     fi
                     removed=true

@@ -244,6 +244,13 @@ Comments, line numbers, search, selection, and Airline are normalized after the
 scheme loads using the theme's exact palette. The Airline adapter replaces the
 former unrelated `deus` and shared `minimalist` mappings.
 
+On a fresh machine where optional Neovim colorscheme plugins have not been
+installed, startup uses Neovim's built-in default plus the selected dotfiles
+palette highlights. It does not download plugins or emit `E185`. Inspect
+`g:dotfiles_theme_fallback_scheme` to see which optional scheme is missing;
+run `bin/install-editor-plugins` explicitly to bootstrap vim-plug and the plugins.
+After that, `vplug` installs newly declared plugins and `vplugup` updates them.
+
 Bat uses exact bundled or built-in themes. Delta 0.18.2 exposes only its
 embedded bat themes and does not load the external bat cache, so exact custom
 syntax themes remain unavailable there. Delta's diff chrome uses exact palette
@@ -256,10 +263,8 @@ Delta's `gruvbox-dark`, which is the closest embedded variant.
 Create `themes/<name>/` with all of these files:
 
 - `meta.sh`: display name and description
-- `palette.sh`: semantic roles and a 16-entry `THEME_ANSI` array
-- `colors.sh`: preview RGB values and three pane tints
+- `palette.sh`: semantic roles, a 16-entry `THEME_ANSI` array, and three pane tints
 - `vim.vim`: supported setup calls before `:colorscheme`
-- `tmux.conf`: readable reference/fallback styling
 - `shell.sh`: native bat, Starship, and Delta names
 - `starship.palette.toml`
 - `delta.gitconfig`
@@ -267,8 +272,10 @@ Create `themes/<name>/` with all of these files:
 - `lazygit.yml`
 - `bat/*.tmTheme` when bat has no matching built-in
 
-Add the Starship palette block to `configs/starship.toml` and an editor plugin
-to `configs/init.vim` only when the theme is not already supported. Then run:
+The renderer appends the theme's Starship palette to the shared template; do not
+copy it into `configs/starship.toml`. Tmux styles and preview RGB values derive
+from `palette.sh`. Add an editor plugin to `configs/init.vim` only when the theme
+is not already supported. Then run:
 
 ```bash
 bin/theme-switcher --init

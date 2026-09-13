@@ -33,9 +33,9 @@ declare -A CONFIG_MAP=(
     [tmux.conf]="$HOME/.tmux.conf:symlink:tmux"
     [editorconfig]="$HOME/.editorconfig:symlink:"
     [ripgreprc]="$HOME/.ripgreprc:symlink:ripgrep"
-    [init.vim]="$HOME/.config/nvim/init.vim:symlink:neovim"
-    [config/bat]="$HOME/.config/bat:symlink:bat"
-    [config/fd]="$HOME/.config/fd:symlink:fd"
+    [init.vim]="${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim:symlink:neovim"
+    [config/bat]="${XDG_CONFIG_HOME:-$HOME/.config}/bat:symlink:bat"
+    [config/fd]="${XDG_CONFIG_HOME:-$HOME/.config}/fd:symlink:fd"
     [ssh_config]="$HOME/.ssh/config:symlink:"
     # starship.toml: NOT a symlink. theme-switcher generates immutable
     # cached themes/<theme>/starship.toml files; STARSHIP_CONFIG selects one
@@ -63,7 +63,7 @@ config_source_path() {
 config_owner_present() {
     local owner="$1"
     [[ -z "$owner" ]] && return 0
-    if [[ -n "${TOOL_TIER[$owner]:-}" ]]; then
+    if [[ -n "${TOOL_BINARY[$owner]:-}" ]]; then
         eval "$(tool_verify_command "$owner")"
     else
         command -v "$owner" >/dev/null 2>&1
@@ -74,12 +74,12 @@ config_owner_present() {
 # tier is sudo-free (eget only). bat/fd/ripgrep/direnv moved to eget, so no
 # [modern] group and no direnv here.
 declare -A PACKAGES=(
-    [core]="git build-essential"
+    [core]="git build-essential locales"
     [development]="zsh bison libevent-dev libncurses-dev xclip lsof psmisc"
     [terminal]="htop tree"
     [languages]="python3-pip"
     [wsl]="socat wslu sox libsox-fmt-pulse"  # sox + pulse backend: mic capture for Claude Code /voice via WSLg (plain sox pulls ALSA, which has no /dev/snd in WSL)
-    [docker]="docker-ce docker-ce-cli containerd.io docker-compose-plugin"
+    [docker]="docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
     [diagramming]="graphviz"
     [rdp]="xrdp xorgxrdp xfce4 xfce4-goodies"  # RDP server + Xorg backend + XFCE session (xrdp ships no desktop)
 )

@@ -1,7 +1,6 @@
 #!/bin/bash
 # Install Neovim from GitHub releases
-# glibc >= 2.32: latest release
-# glibc <  2.32: v0.10.4 (last version compatible with glibc 2.31)
+# Latest release on supported Ubuntu hosts.
 
 set -euo pipefail
 
@@ -12,10 +11,6 @@ source "$DOTFILES_DIR/lib/install.sh"
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
-
-# Last release that works on glibc 2.31 (Ubuntu 20.04)
-FALLBACK_VERSION="0.10.4"
-MIN_GLIBC="2.32"
 
 # Pipe-free version probe. `nvim --version | head -n1` returns 141 when head exits
 # before nvim finishes writing (SIGPIPE), and `set -o pipefail` makes that fatal.
@@ -28,11 +23,10 @@ nvim_version() {
 }
 
 log "Installing Neovim..."
+if preserve_existing_tool neovim "$FORCE"; then exit 2; fi
 
 # Determine which version to install
-GLIBC_VERSION=$(get_glibc_version)
-if version_gte "$GLIBC_VERSION" "$MIN_GLIBC"; then
-    VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
+VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
         # If API fails (rate-limited) and --force, fall back to reinstalling current
         if [[ "$FORCE" == true ]] && verify_binary nvim; then
             VERSION=$(nvim_version)
@@ -41,12 +35,7 @@ if version_gte "$GLIBC_VERSION" "$MIN_GLIBC"; then
             error "Failed to fetch latest Neovim version"
             exit 1
         fi
-    }
-    log "glibc $GLIBC_VERSION >= $MIN_GLIBC — installing latest (v$VERSION)"
-else
-    VERSION="$FALLBACK_VERSION"
-    log "glibc $GLIBC_VERSION < $MIN_GLIBC — installing v$VERSION (glibc 2.31 compatible)"
-fi
+}
 
 # Check existing installation
 if [[ "$FORCE" != true ]] && verify_binary nvim; then
@@ -92,7 +81,8 @@ atomic_replace_tree neovim "$STAGED_TREE" "$HOME/.local/nvim" bin/nvim "$HOME/.l
 # Verify
 if "$HOME/.local/bin/nvim" --version >/dev/null 2>&1; then
     success "Neovim v$VERSION installed successfully!"
-    "$HOME/.local/bin/nvim" --version | head -n1
+    nvim_output="$("$HOME/.local/bin/nvim" --version)"
+    printf '%s\n' "${nvim_output%%$'\n'*}"
 else
     error "Neovim installation failed — binary does not run"
     exit 1

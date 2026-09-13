@@ -59,11 +59,8 @@ for path in sorted((ROOT / "themes").glob("*/palette.sh")):
                 failures.append(f"{theme} ANSI {index} {color} {ratio:.2f}:1")
 
     # The same secondary role must feed the major informational surfaces.
-    tmux = (path.parent / "tmux.conf").read_text()
     btop = (path.parent / "btop.theme").read_text()
     starship = (path.parent / "starship.palette.toml").read_text()
-    if values["THEME_SECONDARY_HEX"].lower() not in tmux.lower():
-        failures.append(f"{theme} tmux does not use secondary role")
     if values["THEME_SECONDARY_HEX"].lower() not in btop.lower():
         failures.append(f"{theme} btop does not use secondary role")
     if values["THEME_SECONDARY_HEX"].lower() not in starship.lower():

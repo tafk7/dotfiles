@@ -16,7 +16,7 @@ fake_repo="$TEST_ROOT/repo"
 mkdir -p "$fake_repo/installers"
 old_dir="$DOTFILES_DIR"
 DOTFILES_DIR="$fake_repo"
-for name in claude codex opencode pi; do
+for name in claude codex opencode pi sbx tailscale azure-cli gcloud aws-cli; do
     printf '#!/bin/sh\nexit 42\n' > "$fake_repo/installers/install-$name.sh"
     chmod +x "$fake_repo/installers/install-$name.sh"
     INSTALL_FAIL=()

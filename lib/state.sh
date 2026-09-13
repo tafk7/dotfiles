@@ -53,10 +53,13 @@ _state_lock_acquire() {
     local attempts="${DOTFILES_STATE_LOCK_ATTEMPTS:-100}" holder="" i lock_age lock_mtime
     local stale_seconds="${DOTFILES_STATE_LOCK_STALE_SECONDS:-2}"
     local owner="${BASHPID:-$$}"
-    mkdir -p "$DOTFILES_STATE_DIR"
+    mkdir -p "$DOTFILES_STATE_DIR" || return 1
     for ((i = 0; i < attempts; i++)); do
         if mkdir "$DOTFILES_STATE_LOCK" 2>/dev/null; then
-            printf '%s\n' "$owner" > "$DOTFILES_STATE_LOCK/pid"
+            printf '%s\n' "$owner" > "$DOTFILES_STATE_LOCK/pid" || {
+                rm -rf -- "$DOTFILES_STATE_LOCK"
+                return 1
+            }
             return 0
         fi
         if [[ -r "$DOTFILES_STATE_LOCK/pid" ]]; then
@@ -92,7 +95,7 @@ _state_lock_release() {
 
 _state_commit_file() {
     local staged="$1" target="$2"
-    chmod 600 "$staged"
+    chmod 600 "$staged" || return 1
     if [[ -f "$target" ]] && cmp -s "$staged" "$target"; then
         rm -f "$staged"
     else
@@ -119,15 +122,15 @@ preference_set() {
         trap _state_lock_release EXIT INT TERM
         _state_validate_file "$DOTFILES_PREFERENCES_FILE" preferences 2 || exit 1
         local staged
-        staged="$(mktemp "$DOTFILES_STATE_DIR/preferences.tsv.tmp.XXXXXX")"
+        staged="$(mktemp "$DOTFILES_STATE_DIR/preferences.tsv.tmp.XXXXXX")" || exit 1
         {
             if [[ -f "$DOTFILES_PREFERENCES_FILE" ]]; then
                 awk -F '\t' -v key="$key" 'NR > 1 && $1 != key { print $1 "\t" $2 }' "$DOTFILES_PREFERENCES_FILE"
             fi
             printf '%s\t%s\n' "$key" "$value"
-        } | LC_ALL=C sort -t $'\t' -k1,1 > "$staged.body"
-        { printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA"; cat "$staged.body"; } > "$staged"
-        rm -f "$staged.body"
+        } | LC_ALL=C sort -t $'\t' -k1,1 > "$staged.body" || exit 1
+        { printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA"; cat "$staged.body"; } > "$staged" || exit 1
+        rm -f "$staged.body" || exit 1
         _state_commit_file "$staged" "$DOTFILES_PREFERENCES_FILE"
     )
 }
@@ -149,14 +152,14 @@ apply_feature_requests() {
         if [[ "${DRY_RUN:-false}" == "true" ]]; then
             printf '  [DRY RUN] Would set theme feature: %s\n' "$THEME_REQUEST"
         else
-            preference_set feature.theme "$THEME_REQUEST"
+            preference_set feature.theme "$THEME_REQUEST" || return 1
         fi
     fi
     if [[ -n "${AGENT_BADGE_REQUEST:-}" ]]; then
         if [[ "${DRY_RUN:-false}" == "true" ]]; then
             printf '  [DRY RUN] Would set agent-badge feature: %s\n' "$AGENT_BADGE_REQUEST"
         else
-            preference_set feature.agent-badge "$AGENT_BADGE_REQUEST"
+            preference_set feature.agent-badge "$AGENT_BADGE_REQUEST" || return 1
         fi
     fi
     if feature_enabled agent-badge; then
@@ -197,7 +200,7 @@ ledger_record() {
         trap _state_lock_release EXIT INT TERM
         _state_validate_file "$DOTFILES_LEDGER_FILE" ledger 8 || exit 1
         local staged
-        staged="$(mktemp "$DOTFILES_STATE_DIR/components.tsv.tmp.XXXXXX")"
+        staged="$(mktemp "$DOTFILES_STATE_DIR/components.tsv.tmp.XXXXXX")" || exit 1
         {
             printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA"
             if [[ -f "$DOTFILES_LEDGER_FILE" ]]; then
@@ -205,7 +208,7 @@ ledger_record() {
             fi
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                 "$component" "$applicable" "$ownership" "$status" "$version" "$path" "$note" "$now"
-        } > "$staged"
+        } > "$staged" || exit 1
         _state_commit_file "$staged" "$DOTFILES_LEDGER_FILE"
     )
 }
@@ -233,11 +236,15 @@ journal_begin() {
     (
         _state_lock_acquire || exit 1
         trap _state_lock_release EXIT INT TERM
+        if journal_pending; then
+            _state_error "An artifact transaction is pending; reconcile it before another replacement"
+            exit 1
+        fi
         local staged
-        staged="$(mktemp "$DOTFILES_STATE_DIR/transaction.tsv.tmp.XXXXXX")"
+        staged="$(mktemp "$DOTFILES_STATE_DIR/transaction.tsv.tmp.XXXXXX")" || exit 1
         printf 'schema\t%s\ncomponent\t%s\nold_path\t%s\nstaged_path\t%s\nnew_path\t%s\n' \
             "$DOTFILES_STATE_SCHEMA" "$component" "$(_state_clean_field "$old_path")" \
-            "$(_state_clean_field "$staged_path")" "$(_state_clean_field "$new_path")" > "$staged"
+            "$(_state_clean_field "$staged_path")" "$(_state_clean_field "$new_path")" > "$staged" || exit 1
         _state_commit_file "$staged" "$DOTFILES_JOURNAL_FILE"
     )
 }
@@ -262,7 +269,8 @@ journal_field() {
 
 journal_reconcile() {
     journal_pending || return 0
-    local component old_path new_path binary observed version=""
+    _state_validate_file "$DOTFILES_JOURNAL_FILE" journal 2 || return 1
+    local component old_path new_path observed version=""
     component="$(journal_field component)" || return 1
     old_path="$(journal_field old_path)" || return 1
     new_path="$(journal_field new_path)" || return 1
@@ -279,24 +287,25 @@ journal_reconcile() {
     fi
 
     if [[ ! -e "$new_path" && -e "$old_path" && "$old_path" != "$new_path" ]]; then
-        mv "$old_path" "$new_path"
+        mv "$old_path" "$new_path" || return 1
         case "$(basename "$(dirname "$old_path")")" in
             .dotfiles-*-rollback) rmdir "$(dirname "$old_path")" 2>/dev/null || true ;;
         esac
     fi
 
-    binary="${TOOL_BINARY[$component]:-}"
-    observed="${binary:+$(command -v "$binary" 2>/dev/null || true)}"
-    [[ -n "$observed" || ! -x "$new_path" ]] || observed="$new_path"
+    observed=""
+    [[ ! -f "$new_path" || ! -x "$new_path" ]] || observed="$new_path"
     if [[ -z "$observed" && -n "${TOOL_RELATIVE_BINARY[$component]:-}" \
        && -x "$new_path/${TOOL_RELATIVE_BINARY[$component]}" ]]; then
         observed="$new_path/${TOOL_RELATIVE_BINARY[$component]}"
     fi
-    if [[ -n "$observed" ]] && "$observed" --version >/dev/null 2>&1; then
-        [[ -n "$observed" ]] && version="$("$observed" --version 2>/dev/null | head -n1 || true)"
-        ledger_record "$component" yes dotfiles installed "$version" "$observed" "recovered interrupted transaction"
+    if [[ -n "$observed" ]] && "$observed" "${TOOL_VERSION_FLAG[$component]:---version}" >/dev/null 2>&1; then
+        version="$("$observed" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | head -n1 || true)"
+        ledger_record "$component" yes dotfiles installed "$version" "$observed" "recovered interrupted transaction" || return 1
     else
-        ledger_record "$component" yes unknown failed "" "$new_path" "interrupted transaction artifact missing"
+        ledger_record "$component" yes unknown failed "" "$new_path" "interrupted transaction artifact missing" || return 1
+        _state_error "Interrupted $component artifact is not runnable: $new_path (journal retained)"
+        return 1
     fi
     journal_clear
 }
@@ -313,8 +322,8 @@ record_install_path() {
         _state_lock_acquire || exit 1
         trap _state_lock_release EXIT INT TERM
         local staged
-        staged="$(mktemp "$DOTFILES_STATE_DIR/install-path.tmp.XXXXXX")"
-        printf '%s\n' "$path" > "$staged"
+        staged="$(mktemp "$DOTFILES_STATE_DIR/install-path.tmp.XXXXXX")" || exit 1
+        printf '%s\n' "$path" > "$staged" || exit 1
         _state_commit_file "$staged" "$DOTFILES_STATE_DIR/install-path"
     )
 }
@@ -332,16 +341,16 @@ theme_state_write_unlocked() {
     # Arguments are key/value pairs and replace the complete theme state in one
     # locked transaction. Empty values are omitted.
     (( $# % 2 == 0 )) || { _state_error "theme_state_write requires key/value pairs"; return 1; }
-    mkdir -p "$DOTFILES_STATE_DIR"
+    mkdir -p "$DOTFILES_STATE_DIR" || return 1
     local staged key value
-    staged="$(mktemp "$DOTFILES_STATE_DIR/theme.tsv.tmp.XXXXXX")"
-    printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA" > "$staged"
+    staged="$(mktemp "$DOTFILES_STATE_DIR/theme.tsv.tmp.XXXXXX")" || return 1
+    printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA" > "$staged" || return 1
         while (( $# )); do
             key="$1"; value="$2"; shift 2
             _state_valid_atom "$key" || { _state_error "Invalid theme-state key: $key"; rm -f "$staged"; return 1; }
             [[ -n "$value" ]] || continue
             value="$(_state_clean_field "$value")"
-            printf '%s\t%s\n' "$key" "$value" >> "$staged"
+            printf '%s\t%s\n' "$key" "$value" >> "$staged" || return 1
     done
     _state_commit_file "$staged" "$DOTFILES_THEME_STATE_FILE"
 }
