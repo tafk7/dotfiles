@@ -13,6 +13,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
 # Source declarative config (PACKAGES, CONFIG_MAP)
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/work-host.sh"
 
 # Backups are machine state, not repository content.
 DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
@@ -44,7 +45,7 @@ track_install() {
 }
 
 record_component_outcome() {
-    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes note existing_record existing_note
+    local name="$1" result="$2" binary path="" ownership="unknown" version="" status applicable=yes note existing_record existing_note prior_owner prior_path
     binary="${TOOL_BINARY[$name]}"
     if [[ "${TOOL_METHOD[$name]:-}" == eget && -x "$HOME/.local/bin/$binary" ]]; then
         path="$HOME/.local/bin/$binary"
@@ -62,8 +63,19 @@ record_component_outcome() {
         done < <(tool_uninstall_paths "$name")
     fi
     if [[ -n "$path" ]]; then
-        if tool_owned_path "$name" "$path"; then ownership="dotfiles"; else ownership="external"; fi
-        version="$("$path" --version 2>/dev/null | head -n1 || true)"
+        if ! tool_owned_path "$name" "$path"; then
+            ownership="external"
+        elif [[ "$result" == ok ]]; then
+            ownership="dotfiles"
+        else
+            existing_record="$(ledger_line "$name" 2>/dev/null || true)"
+            IFS=$'\t' read -r _ _ prior_owner _ _ prior_path _ _ <<< "$existing_record"
+            if [[ "$prior_owner" == dotfiles && "$prior_path" != - ]] \
+               && [[ "$(realpath -m -- "$prior_path")" == "$path" ]]; then
+                ownership=dotfiles
+            fi
+        fi
+        version="$("$path" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null | head -n1 || true)"
     fi
     if [[ "${TOOL_METHOD[$name]:-}" == apt && "$result" == ok ]] \
        && dpkg-query -W "${TOOL_APT_PACKAGE[$name]:-$name}" >/dev/null 2>&1; then
@@ -112,7 +124,7 @@ reconcile_observed_components() {
     for name in "${!TOOL_BINARY[@]}"; do
         ledger_line "$name" >/dev/null 2>&1 && continue
         tool_applicable "$name" || {
-            ledger_record "$name" no unknown not-applicable "" "" "platform/architecture"
+            ledger_record "$name" no unknown not-applicable "" "" "platform/architecture" || return 1
             continue
         }
         verify_cmd="$(tool_verify_command "$name")"
@@ -122,7 +134,7 @@ reconcile_observed_components() {
         version="$(observed_component_version "$name" "$path")"
         ownership=unknown
         [[ -n "$path" ]] && ! tool_owned_path "$name" "$path" && ownership=external
-        ledger_record "$name" yes "$ownership" present "$version" "$path" "observed during reconciliation; ownership unclaimed"
+        ledger_record "$name" yes "$ownership" present "$version" "$path" "observed during reconciliation; ownership unclaimed" || return 1
     done
 }
 
@@ -155,6 +167,13 @@ safe_sudo() {
         error "Command failed: sudo $*"
         return 1
     fi
+}
+
+# Consistent APT invocation for unattended bootstrap/setup runs. A bounded lock
+# wait handles apt-daily overlap without deleting locks or hanging forever.
+safe_apt_get() {
+    safe_sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
+        apt-get -o "DPkg::Lock::Timeout=${DOTFILES_APT_LOCK_TIMEOUT:-120}" "$@"
 }
 
 # Detect Ubuntu version and WSL
@@ -198,7 +217,7 @@ download_https() {
     [[ "$url" == https://* ]] || { error "Refusing non-HTTPS download: $url"; return 1; }
     curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
         --connect-timeout 10 --max-time "${DOTFILES_DOWNLOAD_TIMEOUT:-300}" \
-        --output "$destination" "$url"
+        --output "$destination" "$url" || return 1
     [[ -s "$destination" ]] || { error "Downloaded artifact is empty: $url"; return 1; }
 }
 
@@ -224,16 +243,16 @@ validate_tar_archive() {
 atomic_replace_binary() {
     local component="$1" staged="$2" target="$3" metadata="${4:-}"
     [[ -x "$staged" ]] || { error "Staged $component binary is not executable: $staged"; return 1; }
-    mkdir -p "$(dirname "$target")"
+    mkdir -p "$(dirname "$target")" || return 1
     local pending="${target}.dotfiles-new.$$"
-    journal_begin "$component" "$target" "$staged" "$target"
-    mv "$staged" "$pending"
-    mv -f "$pending" "$target"
+    journal_begin "$component" "$target" "$pending" "$target" || return 1
+    mv "$staged" "$pending" || return 1
+    mv -f "$pending" "$target" || return 1
     local version
-    version="$("$target" --version 2>/dev/null | head -n1 || true)"
+    version="$("$target" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | head -n1 || true)"
     local note="${TOOL_UPDATE_CONTRACT[$component]:-staged}"
     [[ -z "$metadata" ]] || note+=" $metadata"
-    ledger_record "$component" yes dotfiles installed "$version" "$target" "$note"
+    ledger_record "$component" yes dotfiles installed "$version" "$target" "$note" || return 1
     journal_clear
 }
 
@@ -243,23 +262,23 @@ atomic_replace_tree() {
         || { error "Staged $component tree is incomplete: $staged"; return 1; }
     "$staged/$verify_relative" --version >/dev/null 2>&1 \
         || { error "Staged $component tree failed verification"; return 1; }
-    mkdir -p "$(dirname "$target")"
+    mkdir -p "$(dirname "$target")" || return 1
     local rollback_root rollback version
     rollback_root="$(dirname "$target")/.dotfiles-${component}-rollback"
     rollback="$rollback_root/${BASHPID:-$$}"
-    mkdir -p "$rollback_root"
-    journal_begin "$component" "$rollback" "$staged" "$target"
-    if [[ -e "$target" ]]; then mv "$target" "$rollback"; fi
+    mkdir -p "$rollback_root" || return 1
+    journal_begin "$component" "$rollback" "$staged" "$target" || return 1
+    if [[ -e "$target" ]]; then mv "$target" "$rollback" || return 1; fi
     if ! mv "$staged" "$target"; then
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
         return 1
     fi
     if [[ -n "$link_path" ]]; then
-        mkdir -p "$(dirname "$link_path")"
-        ln -sfn "$target/$verify_relative" "$link_path"
+        mkdir -p "$(dirname "$link_path")" || return 1
+        ln -sfn "$target/$verify_relative" "$link_path" || return 1
     fi
     if ! "${link_path:-$target/$verify_relative}" --version >/dev/null 2>&1; then
-        rm -rf "$target"
+        rm -rf "$target" || return 1
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
         if [[ -n "$link_path" ]]; then
             if [[ -e "$target/$verify_relative" ]]; then
@@ -271,8 +290,8 @@ atomic_replace_tree() {
         return 1
     fi
     version="$("${link_path:-$target/$verify_relative}" --version 2>/dev/null | head -n1 || true)"
-    ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}"
-    rm -rf "$rollback"
+    ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}" || return 1
+    rm -rf "$rollback" || return 1
     rmdir "$rollback_root" 2>/dev/null || true
     journal_clear
 }
@@ -415,14 +434,13 @@ write_dotfiles_env() {
 # ==============================================================================
 
 create_backup_dir() {
-    mkdir -p "$DOTFILES_BACKUP_PREFIX"
-    ACTIVE_BACKUP_DIR="$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$ACTIVE_BACKUP_DIR"
+    mkdir -p "$DOTFILES_BACKUP_PREFIX" || return 1
+    ACTIVE_BACKUP_DIR="$(mktemp -d "$DOTFILES_BACKUP_PREFIX/backup-$(date +%Y%m%d-%H%M%S).XXXXXX")"
 }
 
 ensure_backup_dir() {
     if [[ -z "${ACTIVE_BACKUP_DIR:-}" ]]; then
-        create_backup_dir
+        create_backup_dir || return 1
         log "Backup directory: $ACTIVE_BACKUP_DIR"
     fi
 }
@@ -451,19 +469,25 @@ assert_safe_home_target() {
         exit 1
     fi
 
-    local home_canon parent_canon canon
+    local home_canon parent_canon canon config_canon
     home_canon="$(cd "$HOME" 2>/dev/null && pwd -P)" || { error "Cannot resolve \$HOME"; exit 1; }
     parent_canon="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || {
         error "Cannot resolve parent of target: $target"
         exit 1
     }
     canon="$parent_canon/$(basename "$target")"
+    config_canon="$(realpath -m -- "${XDG_CONFIG_HOME:-$HOME/.config}")" || return 1
 
     if [[ "$canon" == "$home_canon" ]]; then
         error "Refusing to delete \$HOME itself: $canon"
         exit 1
     fi
     if [[ "$canon" != "$home_canon"/* ]]; then
+        # XDG configuration may intentionally live outside HOME. Only children
+        # of that configured root are eligible, never the root itself or /.
+        if [[ "$config_canon" != / && "$canon" == "$config_canon/"* ]]; then
+            return 0
+        fi
         error "Refusing to delete target outside \$HOME: $canon"
         exit 1
     fi
@@ -485,41 +509,41 @@ safe_symlink() {
     fi
 
     if [[ "${FORCE_OVERWRITE:-false}" == "true" && -e "$target" ]]; then
-        assert_safe_home_target "$target"
+        assert_safe_home_target "$target" || return 1
         if [[ -L "$target" ]]; then
-            rm -f "$target"
+            rm -f "$target" || return 1
         else
             # Even under --force, preserve real files/dirs in the backup rather
             # than destroying them with rm -rf.
             local dest
-            ensure_backup_dir
+            ensure_backup_dir || return 1
             dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
-            mkdir -p "$(dirname "$dest")"
+            mkdir -p "$(dirname "$dest")" || return 1
             log "Force overwrite: backing up $target -> $dest"
-            mv "$target" "$dest"
+            mv "$target" "$dest" || return 1
         fi
     elif [[ -e "$target" && ! -L "$target" ]]; then
         local dest
-        ensure_backup_dir
+        ensure_backup_dir || return 1
         dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
-        mkdir -p "$(dirname "$dest")"
+        mkdir -p "$(dirname "$dest")" || return 1
         log "Backing up existing $target -> $dest"
-        mv "$target" "$dest"
+        mv "$target" "$dest" || return 1
     elif [[ -L "$target" ]]; then
         local link_target
         link_target="$(readlink -f "$target" 2>/dev/null || true)"
         if [[ -n "$link_target" && -f "$link_target" && "$link_target" != "$(readlink -f "$source")" ]]; then
             local dest
-            ensure_backup_dir
+            ensure_backup_dir || return 1
             dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
-            mkdir -p "$(dirname "$dest")"
+            mkdir -p "$(dirname "$dest")" || return 1
             log "Backing up symlink target $target -> $link_target"
-            cp "$link_target" "$dest"
+            cp "$link_target" "$dest" || return 1
         fi
-        rm "$target"
+        rm "$target" || return 1
     fi
 
-    ln -s "$source" "$target"
+    ln -s "$source" "$target" || return 1
     success "Linked $source -> $target"
 }
 
@@ -566,18 +590,41 @@ process_git_config() {
     local force="${3:-false}"
     local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
     local portable="$portable_dir/gitconfig"
-    local rendered git_version conflict_style="diff3" theme_cache
+    local rendered git_version conflict_style="diff3" theme_cache azure_portable azure_enabled=false
+    local has_nvim=0 has_delta=0
+    command -v nvim >/dev/null 2>&1 && has_nvim=1
+    command -v delta >/dev/null 2>&1 && has_delta=1
 
-    mkdir -p "$portable_dir"
-    rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")"
+    mkdir -p "$portable_dir" || return 1
+    rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")" || return 1
 
     git_version=$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)
     if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
         conflict_style="zdiff3"
     fi
     theme_cache="${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"
+    azure_portable="$portable_dir/gitconfig-azure"
+    local azure_present=false
+    case "${DOTFILES_TEST_AZURE_PRESENT:-}" in
+        1) azure_present=true ;;
+        0) azure_present=false ;;
+        *) command -v az >/dev/null 2>&1 && azure_present=true ;;
+    esac
+    if [[ "${INSTALL_AZURE:-false}" == true || "$azure_present" == true ]]; then
+        azure_enabled=true
+        mkdir -p "$HOME/.local/bin" || return 1
+        safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo" || return 1
+        if [[ ! -f "$azure_portable" ]] || ! cmp -s "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable"; then
+            install -m 0600 "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable" || return 1
+        fi
+    fi
 
     sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
+        awk -v nvim="$has_nvim" -v delta="$has_delta" '
+            !nvim && /^[[:space:]]*(editor = nvim|tool = nvimdiff)$/ { next }
+            !delta && /^[[:space:]]*(pager = delta|diffFilter = delta --color-only)$/ { next }
+            { print }
+        ' |
         if feature_enabled theme; then
             awk -v path="$theme_cache/delta.gitconfig" '
                 $0 == "{{THEME_INCLUDE}}" {
@@ -590,11 +637,22 @@ process_git_config() {
             '
         else
             awk '$0 != "{{THEME_INCLUDE}}" { print }'
-        fi > "$rendered"
+        fi |
+        awk -v enabled="$azure_enabled" -v path="$azure_portable" '
+            $0 == "{{AZURE_INCLUDE}}" {
+                if (enabled == "true") {
+                    print "[include]"
+                    print "    # Optional Azure DevOps credential integration."
+                    print "    path = \"" path "\""
+                }
+                next
+            }
+            { print }
+        ' > "$rendered" || { rm -f "$rendered"; return 1; }
 
     if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
-        mv "$rendered" "$portable"
-        chmod 600 "$portable"
+        chmod 600 "$rendered" || return 1
+        mv "$rendered" "$portable" || return 1
         success "Portable Git config updated: $portable"
     else
         rm -f "$rendered"
@@ -606,19 +664,19 @@ process_git_config() {
     local existing
     existing="$(git config --file "$target" --get-all include.path 2>/dev/null || true)"
     if ! grep -Fxq "$portable" <<< "$existing"; then
-        git config --file "$target" --add include.path "$portable"
+        git config --file "$target" --add include.path "$portable" || return 1
     fi
     if ! grep -Fxq "$HOME/.gitconfig.local" <<< "$existing"; then
-        git config --file "$target" --add include.path "$HOME/.gitconfig.local"
+        git config --file "$target" --add include.path "$HOME/.gitconfig.local" || return 1
     fi
 
     if [[ -n "${DOTFILES_GIT_NAME:-}" ]]; then
         [[ "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || true)" == "$DOTFILES_GIT_NAME" ]] \
-            || git config --file "$HOME/.gitconfig.local" user.name "$DOTFILES_GIT_NAME"
+            || git config --file "$HOME/.gitconfig.local" user.name "$DOTFILES_GIT_NAME" || return 1
     fi
     if [[ -n "${DOTFILES_GIT_EMAIL:-}" ]]; then
         [[ "$(git config --file "$HOME/.gitconfig.local" user.email 2>/dev/null || true)" == "$DOTFILES_GIT_EMAIL" ]] \
-            || git config --file "$HOME/.gitconfig.local" user.email "$DOTFILES_GIT_EMAIL"
+            || git config --file "$HOME/.gitconfig.local" user.email "$DOTFILES_GIT_EMAIL" || return 1
     fi
 
     if [[ -z "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || git config --global user.name 2>/dev/null || true)" \
@@ -660,7 +718,7 @@ install_apt() {
         return 1
     fi
     log "Installing $label APT packages: ${missing[*]}"
-    if safe_sudo apt-get install -y "${missing[@]}"; then
+    if safe_apt_get install -y "${missing[@]}"; then
         success "$label APT packages installed"
     else
         error "Some $label packages failed to install"
@@ -672,7 +730,7 @@ install_apt() {
 update_packages() {
     log "Updating package lists..."
     local output rc=0
-    output="$(safe_sudo apt-get update 2>&1)" || rc=$?
+    output="$(safe_apt_get update 2>&1)" || rc=$?
     printf '%s\n' "$output" | grep -v '^W:' || true
     if (( rc != 0 )); then
         error "APT package index update failed"
@@ -686,46 +744,56 @@ ensure_docker_repo() {
         return 0
     fi
 
-    if [[ -f /etc/apt/sources.list.d/docker.list ]]; then
-        return 0
+    local sources_dir="${DOTFILES_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+    local keyrings_dir="${DOTFILES_APT_KEYRINGS_DIR:-/etc/apt/keyrings}"
+    local main_list="${DOTFILES_APT_MAIN_LIST:-/etc/apt/sources.list}" codename source_file
+
+    codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
+    [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Docker repository"; return 1; }
+
+    # Reuse either legacy .list or current deb822 .sources definitions. Repository
+    # preparation is also used by sbx and must never migrate container runtimes.
+    source_file="$(grep -RslE '^[[:space:]]*(deb .*|URIs:[[:space:]]*)https://download\.docker\.com/linux/ubuntu' \
+        "$sources_dir" "$main_list" 2>/dev/null | head -n1 || true)"
+    if [[ -n "$source_file" ]]; then
+        if grep -Eq "(^|[[:space:]])${codename}([[:space:]]|$)|^Suites:[[:space:]]*${codename}([[:space:]]|$)" "$source_file"; then
+            log "Docker apt repository already configured; reusing existing definition"
+            return 0
+        fi
+        error "Existing Docker repository does not target Ubuntu codename '$codename': $source_file"
+        error "Correct or remove that repository definition manually, then re-run setup."
+        return 1
     fi
 
     log "Adding Docker official apt repository..."
 
-    # Remove conflicting distro packages that shadow Docker CE (per Docker's
-    # official install guidance). Only removes packages that are present.
-    local pkg
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-        if dpkg -s "$pkg" &>/dev/null; then
-            log "Removing conflicting package: $pkg"
-            safe_sudo apt-get remove -y "$pkg" || warn "Could not remove $pkg"
-        fi
-    done
+    safe_apt_get install -y ca-certificates curl gnupg || return 1
 
-    safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
-
-    safe_sudo install -m 0755 -d /etc/apt/keyrings || return 1
-    if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-        local docker_key docker_keyring fingerprint
-        docker_key="$(mktemp)"; docker_keyring="$(mktemp)"
-        download_https https://download.docker.com/linux/ubuntu/gpg "$docker_key" || return 1
-        fingerprint="$(gpg --batch --show-keys --with-colons "$docker_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
+    safe_sudo install -m 0755 -d "$keyrings_dir" || return 1
+    if [[ ! -f "$keyrings_dir/docker.gpg" ]]; then
+        local docker_key docker_keyring fingerprint docker_tmp
+        docker_tmp="$(mktemp -d)"
+        mkdir -m 0700 "$docker_tmp/gnupg"
+        docker_key="$docker_tmp/docker.asc"; docker_keyring="$docker_tmp/docker.gpg"
+        download_https https://download.docker.com/linux/ubuntu/gpg "$docker_key" \
+            || { rm -rf "$docker_tmp"; return 1; }
+        fingerprint="$(GNUPGHOME="$docker_tmp/gnupg" gpg --batch --show-keys --with-colons "$docker_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
         if [[ "$fingerprint" != 9DC858229FC7DD38854AE2D88D81803C0EBFCD88 ]]; then
-            rm -f "$docker_key" "$docker_keyring"
+            rm -rf "$docker_tmp"
             error "Docker repository key fingerprint mismatch: ${fingerprint:-missing}"
             return 1
         fi
-        gpg --batch --dearmor --output "$docker_keyring" "$docker_key" || return 1
-        safe_sudo install -m 0644 "$docker_keyring" /etc/apt/keyrings/docker.gpg || return 1
-        rm -f "$docker_key" "$docker_keyring"
-        safe_sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        GNUPGHOME="$docker_tmp/gnupg" gpg --batch --dearmor --output "$docker_keyring" "$docker_key" \
+            || { rm -rf "$docker_tmp"; return 1; }
+        safe_sudo install -m 0644 "$docker_keyring" "$keyrings_dir/docker.gpg" \
+            || { rm -rf "$docker_tmp"; return 1; }
+        rm -rf "$docker_tmp"
+        safe_sudo chmod a+r "$keyrings_dir/docker.gpg"
     fi
 
-    local codename
-    codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
-    [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Docker repository"; return 1; }
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $codename stable" | \
-        safe_sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    printf 'deb [arch=%s signed-by=%s/docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' \
+        "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | \
+        safe_sudo tee "$sources_dir/docker.list" > /dev/null
 
     update_packages || return 1
     success "Docker apt repository configured"
@@ -735,7 +803,7 @@ ensure_docker_repo() {
 # Replaces the previous `curl https://aka.ms/InstallAzureCLIDeb | sudo bash`,
 # which executed an unpinned remote script as root.
 install_azure_cli() {
-    if command -v az >/dev/null 2>&1; then
+    if [[ "${FORCE_REINSTALL:-false}" != true ]] && command -v az >/dev/null 2>&1; then
         log "Azure CLI already installed"
         return 0
     fi
@@ -746,51 +814,77 @@ install_azure_cli() {
     fi
 
     log "Installing Azure CLI from Microsoft's signed apt repository..."
-    safe_sudo apt-get install -y ca-certificates curl gnupg || return 1
-    safe_sudo install -m 0755 -d /etc/apt/keyrings || return 1
+    safe_apt_get install -y ca-certificates curl gnupg || return 1
+    local sources_dir="${DOTFILES_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+    local keyrings_dir="${DOTFILES_APT_KEYRINGS_DIR:-/etc/apt/keyrings}"
+    safe_sudo install -m 0755 -d "$keyrings_dir" "$sources_dir" || return 1
 
-    if [[ ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
+    if [[ ! -f "$keyrings_dir/microsoft.gpg" ]]; then
         local microsoft_key microsoft_keyring fingerprint
         microsoft_key="$(mktemp)"; microsoft_keyring="$(mktemp)"
         download_https https://packages.microsoft.com/keys/microsoft.asc "$microsoft_key" || return 1
-        fingerprint="$(gpg --batch --show-keys --with-colons "$microsoft_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
+        local microsoft_gnupg
+        microsoft_gnupg="$(mktemp -d)"; chmod 700 "$microsoft_gnupg"
+        fingerprint="$(GNUPGHOME="$microsoft_gnupg" gpg --batch --show-keys --with-colons "$microsoft_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
         if [[ "$fingerprint" != BC528686B50D79E339D3721CEB3E94ADBE1229CF ]]; then
-            rm -f "$microsoft_key" "$microsoft_keyring"
+            rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"
             error "Microsoft repository key fingerprint mismatch: ${fingerprint:-missing}"
             return 1
         fi
-        gpg --batch --dearmor --output "$microsoft_keyring" "$microsoft_key" || return 1
-        safe_sudo install -m 0644 "$microsoft_keyring" /etc/apt/keyrings/microsoft.gpg || return 1
-        rm -f "$microsoft_key" "$microsoft_keyring"
-        safe_sudo chmod a+r /etc/apt/keyrings/microsoft.gpg
+        GNUPGHOME="$microsoft_gnupg" gpg --batch --dearmor --output "$microsoft_keyring" "$microsoft_key" \
+            || { rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"; return 1; }
+        safe_sudo install -m 0644 "$microsoft_keyring" "$keyrings_dir/microsoft.gpg" || return 1
+        rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"
+        safe_sudo chmod a+r "$keyrings_dir/microsoft.gpg"
     fi
 
     local codename
     codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
     [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Azure CLI repository"; return 1; }
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $codename main" | \
-        safe_sudo tee /etc/apt/sources.list.d/azure-cli.list > /dev/null
+    printf 'deb [arch=%s signed-by=%s/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ %s main\n' \
+        "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | safe_sudo tee "$sources_dir/azure-cli.list" > /dev/null
 
     update_packages || return 1
-    install_apt "azure-cli" azure-cli
+    if [[ "${FORCE_REINSTALL:-false}" == true ]] && dpkg-query -W azure-cli >/dev/null 2>&1; then
+        safe_apt_get install --reinstall -y azure-cli
+    else
+        install_apt "azure-cli" azure-cli
+    fi
 }
 
 # ==============================================================================
 # Installer Runner
 # ==============================================================================
 
+# Presence is not provenance. Refresh only recorded installations by default;
+# --force may explicitly adopt a binary already inside a declared local prefix.
+preserve_existing_tool() {
+    local name="$1" force="${2:-false}" path line owner recorded_path
+    path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
+    [[ -n "$path" ]] || return 1
+    "$path" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1 || return 1
+    if tool_owned_path "$name" "$path"; then
+        [[ "$force" == true ]] && return 1
+        line="$(ledger_line "$name" 2>/dev/null || true)"
+        IFS=$'\t' read -r _ _ owner _ _ recorded_path _ _ <<< "$line"
+        if [[ "$owner" == dotfiles && "$recorded_path" != - ]] \
+           && [[ "$(realpath -m -- "$recorded_path")" == "$(realpath -m -- "$path")" ]]; then
+            return 1
+        fi
+    fi
+    log "Preserving unowned $name at $path; manage it with its original installer"
+    return 0
+}
+
 # Run installer script with consistent error handling
 # Exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
 run_installer() {
     local name="$1"
-    local critical="${2:-false}"
-    : "$critical"  # retained for compatibility with older callers
     local script="$DOTFILES_DIR/installers/install-$name.sh"
 
     if [[ ! -f "$script" ]]; then
         error "Installer script not found: $script"
         track_install "$name" fail
-        [[ "$critical" == "true" ]] && exit 1
         return 1
     fi
 
@@ -822,6 +916,7 @@ run_installer() {
 # Install all binary tools declared in eget.toml
 install_eget_tools() {
     local config="$DOTFILES_DIR/eget.toml"
+    local requested="${1:-}"
     if [[ ! -f "$config" ]]; then
         error "eget.toml not found at $config"
         return 1
@@ -837,7 +932,10 @@ install_eget_tools() {
     local name
     for name in "${!TOOL_METHOD[@]}"; do
         [[ "${TOOL_METHOD[$name]}" == "eget" ]] || continue
-        if declare -F tier_includes >/dev/null 2>&1; then
+        if [[ -n "$requested" ]]; then
+            [[ "$name" == "$requested" ]] || continue
+        elif declare -F tier_includes >/dev/null 2>&1; then
+            [[ -n "${TOOL_TIER[$name]:-}" ]] || continue
             tier_includes "${TOOL_TIER[$name]}" || continue
         fi
         if ! tool_applicable "$name"; then
@@ -873,6 +971,8 @@ install_eget_tools() {
                     log "Ignoring incidental $name candidate at $existing"
                     to_download+=("$name")
                 fi
+            elif [[ -n "$existing" ]] && preserve_existing_tool "$name" false; then
+                track_install "$name" skip
             else
                 to_download+=("$name")
             fi
@@ -892,7 +992,7 @@ install_eget_tools() {
         return 0
     fi
 
-    run_installer "eget" true || return 1
+    run_installer "eget" || return 1
     log "Installing binary tools via eget..."
 
     if [[ ${#eget_tools[@]} -eq 0 ]]; then
@@ -938,7 +1038,7 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
-        local pinned current_output target existing_record recorded_note recorded_hash actual_hash
+        local pinned current_output target existing_record recorded_note recorded_hash actual_hash companion_ready companion_output companion
         pinned="$(awk -v section="[\"$slug\"]" '
             $0 == section { active=1; next }
             active && /^\[/ { exit }
@@ -947,7 +1047,12 @@ install_eget_tools() {
             }
         ' "$config")"
         target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
-        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" ]]; then
+        companion_ready=true
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            companion_output="$("$HOME/.local/bin/$companion" --version 2>/dev/null || true)"
+            [[ -n "$pinned" && "$companion_output" == *"${pinned#v}"* ]] || companion_ready=false
+        done
+        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" && "$companion_ready" == true ]]; then
             existing_record="$(ledger_line "$name" 2>/dev/null || true)"
             recorded_note=""
             if [[ -n "$existing_record" ]]; then
@@ -968,12 +1073,14 @@ install_eget_tools() {
             fi
         fi
 
-        local stage_home stage_config staged staged_hash
+        local stage_home stage_config staged staged_hash companion companions_ok
         stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")"
         stage_config="$stage_home/eget.toml"
         mkdir -p "$stage_home/.local/bin"
         sed "s|~/.local/bin|$stage_home/.local/bin|g" "$config" > "$stage_config"
-        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "$slug"; then
+        local -a extract_args=()
+        [[ -z "${TOOL_COMPANIONS[$name]:-}" ]] || extract_args+=(--all)
+        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "${extract_args[@]}" "$slug"; then
             rm -rf "$stage_home"
             track_install "$name" fail
             any_missing=true
@@ -986,8 +1093,31 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
+        companions_ok=true
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            [[ -x "$stage_home/.local/bin/$companion" ]] \
+                && "$stage_home/.local/bin/$companion" --version >/dev/null 2>&1 || companions_ok=false
+        done
+        if [[ "$companions_ok" != true ]]; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        # Promote verified companions before the primary. Each replacement is
+        # recoverable; a multi-executable release is not a filesystem-wide transaction.
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            atomic_replace_binary "$name" "$stage_home/.local/bin/$companion" "$HOME/.local/bin/$companion" \
+                || { companions_ok=false; break; }
+        done
         staged_hash="$(sha256sum "$staged" | awk '{print $1}')"
-        atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"
+        if [[ "$companions_ok" != true ]] \
+           || ! atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
         PATH="$HOME/.local/bin:$PATH"
         export PATH
         hash -r
@@ -1030,6 +1160,24 @@ install_bash_packages() {
     success "Bash tier installation complete"
 }
 
+configure_locale() {
+    locale -a 2>/dev/null | grep -qi '^en_US\.utf8$' && return 0
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        log "[DRY RUN] Would generate en_US.UTF-8 after installing locales"
+        return 0
+    fi
+    if ! command -v locale-gen >/dev/null 2>&1 || ! command -v update-locale >/dev/null 2>&1; then
+        warn "The locales package installed, but locale-gen/update-locale are unavailable"
+        return 0
+    fi
+    log "Generating en_US.UTF-8 locale..."
+    if safe_sudo locale-gen en_US.UTF-8 && safe_sudo update-locale LANG=en_US.UTF-8; then
+        success "Locale generated"
+    else
+        warn "Locale generation failed - some shell features may not work correctly"
+    fi
+}
+
 # dev tier: first apt layer (sudo). Everything that needs root lives here or
 # above — zsh, build toolchain, clipboard, and the tmux build deps that
 # install-tmux.sh compiles against.
@@ -1048,6 +1196,7 @@ install_dev_packages() {
         [[ "${DRY_RUN:-false}" == "true" ]] || track_install zsh fail
         return 1
     fi
+    configure_locale
     if [[ "${DRY_RUN:-false}" != "true" ]]; then
         if command -v zsh >/dev/null 2>&1; then track_install zsh ok; else track_install zsh fail; return 1; fi
     fi
@@ -1064,7 +1213,7 @@ install_dev_packages() {
 # AI CLIs (Claude Code, Codex, opencode). Orthogonal to the tier chain —
 # installed only when --ai/--full or a per-tool flag (--claude/--codex/
 # --opencode) is passed. Which tools run is driven by setup.sh's AI_ALL /
-# AI_TOOLS globals; AI_ALL expands to every ai-tier tool in the registry, so a
+# AI_TOOLS globals; AI_ALL expands to every AI-capability tool in the registry, so a
 # new AI CLI is picked up automatically once registered. Kept separate so an
 # org-managed install can be left untouched — each installer refuses to shadow
 # an external binary already on PATH.
@@ -1072,7 +1221,7 @@ install_ai_packages() {
     local -a tools=()
     local failed=false
     if [[ "${AI_ALL:-false}" == "true" ]]; then
-        readarray -t tools < <(tools_for_tier ai)
+        readarray -t tools < <(tools_for_capability ai)
     else
         # Individual selections, de-duplicated while preserving order.
         local t
@@ -1083,6 +1232,11 @@ install_ai_packages() {
     fi
 
     [[ ${#tools[@]} -eq 0 ]] && return 0
+
+    if feature_enabled agent-badge && [[ " ${tools[*]} " == *' claude '* || " ${tools[*]} " == *' codex '* ]] \
+       && ! command -v jq >/dev/null 2>&1; then
+        install_eget_tools jq || failed=true
+    fi
 
     log "Installing AI CLIs: ${tools[*]}"
     local t
@@ -1134,14 +1288,11 @@ install_rdp_packages() {
     # Pin the display-manager answer before apt can ask (see helper above).
     preserve_default_display_manager || { track_install "xrdp" fail; return 1; }
 
-    # Deliberately not install_apt: we need a preseeded, fully non-interactive
-    # apt run. DEBIAN_FRONTEND=noninteractive suppresses the dialog; DEBIAN_PRIORITY
-    # =critical is a second guard so only critical questions could ever surface.
-    # env, not a bare assignment, because sudo resets the environment.
+    # Deliberately not install_apt: this path must preseed the display-manager
+    # answer before the shared noninteractive APT invocation.
     update_packages || { track_install "xrdp" fail; return 1; }
     # shellcheck disable=SC2086
-    if safe_sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
-        apt-get install -y ${PACKAGES[rdp]}; then
+    if safe_apt_get install -y ${PACKAGES[rdp]}; then
         success "rdp APT packages installed"
     else
         error "rdp APT package installation failed"
@@ -1155,67 +1306,141 @@ install_rdp_packages() {
     success "RDP server installation complete"
 }
 
+docker_conflicting_packages() {
+    local pkg
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 docker-buildx podman-docker containerd runc; do
+        dpkg -s "$pkg" >/dev/null 2>&1 && printf '%s\n' "$pkg"
+    done
+}
+
+install_docker_engine() {
+    # A dry-run describes the requested package path without probing installed
+    # runtimes. Besides keeping the preview host-independent, this prevents the
+    # conflict scan below from invoking even read-only package commands under
+    # the repository's strict no-command dry-run contract.
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        ensure_docker_repo || return 1
+        # shellcheck disable=SC2206
+        local dry_run_packages=(${PACKAGES[docker]})
+        install_apt docker "${dry_run_packages[@]}"
+        return
+    fi
+
+    if dpkg-query -W "${TOOL_APT_PACKAGE[docker]}" >/dev/null 2>&1; then
+        log "Docker Engine package already installed"
+        track_install docker skip
+        return 0
+    fi
+
+    # An already usable non-Docker-CE installation belongs to its administrator.
+    # Keep it and its daemon configuration untouched.
+    if command -v docker >/dev/null 2>&1; then
+        local endpoint
+        endpoint="$(work_docker_endpoint)"
+        if ! work_docker_endpoint_is_local "$endpoint"; then
+            error "Existing Docker CLI uses a remote endpoint ($endpoint); it does not satisfy local Engine installation."
+            error "Select a local context or resolve the external CLI before re-running setup."
+            track_install docker fail
+            return 1
+        fi
+        warn "Keeping externally managed Docker installation: $(command -v docker)"
+        track_install docker skip
+        return 0
+    fi
+
+    local -a conflicts=()
+    readarray -t conflicts < <(docker_conflicting_packages)
+    if (( ${#conflicts[@]} )); then
+        error "Docker Engine migration required; conflicting packages are installed: ${conflicts[*]}"
+        error "Review Docker's migration guidance and container data, remove conflicts manually, then re-run setup."
+        track_install docker fail
+        return 1
+    fi
+
+    ensure_docker_repo || { track_install docker fail; return 1; }
+    # shellcheck disable=SC2206
+    local packages=(${PACKAGES[docker]})
+    install_apt docker "${packages[@]}" || { track_install docker fail; return 1; }
+    if [[ "${DRY_RUN:-false}" != true ]]; then
+        command -v docker >/dev/null 2>&1 \
+            && track_install docker ok \
+            || { track_install docker fail; return 1; }
+    fi
+}
+
+ensure_account_group() {
+    local group="$1" account state
+    account="$(host_account)" || { warn "Cannot resolve the invoking account for $group membership"; return 0; }
+    getent group "$group" >/dev/null 2>&1 || { warn "$group group is unavailable; host configuration remains incomplete"; return 0; }
+    state="$(host_group_state "$group")"
+    case "$state" in
+        active) log "$account has active $group group membership" ;;
+        pending) warn "$account has $group membership, but this process needs a new login" ;;
+        *)
+            log "Adding $account to $group group..."
+            if safe_sudo usermod -aG "$group" "$account"; then
+                warn "$group membership added; sign out and reconnect before verification"
+            else
+                warn "Could not add $account to $group (try: sudo usermod -aG $group $account)"
+            fi
+            ;;
+    esac
+}
+
+configure_docker_host_access() {
+    command -v docker >/dev/null 2>&1 || return 0
+    local endpoint
+    endpoint="$(work_docker_endpoint)"
+    if [[ "$endpoint" == unix:///run/user/*/docker.sock ]]; then
+        log "Rootless Docker endpoint detected; docker-group membership is unnecessary"
+    else
+        ensure_account_group docker
+        warn "Membership in the docker group grants root-equivalent access to this host."
+    fi
+    if host_systemd_running && [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
+        safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
+    fi
+}
+
+configure_work_host() {
+    log "Configuring work-tier Docker and KVM access..."
+    configure_docker_host_access
+    if work_kvm_device_present || work_kernel_has_kvm; then
+        ensure_account_group kvm
+    else
+        warn "KVM unavailable; enable hardware/nested virtualization outside this machine, then verify /dev/kvm"
+    fi
+    if ! work_kvm_device_present; then
+        warn "/dev/kvm is missing; sbx is installed but local sandboxes cannot start"
+    elif ! work_kvm_accessible; then
+        warn "/dev/kvm permission denied; reconnect after kvm group membership is applied"
+    fi
+    host_systemd_running || warn "systemd is not managing this host; Docker service readiness must be handled manually"
+    success "Work host configuration checked (package success and host readiness are reported separately)"
+}
+
+install_tail_packages() {
+    log "Installing the optional Tailscale capability..."
+    run_installer tailscale || return 1
+    success "Tailscale capability installation complete"
+}
+
+install_cloud_capability() {
+    local capability="$1" tool
+    tool="$(tools_for_capability "$capability" | head -n1)"
+    [[ -n "$tool" ]] || { error "No component registered for --$capability"; return 1; }
+    run_installer "$tool"
+}
+
 install_work_packages() {
     log "Installing work tier packages..."
     local failed=false
 
-    # Azure CLI
-    if install_azure_cli; then
-        if [[ "${DRY_RUN:-false}" != "true" ]]; then
-            command -v az >/dev/null 2>&1 && track_install azure-cli ok || { track_install azure-cli fail; failed=true; }
-        fi
-    else
-        track_install azure-cli fail
-        failed=true
-    fi
+    install_apt "work" python3-dev python3-venv || failed=true
 
-    # Azure DevOps git credential helper
-    if [[ -f "$DOTFILES_DIR/bin/git-credential-azdo" ]]; then
-        if [[ "${DRY_RUN:-false}" == "true" ]]; then
-            log "[DRY RUN] Would link the Azure DevOps credential helper"
-        else
-            mkdir -p "$HOME/.local/bin"
-            ln -sf "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
-            success "Azure DevOps credential helper linked"
-        fi
-    fi
-
-    # Docker
-    ensure_docker_repo || failed=true
-    # shellcheck disable=SC2086
-    install_apt "work" python3-dev python3-venv ${PACKAGES[docker]} || failed=true
-    if [[ "${DRY_RUN:-false}" != "true" ]]; then
-        if command -v docker >/dev/null 2>&1; then track_install docker ok; else track_install docker fail; failed=true; fi
-    fi
-
-    if command -v docker >/dev/null 2>&1 && ! groups | grep -q docker; then
-        log "Adding $USER to docker group..."
-        if safe_sudo usermod -aG docker "$USER"; then
-            success "Added to docker group (restart shell to activate)"
-            # Security disclosure: the docker group is root-equivalent — its
-            # members can mount the host filesystem and run privileged containers.
-            warn "Note: membership in the 'docker' group grants root-equivalent access to this host."
-        else
-            warn "Could not add to docker group (try: sudo usermod -aG docker $USER)"
-        fi
-    fi
-
-    # Enable and start the daemon when systemd is managing the system (native
-    # Linux, or WSL with systemd=true). No-op when systemd isn't running.
-    if command -v docker >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
-        safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
-    fi
-
-    # Verify the daemon is reachable. Non-fatal: docker group membership only
-    # takes effect on a new login, and WSL without systemd may need
-    # `sudo service docker start`.
-    if command -v docker >/dev/null 2>&1 && [[ "${DRY_RUN:-false}" != "true" ]]; then
-        if docker info >/dev/null 2>&1; then
-            success "Docker daemon is running"
-        else
-            warn "Docker installed but 'docker info' failed — start the daemon and re-login for group access"
-        fi
-    fi
+    install_docker_engine || failed=true
+    run_installer "sbx" || failed=true
+    configure_work_host
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" || failed=true

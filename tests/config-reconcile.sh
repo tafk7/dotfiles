@@ -44,6 +44,13 @@ run_setup
 [[ ! -d "$DOTFILES_BACKUP_PREFIX" ]] || fail "fresh config created an unnecessary backup directory"
 grep -q 'preserved = yes' "$HOME/.gitconfig" || fail "existing Git config was overwritten"
 grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig" "$HOME/.gitconfig" || fail "portable Git include missing"
+grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig-azure" "$XDG_CONFIG_HOME/dotfiles/gitconfig" \
+    || fail "existing Azure CLI did not activate portable Azure include"
+[[ "$(grep -c '^\[credential ' "$XDG_CONFIG_HOME/dotfiles/gitconfig" || true)" == 0 ]] \
+    || fail "Azure credential helpers remained duplicated in the portable base"
+[[ "$(grep -c '^\[credential ' "$XDG_CONFIG_HOME/dotfiles/gitconfig-azure")" == 2 ]] \
+    || fail "Azure credential include is incomplete or duplicated"
+[[ -L "$HOME/.local/bin/git-credential-azdo" ]] || fail "Azure credential helper was not linked"
 assert_eq "$(stat -c %a "$HOME/.ssh")" 700 "SSH directory permissions"
 assert_eq "$(stat -c %a "$HOME/.ssh/sockets")" 700 "SSH socket directory permissions"
 [[ ! -e "$XDG_CACHE_HOME/dotfiles/theme" ]] || fail "--no-theme generated theme artifacts"
@@ -64,6 +71,12 @@ if [[ "$second" != "$first" ]]; then
 fi
 [[ "$(ledger_line docker)" == $'docker\tyes\tpackage-manager\tinstalled\t1\t/usr/bin/docker\tapt-in-place\t'* ]] \
     || fail "lower-tier reconciliation erased higher-tier ledger history"
+
+rm "$TEST_ROOT/bin/az"
+export DOTFILES_TEST_AZURE_PRESENT=0
+run_setup
+grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig-azure" "$XDG_CONFIG_HOME/dotfiles/gitconfig" \
+    && fail "Azure include stayed active after Azure CLI was no longer applicable"
 
 rm "$HOME/.editorconfig"
 printf 'user content\n' > "$HOME/.editorconfig"

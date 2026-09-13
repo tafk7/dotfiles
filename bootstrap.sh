@@ -19,13 +19,20 @@ die() { printf '\033[0;31m[bootstrap] error:\033[0m %s\n' "$*" >&2; exit 1; }
 os_id="$(awk -F= '$1 == "ID" { gsub(/^"|"$/, "", $2); print $2; exit }' /etc/os-release 2>/dev/null || true)"
 [[ "$os_id" == ubuntu ]] || die "unsupported distribution '${os_id:-unknown}'; this repository supports Ubuntu and Ubuntu-on-WSL"
 
-# 1. Ensure git is available.
-if ! command -v git >/dev/null 2>&1; then
-    log "git not found — installing via apt"
+# 1. Ensure bootstrap prerequisites are available. Install the small fixed set
+# together so minimal images do not reach setup with Git but without curl/TLS.
+if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 \
+   || ! dpkg-query -W -f='${Status}\n' ca-certificates 2>/dev/null | grep -Fq 'install ok installed'; then
+    log "installing missing bootstrap prerequisites via apt"
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update && sudo apt-get install -y git
+        command -v sudo >/dev/null 2>&1 || die "sudo is required to install bootstrap prerequisites"
+        sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
+            apt-get -o "DPkg::Lock::Timeout=${DOTFILES_APT_LOCK_TIMEOUT:-120}" update
+        sudo env DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical \
+            apt-get -o "DPkg::Lock::Timeout=${DOTFILES_APT_LOCK_TIMEOUT:-120}" \
+            install -y git curl ca-certificates
     else
-        die "git is missing and apt-get is unavailable; install git manually and re-run"
+        die "git/curl is missing and apt-get is unavailable; install prerequisites manually and re-run"
     fi
 fi
 

@@ -9,11 +9,15 @@ Tiered dotfiles system for Ubuntu/WSL. Install only what you need: from config-o
 ./setup.sh --config              # Reconcile symlinks to installed tools (no sudo)
 ./setup.sh --bash                # + starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gh, direnv (NO sudo — eget)
 ./setup.sh --dev                 # + zsh, build tools, neovim, tmux (first sudo tier)
-./setup.sh --work                # + NVM, Docker, Azure CLI (everything except the AI CLIs)
+./setup.sh --work                # + NVM, Docker, local sbx/KVM readiness, Rust
 ./setup.sh --ai                  # + all AI CLIs: Claude Code, Codex, opencode, Pi (orthogonal)
 ./setup.sh --claude --opencode   # + only the AI CLIs you name (--claude / --codex / --opencode / --pi)
 ./setup.sh --rdp                 # + xrdp RDP server + XFCE desktop (orthogonal flag; combines with any tier)
-./setup.sh --full                # Everything: --work plus --ai (but NOT --rdp)
+./setup.sh --tail                # + Tailscale package/service (orthogonal; no enrollment)
+./setup.sh --azure               # + Azure CLI and Azure DevOps Git integration
+./setup.sh --gcloud              # + Google Cloud CLI
+./setup.sh --aws                 # + AWS CLI v2
+./setup.sh --full                # Exactly --work plus --ai
 ./setup.sh --dev --ai            # Dev environment + self-managed AI CLIs
 ./setup.sh --bash --no-theme      # Core shell with the default theme feature disabled
 ./setup.sh --ai --no-agent-badge # AI CLIs without the optional tmux badge plugin
@@ -28,7 +32,7 @@ Codex, opencode, Pi) and can be added to any tier. Install them individually wit
 installs just those two). Leave AI off entirely when your org manages the
 install — the shell aliases/shortcuts load regardless and resolve whatever
 `claude`/`codex`/`opencode`/`pi` is on your `PATH`. `--full` is shorthand for
-`--work --ai`. Multiple tier flags select the highest tier regardless of order.
+`--work --ai`. It never implies Tailscale, RDP, or cloud CLIs. Multiple tier flags select the highest tier regardless of order.
 Use `--force` to refresh dotfiles-owned components; externally managed tools are
 never replaced implicitly.
 
@@ -39,11 +43,29 @@ the APT layer (zsh, build tools, clipboard) and require sudo. On the bash tier a
 tool already installed system-wide is left in place (use `--force` to install our
 pinned copy over it).
 
+APT-backed selections run noninteractively and wait up to 120 seconds for an
+existing package-manager operation instead of deleting lock files. Override the
+wait with `DOTFILES_APT_LOCK_TIMEOUT`.
+
+Because local sandbox execution is part of `work`, that tier requires native
+Ubuntu 24.04/26.04 with KVM. The config, bash, and dev tiers retain Ubuntu
+22.04 and WSL support.
+
 `--rdp` is a second orthogonal flag: it installs and configures the xrdp RDP
 server with an XFCE session so you can remote into this machine's desktop
 (WSL: `mstsc -> localhost:3390` from the Windows host). It is deliberately
 **not** part of `--full` — opening a network listener is always an explicit
 opt-in. Details: `issues/xrdp-remote-desktop.md`.
+
+`--tail`, `--azure`, `--gcloud`, and `--aws` are orthogonal. The work tier
+installs Docker Engine, local Docker Sandboxes (`sbx`), and KVM host access on
+native Ubuntu 24.04/26.04. `--tail` adds Tailscale without enrollment. Tailscale
+and APT-backed cloud selections require sudo independently of the tier. See
+[docs/work.md](docs/work.md).
+
+Compatibility change: fresh `--work` and `--full` runs no longer install Azure
+CLI. Use `--work --azure` to retain that selection. Existing Azure installs are
+left in place, and no cloud CLI is inferred from the VM's provider.
 
 The coordinated theme is enabled by default and agent-badge is enabled when a
 supported AI CLI is selected. Both are optional, persistent preferences:
@@ -51,6 +73,9 @@ supported AI CLI is selected. Both are optional, persistent preferences:
 `--agent-badge` is explicitly requested (or `bin/dotfiles-feature` is used).
 
 After installation, verify with `./bin/verify --installed` and restart your shell.
+After `--dev`, run `./bin/install-editor-plugins` explicitly for the optional
+Neovim plugin suite. Agent-badge requires `jq` on PATH; dependency setup and
+rollout guidance are in [maintenance](docs/maintenance.md).
 GitHub CLI authentication remains machine-local; run `gh auth login` on each
 machine where authenticated GitHub access is wanted.
 
@@ -65,6 +90,8 @@ No clone step needed — `bootstrap.sh` installs git, clones this repo, and runs
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh | bash
 curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh | bash -s -- --dev
+curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh \
+  | bash -s -- --full --tail
 ```
 
 The repo lands in `~/dev/dotfiles` (override with `DOTFILES_DIR`). Defaults to the
@@ -253,10 +280,8 @@ Per-tool palettes live under `themes/<name>/`:
 | File                          | Consumer                                  |
 |-------------------------------|-------------------------------------------|
 | `meta.sh`                     | Theme metadata (display name, description)|
-| `colors.sh`                   | Canonical hex/RGB palette                 |
-| `palette.sh`                  | Semantic roles + scoped ANSI palette      |
+| `palette.sh`                  | Semantic roles, ANSI palette, pane tints; tmux styles and previews derive from these |
 | `vim.vim`                     | Neovim/vim colorscheme + overrides        |
-| `tmux.conf`                   | tmux status bar + pane borders            |
 | `shell.sh`                    | Native `BAT_THEME`/`STARSHIP_PALETTE`/Delta feature names |
 | `starship.palette.toml`       | Starship `[palettes.<name>]` block        |
 | `delta.gitconfig`             | Delta `[delta "<name>"]` feature          |
@@ -275,6 +300,12 @@ bat (different versions are binary-incompatible).
 > **New here?** Read [`docs/concepts.md`](docs/concepts.md) first — it explains
 > the four pillars (tiers, CONFIG_MAP, tool registry, theme cascade) on one page.
 
+For current contracts use [architecture](docs/architecture.md); for extension
+recipes use [customization](docs/customization.md). See [testing](docs/testing.md)
+for validation and performance measurements, [maintenance](docs/maintenance.md)
+for ownership and rollout, and [supply-chain policy](docs/supply-chain.md) for
+download contracts. Earlier implementation material is [historical](docs/history/2026-09-improvement-plan.md).
+
 ```
 setup.sh                  Entry point — 3-phase orchestrator (reads lib/config.sh)
 lib/
@@ -282,7 +313,7 @@ lib/
   state.sh                Versioned preferences, component ledger, locks, journal
   runtime.sh              Runtime helpers (logging, is_wsl, command_exists)
   config.sh               Declarative data: CONFIG_MAP + PACKAGES
-  registry.sh             Tool registry: TOOL_BINARY/METHOD/TIER/PATHS for verify + bin/cheatsheet
+  registry.sh             Tool registry: binaries, tiers, capabilities, ownership, verify/update metadata
 configs/                  Config files without dots (symlinked to ~/.<name>)
 themes/                   Theme data — see "Theme System" table above
 shell/
@@ -310,7 +341,7 @@ Override per-machine in `~/.shell.local`.
 ## Extending
 
 **New tool:**
-1. Add an entry to `lib/registry.sh` (`TOOL_BINARY`, `TOOL_METHOD`, `TOOL_TIER`, `TOOL_PATHS`).
+1. Add component inventory and ownership metadata to `lib/registry.sh`; follow the [complete recipe](docs/customization.md#adding-a-new-binary-tool-eget).
 2. For `eget`-installable binaries, add to `eget.toml`. Otherwise create `installers/install-<tool>.sh` and call it from the appropriate `install_<tier>` function in `lib/install.sh` via `run_installer "<tool>"`.
 3. Add aliases/functions in `shell/tools/<domain>.sh`.
 4. Add a row to `shell/shortcuts-index.tsv` for `cheatsheet`.
@@ -321,7 +352,8 @@ Override per-machine in `~/.shell.local`.
 to `CONFIG_MAP` in `lib/config.sh`. Git uses an include-based portable config;
 machine identity belongs in `~/.gitconfig.local`.
 
-**New theme:** Create `themes/<name>/` with the required files (`meta.sh`, `colors.sh`, `vim.vim`, `tmux.conf`, `shell.sh`) — themes are auto-discovered from disk. Add per-tool palette files (`starship.palette.toml`, `delta.gitconfig`, `btop.theme`, `lazygit.yml`, optional `bat/<name>.tmTheme`) for full surface coverage.
+**New theme:** Follow [adding a complete theme](docs/theme-system.md#adding-a-complete-theme).
+Themes are discovered from disk; the shared Starship template needs no catalog edit.
 
 **Local overrides:** `~/.shell.local` is sourced last by both shells, after all dotfiles config. Not tracked. Use it for machine-specific `PROJECTS_DIRS`, secrets, and personal aliases. For shell-specific tweaks (`setopt`, `bindkey`, `shopt`), gate the block:
 
@@ -366,4 +398,5 @@ auth method was used.
 - [`docs/theme-system.md`](docs/theme-system.md) — Cascade internals + adding themes.
 - [`docs/supply-chain.md`](docs/supply-chain.md) — Download trust and update-failure contracts.
 - [`docs/testing.md`](docs/testing.md) — Hermetic matrix and manual WSL/RDP checks.
+- [`docs/work.md`](docs/work.md) — Local sandbox setup, optional Tailscale, authentication, and lifecycle.
 - [`docs/THEME_QUICK_START.md`](docs/THEME_QUICK_START.md) — Day-to-day theme commands.

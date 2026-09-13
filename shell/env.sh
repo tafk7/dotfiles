@@ -61,8 +61,17 @@ fi
 # ==============================================================================
 
 # Editor
-export EDITOR="${EDITOR:-nvim}"
-export VISUAL="${VISUAL:-nvim}"
+if [[ -z "${EDITOR:-}" ]]; then
+    for _dotfiles_editor in nvim vim nano vi; do
+        if command -v "$_dotfiles_editor" >/dev/null 2>&1; then
+            EDITOR="$_dotfiles_editor"
+            break
+        fi
+    done
+    unset _dotfiles_editor
+fi
+export EDITOR="${EDITOR:-vi}"
+export VISUAL="${VISUAL:-$EDITOR}"
 
 # Python
 export PYTHONDONTWRITEBYTECODE=1

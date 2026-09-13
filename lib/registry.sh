@@ -24,6 +24,7 @@ declare -A TOOL_BINARY=(
     [fd]=fd
     [ripgrep]=rg
     [direnv]=direnv
+    [jq]=jq
     [eget]=eget
     [sd]=sd
     [shellcheck]=shellcheck
@@ -40,6 +41,10 @@ declare -A TOOL_BINARY=(
     [zsh]=zsh
     [docker]=docker
     [azure-cli]=az
+    [sbx]=sbx
+    [tailscale]=tailscale
+    [gcloud]=gcloud
+    [aws-cli]=aws
 )
 
 # TOOL_METHOD: tool name → install method (eget|apt|installer|external)
@@ -59,6 +64,7 @@ declare -A TOOL_METHOD=(
     [fd]=eget
     [ripgrep]=eget
     [direnv]=eget
+    [jq]=eget
     [eget]=installer
     [sd]=eget
     [shellcheck]=eget
@@ -75,6 +81,10 @@ declare -A TOOL_METHOD=(
     [zsh]=apt
     [docker]=apt
     [azure-cli]=apt
+    [sbx]=apt
+    [tailscale]=apt
+    [gcloud]=apt
+    [aws-cli]=installer
 )
 
 # TOOL_EGET_REPO: tool name → eget.toml repo slug ("owner/repo")
@@ -83,13 +93,12 @@ declare -A TOOL_EGET_REPO=(
     [gh]=cli/cli
 )
 
-# TOOL_TIER: tool name → tier (bash|dev|work|ai|rdp)
+# TOOL_TIER: tool name → minimum cumulative tier (bash|dev|work).
 # The cumulative chain is bash→dev→work. The "bash" tier is the non-sudo base:
 # every tool in it installs to ~/.local/bin via eget (no root). The sudo boundary
-# starts at dev (apt packages: zsh, build tools, clipboard). "ai" and "rdp" are
-# orthogonal to the chain: those tools install only under their own flag, never as
-# a side effect of a tier. --full implies ai but NOT rdp (a tier must never
-# silently open a listener).
+# starts at dev (apt packages: zsh, build tools, clipboard). Orthogonal
+# membership lives in TOOL_CAPABILITIES. Components may be capability-only,
+# such as Tailscale.
 declare -A TOOL_TIER=(
     [starship]=bash   [eza]=bash      [fzf]=bash       [zoxide]=bash
     [delta]=bash      [btop]=bash     [glow]=bash       [lazygit]=bash
@@ -98,10 +107,19 @@ declare -A TOOL_TIER=(
     [direnv]=bash     [eget]=bash     [sd]=bash        [gdu]=bash
     [neovim]=dev      [tmux]=dev      [shellcheck]=dev
     [wsl2-ssh-agent]=bash
+    [nvm]=work        [rust]=work      [sbx]=work
+    [zsh]=dev         [docker]=work
+)
+
+# TOOL_CAPABILITIES: tool name → comma-separated orthogonal selections.
+# Capabilities compose with tiers and with one another. Empty tier membership is
+# intentional for capability-only components.
+declare -A TOOL_CAPABILITIES=(
     [claude]=ai       [codex]=ai       [opencode]=ai    [pi]=ai
     [xrdp]=rdp
-    [nvm]=work        [rust]=work
-    [zsh]=dev         [docker]=work       [azure-cli]=work
+    [tailscale]=tail
+    [azure-cli]=azure [gcloud]=gcloud  [aws-cli]=aws
+    [jq]=agent-badge
 )
 
 # Supported platform and architecture inventory. "ubuntu" includes native
@@ -110,6 +128,7 @@ declare -A TOOL_TIER=(
 # ARM binaries on an x86 runner.
 declare -A TOOL_PLATFORM=()
 declare -A TOOL_ARCHES=()
+declare -A TOOL_UBUNTU_VERSIONS=()
 declare -A TOOL_OWNERSHIP_ROOTS=()
 declare -A TOOL_UPDATE_CONTRACT=()
 declare -A TOOL_UPDATE_SOURCE=(
@@ -120,11 +139,23 @@ declare -A TOOL_UPDATE_SOURCE=(
 declare -A TOOL_RELATIVE_BINARY=(
     [neovim]="bin/nvim"
 )
+# Companion executables are part of installation, verification, and removal.
+declare -A TOOL_COMPANIONS=([uv]="uvx")
+declare -A TOOL_VERSION_FLAG=([tmux]="-V" [sbx]="version")
+declare -A TOOL_REMOVAL_MODE=(
+    [xrdp]="manual"
+)
+declare -A TOOL_REMOVAL_REQUIRES_SUDO=(
+    [aws-cli]="yes"
+)
 declare -A TOOL_APT_PACKAGE=(
     [zsh]="zsh"
     [docker]="docker-ce"
     [azure-cli]="azure-cli"
     [xrdp]="xrdp"
+    [sbx]="docker-sbx"
+    [tailscale]="tailscale"
+    [gcloud]="google-cloud-cli"
 )
 
 for _registry_name in "${!TOOL_BINARY[@]}"; do
@@ -133,8 +164,16 @@ for _registry_name in "${!TOOL_BINARY[@]}"; do
 done
 unset _registry_name
 TOOL_PLATFORM[wsl2-ssh-agent]="wsl"
+TOOL_PLATFORM[sbx]="native-ubuntu"
+TOOL_PLATFORM[tailscale]="ubuntu"
+TOOL_UBUNTU_VERSIONS[sbx]="24.04,26.04"
+TOOL_UBUNTU_VERSIONS[tailscale]="22.04,24.04,26.04"
+TOOL_UBUNTU_VERSIONS[docker]="22.04,24.04,26.04"
+TOOL_UBUNTU_VERSIONS[azure-cli]="22.04,24.04"
+TOOL_UBUNTU_VERSIONS[gcloud]="22.04,24.04,26.04"
+TOOL_UBUNTU_VERSIONS[aws-cli]="22.04,24.04,26.04"
 
-for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck wsl2-ssh-agent; do
+for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv jq sd shellcheck wsl2-ssh-agent; do
     TOOL_OWNERSHIP_ROOTS["$_registry_name"]="$HOME/.local/bin"
     TOOL_UPDATE_CONTRACT["$_registry_name"]="staged-release"
 done
@@ -148,6 +187,7 @@ TOOL_OWNERSHIP_ROOTS[claude]="$HOME/.local/bin|$HOME/.local/share/claude"
 TOOL_OWNERSHIP_ROOTS[codex]="$HOME/.local/bin|$HOME/.codex/packages/standalone"
 TOOL_OWNERSHIP_ROOTS[opencode]="$HOME/.local/bin|$HOME/.opencode"
 TOOL_OWNERSHIP_ROOTS[pi]="$HOME/.local/bin|$HOME/.pi/agent/install"
+TOOL_OWNERSHIP_ROOTS[aws-cli]="/usr/local/aws-cli|/usr/local/bin/aws|/usr/local/bin/aws_completer"
 TOOL_UPDATE_CONTRACT[eget]="staged-release"
 TOOL_UPDATE_CONTRACT[neovim]="staged-release"
 TOOL_UPDATE_CONTRACT[tmux]="staged-build"
@@ -161,6 +201,10 @@ TOOL_UPDATE_CONTRACT[zsh]="apt-in-place"
 TOOL_UPDATE_CONTRACT[docker]="apt-in-place"
 TOOL_UPDATE_CONTRACT[azure-cli]="apt-in-place"
 TOOL_UPDATE_CONTRACT[xrdp]="apt-and-service-in-place"
+TOOL_UPDATE_CONTRACT[sbx]="apt-in-place-preserve-user-state"
+TOOL_UPDATE_CONTRACT[tailscale]="apt-and-service-in-place-preserve-enrollment"
+TOOL_UPDATE_CONTRACT[gcloud]="apt-in-place"
+TOOL_UPDATE_CONTRACT[aws-cli]="signed-vendor-installer-in-place"
 
 # TOOL_VERIFY: tool name → verification command (exit 0 = pass)
 # Empty = use "command -v TOOL_BINARY[name]"
@@ -174,6 +218,8 @@ declare -A TOOL_VERIFY=(
     # Binary present isn't success for a service — it must be running.
     [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
     [ripgrep]='if [[ -x "$HOME/.local/bin/rg" ]]; then "$HOME/.local/bin/rg" --version >/dev/null 2>&1; else p=$(command -v rg 2>/dev/null || true); [[ -n "$p" && "$p" != */.codex/* && "$p" != */.vscode*/extensions/* ]]; fi'
+    [sbx]='command -v sbx >/dev/null 2>&1 && timeout --foreground 10 sbx version >/dev/null 2>&1'
+    [aws-cli]='command -v aws >/dev/null 2>&1 && aws --version >/dev/null 2>&1'
 )
 
 # TOOL_PATHS: tool name → space-separated paths to remove on uninstall
@@ -183,13 +229,13 @@ declare -A TOOL_PATHS=(
     [tmux]="$HOME/.local/bin/tmux"
     [nvm]="$HOME/.nvm"
     [rust]=""
-    [uv]="$HOME/.local/bin/uv|$HOME/.local/bin/uvx"
     [claude]="$HOME/.local/bin/claude|$HOME/.local/share/claude"
     [codex]="$HOME/.local/bin/codex|$HOME/.codex/packages/standalone"
     [opencode]="$HOME/.local/bin/opencode|$HOME/.opencode"
     # Only the install/ subtree — ~/.pi/agent also holds settings.json,
     # sessions/, trust.json and models.json, which are user data.
     [pi]="$HOME/.local/bin/pi|$HOME/.pi/agent/install"
+    [aws-cli]="/usr/local/bin/aws|/usr/local/bin/aws_completer|/usr/local/aws-cli"
 )
 
 # TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
@@ -201,6 +247,11 @@ declare -A TOOL_REMOVAL_INSTRUCTIONS=(
     [opencode]="$HOME/.config/opencode configuration is preserved"
     [pi]="$HOME/.pi/agent settings, trust data, and sessions outside install/ are preserved"
     [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
+    [sbx]="Sandbox state, settings, credentials, and sessions under XDG directories are preserved"
+    [tailscale]="Tailscale identity and enrollment state under /var/lib/tailscale are preserved"
+    [azure-cli]="$HOME/.azure credentials and configuration are preserved"
+    [gcloud]="$HOME/.config/gcloud credentials and configuration are preserved"
+    [aws-cli]="$HOME/.aws credentials and configuration are preserved"
 )
 
 # ==============================================================================
@@ -217,6 +268,31 @@ tools_for_tier() {
     done | sort
 }
 
+tool_has_capability() {
+    local name="$1" capability="$2"
+    case ",${TOOL_CAPABILITIES[$name]:-}," in
+        *",$capability,"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+tools_for_capability() {
+    local capability="$1" name
+    for name in "${!TOOL_BINARY[@]}"; do
+        tool_has_capability "$name" "$capability" && printf '%s\n' "$name"
+    done | sort
+}
+
+tool_in_cumulative_tier() {
+    local name="$1" selected="$2"
+    local required="${TOOL_TIER[$name]:-}"
+    [[ -n "$required" ]] || return 1
+    case "$selected:$required" in
+        work:config|work:bash|work:dev|work:work|dev:config|dev:bash|dev:dev|bash:config|bash:bash|config:config) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Return the verification command for a tool.
 # Falls back to "command -v <binary>" if no custom verify is defined.
 tool_verify_command() {
@@ -224,7 +300,12 @@ tool_verify_command() {
     if [[ -n "${TOOL_VERIFY[$name]:-}" ]]; then
         echo "${TOOL_VERIFY[$name]}"
     else
-        echo "command -v ${TOOL_BINARY[$name]} >/dev/null 2>&1"
+        printf 'command -v %s >/dev/null 2>&1' "${TOOL_BINARY[$name]}"
+        local companion
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            printf ' && command -v %s >/dev/null 2>&1' "$companion"
+        done
+        printf '\n'
     fi
 }
 
@@ -236,6 +317,10 @@ tool_uninstall_paths() {
         printf '%s\n' "${TOOL_PATHS[$name]}" | tr '|' '\n'
     elif [[ "${TOOL_METHOD[$name]}" == "eget" ]]; then
         echo "$HOME/.local/bin/${TOOL_BINARY[$name]}"
+        local companion
+        for companion in ${TOOL_COMPANIONS[$name]:-}; do
+            printf '%s/.local/bin/%s\n' "$HOME" "$companion"
+        done
     fi
 }
 
@@ -254,14 +339,22 @@ tool_arch() {
 }
 
 tool_applicable() {
-    local name="$1" platform arch
+    local name="$1" platform arch version=""
     platform="$(tool_platform)"; arch="$(tool_arch)" || return 1
     case ",${TOOL_ARCHES[$name]:-}," in *",$arch,"*) ;; *) return 1 ;; esac
     case "${TOOL_PLATFORM[$name]:-ubuntu}" in
         ubuntu) [[ "$platform" == ubuntu || "$platform" == wsl ]] ;;
+        native-ubuntu) [[ "$platform" == ubuntu ]] ;;
         wsl) [[ "$platform" == wsl ]] ;;
         *) return 1 ;;
-    esac
+    esac || return 1
+    if [[ -n "${TOOL_UBUNTU_VERSIONS[$name]:-}" ]]; then
+        version="${DOTFILES_TEST_OS_VERSION:-}"
+        if [[ -z "$version" ]]; then
+            version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}" 2>/dev/null || true)"
+        fi
+        case ",${TOOL_UBUNTU_VERSIONS[$name]}," in *",$version,"*) ;; *) return 1 ;; esac
+    fi
 }
 
 tool_owned_path() {

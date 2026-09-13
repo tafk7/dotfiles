@@ -50,6 +50,13 @@ shift when you switch themes.
 The plugin is distributed from this repo, which doubles as a marketplace for
 both harnesses. Nothing else in the dotfiles needs to be present.
 
+Dependencies: Bash, tmux, GNU coreutils (`timeout`), and `jq` on PATH.
+`jq` parses hook payloads, including background-agent IDs and compaction events.
+Dotfiles setup installs jq without sudo when selecting Claude/Codex with badges
+enabled. For standalone plugin installations, use your machine's package manager
+(Ubuntu: `sudo apt install jq`) or your organization's user-local tool distribution.
+The plugin never installs dependencies from a session hook.
+
 **Claude Code**
 
 ```bash
