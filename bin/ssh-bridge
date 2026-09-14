@@ -79,7 +79,11 @@ cmd_enable() {
     if ! command -v wsl2-ssh-agent >/dev/null 2>&1; then
         if command -v eget >/dev/null 2>&1; then
             log "Installing wsl2-ssh-agent via eget..."
-            EGET_CONFIG="$DOTFILES_DIR/eget.toml" eget mame/wsl2-ssh-agent
+            # shellcheck source=../lib/registry.sh
+            source "$DOTFILES_DIR/lib/registry.sh"
+            local -a asset_args
+            mapfile -t asset_args < <(tool_eget_asset_args wsl2-ssh-agent)
+            EGET_CONFIG="$DOTFILES_DIR/eget.toml" eget "${asset_args[@]}" mame/wsl2-ssh-agent
         else
             error "eget not found — run ./setup.sh --bash first, then retry"
             exit 1

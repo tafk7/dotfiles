@@ -46,6 +46,18 @@ done
 DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_PLATFORM=ubuntu tool_applicable wsl2-ssh-agent \
     && fail "WSL-only component applicable on native Ubuntu"
 
+# wsl2-ssh-agent assets carry no OS, so eget needs explicit per-arch filters
+# that leave exactly one of: wsl2-ssh-agent, wsl2-ssh-agent-arm64.
+assert_asset_args() {
+    local arch="$1" expected="$2" actual
+    actual="$(DOTFILES_TEST_ARCH="$arch" tool_eget_asset_args wsl2-ssh-agent | paste -sd' ')"
+    [[ "$actual" == "$expected" ]] || fail "wsl2-ssh-agent $arch asset args: got '$actual', want '$expected'"
+}
+assert_asset_args x86_64 '--asset wsl2-ssh-agent --asset ^arm64'
+assert_asset_args aarch64 '--asset wsl2-ssh-agent-arm64'
+[[ -z "$(DOTFILES_TEST_ARCH=aarch64 tool_eget_asset_args starship)" ]] \
+    || fail "tools selected natively must not get per-arch asset args"
+
 if grep '^asset_filters' "$ROOT/eget.toml" | grep -Eq 'amd64|x86_64'; then
     fail "eget manifest contains architecture-specific filters; native selection would exclude ARM"
 fi

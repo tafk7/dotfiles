@@ -338,6 +338,18 @@ tool_arch() {
     [[ -n "${DOTFILES_TEST_ARCH:-}" ]] && printf '%s\n' "$DOTFILES_TEST_ARCH" || get_arch
 }
 
+# Per-arch eget --asset flags, one argument per line, for releases whose asset
+# names carry no OS and so defeat eget's native detection. Command-line --asset
+# replaces the tool's eget.toml asset_filters. Prints nothing for other tools.
+tool_eget_asset_args() {
+    local name="$1" arch
+    arch="$(tool_arch)" || return 1
+    case "$name:$arch" in
+        wsl2-ssh-agent:x86_64)  printf '%s\n' --asset wsl2-ssh-agent --asset '^arm64' ;;
+        wsl2-ssh-agent:aarch64) printf '%s\n' --asset wsl2-ssh-agent-arm64 ;;
+    esac
+}
+
 tool_applicable() {
     local name="$1" platform arch version=""
     platform="$(tool_platform)"; arch="$(tool_arch)" || return 1
