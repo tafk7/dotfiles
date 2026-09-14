@@ -8,6 +8,11 @@
 # re-run — the newer release date triggers the download. To force a clean
 # re-download (repair or downgrade), use `./setup.sh --bash --force`; downloads
 # are staged and verified before atomically replacing the working binary.
+#
+# Architecture: filters must leave exactly one asset per supported arch
+# (x86_64 and aarch64) after eget's native OS/arch detection. Never filter on an
+# arch name, and never let a filter narrow to a single asset on its own — eget
+# takes a lone filter match without checking its architecture.
 
 [global]
 target = "~/.local/bin"
@@ -15,11 +20,13 @@ upgrade_only = true
 
 ["starship/starship"]
 tag = "v1.24.2"
-asset_filters = ["gnu", ".tar.gz"]
+# aarch64 ships only a musl build; musl exists for x86_64 too.
+asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
 ["eza-community/eza"]
 tag = "v0.23.4"
-asset_filters = ["gnu", ".tar.gz"]
+# aarch64 also ships a gnu _no_libgit variant.
+asset_filters = ["gnu", ".tar.gz", "^no_libgit"]
 
 ["junegunn/fzf"]
 tag = "v0.67.0"
@@ -36,11 +43,11 @@ tag = "v1.4.6"
 
 ["dundee/gdu"]
 tag = "v5.36.1"
-# The release ships one binary per platform, each named for its target. The
-# amd64 static build's name is a unique substring among the assets.
-asset_filters = ["gdu_linux_", "_static"]
-# The archive's binary is named gdu_linux_amd64_static; a file-path target
-# renames it to plain `gdu` on install.
+# The release ships one archive per platform. Only amd64 has a _static build,
+# so exclude it and let native detection pick amd64 or arm64.
+asset_filters = ["gdu_linux_", ".tgz", "^_static"]
+# The archive's binary is named for its target (gdu_linux_arm64); a file-path
+# target renames it to plain `gdu` on install.
 target = "~/.local/bin/gdu"
 
 ["charmbracelet/glow"]
@@ -72,8 +79,8 @@ asset_filters = ["unknown-linux-gnu", ".tar.gz"]
 
 ["BurntSushi/ripgrep"]
 tag = "15.2.0"
-# Upstream ships only a musl build for x86_64 Linux (no gnu asset).
-asset_filters = ["unknown-linux-", ".tar.gz"]
+# x86_64 ships only musl; aarch64 ships gnu and musl. musl is common to both.
+asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
 ["direnv/direnv"]
 tag = "v2.37.1"
@@ -99,5 +106,7 @@ target = "~/.local/bin/jq"
 ["mame/wsl2-ssh-agent"]
 tag = "v0.9.7"
 # Release ships bare binaries: wsl2-ssh-agent (x86_64) and wsl2-ssh-agent-arm64.
-# eget applies its native architecture selector to the amd64/arm64 assets.
+# Neither name carries an OS, so eget's native detection cannot choose between
+# them. Callers pass per-arch --asset flags from tool_eget_asset_args
+# (lib/registry.sh), which override this filter.
 asset_filters = ["wsl2-ssh-agent"]

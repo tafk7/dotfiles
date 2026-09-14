@@ -1080,6 +1080,7 @@ install_eget_tools() {
         sed "s|~/.local/bin|$stage_home/.local/bin|g" "$config" > "$stage_config"
         local -a extract_args=()
         [[ -z "${TOOL_COMPANIONS[$name]:-}" ]] || extract_args+=(--all)
+        mapfile -t -O "${#extract_args[@]}" extract_args < <(tool_eget_asset_args "$name")
         if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "${extract_args[@]}" "$slug"; then
             rm -rf "$stage_home"
             track_install "$name" fail
