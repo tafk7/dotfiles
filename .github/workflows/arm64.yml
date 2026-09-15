@@ -1,0 +1,111 @@
+name: ARM64 install
+
+# Native aarch64 execution of the real --bash installer. CI's other aarch64
+# coverage is selection-only (tests/registry.sh, tests/eget-selection.py); this
+# job proves the selected release assets and installer downloads actually run.
+# Standard GitHub-hosted runners are free for public repositories. It runs when
+# installer inputs change, weekly to catch upstream release drift, and on demand.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - eget.toml
+      - installers/**
+      - lib/**
+      - setup.sh
+      - bin/verify
+      - tests/fixtures/eget-assets/**
+      - .github/workflows/arm64.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - eget.toml
+      - installers/**
+      - lib/**
+      - setup.sh
+      - bin/verify
+      - tests/fixtures/eget-assets/**
+      - .github/workflows/arm64.yml
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-arm64:
+    name: Containerized install (--bash, aarch64)
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Bootstrap container (git, sudo, locales, non-root user)
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == aarch64 ]] || { echo "::error::expected aarch64, got $(uname -m)"; exit 1; }
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git sudo locales lsb-release
+          useradd -m -s /bin/bash test
+          echo 'test ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/test
+          chmod 0440 /etc/sudoers.d/test
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Stage repo for the test user
+        run: |
+          set -euo pipefail
+          mkdir -p /home/test/dev
+          cp -a "$GITHUB_WORKSPACE" /home/test/dev/dotfiles
+          chown -R test:test /home/test/dev
+
+      - name: Run the installer (--bash tier)
+        run: |
+          su - test <<'EOSU'
+          set -euo pipefail
+          cd ~/dev/dotfiles
+          ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
+          EOSU
+
+      - name: Assert every bash-tier binary executes natively and is owned
+        run: |
+          cat > /home/test/assert-arm64.sh <<'EOS'
+          set -euo pipefail
+          cd "$HOME/dev/dotfiles"
+          export DOTFILES_DIR="$PWD"
+          export PATH="$HOME/.local/bin:$PATH"
+          # shellcheck disable=SC1091
+          source lib/runtime.sh
+          source lib/registry.sh
+          source lib/state.sh
+          fail=0
+          # An x86_64 binary selected by mistake fails here with "Exec format error".
+          for name in eget $(tools_for_tier bash); do
+              tool_applicable "$name" || continue
+              bin="$HOME/.local/bin/${TOOL_BINARY[$name]}"
+              if ! "$bin" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1; then
+                  echo "::error::$name does not execute on aarch64: $bin ($(file -b "$bin" 2>/dev/null || echo missing))"
+                  fail=1
+                  continue
+              fi
+              IFS=$'\t' read -r _ _ owner status _ _ _ _ <<< "$(ledger_line "$name" 2>/dev/null || true)"
+              if [[ "$owner" != dotfiles || "$status" != installed ]]; then
+                  echo "::error::$name ledger is owner=${owner:-none} status=${status:-none}, expected dotfiles/installed"
+                  fail=1
+              fi
+          done
+          [[ $fail -eq 0 ]] && echo "ARM64 install assertions passed."
+          exit $fail
+          EOS
+          chown test:test /home/test/assert-arm64.sh
+          apt-get install -y --no-install-recommends file >/dev/null
+          sudo -u test -H bash /home/test/assert-arm64.sh
+
+      - name: Verify bash profile
+        run: su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash'

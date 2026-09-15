@@ -1,0 +1,12 @@
+# aristocratos/btop v1.4.6 (recorded by tests/eget-selection.py --refresh)
+btop-aarch64-unknown-linux-musl.tbz
+btop-arm-unknown-linux-musleabi.tbz
+btop-armv7-unknown-linux-musleabi.tbz
+btop-i586-unknown-linux-musl.tbz
+btop-i686-unknown-linux-musl.tbz
+btop-m68k-unknown-linux-musl.tbz
+btop-mips64-unknown-linux-musl.tbz
+btop-powerpc64-unknown-linux-musl.tbz
+btop-riscv64-unknown-linux-musl.tbz
+btop-s390x-ibm-linux-musl.tbz
+btop-x86_64-unknown-linux-musl.tbz

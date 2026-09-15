@@ -1,0 +1,4 @@
+# mame/wsl2-ssh-agent v0.9.7 (recorded by tests/eget-selection.py --refresh)
+checksums.txt
+wsl2-ssh-agent
+wsl2-ssh-agent-arm64

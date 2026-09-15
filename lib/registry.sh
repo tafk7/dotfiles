@@ -225,6 +225,9 @@ declare -A TOOL_VERIFY=(
 # TOOL_PATHS: tool name → space-separated paths to remove on uninstall
 # Empty = managed by install method (apt uses apt remove; eget uses ~/.local/bin/BINARY)
 declare -A TOOL_PATHS=(
+    # eget installs through its own installer, not TOOL_METHOD=eget, so it needs
+    # an explicit path: a fresh machine's PATH lacks ~/.local/bin.
+    [eget]="$HOME/.local/bin/eget"
     [neovim]="$HOME/.local/bin/nvim|$HOME/.local/nvim"
     [tmux]="$HOME/.local/bin/tmux"
     [nvm]="$HOME/.nvm"
