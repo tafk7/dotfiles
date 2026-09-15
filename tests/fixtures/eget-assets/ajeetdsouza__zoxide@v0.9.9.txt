@@ -1,0 +1,16 @@
+# ajeetdsouza/zoxide v0.9.9 (recorded by tests/eget-selection.py --refresh)
+zoxide-0.9.9-aarch64-apple-darwin.tar.gz
+zoxide-0.9.9-aarch64-linux-android.tar.gz
+zoxide-0.9.9-aarch64-pc-windows-msvc.zip
+zoxide-0.9.9-aarch64-unknown-linux-musl.tar.gz
+zoxide-0.9.9-arm-unknown-linux-musleabihf.tar.gz
+zoxide-0.9.9-armv7-linux-androideabi.tar.gz
+zoxide-0.9.9-armv7-unknown-linux-musleabihf.tar.gz
+zoxide-0.9.9-i686-unknown-linux-musl.tar.gz
+zoxide-0.9.9-x86_64-apple-darwin.tar.gz
+zoxide-0.9.9-x86_64-pc-windows-msvc.zip
+zoxide-0.9.9-x86_64-unknown-linux-musl.tar.gz
+zoxide_0.9.9-1_amd64.deb
+zoxide_0.9.9-1_arm64.deb
+zoxide_0.9.9-1_armhf.deb
+zoxide_0.9.9-1_i386.deb

@@ -217,7 +217,8 @@ emit_table() {
     local auth_note=" (auth: $GH_AUTH_SOURCE)"
     if [[ "$outdated_count" -gt 0 ]]; then
         warn "$outdated_count of $total tool(s) have updates available.${auth_note}"
-        echo "  Bump the tag in $EGET_TOML and rerun setup.sh with the component's tier."
+        echo "  Bump the tag in $EGET_TOML, record the new release's assets with"
+        echo "  'python3 tests/eget-selection.py --refresh', then rerun setup.sh with the component's tier."
     elif [[ "$error_count" -gt 0 ]]; then
         warn "$error_count of $total check(s) failed.${auth_note}"
         [[ "$GH_AUTH_SOURCE" == "none" ]] && echo "  Likely rate-limited. Set GITHUB_TOKEN or install gh."

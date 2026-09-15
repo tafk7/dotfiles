@@ -1,0 +1,21 @@
+# junegunn/fzf v0.67.0 (recorded by tests/eget-selection.py --refresh)
+fzf-0.67.0-android_arm64.tar.gz
+fzf-0.67.0-darwin_amd64.tar.gz
+fzf-0.67.0-darwin_arm64.tar.gz
+fzf-0.67.0-freebsd_amd64.tar.gz
+fzf-0.67.0-linux_amd64.tar.gz
+fzf-0.67.0-linux_arm64.tar.gz
+fzf-0.67.0-linux_armv5.tar.gz
+fzf-0.67.0-linux_armv6.tar.gz
+fzf-0.67.0-linux_armv7.tar.gz
+fzf-0.67.0-linux_loong64.tar.gz
+fzf-0.67.0-linux_ppc64le.tar.gz
+fzf-0.67.0-linux_riscv64.tar.gz
+fzf-0.67.0-linux_s390x.tar.gz
+fzf-0.67.0-openbsd_amd64.tar.gz
+fzf-0.67.0-windows_amd64.zip
+fzf-0.67.0-windows_arm64.zip
+fzf-0.67.0-windows_armv5.zip
+fzf-0.67.0-windows_armv6.zip
+fzf-0.67.0-windows_armv7.zip
+fzf_0.67.0_checksums.txt

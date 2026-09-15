@@ -11,6 +11,7 @@ for test_file in tests/*.sh; do bash "$test_file"; done
 python3 tests/startup-benchmark-test.py
 python3 tests/theme-contrast.py
 python3 tests/documentation.py
+python3 tests/eget-selection.py
 ```
 
 Run the base-versus-candidate startup regression check from an isolated copy of
@@ -72,9 +73,15 @@ make one tmux context query when inside tmux; they do not launch the full resolv
 
 - Native Ubuntu CI runs syntax, behavior, state, theme, installer, and config
   tests. The supported release matrix exercises Ubuntu 22.04, 24.04, and 26.04.
-- The aarch64 jobs validate registry applicability and artifact-selection
-  filters only. They are explicitly reported as `selection-only`; they do not
-  claim ARM runtime execution.
+- The aarch64 registry jobs validate applicability only and report
+  `selection-only`. `tests/eget-selection.py` replays eget's release-asset
+  selection (mirroring the pinned eget version) for every `eget.toml` entry on
+  x86_64 and aarch64 against recorded asset lists in
+  `tests/fixtures/eget-assets/`; refresh them with `--refresh` after bumping a
+  tag. `.github/workflows/arm64.yml` runs the real `--bash` installer natively
+  on `ubuntu-24.04-arm` and asserts every tool executes and is owned. It runs on
+  installer-input changes, weekly, and on demand. It does not cover dev/work
+  tiers or apt repositories on ARM.
 - WSL2 behavior is mocked in normal CI, including the non-systemd shell fallback.
   A real Windows 11/WSL2 run remains periodic/manual because hosted Linux runners
   cannot validate Windows interop, the Windows agent pipe, or WSL lifecycle.

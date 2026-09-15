@@ -1,0 +1,22 @@
+# sharkdp/fd v10.4.2 (recorded by tests/eget-selection.py --refresh)
+fd-musl_10.4.2_amd64.deb
+fd-musl_10.4.2_arm64.deb
+fd-musl_10.4.2_armhf.deb
+fd-musl_10.4.2_i686.deb
+fd-v10.4.2-aarch64-apple-darwin.tar.gz
+fd-v10.4.2-aarch64-pc-windows-msvc.zip
+fd-v10.4.2-aarch64-unknown-linux-gnu.tar.gz
+fd-v10.4.2-aarch64-unknown-linux-musl.tar.gz
+fd-v10.4.2-arm-unknown-linux-gnueabihf.tar.gz
+fd-v10.4.2-arm-unknown-linux-musleabihf.tar.gz
+fd-v10.4.2-i686-pc-windows-msvc.zip
+fd-v10.4.2-i686-unknown-linux-gnu.tar.gz
+fd-v10.4.2-i686-unknown-linux-musl.tar.gz
+fd-v10.4.2-x86_64-pc-windows-gnu.zip
+fd-v10.4.2-x86_64-pc-windows-msvc.zip
+fd-v10.4.2-x86_64-unknown-linux-gnu.tar.gz
+fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz
+fd_10.4.2_amd64.deb
+fd_10.4.2_arm64.deb
+fd_10.4.2_armhf.deb
+fd_10.4.2_i686.deb
