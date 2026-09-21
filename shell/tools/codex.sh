@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # OpenAI Codex CLI: the official standalone binary on PATH (installed by
-# `./setup.sh --ai`, normally ~/.local/bin/codex). The wrapper exists solely to
-# inject $CODEX_FLAGS.
+# `./setup.sh --ai`, normally ~/.local/bin/codex). The wrapper applies optional
+# launch defaults; an explicit profile argument takes precedence.
 #
 # The openai.chatgpt VS Code extension binary is deliberately NOT discovered any
 # more. Locating it meant a `find` across ~13k files under
@@ -17,20 +17,39 @@ unset -f codex codex-vsc 2>/dev/null
 # `command -v` as a bare condition is a builtin — no subshell, no fork. Capturing
 # it (`x=$(command -v ...)`) would fork, which is what this file used to do.
 if command -v codex >/dev/null 2>&1; then
-    # CODEX_FLAGS is intentionally split into separate arguments. zsh does NOT
-    # word-split unquoted parameter expansions, so the shared `${CODEX_FLAGS:-}`
-    # form silently passed CODEX_FLAGS="--profile amd" to codex as a SINGLE
-    # argument under zsh ("unexpected argument '--profile amd'") while working
-    # under bash. ${=VAR} forces the split; keep the two branches in sync.
-    if [[ -n "${ZSH_VERSION:-}" ]]; then
-        codex() { command codex ${=CODEX_FLAGS} "$@"; }
-    else
-        codex() {
-            local -a flags=()
-            read -r -a flags <<< "${CODEX_FLAGS:-}"
-            command codex "${flags[@]}" "$@"
-        }
-    fi
+    codex() {
+        local -a flags=() defaults=()
+        local arg explicit_profile=0 default_profile=0 skip=0 raw_flags="${CODEX_FLAGS:-}"
+        # Defaults use whitespace-separated words, without shell evaluation.
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            # shellcheck disable=SC2296,SC2206
+            flags=( ${=raw_flags} )
+        else
+            read -r -a flags <<< "$raw_flags"
+        fi
+        for arg in "$@"; do
+            case "$arg" in
+                --) break ;;
+                -p|--profile|-p?*|--profile=*) explicit_profile=1; break ;;
+            esac
+        done
+        for arg in "${flags[@]}"; do
+            if (( skip )); then skip=0; continue; fi
+            case "$arg" in
+                -p|--profile)
+                    if (( explicit_profile )); then skip=1; continue; fi
+                    default_profile=1 ;;
+                -p?*|--profile=*)
+                    if (( explicit_profile )); then continue; fi
+                    default_profile=1 ;;
+            esac
+            defaults+=("$arg")
+        done
+        if (( !explicit_profile && !default_profile )) && [[ -n "${CODEX_DEFAULT_PROFILE:-}" ]]; then
+            defaults+=(--profile "$CODEX_DEFAULT_PROFILE")
+        fi
+        command codex "${defaults[@]}" "$@"
+    }
 else
     codex() {
         echo "Codex CLI not found. Install with: ./setup.sh --ai" >&2

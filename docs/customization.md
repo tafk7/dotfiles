@@ -198,15 +198,38 @@ recipe.
 
 Keep machine-specific tweaks out of git via `*.local`:
 
-- `~/.shell.local` — sourced at the end of `shell/init.sh` for both bash and
-  zsh. The single override hook for aliases, exports, secrets, and tweaks.
+- `~/.shell.local` — sourced near the end of interactive `shell/init.sh` for
+  both bash and zsh, before any local fragments. Use it for aliases, exports,
+  secrets, and tweaks.
   Gate shell-specific syntax with `[[ -n "$ZSH_VERSION" ]]` /
   `[[ -n "$BASH_VERSION" ]]` blocks if needed.
+- `~/.shell.local.d/*.sh` — optional readable files sourced in filename order
+  after `~/.shell.local`. Use numbered names when ordering matters. Fragments
+  run again on `reload` and should be idempotent. No loader line is needed in
+  `~/.shell.local`; remove any existing manual loop to avoid loading twice.
+- `~/.ssh/config.d/*.conf` — optional named SSH configuration files, included
+  after `~/.ssh/config.local` and before generic defaults. Keep personal host
+  overrides in `config.local`; SSH uses the first matching value.
 - `~/.gitconfig.local` — included last by the templated `~/.gitconfig`, so its
   values override everything in the tracked config. Use it for per-machine git
   identity (e.g. a work email) and commit signing — neither belongs in the repo.
 
 These are gitignored.
+
+Local shell files are interactive hooks. Services, desktop applications, and
+clean noninteractive shells must receive their environment explicitly; inherited
+exports do not imply that a shell wrapper is active.
+
+For Codex, `CODEX_DEFAULT_PROFILE` supplies a default profile to the interactive
+wrapper. An explicit `-p` or `--profile` takes precedence, including over a profile
+in the legacy `CODEX_FLAGS` variable. Other `CODEX_FLAGS` words are retained.
+Flags are split on whitespace, not evaluated as shell code. `command codex`
+bypasses these shell defaults. For example:
+
+```sh
+export CODEX_DEFAULT_PROFILE=work
+codex -p personal
+```
 
 For the `gcl-amd` helper, set the GitHub login associated with the AMD account
 after authenticating it with `gh`:

@@ -75,7 +75,7 @@ command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init "$SHELL_NAME")"
 source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
 # Local overrides (not tracked)
-[[ -f ~/.shell.local ]] && source ~/.shell.local
+source "$DOTFILES_DIR/shell/local.sh"
 
 # Collapse duplicate PATH entries. Must run LAST: vendor scripts sourced from
 # ~/.shell.local (e.g. Xilinx settings64.sh) prepend unconditionally, and
