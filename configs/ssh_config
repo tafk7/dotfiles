@@ -3,6 +3,9 @@
 # for each keyword). A missing file is silently ignored, so this is a no-op on
 # machines that don't have one. See docs/customization.md.
 Include ~/.ssh/config.local
+# Optional named configuration files follow machine-local overrides and precede
+# the generic defaults. Missing directories and unmatched globs are harmless.
+Include ~/.ssh/config.d/*.conf
 
 Host *
     ControlMaster auto
