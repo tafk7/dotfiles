@@ -21,70 +21,9 @@ FORCE=false
 CODEX_BIN="$HOME/.local/bin/codex"
 CODEX_INSTALLER_URL="https://chatgpt.com/codex/install.sh"
 
-# Provision the portable block in ~/.codex/config.toml. On first install the
-# tracked file is copied whole. Later runs replace only the marked block, leaving
-# Codex-owned project trust, hook trust, plugin state, and adapter selections
-# untouched. Older unmarked configs are preserved and get a migration warning.
+# Reconcile portable keys and assets; all backups stay in the application home.
 provision_codex_config() {
-    local src="$DOTFILES_DIR/configs/codex.toml"
-    local dest="$HOME/.codex/config.toml"
-    local begin='# BEGIN DOTFILES-MANAGED CODEX CONFIG'
-    local end='# END DOTFILES-MANAGED CODEX CONFIG'
-    [[ -f "$src" ]] || return 0
-    mkdir -p "$(dirname "$dest")"
-
-    if [[ ! -e "$dest" ]]; then
-        cp "$src" "$dest"
-        chmod 600 "$dest"
-        success "Provisioned portable ~/.codex/config.toml."
-        return 0
-    fi
-
-    if ! grep -qxF "$begin" "$dest" || ! grep -qxF "$end" "$dest"; then
-        warn "Existing $dest predates dotfiles-managed blocks; preserving it unchanged."
-        warn "Migrate its portable settings once, then bracket them with:"
-        warn "    $begin"
-        warn "    $end"
-        return 0
-    fi
-
-    local tmp
-    tmp=$(mktemp "${dest}.tmp.XXXXXX")
-    if ! awk -v src="$src" -v begin="$begin" -v end="$end" '
-        function emit_source(   line, copying) {
-            copying = 0
-            while ((getline line < src) > 0) {
-                if (line == begin) copying = 1
-                if (copying) print line
-                if (copying && line == end) break
-            }
-            close(src)
-        }
-        $0 == begin {
-            emit_source()
-            in_managed = 1
-            replaced = 1
-            next
-        }
-        in_managed && $0 == end {
-            in_managed = 0
-            next
-        }
-        !in_managed { print }
-        END { if (!replaced || in_managed) exit 42 }
-    ' "$dest" >"$tmp"; then
-        rm -f "$tmp"
-        error "Could not refresh the managed Codex config block in $dest"
-        return 1
-    fi
-
-    chmod 600 "$tmp"
-    if cmp -s "$tmp" "$dest"; then
-        rm -f "$tmp"
-        return 0
-    fi
-    mv "$tmp" "$dest"
-    success "Refreshed portable settings in ~/.codex/config.toml."
+    "$DOTFILES_DIR/bin/ai-config" codex
 }
 
 # Install the agent-badge plugin (plugins/agent-badge) from this repo, which
@@ -114,6 +53,11 @@ provision_agent_badge_plugin() {
     fi
     if "$codex_cmd" plugin add agent-badge@tafk7 >/dev/null 2>&1; then
         success "Plugin agent-badge installed (tmux window badges for agent sessions)."
+        # tmux survives plugin cache replacement. Repair its paths immediately,
+        # including when no new agent session has started since the update.
+        if [[ -n "${TMUX:-}" ]]; then
+            "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" wire >/dev/null 2>&1 || true
+        fi
         # Worth stating on every run. Codex gates hooks behind human review, and
         # an untrusted hook is skipped in SILENCE -- indistinguishable from a
         # broken config, and it has already caused one wrong diagnosis here.

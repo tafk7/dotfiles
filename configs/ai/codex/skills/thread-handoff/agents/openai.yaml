@@ -1,0 +1,4 @@
+interface:
+  display_name: "Thread Handoff"
+  short_description: "Create portable handoffs between Codex threads and providers"
+  default_prompt: "Create a portable handoff for this Codex thread."

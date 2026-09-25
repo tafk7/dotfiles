@@ -5,8 +5,8 @@
 #   1. the badge placeholder #{E:@cc_win_badge} in the window status formats
 #   2. the pane-focus-in / pane-exited hooks that keep badges honest
 #
-# Called by agent-status.sh when a SessionStart/focus event notices that the
-# badge is missing from window-status-format. Base tmux configuration has no
+# Called by agent-status.sh on SessionStart and when a focus event notices
+# that the badge is missing from window-status-format. Base tmux configuration has no
 # dependency on this optional plugin. A `prefix+r` reload can reset the format;
 # the next plugin event wires it again.
 #
@@ -20,6 +20,7 @@ set -u
 SELF_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 STATUS="$SELF_DIR/scripts/agent-status.sh"
 RECONCILE="$SELF_DIR/scripts/agent-reconcile.sh"
+WIRING_VERSION=2
 
 BADGE='#{E:@cc_win_badge}'
 FORMATS="window-status-format window-status-current-format"
@@ -48,16 +49,27 @@ minor=${ver#*.}; minor=${minor%%.*}
 # recomputes the whole window badge before exiting, so they converge whatever
 # order they run in -- but it is kept stable for readability.
 # --------------------------------------------------------------------------
+hook_run() {
+    local quoted command
+    # Quote for the POSIX shell run by tmux, then for tmux's command parser.
+    # A removed cache is an expected update window, not a failed tmux command.
+    quoted="'${1//\'/\'\\\'\'}'"
+    shift
+    command="if [ -x $quoted ]; then $quoted${*:+ $*}; fi"
+    command="${command//\\/\\\\}"
+    command="${command//\"/\\\"}"
+    printf 'run-shell -b "%s"\n' "$command"
+}
+
 hook_cmds() {
     case "$1" in
         pane-focus-in)
-            printf '%s\n' \
-                "run-shell -b \"$STATUS seen #{pane_id}\"" \
-                "run-shell -b \"$STATUS reap #{pane_id}\"" \
-                "run-shell -b \"$RECONCILE\""
+            hook_run "$STATUS" 'seen #{pane_id}'
+            hook_run "$STATUS" 'reap #{pane_id}'
+            hook_run "$RECONCILE"
             ;;
         pane-exited)
-            printf '%s\n' "run-shell -b \"$STATUS reap #{pane_id}\""
+            hook_run "$STATUS" 'reap #{pane_id}'
             ;;
     esac
 }
@@ -115,9 +127,11 @@ wire)
     # install at a new path (plugin update, or dotfiles replacing a cache copy)
     # falls through and re-points the hooks.
     wire_formats
-    if [[ "$(tmux show -gv @cc_badge_wired 2>/dev/null)" != "$SELF_DIR" ]]; then
+    if [[ "$(tmux show -gv @cc_badge_wired 2>/dev/null)" != "$SELF_DIR" \
+       || "$(tmux show -gv @cc_badge_wiring_version 2>/dev/null)" != "$WIRING_VERSION" ]]; then
         wire_hooks
         tmux set -g @cc_badge_wired "$SELF_DIR" 2>/dev/null
+        tmux set -g @cc_badge_wiring_version "$WIRING_VERSION" 2>/dev/null
     fi
     tmux refresh-client -S 2>/dev/null
     ;;
@@ -131,6 +145,7 @@ unwire)
         tmux set -g "$opt" "${cur//"$BADGE"/}" 2>/dev/null
     done
     tmux set -gu @cc_badge_wired 2>/dev/null
+    tmux set -gu @cc_badge_wiring_version 2>/dev/null
     while IFS= read -r w; do
         [[ -n "$w" ]] || continue
         tmux set -wu -t "$w" @cc_win_badge 2>/dev/null

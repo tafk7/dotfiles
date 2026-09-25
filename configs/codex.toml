@@ -1,11 +1,9 @@
-# BEGIN DOTFILES-MANAGED CODEX CONFIG
-# Codex portable base configuration. installers/install-codex.sh installs this
-# block into ~/.codex/config.toml and refreshes it on later runs while preserving
-# Codex-owned project trust, hook trust, plugin state, and machine-local overlays.
+# Portable keys reconciled by bin/ai-config. Unlisted local values are preserved.
 
 model = "gpt-6-astra"
 model_context_window = 872000
-model_reasoning_effort = "xhigh"
+model_auto_compact_token_limit = 784800
+model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 approvals_reviewer = "user"
 
@@ -37,7 +35,6 @@ delete_forward_word = "ctrl-delete"
 kill_line_start = "alt-backspace"
 kill_line_end = "alt-delete"
 
-# END DOTFILES-MANAGED CODEX CONFIG
 
 # Ctrl stays application-local; Alt remains available for tmux navigation.
 [tui.keymap.global]

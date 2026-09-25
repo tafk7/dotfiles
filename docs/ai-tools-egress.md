@@ -26,15 +26,12 @@ an existing config).
   `api.anthropic.com` (`skipWebFetchPreflight: true` to stop), managed-settings
   poll → `api.anthropic.com` (org-managed only), auto-updater → `downloads.claude.ai`.
 
-**What we ship:** `~/.claude/settings.json` (only when absent) with the
-content-safe defaults:
-```json
-{ "env": { "DISABLE_TELEMETRY": "1", "DISABLE_ERROR_REPORTING": "1" } }
-```
-If you already have a `settings.json`, we leave it and you merge those `env`
-keys. For a stricter work machine, also consider `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
-(surveys+metrics+errors+feedback) and `skipWebFetchPreflight: true`. We do **not**
-disable auto-update.
+**What we ship:** `bin/ai-config claude` merges the explicitly owned preferences
+from `configs/claude-settings.json`, including `DISABLE_TELEMETRY=1`,
+`DISABLE_ERROR_REPORTING=1`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`.
+Unlisted keys remain local. The nonessential-traffic setting also disables
+Claude's automatic updater (confirmed by Claude Code 2.1.273's `doctor`). Use
+`bin/ai-update claude` for an explicit native update without weakening that policy.
 
 **Fleet enforcement (admins):** user `settings.json` is *lowest* precedence.
 To enforce policy that can't be bypassed, use system managed settings at
@@ -69,14 +66,15 @@ To enforce policy that can't be bypassed, use system managed settings at
   does not replace the launcher's symlink. Re-run `./setup.sh --codex --force`
   to ask the official installer to update or repair the installation.
 
-**What we ship:** a marked portable block in `~/.codex/config.toml` with:
+**What we ship:** portable keys in `~/.codex/config.toml` with:
 ```toml
 [otel]
 metrics_exporter = "none"
 log_user_prompt = false
 ```
-On later runs, `install-codex.sh` refreshes only that marked block and preserves
-Codex-owned trust, hook, plugin, and machine-local profile state. Provider
+On later runs, `install-codex.sh` invokes `bin/ai-config codex`, which reconciles
+only declared portable keys and preserves unlisted trust, hook, plugin, and
+provider state. Backups remain in `~/.codex/backups`. Provider
 profiles remain site-specific and are installed separately; Codex requires
 those endpoints to implement the Responses API.
 

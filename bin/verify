@@ -257,6 +257,15 @@ if [[ "$azure_git_expected" == true ]]; then
     fi
 fi
 
+# Configuration is checked separately from binary availability.
+for ai_component in codex claude; do
+    if component_expected "$ai_component"; then
+        if ! "$DOTFILES_DIR/bin/ai-config" "$ai_component" --check --plugins; then
+            check_fail "$ai_component portable configuration needs reconciliation (bin/ai-config)."
+        fi
+    fi
+done
+
 # Pre-commit hook (info-level — never fail verify if absent).
 git_common_dir="$(git -C "$DOTFILES_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
 hook_path="${git_common_dir:-$DOTFILES_DIR/.git}/hooks/pre-commit"

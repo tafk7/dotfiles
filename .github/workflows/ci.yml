@@ -81,7 +81,9 @@ jobs:
           ./bin/opencode-contract --help    >/dev/null
 
       - name: Codex installer ownership behavior
-        run: bash tests/install-codex.sh
+        run: |
+          bash tests/install-codex.sh
+          python3 tests/ai-config.py
 
       - name: Hermetic behavior and safety suite
         run: |

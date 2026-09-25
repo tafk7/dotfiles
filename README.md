@@ -224,11 +224,27 @@ the normal WezTerm palette, no native pane shortcuts, and reduced client-side
 scrollback. Remote shells and applications remain responsible for their own
 ANSI/truecolor styling.
 
-Codex: [`configs/codex.toml`](configs/codex.toml) is the portable base. The
-Codex installer refreshes only its marked block in `~/.codex/config.toml`, so
-project trust, hook trust, plugins, and private provider selections remain
-machine-local. If bindings are changed through Codex's `/keymap` UI, mirror the
-resulting `tui.keymap` entries back into the tracked config.
+Codex: [`configs/codex.toml`](configs/codex.toml) declares the portable keys,
+including every tracked keybinding. [`bin/ai-config`](bin/ai-config) reconciles
+those keys while preserving unlisted project trust, hook trust, plugins, and
+provider selections. Claude preferences come from
+[`configs/claude-settings.json`](configs/claude-settings.json); portable status
+line, keybindings, and skills live under [`configs/ai`](configs/ai).
+
+```sh
+./bin/ai-config --dry-run          # Preview both applications, without installers
+./bin/ai-config                    # Reconcile preferences and portable assets
+./bin/ai-config --check --plugins  # Check preferences, assets, and badge caches
+./bin/ai-update claude             # Explicit native update/repair
+./bin/ai-update codex
+```
+
+Python 3.11+ is required. Changed configuration is backed up under
+`~/.claude/backups` or `~/.codex/backups`; unchanged files are not rewritten.
+TOML formatting/comments normalize on a semantic change; unowned values survive.
+The old marked-block format migrates through the same parser. Mirror changes
+made through an application's settings UI into the tracked source if they should
+become portable defaults. See [AI configuration ownership](docs/ai-configuration.md).
 
 ## Theme System
 
