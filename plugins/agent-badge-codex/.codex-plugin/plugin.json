@@ -1,6 +1,6 @@
 {
   "name": "agent-badge",
-  "version": "1.0.0",
+  "version": "1.0.0+codex.20260925164818",
   "description": "Per-window tmux status badges showing what every Claude Code and Codex session in your tmux server is doing.",
   "author": {
     "name": "tkeller",
@@ -22,6 +22,7 @@
     "category": "Productivity",
     "capabilities": [
       "Read"
-    ]
+    ],
+    "defaultPrompt": "Show the status of agent sessions in tmux."
   }
 }

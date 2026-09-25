@@ -8,14 +8,8 @@
 # Usage: agent-status.sh <state> [pane]  state = working|done|needs|idle|busy|
 #                                                thinking|tool|reap|gone
 #
-# Wired from THREE places, all of which pass state as argv[1]:
-#   hooks/hooks.json          (Claude Code, via the plugin manifest)
-#   ~/.codex/config.toml      [[hooks.*]]      (Codex CLI, via codex/install.sh --
-#                             Codex's own plugin hooks are feature-gated and do
-#                             not execute as of 0.150.1, so it cannot use the
-#                             plugin manifest yet)
-#   the tmux server           pane-focus-in / pane-exited, installed by
-#                             ../agent-badge.tmux
+# Wired from per-harness hooks/hooks.json files and from the tmux server's
+# pane-focus-in / pane-exited hooks installed by ../agent-badge.tmux.
 #
 # Agent-agnostic by design: the only agent-specific thing here is AGENT_CMDS,
 # the list of process names that count as a live agent pane.
@@ -45,17 +39,16 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 0
 fi
 
-# Self-heal the tmux wiring. The badge placeholder living in
-# window-status-format is the one piece of state that gets destroyed routinely:
-# `source-file ~/.tmux.conf` (bound to prefix+r) resets the option to whatever
-# the file says, stripping it. It is also simply absent on a machine where the
-# plugin is installed but no dotfiles are.
-#
-# Checked only on the two low-frequency events, and content-first, so the steady
-# state costs a single `show -gv`. agent-badge.tmux is itself idempotent and
-# separately guarded; this just decides whether to bother calling it.
+# SessionStart must check both formats and hook ownership: the badge can remain
+# visible while a plugin update deletes the cache directory stored in tmux's
+# hooks. Focus events also repair a format removed by a tmux config reload.
+# The wiring script owns the version/path checks and preserves unrelated hooks.
 case "$state" in
-    seen|session-start)
+    session-start)
+        "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/agent-badge.tmux" \
+            >/dev/null 2>&1
+        ;;
+    seen)
         case "$(tmux show -gv window-status-format 2>/dev/null)" in
             *@cc_win_badge*) ;;
             *) "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/agent-badge.tmux" \

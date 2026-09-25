@@ -1,10 +1,8 @@
 #!/bin/bash
 # Install Claude Code via the official native installer (claude.ai/install.sh).
 #
-# Claude Code self-updates in the background by design, so this script only
-# ensures the binary is present — it does NOT pin or manage versions. Re-run
-# with --force to reinstall (e.g. to repair a broken binary). To stop the
-# background auto-update, set DISABLE_AUTOUPDATER=1 in ~/.claude/settings.json.
+# Ensure the native binary exists. bin/ai-update claude explicitly updates it
+# using --force; automatic updates may be disabled by the configured traffic policy.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,37 +18,9 @@ FORCE=false
 # PATH (the same reason install_eget_tools resolves eget by absolute path).
 CLAUDE_BIN="$HOME/.local/bin/claude"
 
-# Provision ~/.claude/settings.json with content-safe telemetry defaults
-# (DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING) plus CLAUDE_CODE_DISABLE_MOUSE.
-#
-# The mouse flag is a usability fix, not a privacy one: Claude Code is a
-# fullscreen TUI that grabs mouse tracking, and under tmux every drag-select has
-# to be arbitrated with tmux's own mouse handling, forcing a full repaint of a
-# large Ink surface. That stalls the terminal for seconds on every highlight --
-# reproducible on a brand-new session, so it is not the known scrollback bug.
-# Disabling mouse capture hands selection back to the terminal natively. The
-# trade-off is that the wheel scrolls tmux's scrollback rather than Claude's
-# viewport, which under tmux is usually what you wanted anyway.
-#
-# ONLY when absent — settings.json
-# is a rich, user-owned file (model, permissions, hooks), so we never overwrite
-# it; for an existing file we point at the keys to add. Note: org-managed
-# settings override user settings.json (by design). Auto-update is intentionally
-# NOT disabled here. See configs/claude-settings.json and docs/ai-tools-egress.md.
+# Reconcile portable keys and assets; all backups stay in the application home.
 provision_claude_settings() {
-    local src="$DOTFILES_DIR/configs/claude-settings.json"
-    local dest="$HOME/.claude/settings.json"
-    [[ -f "$src" ]] || return 0
-    mkdir -p "$(dirname "$dest")"
-
-    if [[ -e "$dest" ]]; then
-        log "Existing $dest left untouched."
-        log "  To harden telemetry, merge the \"env\" keys from configs/claude-settings.json"
-        log "  (see docs/ai-tools-egress.md)."
-        return 0
-    fi
-    cp "$src" "$dest"
-    success "Provisioned ~/.claude/settings.json (telemetry + error reporting off)."
+    "$DOTFILES_DIR/bin/ai-config" claude
 }
 
 # Install the agent-badge plugin (plugins/agent-badge) from this repo, which
@@ -79,6 +49,9 @@ provision_agent_badge_plugin() {
     fi
     if "$claude_cmd" plugin install agent-badge@tafk7 >/dev/null 2>&1; then
         success "Plugin agent-badge installed (tmux window badges for agent sessions)."
+        if [[ -n "${TMUX:-}" ]]; then
+            "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" wire >/dev/null 2>&1 || true
+        fi
         log "  Takes effect in new Claude sessions."
     else
         warn "Could not install the agent-badge plugin; see plugins/agent-badge-claude/README.md."
@@ -88,7 +61,7 @@ provision_agent_badge_plugin() {
 provision_claude_settings
 
 if [[ "$FORCE" != true && -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
-    success "Claude Code already installed ($("$CLAUDE_BIN" --version 2>/dev/null | head -n1)); it self-updates."
+    success "Claude Code already installed ($("$CLAUDE_BIN" --version 2>/dev/null | head -n1)); updates follow its traffic policy; use bin/ai-update claude."
     provision_agent_badge_plugin "$CLAUDE_BIN"
     exit 2
 fi

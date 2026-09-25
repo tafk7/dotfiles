@@ -80,7 +80,18 @@ the badge does not appear.
 
 Nothing is required in the base tmux configuration. The installed plugin is
 self-contained and wires the running tmux server from its `SessionStart` hook.
-Reinstalling/updating the plugin refreshes cached paths before the next session.
+Every `SessionStart` checks the cached script paths even when the badge is
+already visible. Dotfiles installers also repair the live hooks immediately when
+run inside tmux. Hooks tolerate a removed cache directory between an update and
+the next session, so clicking a pane does not produce a command-not-found error.
+
+To repair an already-running server without restarting it, run:
+
+```bash
+~/dotfiles/plugins/shared/agent-badge.tmux wire
+```
+
+Wiring replaces only badge-owned hook entries and preserves other tmux hooks.
 
 ## Why two plugins
 
