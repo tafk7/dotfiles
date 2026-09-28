@@ -3,14 +3,11 @@
 # zsh-only constructs below carry per-line `shellcheck disable` directives)
 # Owns: zsh options, history, completion, keybindings
 
-# DOTFILES_DIR + env are normally established by ~/.zshenv (entry/zshenv).
-# This block is a defensive fallback for installs where .zshenv was opted
-# out of or symlinked manually but .zshrc wasn't. Profile sourcing is
-# idempotent via _PROFILE_LOADED.
+# ~/.zshenv normally establishes DOTFILES_DIR and the environment; this is the
+# fallback when only .zshrc is linked.
 if [[ -z "${DOTFILES_DIR:-}" ]]; then
-    # readlink locates the repo, but a flattened symlink (bind-mount/copy) makes
-    # it resolve wrong; use the data-only XDG install-path record, with the old
-    # generated/bridge.sh retained as a read-only compatibility fallback.
+    # A flattened copy or bind mount defeats readlink; fall back to the recorded
+    # install path. generated/bridge.sh is legacy, read-only compatibility.
     DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
     if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
         _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
@@ -74,9 +71,8 @@ source "$DOTFILES_DIR/shell/init.sh"
 # Vendored completion functions, generated on demand into a private fpath dir.
 # MUST come before compinit — compinit scans fpath and registers what it finds.
 #
-# These files are `#compdef`-style autoload stubs, so compinit only records the
-# name; zsh parses the (6000+ line, for uv) body the first time you actually
-# complete that command. Sourcing them at startup instead cost ~80ms per shell.
+# They are `#compdef` autoload stubs, so zsh parses the (large) body only on
+# first use instead of at every startup.
 _dotfiles_compdir="${DOTFILES_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles}/zsh/completions"
 _dotfiles_comp_dirty=0
 
@@ -97,28 +93,22 @@ fi
 [[ -d "$_dotfiles_compdir" ]] && fpath=("$_dotfiles_compdir" $fpath)
 unset _dotfiles_compdir
 
-# Rebuild the completion dump at most once a day; otherwise trust the cache
-# (`-C` skips the security/staleness scan of every fpath entry, ~85ms here).
-# Trade-off: a tool installed today may not offer completions until tomorrow —
-# run `compinit` by hand after installing something you want to complete now.
+# Rebuild the completion dump at most once a day; otherwise `-C` skips the slow
+# scan of every fpath entry. A tool installed today may lack completions until
+# tomorrow; run `compinit` by hand if needed.
 # shellcheck disable=SC2296,SC2298  # zsh glob qualifiers
 autoload -Uz compinit
-# Array assignment, not [[ -n ... ]] — `[[` does NOT perform filename generation
-# in zsh, so a glob-qualifier test there is just a non-empty literal string and
-# is always true. Qualifiers: N=nullglob, .=plain file, mh+24=mtime over 24h old.
-#
-# Wrapped in eval so `bash -n` (run by hooks/pre-commit on every *.sh file) can
-# parse this file: the bare parenthesised glob qualifier is a bash syntax error.
-# Only zsh ever sources this file, so the eval never runs anywhere else.
+# Array assignment, because `[[` does not glob in zsh. Qualifiers: N=nullglob,
+# .=plain file, mh+24=older than 24h. The eval keeps the file parseable by
+# `bash -n` in the pre-commit hook.
 eval '_zcompdump_stale=(${HOME}/.zcompdump(N.mh+24))'
 # A regenerated completion function above means the dump no longer describes
 # fpath, so force the full path in that case regardless of the dump's age.
 # shellcheck disable=SC2154  # assigned inside the eval above
 if (( ${#_zcompdump_stale} || _dotfiles_comp_dirty )); then
     compinit
-    # compinit only rewrites the dump when the completion set actually changed,
-    # so without this the mtime never advances and every shell takes the slow
-    # path forever. Stamping it makes the check a real once-a-day rebuild.
+    # compinit only rewrites the dump when completions changed; stamp it so the
+    # slow path runs at most once a day.
     touch ~/.zcompdump
 else
     compinit -C
@@ -134,8 +124,6 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 
 zstyle ':completion:*:*:docker:*' option-stacking yes
 zstyle ':completion:*:*:docker-*:*' option-stacking yes
-
-# (Tool completion functions are generated into fpath above, before compinit.)
 
 # ==============================================================================
 # Key Bindings

@@ -1,10 +1,8 @@
 #!/bin/bash
 # Install or update the OpenAI Codex CLI with OpenAI's standalone installer.
 #
-# Codex is an "ai" tier tool (./setup.sh --ai, or --full). It is kept out of the
-# shell-tier installers so an org-managed Codex install isn't shadowed by
-# default. A normal rerun preserves a working standalone install; --force asks
-# the official installer to update or repair it without deleting its launcher.
+# A normal rerun preserves a working standalone install; --force asks the
+# official installer to update or repair it without deleting its launcher.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,17 +24,10 @@ provision_codex_config() {
     "$DOTFILES_DIR/bin/ai-config" codex
 }
 
-# Install the agent-badge plugin (plugins/agent-badge) from this repo, which
-# doubles as a plugin marketplace via .agents/plugins/marketplace.json.
-#
-# Same mechanism as the Claude side in install-claude.sh, and the same shared
-# hooks/hooks.json: Codex auto-loads it by convention and expands
-# ${CLAUDE_PLUGIN_ROOT} in the commands, so one file serves both harnesses.
-#
-# Registered as a local directory rather than tafk7/dotfiles so it tracks the
-# working tree and needs no network. Both commands are idempotent.
-#
-# Never fatal: a badge is a convenience, not a reason to fail the Codex install.
+# Install the agent-badge plugin (plugins/agent-badge-codex) from this repo,
+# which is also a marketplace (.agents/plugins/marketplace.json). Registered as
+# a local directory so it tracks the working tree and needs no network. Never
+# fatal: the badge is a convenience.
 provision_agent_badge_plugin() {
     [[ "${DOTFILES_AGENT_BADGE_ENABLED:-1}" == "1" ]] || {
         log "Agent-badge disabled; skipping plugin registration."
@@ -58,9 +49,8 @@ provision_agent_badge_plugin() {
         if [[ -n "${TMUX:-}" ]]; then
             "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" wire >/dev/null 2>&1 || true
         fi
-        # Worth stating on every run. Codex gates hooks behind human review, and
-        # an untrusted hook is skipped in SILENCE -- indistinguishable from a
-        # broken config, and it has already caused one wrong diagnosis here.
+        # Stated on every run: Codex silently skips untrusted hooks, which looks
+        # exactly like a broken install.
         log "  Run /hooks inside Codex once to review and trust them."
         log "  Until you do, they are skipped silently and no badges appear."
     else

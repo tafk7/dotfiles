@@ -1,28 +1,14 @@
 #!/bin/bash
 # Install Pi (earendil-works/pi) — a minimal terminal coding agent harness.
 #
-# Pi self-updates (`pi update`), so this script only ensures the binary is
-# present — it does not pin or manage versions. Re-run with --force to reinstall
-# (e.g. to repair a broken install).
+# Pi self-updates (`pi update`), so this only ensures it is present; --force
+# reinstalls. It refuses to shadow an org-managed pi already on PATH.
 #
-# Pi is an "ai" tier tool: installed only by --pi (or --ai/--full), never as a
-# side effect of a tier. Like the other AI installers, it refuses to shadow an
-# org-managed pi already on PATH.
-#
-# WHY NOT THE OFFICIAL INSTALLER (https://pi.dev/install.sh):
-# It interactively prompts to append a PATH line to .bashrc/.zshrc/.profile and
-# offers NO --no-modify-path escape (opencode's installer does). Our rc files are
-# dotfiles symlinks, so that write-through would dirty the tracked repo. It will
-# also auto-install Node via apt/brew (sudo) when missing, and can install into
-# npm's global prefix (/usr/local/lib/node_modules — also sudo). We want none of
-# that, so we drive npm ourselves into a controlled prefix and symlink the binary
-# into ~/.local/bin — already on PATH via shell/env.sh, and where the
-# registry/verify/uninstall expect it (the same approach used for opencode).
-#
-# WHY npm AND NOT eget: Pi is a pure-JS npm package (@earendil-works/pi-coding-
-# agent, bin "pi" -> dist/bundle/cli.js), not a compiled release artifact. There
-# are no GitHub binary assets to pin. Correspondingly there is no CPU/libc
-# variant detection to replicate, unlike opencode.
+# Not the official installer (pi.dev/install.sh): it appends a PATH line to the
+# shell rc files with no opt-out (those are symlinks into this repo), may install
+# Node with sudo, and may use npm's global prefix (also sudo). Instead, npm
+# installs into a controlled prefix and the binary is linked into ~/.local/bin.
+# Pi is a pure-JS npm package, so there is no release binary for eget to pin.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,17 +25,10 @@ PI_PREFIX="$HOME/.pi/agent/install"         # matches upstream's managed-mode di
 PI_REAL="$PI_PREFIX/bin/pi"
 PI_LINK="$HOME/.local/bin/pi"               # our PATH-visible symlink
 
-# Provision ~/.pi/agent/settings.json with the install/update telemetry ping to
-# pi.dev/api/report-install turned off.
-#
-# ONLY when absent. settings.json is a rich, user-owned file (models,
-# keybindings, project trust, compaction), so we never overwrite it; for an
-# existing file we point at the key to add. Same policy as
-# provision_claude_settings in installers/install-claude.sh.
-#
-# Note this does NOT disable the separate startup version check against
-# pi.dev/api/latest-version — set PI_SKIP_VERSION_CHECK=1, or PI_OFFLINE=1 to
-# disable all startup network activity. See docs/ai-tools-egress.md.
+# Provision ~/.pi/agent/settings.json with install telemetry off, only when the
+# file is absent: it is user-owned (models, keybindings, trust), so an existing
+# file only gets a hint. The separate startup version check is controlled by
+# PI_SKIP_VERSION_CHECK / PI_OFFLINE (see docs/ai-tools-egress.md).
 provision_pi_settings() {
     local src="$DOTFILES_DIR/configs/pi-settings.json"
     local dest="$HOME/.pi/agent/settings.json"
@@ -73,13 +52,9 @@ version_ge() {
     [[ "$(printf '%s\n%s\n' "$want" "$have" | sort -V | head -n1)" == "$want" ]]
 }
 
-# Node gate. Pi is the only npm-based tool in the registry; every other AI CLI
-# is a standalone binary. Node comes from the work tier's NVM, but Pi sits in the
-# ai tier, so `--pi` on a fresh machine can legitimately arrive without it.
-#
-# This is a requested-install failure: setup must exit nonzero rather than call
-# a missing prerequisite "up to date". Deliberately does NOT
-# install Node itself: `--pi` must not silently become a partial `--work`.
+# Node normally comes from the work tier's NVM, but `--pi` can arrive without
+# it. That is a requested-install failure, and this does not install Node
+# itself: `--pi` must not silently become a partial `--work`.
 require_node() {
     local have
     if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
@@ -118,10 +93,7 @@ if [[ "$FORCE" != true && -x "$PI_REAL" ]] && "$PI_REAL" --version >/dev/null 2>
     exit 0
 fi
 
-# Don't shadow an externally-managed pi. On org-managed machines the CLI may be
-# provided elsewhere on PATH; installing our own copy would silently override it
-# (shell/env.sh prepends ~/.local/bin). Our own symlink and our prefix are not
-# "external" — anything else is always preserved.
+# Don't shadow an externally managed pi: ~/.local/bin comes first on PATH.
 EXTERNAL_PI="$(command -v pi 2>/dev/null || true)"
 if [[ -n "$EXTERNAL_PI" \
       && "$EXTERNAL_PI" != "$PI_LINK" \
@@ -150,14 +122,10 @@ filter_pi_npm_stderr() {
     done
 }
 
-# -g --prefix: put the package under $PI_PREFIX/lib and its bin shim in
-# $PI_PREFIX/bin, isolated from whichever Node version NVM currently defaults to
-# (a plain `npm install -g` would land in ~/.nvm/versions/node/<ver>/bin and
-# vanish on the next Node upgrade). The bin shim is `#!/usr/bin/env node`, so it
-# follows PATH and keeps working across Node versions.
-#
-# --ignore-scripts is upstream's own documented recommendation and costs nothing
-# here: the package declares no install/postinstall lifecycle scripts.
+# A private prefix keeps Pi out of NVM's per-version global directory, which
+# would vanish on the next Node upgrade; the `env node` shim follows PATH.
+# --ignore-scripts is upstream's recommendation; the package has no lifecycle
+# scripts.
 mkdir -p "$PI_PREFIX"
 if ! npm install -g --prefix "$PI_PREFIX" --ignore-scripts "$PI_PACKAGE" \
     2> >(filter_pi_npm_stderr); then

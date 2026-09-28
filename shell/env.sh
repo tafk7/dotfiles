@@ -1,29 +1,11 @@
 #!/bin/bash
-# Static exports and PATH composition. Single source of truth for
-# everything on PATH.
+# Static exports and PATH composition: the single source of truth for PATH.
+# Sourced after shell/env-runtime.sh by entry/profile.sh and shell/init.sh.
 #
-# Sourced by:
-#   - entry/profile.sh (login shells, non-interactive subshells)
-#   - shell/init.sh (interactive shells)
-# Always AFTER shell/env-runtime.sh, which holds the always-fresh exports
-# (STARSHIP_CONFIG, BAT_CACHE_PATH, scoped theme state) that point at
-# generated cache files and must re-evaluate on `reload`.
-#
-# Safe to source multiple times — guarded by _DOTFILES_ENV_LOADED below.
-# `reload` (in shell/tools/general.sh) unsets the guard so guarded exports
-# actually re-run after PATH/env edits.
-#
-# The guard is EXPORTED so child processes inherit it and skip the PATH
-# composition that the parent already performed. Without this, every
-# `zsh -c "cmd"` subprocess (and any other shell that re-sources this
-# file) would re-prepend ~/bin, ~/.local/bin, $DOTFILES_DIR/bin, NVM,
-# etc. onto the inherited PATH, producing unbounded duplication
-# across nested subprocesses.
-#
-# Interactive-only tool init (direnv hook, completions)
-# lives in shell/tool-init.sh. CWD-sensitive exports that must re-fire
-# in every subprocess (notably `direnv export`) live in
-# shell/env-runtime.sh, which is intentionally un-guarded.
+# The guard is exported so child shells inherit the composed environment
+# instead of re-prepending the same directories at every nesting level.
+# `reload` unsets it to force recomputation. CWD-sensitive exports live in
+# shell/env-runtime.sh; interactive tool init lives in shell/tool-init.sh.
 
 [[ -n "${_DOTFILES_ENV_LOADED:-}" ]] && return 0
 export _DOTFILES_ENV_LOADED=1
@@ -37,7 +19,7 @@ export _DOTFILES_ENV_LOADED=1
 [[ -d "$HOME/.local/bin" ]] && PATH="$HOME/.local/bin:$PATH"
 [[ -d "/usr/local/bin" ]] && PATH="/usr/local/bin:$PATH"
 
-# Dotfiles user commands (theme-switcher, verify, cheatsheet, replace)
+# Dotfiles user commands
 [[ -d "${DOTFILES_DIR:-}/bin" ]] && PATH="$DOTFILES_DIR/bin:$PATH"
 
 # NVM (stable symlink to active version — no nvm.sh sourcing needed)
@@ -79,10 +61,8 @@ export PIP_REQUIRE_VIRTUALENV=false
 export RIPGREP_CONFIG_PATH="${RIPGREP_CONFIG_PATH:-$HOME/.ripgreprc}"
 
 # Node.js
-# NODE_OPTIONS is intentionally NOT set globally — forcing
-# --max-old-space-size onto every node process affects small CLIs and tools
-# that may mis-handle inherited options. Set it per-project (e.g. in an
-# .envrc) or in ~/.shell.local if a specific tool needs a larger heap.
+# NODE_OPTIONS is deliberately not set: every node process would inherit it,
+# including small CLIs. Set it per project in .envrc if a tool needs it.
 
 # Docker
 export DOCKER_BUILDKIT=1
@@ -91,8 +71,7 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 # Theme-specific variables are deliberately absent from Layer 0. Interactive
 # startup adds them only when the optional theme feature is enabled.
 
-# Project search roots — colon-separated, like PATH. Used by `proj`,
-# `fzf-project`, and `cproj`. Override per-machine via your shell rc.
+# Project search roots for proj, fzf-project, and cproj (colon-separated).
 export PROJECTS_DIRS="${PROJECTS_DIRS:-$HOME/projects:$HOME/work:$HOME/dev:$HOME/code:$HOME/src}"
 
 # ==============================================================================
@@ -144,7 +123,3 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
         export WIN_SSH="$WIN_HOME/.ssh"
     fi
 fi
-
-# Note: `direnv export` lives in shell/env-runtime.sh — it must re-fire
-# in every subprocess (it's CWD-sensitive), and the exported guard on
-# this file would skip it here in child shells.

@@ -143,16 +143,21 @@ the live tmux fragments without deleting AI configuration or session data.
 ## Repository layout
 
 ```text
-entry/                         shell entrypoints
+setup.sh, bootstrap.sh         installation entry points
+entry/                         shell entrypoints (symlinked to ~/.bashrc etc.)
 shell/env*.sh                  Layer 0 implementation
 shell/init.sh                  Layer 1 loader
-shell/interactive/             Layer 2 shell adapters
+shell/tools/, shell/platform/  interactive aliases/functions and platform adapters
+shell/interactive/             Layer 2 feature adapters
 lib/runtime.sh                 side-effect-free command helpers
-lib/config.sh                  configuration/package declarations
+lib/config.sh                  CONFIG_MAP and APT package groups
 lib/registry.sh                component inventory and ownership
 lib/state.sh                   persistent state, lock, journal
+lib/install.sh                 host mutation used by setup and installers
+lib/work-host.sh               read-only work-host probes
 installers/                    component-specific installation
-features are represented by their adapters and public commands
+configs/                       tracked configuration sources
+bin/                           user and maintenance commands
 themes/                        theme source data
 plugins/shared/                agent-badge source of truth
 plugins/agent-badge-*/         self-contained marketplace packages
@@ -165,8 +170,6 @@ Host-mutating commands are faked in unit tests. Hook tests use disposable
 standalone repositories. Architecture jobs explicitly label ARM checks as
 selection-only unless an ARM binary was actually executed.
 
-Development occurs in an isolated checkout. Performance measurement and owner
-review precede adoption into the live symlink-target checkout. Integration,
-configuration reconciliation, and host changes are separate actions described in
-[maintenance and rollout](maintenance.md). The earlier implementation program is
-retained as [history](history/2026-09-improvement-plan.md).
+Development and rollout practice is in [maintenance](maintenance.md). The
+rationale behind much of this design is recorded in the completed
+[September 2026 improvement plan](history/2026-09-improvement-plan.md).

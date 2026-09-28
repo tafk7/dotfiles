@@ -1,9 +1,9 @@
 #!/bin/bash
 # Coding-agent -> tmux window badge  (Claude Code + Codex CLI)
 #
-# Writes the calling pane's Claude state into tmux user options, aggregates the
+# Writes the calling pane's agent state into tmux user options, aggregates the
 # per-pane states up to a window-level option, and forces a status redraw.
-# The badge itself is rendered by window-status-format in ~/.tmux.conf.
+# window-status-format renders the pre-built badge.
 #
 # Usage: agent-status.sh <state> [pane]  state = working|done|needs|idle|busy|
 #                                                thinking|tool|reap|gone
@@ -14,11 +14,10 @@
 # Agent-agnostic by design: the only agent-specific thing here is AGENT_CMDS,
 # the list of process names that count as a live agent pane.
 #
-# The optional [pane] argument exists because the two callers differ: a Claude
-# Code hook inherits $TMUX_PANE from the Claude process, but a tmux-spawned hook
-# gets $TMUX only -- no $TMUX_PANE -- so tmux.conf passes #{pane_id} explicitly.
+# The optional [pane] argument exists because an agent hook inherits $TMUX_PANE,
+# but a tmux-spawned hook gets only $TMUX, so tmux passes #{pane_id} explicitly.
 #
-# Contract: never block Claude, never write to stdout (hook stdout can be
+# Contract: never block the agent, never write to stdout (hook stdout can be
 # interpreted), always exit 0.
 
 # Process names that count as an agent pane. A pane running anything else has
@@ -29,7 +28,6 @@ AGENT_CMDS="claude codex"
 state="$1"
 pane="${2:-$TMUX_PANE}"
 
-# Not in tmux (plain terminal, SSH without tmux, CI) -> nothing to do.
 [[ -n "$TMUX" && -n "$pane" ]] || exit 0
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -71,10 +69,9 @@ case "$state" in
     *) exit 0 ;;
 esac
 
-# Only the subagent events need the payload (for agent_id); every other caller's
-# stdin is irrelevant. Read it *only* when required, and always under a timeout:
-# an unconditional `cat` blocks forever if stdin is neither a tty nor closed,
-# which would leave a stuck process behind for every hook invocation.
+# Read the payload only for events that need it, and always under a timeout: a
+# plain `cat` blocks forever if stdin is neither a tty nor closed, leaving a
+# stuck process behind for every hook invocation.
 payload=""
 if [[ "$state" == sub-start || "$state" == sub-stop || "$state" == tool \
    || "$state" == session-start ]] && [[ ! -t 0 ]]; then
@@ -84,22 +81,19 @@ fi
 # ---------------------------------------------------------------------------
 # Background subagents
 #
-# SubagentStop fires even for agents that outlive the parent turn (verified: a
-# Stop at 10:58:44 was followed by its SubagentStop at 11:02:36), so the parent
+# SubagentStop fires even for agents that outlive the parent turn, so the parent
 # pane can legitimately be "done" while work is still in flight.
 #
-# Track the live agent IDs as a set rather than a counter. The events carry no
-# ordering guarantee and a Stop can arrive for an ID we never saw -- observed
-# live when an agent predated the hook being registered. Removing an unknown ID
-# from a set is a harmless no-op; decrementing a counter for one drives it
-# negative and the badge never clears.
+# Track live agent IDs as a set rather than a counter. Events carry no ordering
+# guarantee and a Stop can arrive for an ID never seen (e.g. an agent that
+# predates hook registration). Removing an unknown ID from a set is a no-op;
+# decrementing a counter drives it negative and the badge never clears.
+#
+# Entries are "id:epoch" and expire, because SubagentStop is not guaranteed: a
+# harness killed while children run strands ids with nothing to remove them.
+# Self-healing matters more than precision; dropping a live subagent early only
+# means the badge reads "done" slightly early.
 # ---------------------------------------------------------------------------
-# Entries are stored as "id:epoch" and expire. SubagentStop is not guaranteed:
-# a harness killed or restarted while children run leaves ids in the set with
-# nothing to remove them, and the pane then shows "waiting" forever. Observed
-# live -- two Codex ids stranded 26 minutes. Expiry makes the set self-healing,
-# which matters more than precision here: the cost of dropping a real subagent
-# early is a badge that reads "done" while something finishes quietly.
 SUB_TTL=1800   # 30 min
 
 prune_agents() {   # $1=pane, $2=id to drop (optional), $3=id to add (optional)
@@ -137,16 +131,10 @@ fi
 win=$(tmux display -p -t "$pane" '#{session_name}:#{window_index}' 2>/dev/null) || exit 0
 [[ -n "$win" ]] || exit 0
 
-# PostToolUse fires on every tool call, including ones a *subagent* or a
-# background task makes after the main turn already emitted Stop. Writing
-# "working" unconditionally there resurrects a finished window back to ✻ and it
-# never settles -- the bug where a done pane kept showing as running. So a
-# tool-driven update only applies when the pane isn't already resolved.
-# A tool event carrying agent_id came from a *subagent*, not the pane's own
-# agent, and says nothing about what the parent is doing. Codex confirmed:
-# parent-originated Pre/PostToolUse have no agent_id key; subagent ones carry
-# agent_id + agent_type. Letting these through made a parent that had already
-# finished look busy again.
+# Tool events also fire for subagents and background tasks after the parent
+# turn has stopped. Those carry agent_id (parent-originated events do not) and
+# say nothing about the parent, so ignore them; otherwise a finished pane would
+# flip back to working and never settle.
 if [[ "$state" == tool ]]; then
     if [[ -n "$(printf '%s' "$payload" | jq -r '.agent_id // empty' 2>/dev/null)" ]]; then
         exit 0
@@ -154,24 +142,18 @@ if [[ "$state" == tool ]]; then
 fi
 
 if [[ "$state" == tool ]]; then
-    # Parent-originated tool call => this pane's own agent is actively working.
-    # There is no carve-out for already-settled states any more: the only reason
-    # one existed was to stop a *subagent's* tool events resurrecting a finished
-    # pane, and those are now dropped above by the agent_id filter. Keeping the
-    # carve-out stranded panes instead -- `needs` never cleared, because neither
-    # harness fires a hook when you *grant* permission, and `busy` never cleared,
-    # because PostCompact routes here too.
+    # A parent tool call means the agent is working, whatever the prior state:
+    # neither harness fires a hook when permission is granted, so this is what
+    # clears `needs`.
     case "$(tmux display -p -t "$pane" '#{pane_current_command}' 2>/dev/null)" in
         *codex*) state=thinking ;;
         *)       state=working ;;
     esac
 fi
 
-# Compaction is an interlude, not a state change: the agent is doing the same
-# thing after it as before. Stash the prior state on the way in and restore it on
-# the way out. PostCompact used to route through `tool`, which unconditionally
-# means "active" -- so an auto-compaction that ran *after* a turn finished flipped
-# a settled pane to working and nothing ever came along to clear it.
+# Compaction is an interlude, not a state change: stash the prior state on the
+# way in and restore it on the way out, so a compaction after a finished turn
+# doesn't flip a settled pane back to working.
 if [[ "$state" == busy ]]; then
     prev=$(tmux show -p -t "$pane" -qv @cc_pane_state 2>/dev/null)
     [[ -n "$prev" && "$prev" != "busy" ]] \
@@ -181,14 +163,13 @@ fi
 if [[ "$state" == uncompact ]]; then
     state=$(tmux show -p -t "$pane" -qv @cc_pane_prev 2>/dev/null)
     tmux set -pu -t "$pane" @cc_pane_prev 2>/dev/null
-    # No stash (compaction began before we were tracking) -> assume settled
-    # rather than active. Guessing "working" is what stranded panes before.
+    # No stash (compaction began before tracking): assume settled, because a
+    # wrong "working" is never cleared.
     [[ -n "$state" ]] || state=idle
 fi
 
-# SessionStart re-fires mid-session after a compaction (Codex: source=compact;
-# Claude: matcher excludes it). Treating that as a fresh session flickered an
-# actively-working pane to idle. Only a genuinely new session resets state.
+# SessionStart re-fires after a compaction (Codex: source=compact; Claude's
+# matcher excludes it). Only a genuinely new session resets state.
 if [[ "$state" == session-start ]]; then
     src=$(printf '%s' "$payload" \
           | jq -r '.source // .session_start_reason // empty' 2>/dev/null)
@@ -199,19 +180,16 @@ if [[ "$state" == session-start ]]; then
     esac
 fi
 
-# SessionEnd: clear this pane explicitly rather than waiting for the loop's
-# command check. Claude is still the running command at the instant the hook
-# fires, so the "is it still claude?" prune would not catch it yet.
+# SessionEnd: clear this pane explicitly. The agent is still the pane's running
+# command when the hook fires, so the prune in the loop below would miss it.
 if [[ "$state" == gone ]]; then
     tmux set -pu -t "$pane" @cc_pane_state 2>/dev/null
     tmux set -pu -t "$pane" @cc_pane_since 2>/dev/null
     tmux set -pu -t "$pane" @cc_pane_agents 2>/dev/null
 fi
 
-# Window focused: demote *every* done pane in it, not just the focused one.
-# The old tmux hook wrote idle to whichever pane had focus, so in a split,
-# focusing the shell pane demoted that (stateless) pane while the agent pane
-# beside it kept its ● indefinitely.
+# Window focused: demote every done pane in it, not just the focused one, which
+# in a split may be a plain shell.
 if [[ "$state" == "seen" ]]; then
     w=$(tmux display -p -t "$pane" '#{session_name}:#{window_index}' 2>/dev/null)
     while IFS= read -r sp; do
@@ -237,9 +215,7 @@ if [[ "$state" != reap && "$state" != gone && "$state" != seen \
     tmux set -p -t "$pane" @cc_pane_since "$(date +%s)" 2>/dev/null
 fi
 
-# Window badge = highest-severity pane state in that window. Windows here mix a
-# Claude pane with a plain shell (and window 1 runs two Claudes), so the window
-# must surface whichever pane is most urgent rather than the last one to write.
+# The window state is the highest-severity pane state, not the last writer.
 rank() {
     case "$1" in
         needs)   echo 6 ;;
@@ -258,17 +234,12 @@ rank() {
 #
 # Two tiers, and the split is deliberate:
 #
-#   ACTIONABLE (done, waiting, needs) -- agent-NEUTRAL.
-#       Universal shape and semantic colour. What you do about a finished or
-#       blocked session is identical whichever harness produced it, so spending
-#       the glyph on agent identity buys nothing and costs the "scan for green"
-#       affordance. Shape AND colour both encode state here, so the two states
-#       that demand action survive a colour-blind reading.
+#   ACTIONABLE (done, waiting, needs) -- agent-neutral shape and colour: the
+#       response is the same whichever harness produced it. Shape and colour
+#       both encode state, so these survive a colour-blind reading.
 #
-#   AMBIENT (active, idle, compacting) -- agent-SPECIFIC.
-#       Nothing is being asked of you, so the useful information is *what is
-#       running where*. Claude ✻ / Codex ✾, tinted by the agent when live and
-#       dimmed when idle.
+#   AMBIENT (active, idle, compacting) -- agent-specific: nothing is asked of
+#       you, so show what is running where. Tinted when live, dimmed when idle.
 #
 # $1 = state, $2 = agent glyph, $3 = agent colour.
 glyph() {
@@ -277,12 +248,8 @@ glyph() {
         # -- actionable: neutral --
         needs)   printf '#[fg=yellow]◆#[default]' ;;
         done)    printf '#[fg=green]●#[default]' ;;
-        # Finished, but background subagents are still running. Uses the
-        # AGENT's glyph in a distinct teal-green rather than a fourth neutral
-        # shape: confusing this with plain done is cheap (you glance at a window
-        # a moment early), so it does not warrant new vocabulary. Every adjacent
-        # pair still differs in a channel -- ✻ orange->teal by colour, ✻ teal ->
-        # ● green by shape.
+        # Finished with subagents still running: the agent glyph in teal
+        # rather than new vocabulary, since mistaking it for done is cheap.
         waiting) printf '#[fg=#10b981]%s#[default]' "$g" ;;
         # -- ambient: agent-specific --
         working|thinking) printf '#[fg=%s]%s#[default]' "$c" "$g" ;;
@@ -291,9 +258,8 @@ glyph() {
     esac
 }
 
-# Glyph + colour for a pane's agent. Claude ✻ (Anthropic clay), Codex ✾ (the
-# blue found in the codex binary; six-petalled to echo OpenAI's six-fold mark --
-# ✦ was used first and is Gemini's logo, ⬡ before that was illegible).
+# Glyph + colour for a pane's agent: Claude ✻ in Anthropic clay, Codex ✾ in the
+# blue from the codex binary. Solid shapes only; hollow ones smear when bold.
 agent_style() {
     case "$1" in
         *codex*) printf '✾ #3b82f6' ;;
@@ -312,11 +278,9 @@ while IFS= read -r line; do
     ps_state=$(tmux show -p -t "$p" -qv @cc_pane_state 2>/dev/null)
     [[ -n "$ps_state" ]] || continue
 
-    # Drop state for panes that are no longer running Claude. Quitting Claude
-    # leaves the pane alive as a shell, so pane-exited never fires and the stale
-    # @cc_pane_state would keep contributing a phantom glyph forever. Checking
-    # the live command here covers every exit path at once -- clean quit, crash,
-    # or kill -- without needing a SessionEnd hook to fire reliably.
+    # Drop state for panes no longer running an agent. Quitting leaves the pane
+    # alive as a shell, so pane-exited never fires; checking the live command
+    # covers clean quit, crash, and kill without relying on SessionEnd.
     if [[ " $AGENT_CMDS " != *" $cmd "* ]]; then
         tmux set -pu -t "$p" @cc_pane_state 2>/dev/null
         tmux set -pu -t "$p" @cc_pane_since 2>/dev/null
@@ -324,14 +288,9 @@ while IFS= read -r line; do
         continue
     fi
 
-    # Derived, not stored: a pane that has settled but still has live subagents
-    # renders as `waiting`. Deriving means the final SubagentStop flips it back
-    # to plain `done` on the next recompute without rewriting @cc_pane_state.
-    # `waiting` is Claude-only. Codex's SubagentStop does not reliably fire -- a
-    # session interrupted or restarted while children run strands ids with
-    # nothing to remove them, and the pane read "waiting" for 26 minutes in
-    # practice. Its subagent events are still recorded (cheap, and useful if the
-    # reliability improves), they just do not drive the badge.
+    # `waiting` is derived, not stored, so the final SubagentStop reverts it to
+    # `done` on the next recompute. It is Claude-only: Codex's SubagentStop does
+    # not fire reliably. Codex subagent events are still recorded.
     if [[ "$cmd" != *codex* ]] \
        && [[ "$ps_state" == "done" || "$ps_state" == "idle" ]]; then
         # Prune before testing, so expired ids cannot pin a pane to `waiting`
@@ -345,15 +304,8 @@ while IFS= read -r line; do
         best_rank=$r
         best="$ps_state"
     fi
-    # One glyph per agent pane, in pane order, so a split window shows e.g.
-    # "● ✻ 3:Thesis" -- left pane done, right pane still working. Panes with no
-    # state (plain shells) contribute nothing.
-    #
-    # Separator is a plain space. A dim │ was used first to make the pane
-    # boundary explicit, but it added visual weight for a distinction the glyphs
-    # already carry, and ✻ is drawn wider than its cell in this font -- its
-    # spokes overhang into the neighbouring cell, which a coloured separator
-    # then repaints, clipping the star.
+    # One glyph per agent pane, in pane order. The separator is a plain space:
+    # ✻ overhangs its cell, and a coloured separator would repaint and clip it.
     [[ -n "$badge" ]] && badge+=' '
     # shellcheck disable=SC2046
     badge+="$(glyph "$ps_state" $(agent_style "$cmd"))"

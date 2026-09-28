@@ -26,11 +26,9 @@ list_surfaces_in_group() {
 }
 
 # Hot-path convention: helpers suffixed `_into` (and `_theme_group_of`) return
-# their result in the global `_THEME_REPLY` instead of on stdout. Capturing
-# stdout requires `$(...)`, and a command substitution is a fork — measured at
-# ~1.8ms here, which turned `theme-switcher env` into 356 clone() calls for 28
-# real commands and ~960ms of startup. The printing wrappers below are kept for
-# callers outside the hot path (bin/verify, `theme resolve`).
+# their result in the global `_THEME_REPLY` instead of on stdout, because each
+# `$(...)` is a fork and this runs at every shell start. The printing wrappers
+# below serve callers outside the hot path (bin/verify, `theme resolve`).
 _THEME_REPLY=""
 
 _theme_group_of() {
@@ -187,8 +185,7 @@ theme_detect_context() {
     fi
 
     if [[ -n "$THEME_CONTEXT_WINDOW" ]]; then
-        # One `list-windows` pass feeds both values. Calling theme_window_sessions
-        # and theme_window_owner_session separately re-ran the same tmux query.
+        # One `list-windows` pass feeds both values.
         local -a linked=()
         local sess
         mapfile -t linked < <(theme_window_sessions "$THEME_CONTEXT_WINDOW")
@@ -197,9 +194,7 @@ theme_detect_context() {
             for sess in "${linked[@]:1}"; do
                 THEME_CONTEXT_LINKED_SESSIONS+=",$sess"
             done
-            # Linked windows own one pane tree and one option set. The lowest
-            # stable session id is the deterministic inheritance owner when no
-            # window value masks session state.
+            # Lowest stable session id owns a linked window (see above).
             THEME_CONTEXT_SESSION="${linked[0]}"
         else
             THEME_CONTEXT_LINKED_SESSIONS=""

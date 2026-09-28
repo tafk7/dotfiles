@@ -1,19 +1,14 @@
 #!/bin/bash
 # Dotfiles Cheat Sheet - Quick reference for all keybindings and shortcuts
-# Part of dotfiles - compact display of vim, tmux, git, and shell shortcuts
 
 set -e
 
-# Source core functions for colors
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Navigate up one directory since we're now in bin/
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 source "$DOTFILES_DIR/lib/runtime.sh"
 
-# Terminal width detection
 TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 
-# Color definitions using tput for better compatibility
 if command -v tput >/dev/null 2>&1 && [[ -t 1 ]]; then
     BOLD=$(tput bold)
     CYAN=$(tput setaf 6)
@@ -28,61 +23,52 @@ else
     RESET=""
 fi
 
-# Print section header
 print_header() {
     local title="$1"
     echo
     echo "${BOLD}${CYAN}${title}${RESET}"
 }
 
-# Print table separator
 print_separator() {
     printf "${DIM}"
     printf '─%.0s' $(seq 1 "$TERM_WIDTH")
     printf "${RESET}\n"
 }
 
-# Format shortcut in two-column table (shortcut on left, description on right)
 format_shortcut() {
     local shortcut="$1"
     local description="$2"
     printf "    ${YELLOW}%-15s${RESET} %s\n" "$shortcut" "$description"
 }
 
-# Show shortcuts for a specific category from TSV
 show_category() {
     local category="$1"
     local title="$2"
 
     print_header "$title"
 
-    # Filter shortcuts by category and format
     build_shortcut_index | grep "^${category}│" | while IFS='│' read -r cat shortcut description command; do
         format_shortcut "$shortcut" "$description"
     done
 }
 
-# Show vim keybindings
 show_vim() {
     show_category "vim" "VIM KEYBINDINGS"
 }
 
-# Show tmux keybindings
 show_tmux() {
     show_category "tmux" "TMUX KEYBINDINGS (Prefix: Ctrl+a)"
 }
 
-# Show git aliases
 show_git() {
     show_category "git" "GIT ALIASES"
 }
 
-# Show shell shortcuts
 show_shell() {
     show_category "shell" "SHELL ALIASES & SHORTCUTS"
 }
 
-# Show development tools (combines docker, python, node)
+# Docker, Python, and Node shortcuts together.
 show_dev() {
     print_header "DEVELOPMENT SHORTCUTS"
 
@@ -105,12 +91,11 @@ show_dev() {
     done
 }
 
-# Show installed tools (auto-generated from lib/registry.sh — never drifts).
-# Reports each tool's tier, install method, and live presence on PATH.
+# Generated from lib/registry.sh, with each tool's live presence.
 show_tools() {
     print_header "INSTALLED TOOLS (from lib/registry.sh)"
 
-    # Sourcing registry on demand keeps cheatsheet snappy when this isn't asked for.
+    # Loaded on demand to keep other views fast.
     # shellcheck source=../lib/registry.sh
     source "$DOTFILES_DIR/lib/registry.sh"
 
@@ -125,21 +110,18 @@ show_tools() {
     done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
 }
 
-# Show bin/ utility scripts (auto-generated — each script's line 2 is its
-# one-line description, so new utilities appear here with zero manual upkeep).
+# Lists bin/ scripts with the one-line description on each script's line 2.
 show_commands() {
     print_header "UTILITY COMMANDS (bin/)"
 
     local f name desc
     while IFS= read -r f; do
         name="$(basename "$f")"
-        # Convention: line 2 of every bin/ script is "# <one-line description>".
         desc="$(sed -n '2p' "$f" | sed -n 's/^# \{0,1\}//p')"
         [[ -n "$desc" ]] && printf "    ${YELLOW}%-18s${RESET} %s\n" "$name" "$desc"
     done < <(find "$DOTFILES_DIR/bin" -maxdepth 1 -type f | sort)
 }
 
-# Show all cheatsheets
 show_all() {
     show_vim
     show_tmux
@@ -150,9 +132,7 @@ show_all() {
     show_commands
 }
 
-# Build comprehensive searchable index of all shortcuts
-# Format: category│shortcut│description│full_command
-# Reads from shell/shortcuts-index.tsv
+# Rows of shell/shortcuts-index.tsv: category│shortcut│description│full_command
 build_shortcut_index() {
     local index_file="$DOTFILES_DIR/shell/shortcuts-index.tsv"
 
@@ -161,16 +141,13 @@ build_shortcut_index() {
         return 1
     fi
 
-    # Read the file, skipping comments and empty lines
     grep -v '^#' "$index_file" | grep -v '^$'
 }
 
-# Show detailed information about a specific shortcut
 show_shortcut_detail() {
     local category="$1"
     local shortcut="$2"
 
-    # Get the full line from the index
     local detail
     detail=$(build_shortcut_index | grep "^${category}│${shortcut}│")
 
@@ -206,19 +183,15 @@ show_shortcut_detail() {
     fi
 }
 
-# Export function for FZF preview
 export -f show_shortcut_detail
 export -f build_shortcut_index
 
-# Interactive FZF selector with searchable shortcuts
 show_interactive() {
-    # Fallback to traditional view if FZF not available
     if ! command -v fzf >/dev/null 2>&1; then
         show_all | less -R
         return
     fi
 
-    # Color definitions for preview
     local PREVIEW_BOLD PREVIEW_CYAN PREVIEW_YELLOW PREVIEW_DIM PREVIEW_RESET
     if command -v tput >/dev/null 2>&1; then
         PREVIEW_BOLD=$(tput bold)
@@ -234,12 +207,10 @@ show_interactive() {
         PREVIEW_RESET=""
     fi
 
-    # Create temporary index file for preview to read
     local index_file preview_script
     index_file=$(mktemp)
     build_shortcut_index > "$index_file"
 
-    # Create temporary file for preview script
     preview_script=$(mktemp)
     cat > "$preview_script" <<PREVIEW_EOF
 #!/bin/bash
@@ -294,18 +265,13 @@ fi
 PREVIEW_EOF
     chmod +x "$preview_script"
 
-    # Build searchable index with visible delimiters for display
+    # Show category, shortcut, and command; keep the original row after a tab.
     local selected
     selected=$({
-        # Add column headers with visible delimiters (3 columns: category, shortcut, command)
         printf "${BOLD}%-10s │ %-15s │ %s${RESET}\n" "CATEGORY" "SHORTCUT" "COMMAND"
-        # Add separator line
         printf "${DIM}%-10s─┼─%-15s─┼─%s${RESET}\n" "$(printf '─%.0s' {1..10})" "$(printf '─%.0s' {1..15})" "$(printf '─%.0s' {1..50})"
-        # Format all shortcuts with visible delimiters (show only category, shortcut, command)
         cat "$index_file" | awk -F'│' '{
-            # Format for display with visible separators (3 columns, no description in search)
             display = sprintf("%-10s │ %-15s │ %s", $1, $2, $4)
-            # Append original line after a tab separator (invisible, clean split)
             print display "\t" $0
         }'
     } | \
@@ -321,10 +287,8 @@ PREVIEW_EOF
             --border=rounded \
             --color='header:italic:cyan,prompt:bold:yellow')
 
-    # Clean up temporary files
     rm -f "$preview_script" "$index_file"
 
-    # If user selected something, extract the original TSV data (after tab) and get command
     if [[ -n "$selected" ]]; then
         local original command
         original=$(echo "$selected" | cut -f2)
@@ -337,7 +301,6 @@ PREVIEW_EOF
     fi
 }
 
-# Main function
 main() {
     case "${1}" in
         vim)
@@ -365,7 +328,6 @@ main() {
             show_all
             ;;
         "")
-            # No args - show interactive selector
             show_interactive
             ;;
         *)
@@ -378,5 +340,4 @@ main() {
     esac
 }
 
-# Direct output - let users pipe to less if needed
 main "$@"

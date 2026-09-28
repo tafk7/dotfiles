@@ -2,15 +2,12 @@
 # Install-time helpers — sourced only by setup.sh and installer scripts.
 # Never sourced at shell startup or by bin/ utilities.
 
-# Prevent double-sourcing
 [[ -n "${_DOTFILES_INSTALL_LOADED:-}" ]] && return 0
 _DOTFILES_INSTALL_LOADED=1
 
 set -euo pipefail
 
-# Source runtime helpers (logging, is_wsl, etc.)
 source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
-# Source declarative config (PACKAGES, CONFIG_MAP)
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/work-host.sh"
@@ -155,7 +152,6 @@ print_install_summary() {
 # Core Install Utilities
 # ==============================================================================
 
-# Safe sudo wrapper
 safe_sudo() {
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
         log "[DRY RUN] Would execute: sudo $*"
@@ -296,7 +292,6 @@ atomic_replace_tree() {
     journal_clear
 }
 
-# Get Windows username for WSL operations
 get_windows_username() {
     if is_wsl; then
         local win_user
@@ -316,7 +311,6 @@ get_windows_username() {
 # WSL Install Helpers
 # ==============================================================================
 
-# Setup WSL clipboard integration
 setup_wsl_clipboard() {
     if ! is_wsl; then
         return 0
@@ -367,17 +361,13 @@ EOF
     success "WSL clipboard integration setup complete"
 }
 
-# Install + enable the systemd user service that bridges the Windows ssh-agent
-# (Bitwarden) into WSL2. The relay then runs at BOOT — visible to every shell,
-# tmux pane, and captured environment (Claude Code's shell snapshot, etc.), and
-# survives reboots — instead of only being (re)started at interactive shell
-# startup by shell/platform/wsl.sh. No sudo (a --user service); linger is
-# best-effort. OPT-IN per machine via the same marker the shell bridge uses:
-# leave ~/.ssh/use-windows-agent absent on work machines and this is a no-op.
+# Bridge the Windows ssh-agent into WSL2 as a systemd user service, so the relay
+# runs from boot and every shell, tmux pane, and agent shell snapshot sees it
+# (shell/platform/wsl.sh is only the fallback). Opt-in per machine through the
+# ~/.ssh/use-windows-agent marker; work machines leave it absent.
 setup_wsl_ssh_agent() {
     is_wsl || return 0
 
-    # Opt-in gate — only personal machines that asked for the Windows-agent bridge.
     if [[ ! -f "$HOME/.ssh/use-windows-agent" ]]; then
         wsl_log "ssh-agent bridge: marker ~/.ssh/use-windows-agent absent — skipping (work machine / not opted in)"
         return 0
@@ -557,10 +547,8 @@ cleanup_old_backups() {
 
     log "Cleaning up old backups (keeping last $keep_count)..."
 
-    # Backups are named backup-YYYYMMDD-HHMMSS, so a lexical glob sort is also
-    # chronological (oldest first). Collect into an array instead of parsing
-    # `ls` and piping to `xargs rm -rf`, which would word-split on any path
-    # containing spaces (e.g. a DOTFILES_DIR under a spaced parent directory).
+    # Names are backup-YYYYMMDD-HHMMSS, so glob order is oldest first. An array
+    # (not ls | xargs) keeps paths containing spaces intact.
     shopt -s nullglob
     local -a backups
     if [[ -n "$backup_type" ]]; then
@@ -573,7 +561,6 @@ cleanup_old_backups() {
     local total=${#backups[@]}
     (( total > keep_count )) || return 0
 
-    # Glob expands ascending (oldest first); remove all but the last keep_count.
     local i
     for (( i = 0; i < total - keep_count; i++ )); do
         rm -rf "${backups[i]}"
@@ -799,9 +786,8 @@ ensure_docker_repo() {
     success "Docker apt repository configured"
 }
 
-# Install Azure CLI from Microsoft's signed apt repository.
-# Replaces the previous `curl https://aka.ms/InstallAzureCLIDeb | sudo bash`,
-# which executed an unpinned remote script as root.
+# Install Azure CLI from Microsoft's signed apt repository rather than its
+# install script, which would run an unpinned remote script as root.
 install_azure_cli() {
     if [[ "${FORCE_REINSTALL:-false}" != true ]] && command -v az >/dev/null 2>&1; then
         log "Azure CLI already installed"
@@ -876,8 +862,7 @@ preserve_existing_tool() {
     return 0
 }
 
-# Run installer script with consistent error handling
-# Exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
+# Installer exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
 run_installer() {
     local name="$1"
     local script="$DOTFILES_DIR/installers/install-$name.sh"
@@ -888,9 +873,7 @@ run_installer() {
         return 1
     fi
 
-    # DRY RUN: don't execute the installer. The per-tool scripts download and
-    # write to disk (and only some self-guard on an existing install), so running
-    # them would mutate the system — exactly what a dry run must not do.
+    # Installers download and write to disk, so a dry run must not execute them.
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
         log "[DRY RUN] Would run installer: $name"
         return 0
@@ -922,12 +905,8 @@ install_eget_tools() {
         return 1
     fi
 
-    # Collect eget tool names from registry, honoring the selected tier. This
-    # function runs from install_bash_packages, which fires at bash tier and up
-    # (cumulative chain), so gating each tool on tier_includes its own tier keeps
-    # a dev-tier eget tool (e.g. shellcheck) out of a --bash run but pulls it in
-    # at --dev. tier_includes lives in setup.sh; if this is ever called with it
-    # undefined (installer sourcing lib standalone), fall back to installing all.
+    # Gate each tool on its own tier so a dev-tier eget tool (shellcheck) is
+    # skipped by --bash. Without setup.sh's tier_includes, install all of them.
     local -a eget_tools=()
     local name
     for name in "${!TOOL_METHOD[@]}"; do
@@ -945,12 +924,8 @@ install_eget_tools() {
         eget_tools+=("$name")
     done
 
-    # Respect system-managed copies. A binary already on PATH outside our prefix
-    # (~/.local/bin) is one the admin/apt installed — downloading our pinned copy
-    # would shadow it (~/.local/bin sorts earlier on PATH) for no gain. Skip those
-    # here so eget only fetches tools we actually own; --force overrides to install
-    # the pinned version regardless. Same courtesy the AI installers extend to an
-    # org-managed binary on PATH.
+    # A binary on PATH outside ~/.local/bin belongs to the system or an admin, and
+    # a pinned copy would shadow it. Skip it unless --force.
     if [[ "${FORCE_REINSTALL:-false}" != "true" ]]; then
         local -a to_download=() existing binary managed_target
         local verify_cmd
@@ -980,9 +955,7 @@ install_eget_tools() {
         eget_tools=("${to_download[@]}")
     fi
 
-    # DRY RUN: report what would be fetched, then stop before touching disk. This
-    # must come before the eget bootstrap and any download — the whole function is
-    # otherwise a mutation.
+    # Stop before bootstrapping eget or downloading anything.
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
         if [[ ${#eget_tools[@]} -eq 0 ]]; then
             log "[DRY RUN] All eget tools already provided by the system — nothing to download"
@@ -1000,9 +973,7 @@ install_eget_tools() {
         return 0
     fi
 
-    # eget was just installed to ~/.local/bin, which is not necessarily on PATH
-    # yet on a fresh machine — resolve the binary explicitly rather than relying
-    # on PATH. Otherwise every tool download silently fails on the first run.
+    # ~/.local/bin may not be on PATH yet on a fresh machine.
     local eget_bin="$HOME/.local/bin/eget"
     command -v eget >/dev/null 2>&1 && eget_bin="$(command -v eget)"
     if [[ ! -x "$eget_bin" ]]; then
@@ -1022,13 +993,9 @@ install_eget_tools() {
         pinned_slug["$slug"]=1
     done < <(grep -Po '^\["\K[^"]+' "$config")
 
-    # Drive eget per surviving tool rather than --download-all: the guard above
-    # dropped system-provided tools from eget_tools, and a per-target invocation
-    # (eget applies this repo's TOML config — tag, asset_filters, target) ensures
-    # those are never fetched. upgrade_only (eget.toml) still makes each call a
-    # no-op when the pinned version is already present, so re-runs download nothing.
-    # eget's exit code doesn't cleanly separate "skipped, up to date" from "failed",
-    # so don't trust it: judge each tool by whether its binary lands on disk.
+    # Run eget per tool rather than --download-all so skipped system tools are
+    # never fetched. eget's exit code doesn't distinguish "up to date" from
+    # "failed", so each tool is judged by whether its binary lands on disk.
     local any_missing=false
     for name in "${eget_tools[@]}"; do
         slug="${TOOL_EGET_REPO[$name]:-${tool_slug[$name]:-}}"
@@ -1123,11 +1090,7 @@ install_eget_tools() {
         export PATH
         hash -r
         rm -rf "$stage_home"
-        # Judge by the binary on disk at our prefix, NOT command -v: on a fresh
-        # machine ~/.local/bin isn't on PATH yet, so a PATH lookup would report
-        # every just-installed tool as failed. eget lands each tool at
-        # ~/.local/bin/<binary> (the global target, or the per-tool file-path
-        # target which renames to that same path).
+        # Check our prefix, not command -v: ~/.local/bin may not be on PATH yet.
         if [[ -x "$HOME/.local/bin/${TOOL_BINARY[$name]}" ]]; then
             track_install "$name" ok
         else
@@ -1146,10 +1109,8 @@ install_eget_tools() {
 # Tiered Installation Functions
 # ==============================================================================
 
-# bash tier: the non-sudo base. eget binaries to ~/.local/bin only — no apt,
-# no root. git is assumed present (needed to clone this repo in the first place);
-# we warn rather than install it, since installing would require the sudo this
-# tier deliberately avoids.
+# bash tier: eget binaries in ~/.local/bin, no apt and no root. Git is only
+# checked, because installing it would need sudo.
 install_bash_packages() {
     log "Installing bash tier packages..."
 
@@ -1185,9 +1146,7 @@ configure_locale() {
 install_dev_packages() {
     log "Installing dev tier packages..."
 
-    # PACKAGES values are intentionally space-separated lists meant to be
-    # word-split into the array — the alternative (per-key arrays) would
-    # bloat the data file. shellcheck flags this as SC2206; that's expected.
+    # PACKAGES values are space-separated lists; word splitting is intended.
     # shellcheck disable=SC2206
     local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[languages]} ${PACKAGES[terminal]} ${PACKAGES[diagramming]})
     # shellcheck disable=SC2206
@@ -1211,13 +1170,9 @@ install_dev_packages() {
     success "Dev tier installation complete"
 }
 
-# AI CLIs (Claude Code, Codex, opencode). Orthogonal to the tier chain —
-# installed only when --ai/--full or a per-tool flag (--claude/--codex/
-# --opencode) is passed. Which tools run is driven by setup.sh's AI_ALL /
-# AI_TOOLS globals; AI_ALL expands to every AI-capability tool in the registry, so a
-# new AI CLI is picked up automatically once registered. Kept separate so an
-# org-managed install can be left untouched — each installer refuses to shadow
-# an external binary already on PATH.
+# AI CLIs selected by setup.sh's AI_ALL (every registry tool with the ai
+# capability) or AI_TOOLS. Each installer refuses to shadow an external binary
+# already on PATH, so org-managed installs are left alone.
 install_ai_packages() {
     local -a tools=()
     local failed=false
@@ -1274,9 +1229,8 @@ preserve_default_display_manager() {
         | safe_sudo debconf-set-selections
 }
 
-# RDP server (xrdp + XFCE session). Orthogonal to the tier chain — installed
-# only when --rdp is passed, and deliberately NOT implied by --full: no tier
-# should silently open a network listener. See issues/xrdp-remote-desktop.md.
+# RDP server (xrdp + XFCE session). Only installed with --rdp, never by a tier
+# or --full, because it opens a network listener.
 install_rdp_packages() {
     log "Installing RDP server (xrdp + XFCE session)..."
 
@@ -1315,10 +1269,8 @@ docker_conflicting_packages() {
 }
 
 install_docker_engine() {
-    # A dry-run describes the requested package path without probing installed
-    # runtimes. Besides keeping the preview host-independent, this prevents the
-    # conflict scan below from invoking even read-only package commands under
-    # the repository's strict no-command dry-run contract.
+    # A dry run describes the package path without probing installed runtimes,
+    # so the preview is host-independent and runs no package commands.
     if [[ "${DRY_RUN:-false}" == true ]]; then
         ensure_docker_repo || return 1
         # shellcheck disable=SC2206

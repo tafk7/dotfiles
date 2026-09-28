@@ -13,9 +13,8 @@ source "$DOTFILES_DIR/lib/install.sh"
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
 
-# The native installer writes the binary here. Verify by absolute path: on a
-# fresh machine ~/.local/bin is not guaranteed to be on the installer process's
-# PATH (the same reason install_eget_tools resolves eget by absolute path).
+# The native installer writes the binary here. Verify by absolute path, since
+# ~/.local/bin may not be on PATH yet on a fresh machine.
 CLAUDE_BIN="$HOME/.local/bin/claude"
 
 # Reconcile portable keys and assets; all backups stay in the application home.
@@ -23,16 +22,10 @@ provision_claude_settings() {
     "$DOTFILES_DIR/bin/ai-config" claude
 }
 
-# Install the agent-badge plugin (plugins/agent-badge) from this repo, which
-# doubles as a plugin marketplace via .claude-plugin/marketplace.json.
-#
-# Registered as a *directory* marketplace rather than tafk7/dotfiles, so it
-# tracks the working tree instead of whatever is pushed to GitHub, and needs no
-# network. Both commands are idempotent and exit 0 when the marketplace or the
-# plugin is already present, so this is safe on every re-run.
-#
-# Never fatal: a badge is a convenience, and the plugin failing to install is not
-# a reason for the Claude installer to report failure.
+# Install the agent-badge plugin (plugins/agent-badge-claude) from this repo,
+# which is also a marketplace (.claude-plugin/marketplace.json). Registered as a
+# local directory so it tracks the working tree and needs no network. Both
+# commands are idempotent. Never fatal: the badge is a convenience.
 provision_agent_badge_plugin() {
     [[ "${DOTFILES_AGENT_BADGE_ENABLED:-1}" == "1" ]] || {
         log "Agent-badge disabled; skipping plugin registration."
@@ -66,10 +59,7 @@ if [[ "$FORCE" != true && -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/n
     exit 2
 fi
 
-# Don't shadow an externally-managed Claude. On org-managed machines the AI CLI
-# is provided elsewhere on PATH; installing our own copy at ~/.local/bin/claude
-# would silently override it (shell/env.sh prepends ~/.local/bin). The shell
-# wrapper resolves whatever `claude` is on PATH either way.
+# Don't shadow an externally managed Claude: ~/.local/bin comes first on PATH.
 EXTERNAL_CLAUDE="$(command -v claude 2>/dev/null || true)"
 if [[ -n "$EXTERNAL_CLAUDE" && "$EXTERNAL_CLAUDE" != "$CLAUDE_BIN" ]]; then
     warn "Found an externally-managed claude on PATH: $EXTERNAL_CLAUDE"
@@ -82,9 +72,8 @@ fi
 
 log "Installing Claude Code via claude.ai/install.sh..."
 
-# ~/.local/bin is already on PATH (shell/env.sh), so the installer should detect
-# that and skip editing shell rc files. Those rc files are dotfiles symlinks, so
-# if it edits them anyway it writes through into the tracked repo — warn if so.
+# The installer should skip editing rc files because ~/.local/bin is on PATH.
+# They are symlinks into this repo, so warn if it wrote through anyway.
 claude_installer="${DOTFILES_CLAUDE_INSTALLER_SCRIPT:-}"
 downloaded_installer=false
 if [[ -z "$claude_installer" ]]; then

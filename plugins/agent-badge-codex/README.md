@@ -85,10 +85,11 @@ already visible. Dotfiles installers also repair the live hooks immediately when
 run inside tmux. Hooks tolerate a removed cache directory between an update and
 the next session, so clicking a pane does not produce a command-not-found error.
 
-To repair an already-running server without restarting it, run:
+To repair an already-running server without restarting it, run the plugin's
+`agent-badge.tmux` (in a dotfiles checkout, `plugins/shared/agent-badge.tmux`):
 
 ```bash
-~/dotfiles/plugins/shared/agent-badge.tmux wire
+"$DOTFILES_DIR"/plugins/shared/agent-badge.tmux wire
 ```
 
 Wiring replaces only badge-owned hook entries and preserves other tmux hooks.

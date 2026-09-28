@@ -1,21 +1,15 @@
 #!/bin/bash
 
-# OpenAI Codex CLI: the official standalone binary on PATH (installed by
-# `./setup.sh --ai`, normally ~/.local/bin/codex). The wrapper applies optional
-# launch defaults; an explicit profile argument takes precedence.
-#
-# The openai.chatgpt VS Code extension binary is deliberately NOT discovered any
-# more. Locating it meant a `find` across ~13k files under
-# ~/.vscode-server/extensions on every single shell start (~127ms) to resolve a
-# path that changes only when the extension updates.
+# Codex: whatever `codex` is on PATH. The wrapper applies optional launch
+# defaults; an explicit profile argument takes precedence. The VS Code
+# extension's bundled binary is deliberately not discovered; finding it cost a
+# filesystem scan at every shell start.
 
-# Re-source safety: drop our own function so `command -v` resolves the PATH
-# binary, not the wrapper. `command -v` is portable across bash and zsh; `type -P`
-# is bash-only (zsh errors "bad option: -P", silently yielding no match).
+# Drop our own wrapper (and the retired *-vsc helper) on re-source so
+# `command -v` finds the PATH binary. `type -P` would be bash-only.
 unset -f codex codex-vsc 2>/dev/null
 
-# `command -v` as a bare condition is a builtin — no subshell, no fork. Capturing
-# it (`x=$(command -v ...)`) would fork, which is what this file used to do.
+# A bare `command -v` condition doesn't fork; capturing its output would.
 if command -v codex >/dev/null 2>&1; then
     codex() {
         local -a flags=() defaults=()

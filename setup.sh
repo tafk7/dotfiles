@@ -1,20 +1,15 @@
 #!/bin/bash
-# Simplified Dotfiles Installation Script
-# Clean, direct installation without complexity theater
+# Tiered dotfiles installer. See --help.
 
 set -euo pipefail
 
-# Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Set DOTFILES_DIR before sourcing lib
 DOTFILES_DIR="$SCRIPT_DIR"
 export DOTFILES_DIR
 
-# Load install library (pulls in runtime.sh + config.sh)
 source "$SCRIPT_DIR/lib/install.sh"
 
-# Installation options
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool flag).
 AI_ALL=false           # --ai / --full: install every AI-capability tool.
@@ -67,7 +62,6 @@ require_option_value() {
 DOTFILES_GIT_NAME="${DOTFILES_GIT_NAME:-}"
 DOTFILES_GIT_EMAIL="${DOTFILES_GIT_EMAIL:-}"
 
-# Parse command line arguments
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -97,21 +91,17 @@ parse_arguments() {
                 shift
                 ;;
             --ai)
-                # Orthogonal opt-in; combines with any tier. Installs every
-                # AI-capability tool; use the per-tool flags below to pick individually.
                 INSTALL_AI=true
                 AI_ALL=true
                 shift
                 ;;
             --claude|--codex|--opencode|--pi)
-                # Per-tool AI selection (orthogonal; composes with any tier).
                 INSTALL_AI=true
                 AI_TOOLS+=("${1#--}")
                 shift
                 ;;
             --rdp)
-                # Orthogonal opt-in; combines with any tier. Never implied by
-                # --full — installing it opens a network listener.
+                # Never implied by --full: it opens a network listener.
                 INSTALL_RDP=true
                 shift
                 ;;
@@ -188,11 +178,8 @@ parse_arguments() {
     [[ "$PARSE_ERROR" == "false" ]]
 }
 
-# Check if current tier includes the required tier level.
-# Cumulative chain: config → bash → dev → work. The sudo boundary sits at dev
-# (bash is eget-only, no root). AI tooling (claude, codex) is NOT part of this
-# chain — it is gated by the orthogonal INSTALL_AI flag so an org-managed AI
-# install can be left alone.
+# Whether the selected cumulative tier (config → bash → dev → work) includes $1.
+# Orthogonal selections such as AI are checked with capability_selected.
 tier_includes() {
     local required="$1"
     case "$INSTALL_TIER" in
@@ -224,7 +211,6 @@ component_selected() {
     return 1
 }
 
-# Show help information
 show_help() {
     cat << 'EOF'
 Dotfiles Installation Script - Tiered Installation System
@@ -362,7 +348,6 @@ EOF
 }
 
 
-# Phase 1: System Verification
 phase_verify_system() {
     log "Phase 1: System Verification"
 
@@ -432,11 +417,9 @@ phase_verify_system() {
     success "System verification complete"
 }
 
-# Phase 2: Package Installation
 phase_install_packages() {
     log "Phase 2: Package Installation"
 
-    # Nothing to install for a bare config tier with no orthogonal flags.
     if ! tier_includes "bash" && [[ "$INSTALL_AI" != true && "$INSTALL_RDP" != true && "$INSTALL_TAIL" != true && "$INSTALL_AZURE" != true && "$INSTALL_GCLOUD" != true && "$INSTALL_AWS" != true ]]; then
         log "Config tier: skipping package installation"
         return 0
@@ -454,12 +437,10 @@ phase_install_packages() {
         install_work_packages || INSTALLATION_FAILED=true
     fi
 
-    # AI CLIs are orthogonal to the tier chain (--ai, or --full which implies it).
     if [[ "$INSTALL_AI" == "true" ]]; then
         install_ai_packages || INSTALLATION_FAILED=true
     fi
 
-    # RDP server is orthogonal too, and NOT implied by --full.
     if [[ "$INSTALL_RDP" == "true" ]]; then
         install_rdp_packages || INSTALLATION_FAILED=true
     fi
@@ -477,7 +458,6 @@ phase_install_packages() {
     success "Package installation complete"
 }
 
-# Phase 3: Configuration and Validation
 phase_setup_configs() {
     log "Phase 3: Configuration and Validation"
     local failed=false
@@ -486,7 +466,6 @@ phase_setup_configs() {
     # user data. Matching symlinks and dry-runs create no backup directories.
     ACTIVE_BACKUP_DIR=""
     
-    # Process configurations
     if [[ "$DRY_RUN" == "true" ]]; then
         log "[DRY RUN] Would process configurations:"
         readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
@@ -521,8 +500,7 @@ phase_setup_configs() {
             local target type owner
             IFS=: read -r target type owner <<< "$mapping"
 
-            # Skip configs whose owning tool isn't present, so a bare/partial
-            # install never lays down orphaned configs (see config_owner_present).
+            # Never lay down configs for tools that aren't installed.
             if ! config_owner_present "$owner"; then
                 log "Skipping $target — $owner not installed"
                 continue
@@ -559,14 +537,11 @@ phase_setup_configs() {
         done
     fi
     
-    # WSL-specific setup
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then
         setup_wsl_clipboard || failed=true
         setup_wsl_ssh_agent || failed=true
     fi
 
-    # Initialize theme artifacts only when the feature is enabled. Persistent
-    # preference handling is centralized in lib/state.sh.
     if feature_enabled theme; then
         if [[ "$DRY_RUN" == "true" ]]; then
             log "[DRY RUN] Would initialize theme feature"
@@ -578,8 +553,6 @@ phase_setup_configs() {
         [[ "$DRY_RUN" == "true" ]] || "$DOTFILES_DIR/bin/theme-switcher" tmux-unwire || failed=true
     fi
 
-    # Install pre-commit git hooks (default: on; opt out with --no-hooks).
-    # Idempotent and safe — refuses to clobber an unrelated existing hook.
     if [[ "$NO_HOOKS" == "true" ]]; then
         log "Skipping git hooks install (--no-hooks)"
     elif [[ "$DRY_RUN" == "true" ]]; then
@@ -588,11 +561,9 @@ phase_setup_configs() {
         "$DOTFILES_DIR/bin/install-git-hooks" --quiet || { warn "git hooks install failed"; failed=true; }
     fi
 
-    # Record the checkout location and WSL details in data-only XDG state.
     write_dotfiles_env || failed=true
     reconcile_observed_components || failed=true
 
-    # Cleanup
     if [[ "$DRY_RUN" != "true" && -n "${ACTIVE_BACKUP_DIR:-}" ]]; then
         cleanup_old_backups 10
     fi
@@ -604,7 +575,6 @@ phase_setup_configs() {
     success "Configuration complete"
 }
 
-# Process symlink configuration
 process_symlink() {
     local source="$1" target="$2"
     
@@ -613,7 +583,6 @@ process_symlink() {
         return 0
     fi
     
-    # Create parent directory if needed
     local parent_dir
     parent_dir="$(dirname "$target")"
     if [[ ! -d "$parent_dir" ]]; then
@@ -630,7 +599,6 @@ process_symlink() {
     safe_symlink "$source" "$target"
 }
 
-# Main installation workflow
 run_installation() {
     INSTALLATION_FAILED=false
     if journal_pending; then
@@ -650,7 +618,6 @@ run_installation() {
         phase_setup_configs || INSTALLATION_FAILED=true
     fi
 
-    # Show what happened with tool installs
     print_install_summary
 
     if [[ "$INSTALLATION_FAILED" == "true" || ${#INSTALL_FAIL[@]} -gt 0 ]]; then
@@ -659,12 +626,10 @@ run_installation() {
         return 1
     fi
 
-    # Success message
     echo
     success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == true ]] && echo " +ai")$([[ "$INSTALL_RDP" == true ]] && echo " +rdp")$([[ "$INSTALL_TAIL" == true ]] && echo " +tail")$([[ "$INSTALL_AZURE" == true ]] && echo " +azure")$([[ "$INSTALL_GCLOUD" == true ]] && echo " +gcloud")$([[ "$INSTALL_AWS" == true ]] && echo " +aws"))"
     echo
 
-    # Post-installation instructions
     local needs_restart=false
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -672,7 +637,6 @@ run_installation() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
 
-    # Check if Docker group was added (work tier only)
     if tier_includes "work" && command -v docker >/dev/null 2>&1; then
         if [[ "$(host_group_state docker)" == pending ]]; then
                 echo "* Docker group membership requires restart"
@@ -685,13 +649,11 @@ run_installation() {
         needs_restart=true
     fi
 
-    # Check if NVM was installed (work tier only)
     local nvm_installed=false
     if tier_includes "work" && [[ -d "$HOME/.nvm" ]]; then
         nvm_installed=true
     fi
 
-    # Restart recommendation based on tier
     local step=1
     if tier_includes "bash"; then
         echo "$step. Restart your shell session:"
@@ -738,7 +700,6 @@ run_installation() {
         ((step++))
     fi
 
-    # RDP connect instructions (port/security depend on WSL vs native).
     if [[ "$INSTALL_RDP" == "true" ]]; then
         echo "$step. Connect to the RDP desktop:"
         if is_wsl; then
@@ -750,7 +711,6 @@ run_installation() {
         ((step++))
     fi
 
-    # WSL personal machines: nudge toward the Windows SSH agent bridge.
     if is_wsl && tier_includes "bash"; then
         echo "$step. (Personal WSL) Use your Windows SSH agent (Bitwarden/1Password):"
         echo "   ./bin/ssh-bridge enable     # bridges vault keys into WSL, then reload"
@@ -777,39 +737,32 @@ run_installation() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
-# Main entry point
 main() {
-    # Refuse to run as root. The installer writes throughout $HOME, configures
-    # the invoking user's group membership (docker), and calls sudo only where
-    # a step genuinely needs it. Running as root would target /root and grant
-    # root's groups instead.
+    # Running as root would target /root and grant root's groups instead of the
+    # invoking user's; steps that need root call sudo themselves.
     if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
         echo "Error: do not run setup.sh as root." >&2
         echo "Run it as your normal user; the script invokes sudo only where required." >&2
         exit 1
     fi
 
-    # Bare invocation shows help and mutates nothing. setup.sh installs packages
-    # and rewrites $HOME configs, so it must never run by accident — an explicit
-    # tier/action flag is required. Use --config to just reconcile symlinks.
+    # Installing packages and rewriting $HOME must never happen by accident, so a
+    # bare invocation only prints help.
     if [[ $# -eq 0 ]]; then
         show_help
         exit 0
     fi
 
-    # Parse command line arguments
     if ! parse_arguments "$@"; then
         show_help >&2
         exit 64
     fi
 
-    # Show help if requested
     if [[ "$SHOW_HELP" == "true" ]]; then
         show_help
         exit 0
     fi
     
-    # Show banner
     echo "Dotfiles Installation"
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
@@ -831,11 +784,9 @@ main() {
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     
-    # Run installation
     run_installation
 }
 
-# Execute main function
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     main "$@"
 fi

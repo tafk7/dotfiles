@@ -21,12 +21,11 @@ Codex defaults to high reasoning. The model, provider, context window, and
 compaction threshold depend on where requests are served, so they are left to
 whatever configures the provider; named profiles can override any default.
 Provider-specific Claude environment, such as gateway compatibility flags,
-belongs to the provider configuration too. Claude retains medium effort and
-disabled nonessential traffic. That
-traffic setting disables automatic updates in the verified native version; use
-`bin/ai-update claude` for explicit maintenance. This command uses the official
-installer's existing `--force` update/repair path, including configuration and
-plugin provisioning. `bin/ai-update codex` does the same for Codex.
+belongs to the provider configuration too. Claude keeps medium effort and
+disabled nonessential traffic, which also disables its automatic updater. Use
+`bin/ai-update claude` or `bin/ai-update codex` to update explicitly through the
+official installer's `--force` update/repair path, including configuration and
+plugin provisioning.
 
 Before changes, files are copied into private, uniquely named subdirectories of
 `~/.claude/backups` or `~/.codex/backups`. Alternate configuration homes use their

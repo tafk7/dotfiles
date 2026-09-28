@@ -30,8 +30,6 @@ GitHub Light uses GitHub Primer's neutral light palette (MIT licensed) and the
 maintained `projekt0n/github-nvim-theme` editor plugin. It is intentionally less
 muted than the other light themes: normal text, secondary text, selected rows,
 search states, and all 16 ANSI entries are checked for 4.5:1 contrast.
-Existing installations should run `vplug` once to install the newly declared
-editor plugin before selecting GitHub Light in Neovim.
 
 ## Resolution order
 
@@ -67,8 +65,7 @@ session, and other sessions still inherit Tokyo Night globally.
 
 ## CLI
 
-With no scope flag, commands operate on the global scope. This preserves the
-existing global commands.
+With no scope flag, commands operate on the global scope.
 
 ```bash
 theme-switcher                         # interactive global picker
@@ -79,7 +76,7 @@ theme-switcher -s                      # short form: current session picker
 theme-switcher -w tmux                 # short form: current window tmux picker
 theme-switcher kanagawa                # set global default
 theme-switcher set code tokyo-night    # global group override
-theme-switcher unset starship          # alias for `clear`; global compatibility
+theme-switcher unset starship          # alias for `clear`
 theme-switcher reset                   # clear global group/tool overrides
 theme-switcher --current
 theme-switcher --list
@@ -126,15 +123,13 @@ only Enter applies the selected theme and Escape cancels.
 
 Global settings are written atomically to
 `${XDG_STATE_HOME:-~/.local/state}/dotfiles/theme.tsv` and survive shell and
-machine restarts. The old checkout-local `generated/theme.sh` and
-`generated/theme-overrides.sh` are read without `eval` during migration and are
-never the durable source of truth.
+machine restarts. Legacy checkout-local `generated/theme*.sh` files are read
+without `eval` only as a migration fallback (see
+[compatibility boundary](../generated/compatibility/README.md)).
 
-The former active loaders `~/.tmux/theme.conf`, `~/.config/nvim/theme.vim`, and
-`generated/starship.toml` are no longer read. They may remain on disk as inert
-upgrade leftovers; the switcher deliberately does not delete or rewrite live
-user configuration. Existing btop and lazygit files are treated as base user
-configuration and receive a scoped launch overlay.
+The switcher never deletes or rewrites live user configuration. Existing btop
+and lazygit files are treated as base user configuration and receive a scoped
+launch overlay.
 
 Session and window settings are tmux user options on stable ids (`$N` and
 `@N`). They survive renames and window index changes because names and indexes
@@ -188,7 +183,9 @@ launch-time environment variables for each shell.
 
 The prompt check compares a global and tmux generation signature. If nothing
 changed, it emits no exports and rebuilds no caches. Bat's cache contains every
-vendored theme and is rebuilt only when a source theme changes.
+vendored theme and is rebuilt only when a source theme changes. It is isolated
+under its own `BAT_CACHE_PATH` so it does not interfere with the bat embedded in
+Delta; the two bat versions use incompatible binary caches.
 
 `theme-switcher disable` persists the feature choice and immediately removes
 theme-owned hooks and styles from a reachable tmux server without deleting
@@ -241,8 +238,7 @@ navigation cue.
 
 Neovim applies supported plugin setup APIs before loading each colorscheme.
 Comments, line numbers, search, selection, and Airline are normalized after the
-scheme loads using the theme's exact palette. The Airline adapter replaces the
-former unrelated `deus` and shared `minimalist` mappings.
+scheme loads using the theme's exact palette.
 
 On a fresh machine where optional Neovim colorscheme plugins have not been
 installed, startup uses Neovim's built-in default plus the selected dotfiles

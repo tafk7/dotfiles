@@ -1,9 +1,4 @@
-# fd ignore patterns
-# https://github.com/sharkdp/fd
-# Part of dotfiles
-#
-# This file uses gitignore syntax
-# Patterns are matched relative to the directory fd is run from
+# fd global ignore patterns (gitignore syntax, relative to the search root).
 
 # ==============================================================================
 # Version Control

@@ -1,10 +1,11 @@
-# Test strategy
+# Testing
 
-Local and CI tests use temporary HOME, XDG, PATH, and tmux roots. They must not
-source the operator's startup files, write the default tmux server, install
-packages, rotate real backups, or register plugins in a real CLI profile.
+Tests use temporary HOME, XDG, PATH, and tmux roots. They must not source the
+operator's startup files, use the default tmux server, install packages, rotate
+real backups, or register plugins in a real CLI profile. Host-mutating commands
+(APT, sudo, services, groups, Docker, KVM, `sbx`) are faked.
 
-Run the local suite:
+Run the suite (CI runs the same set, discovering every `tests/*.sh`):
 
 ```bash
 for test_file in tests/*.sh; do bash "$test_file"; done
@@ -12,10 +13,13 @@ python3 tests/startup-benchmark-test.py
 python3 tests/theme-contrast.py
 python3 tests/documentation.py
 python3 tests/eget-selection.py
+python3 tests/ai-config.py
 ```
 
-Run the base-versus-candidate startup regression check from an isolated copy of
-the base revision:
+## Startup performance
+
+Startup time matters because coding agents start a shell for every tool call.
+Compare a candidate against an isolated copy of the base revision:
 
 ```bash
 python3 tests/startup-benchmark.py /path/to/base /path/to/candidate
@@ -23,84 +27,39 @@ python3 tests/startup-benchmark.py /path/to/base /path/to/candidate --theme disa
 python3 tests/startup-benchmark.py /path/to/base /path/to/candidate --tools installed
 ```
 
-The benchmark copies both revisions without live generated state and links the
-actual startup files into isolated HOME directories. It starts with a clean
-environment and deterministic direnv/Starship/uv/fzf/zoxide fixtures, then checks
-that the intended profile, checkout, project exports, and interactive functions
-loaded. A nonzero exit, startup diagnostic, or missing marker fails the run.
-Interactive measurements use a controlling terminal; output is never silently
-discarded. The fixture suppresses Ubuntu's first-shell sudo tutorial explicitly
-and restricts Zsh's completion search to distribution-owned function directories,
-so permissive host or runner plugin directories cannot trigger an interactive
-`compinit` security prompt. It prepares a valid completion dump before sampling,
-matching the documented warm-cache benchmark scope.
+The benchmark links each revision's startup files into isolated HOMEs and uses
+deterministic direnv/Starship/uv/fzf/zoxide fixtures (`--tools installed` uses
+the real local binaries instead). It covers first environment initialization,
+inherited environment, interactive Bash and Zsh, and Bash snapshot replay. It
+takes at least 30 samples per revision in random interleaved order and reports
+median and p95; `--json FILE` keeps the raw samples. It fails when a regression
+exceeds both 10 ms and 15%, or when any startup exceeds two seconds. A run also
+fails if the expected profile, exports, or functions didn't load. These are
+warm-cache shell measurements, not measurements of tool releases, Windows IPC,
+or first-prompt rendering. Don't run them concurrently with other tests.
 
-It takes at least 30 samples per revision for first environment initialization,
-inherited environment, interactive startup (Bash and Zsh), and Bash export/function
-snapshot replay. Base/candidate execution order alternates randomly; reports
-include medians and p95. Use `--json /tmp/startup.json` to retain raw samples.
-It fails when the candidate regression exceeds both 10 ms and 15%, and also
-enforces a two-second catastrophic ceiling. These are warm-cache shell/config
-measurements with controlled tools, not benchmarks of real tool releases,
-Windows IPC, first prompt rendering, or model/tool transport latency.
+## Platform coverage
 
-`--tools installed` uses local direnv, Starship, uv, fzf, and zoxide binaries in
-the same isolated profiles. It authorizes only the fixture's disposable project.
-Report both modes and retain their JSON results; use `--theme disabled` with
-either. Performance changes require owner review before live adoption, including
-changes below the automated threshold. See [rollout](maintenance.md).
-
-`transaction-failures.sh`, `companion-artifacts.sh`, `fresh-config.sh`, and
-`check-updates.sh` exercise conditional-call failures, incomplete component
-releases, relocated XDG config, external installation preservation, and upstream
-lookup failures. `editor-plugins.sh` requires Neovim and uses a fake download and
-plugin manager; it never fetches plugins. CI discovers all `tests/*.sh` files.
-
-`tests/project-environment.sh` requires direnv and tests actual authorized
-project activation in fresh Bash/Zsh subprocesses, including a changed working
-directory with inherited environment guards and rejection of an unapproved
-`.envrc`. Bare Bash intentionally inherits its parent's environment. An agent
-using snapshot replay must arrange activation separately when needed; a child
-shell's activation does not update the agent parent's environment.
-
-`tests/theme-refresh.sh` verifies the prompt fast path in both shells, including
-global/session/window changes, standalone operation alongside a running tmux
-server, enable/disable transitions, exit-status preservation, and fallback for
-unfamiliar state. Unchanged prompts read freshness data with shell builtins and
-make one tmux context query when inside tmux; they do not launch the full resolver.
-
-## Platform confidence
-
-- Native Ubuntu CI runs syntax, behavior, state, theme, installer, and config
-  tests. The supported release matrix exercises Ubuntu 22.04, 24.04, and 26.04.
-- The aarch64 registry jobs validate applicability only and report
-  `selection-only`. `tests/eget-selection.py` replays eget's release-asset
-  selection (mirroring the pinned eget version) for every `eget.toml` entry on
-  x86_64 and aarch64 against recorded asset lists in
-  `tests/fixtures/eget-assets/`; refresh them with `--refresh` after bumping a
-  tag. `.github/workflows/arm64.yml` runs the real `--bash` installer natively
-  on `ubuntu-24.04-arm` and asserts every tool executes and is owned. It runs on
-  installer-input changes, weekly, and on demand. It does not cover dev/work
-  tiers or apt repositories on ARM.
-- WSL2 behavior is mocked in normal CI, including the non-systemd shell fallback.
-  A real Windows 11/WSL2 run remains periodic/manual because hosted Linux runners
-  cannot validate Windows interop, the Windows agent pipe, or WSL lifecycle.
-- xrdp has immutable dry-run and preflight unit coverage. Starting a real
-  listener and validating an RDP desktop session is periodic/manual and requires
-  explicit authorization on the target host.
-- Work-host tests use mocked APT repositories, sudo, services, groups, Docker
-  contexts, KVM, and `sbx`. They validate local-versus-remote Docker, pending
-  login state, precise smoke cleanup, and forbidden broad/cloud operations.
-  They do not execute a microVM or enroll a Tailscale node.
-- The minimal-Ubuntu fixture verifies locale ordering, noninteractive APT, and
-  bounded lock waiting. AI installer fixtures verify Codex prompt suppression
-  and narrow Pi warning filtering without hiding unrelated npm diagnostics.
+- **Ubuntu (CI):** the full suite plus syntax and shellcheck. A clean
+  `ubuntu:24.04` container runs the real `--bash` installer as a non-root user,
+  and 22.04, 24.04, and 26.04 containers each run the dry-run safety test.
+- **aarch64:** registry checks on x86 runners report `selection-only`.
+  `tests/eget-selection.py` replays eget's asset selection for every
+  `eget.toml` entry on both architectures against recorded asset lists in
+  `tests/fixtures/eget-assets/` (refresh with `--refresh` after bumping a tag).
+  `.github/workflows/arm64.yml` runs the real `--bash` installer on
+  `ubuntu-24.04-arm` weekly and on installer changes. Dev/work tiers and APT
+  repositories are not exercised on ARM.
+- **WSL2:** mocked in CI, including the non-systemd fallback. Windows interop,
+  the Windows agent pipe, and the WSL lifecycle need the manual checklist.
+- **xrdp and work hosts:** dry-run, preflight, and mocked lifecycle coverage
+  only. No test starts a real listener, executes a microVM, or enrolls
+  Tailscale.
 
 ## Manual WSL2 checklist
 
 1. Verify `wsl.exe --status` reports WSL2 and start a supported Ubuntu release.
-2. Run `setup.sh --bash --dry-run`, then an approved real setup in a disposable
-   WSL user profile.
+2. Run `setup.sh --bash --dry-run`, then a real setup in a disposable WSL user.
 3. With systemd enabled, verify `wsl2-ssh-agent.service` starts only when
    `~/.ssh/use-windows-agent` exists.
 4. With systemd disabled, verify a new interactive shell uses the fallback and
@@ -109,17 +68,14 @@ make one tmux context query when inside tmux; they do not launch the full resolv
 
 ## Manual RDP checklist
 
-On an authorized disposable VM, run the requested `--rdp` setup,
-verify the selected port, TLS configuration, desktop session, and service state,
-then run `bin/verify --tier rdp`. Confirm rollback from the timestamped xrdp
-configuration backup before considering the live service test complete.
+On a disposable VM, run the `--rdp` setup, verify the port, TLS configuration,
+desktop session, and service state, then run `bin/verify --tier rdp`. Confirm
+you can restore from the timestamped xrdp configuration backup.
 
-## Manual persistent work-host checklist
+## Manual work-host checklist
 
-On an authorized disposable Ubuntu 24.04/26.04 VM or bare-metal host, expose
-KVM/nested virtualization before setup. Run `setup.sh --full --tail`, log out
-and reconnect after group changes, enroll Tailscale manually, authenticate
-`sbx`, and run `bin/verify --tier work --tail --smoke`. Then validate a complete SSH
-disconnect/reconnect and a reboot: `tailscaled` and Docker must return, group
-access must stay active, and a new local sandbox must execute. This real-host
-gate is required before claiming persistent work-host acceptance.
+On a disposable Ubuntu 24.04/26.04 VM or bare-metal host with KVM/nested
+virtualization exposed, run `setup.sh --full --tail`, log out and back in,
+enroll Tailscale, run `sbx login`, and run
+`bin/verify --tier work --tail --smoke`. Then check that Docker, `tailscaled`,
+group access, and a new local sandbox all survive an SSH reconnect and a reboot.

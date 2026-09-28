@@ -17,7 +17,6 @@ FORCE=false
 log "Installing eget v${EGET_VERSION}..."
 if preserve_existing_tool eget "$FORCE"; then exit 2; fi
 
-# Check existing installation
 if [[ "$FORCE" != true ]] && verify_binary eget; then
     CURRENT=$(eget --version 2>&1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0.0.0")
     if [[ "$CURRENT" == "$EGET_VERSION" ]]; then
@@ -49,11 +48,8 @@ chmod +x "$STAGED_EGET"
 "$STAGED_EGET" --version >/dev/null 2>&1 || { error "Staged eget binary does not run"; exit 1; }
 atomic_replace_binary eget "$STAGED_EGET" "$HOME/.local/bin/eget"
 
-# Verify the binary we just wrote, by absolute path — NOT via command -v. On a
-# fresh machine ~/.local/bin isn't on PATH yet (Ubuntu's ~/.profile only adds it
-# if it existed at login, and the dotfiles shell configs aren't loaded in this
-# session), so a PATH lookup would report a false failure for a perfectly good
-# install. Same reason install_eget_tools resolves eget by absolute path.
+# Verify by absolute path, not command -v: ~/.local/bin may not be on PATH yet
+# on a fresh machine.
 if "$HOME/.local/bin/eget" --version >/dev/null 2>&1; then
     success "eget v${EGET_VERSION} installed"
 else

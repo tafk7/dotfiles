@@ -1,25 +1,18 @@
 #!/bin/bash
-# Declarative configuration — single source of truth for managed files and packages.
-# This file defines data only. No functions. No side effects.
+# Declarative configuration — single source of truth for managed files and
+# packages. Data plus side-effect-free lookups.
 
-# Tool registry (single source of truth for managed tools)
 source "$(dirname "${BASH_SOURCE[0]}")/registry.sh"
 
-# Directory constants
 CONFIGS_DIR="$DOTFILES_DIR/configs"
 ENTRY_DIR="$DOTFILES_DIR/entry"
 
-# Configuration mappings: key → "target:type:owner"
-# Keys under shell/ use SHELL_DIR; keys under configs/ use CONFIGS_DIR.
-# setup.sh resolves the source path using config_source_path().
+# Configuration mappings: key → "target:type:owner". config_source_path()
+# resolves the key to entry/ or configs/.
 #
-# owner (3rd field): the tool a config belongs to. Empty owner = base config,
-# always symlinked (the bash dev environment + universal files). A named owner
-# means the config is symlinked only when that tool is present on the system
-# (config_owner_present in setup.sh), so a bare install never litters configs for
-# tools that aren't there, and an org-managed/pre-installed tool still gets its
-# config. Owner is a registry tool name where one exists; otherwise a plain
-# command name (e.g. zsh, which is an apt package, not a managed tool).
+# An empty owner means the config is always linked. A named owner (a registry
+# tool, else a plain command such as zsh) links it only when that tool is
+# present, whoever installed it, so no config is left without its tool.
 declare -A CONFIG_MAP=(
     # Shell RC files (source: entry/)
     [bash.sh]="$HOME/.bashrc:symlink:"
@@ -54,12 +47,8 @@ config_source_path() {
     esac
 }
 
-# Decide whether a config's owning tool is present, so setup.sh can skip configs
-# for tools that aren't installed. Empty owner = base config, always applied.
-# A named owner is checked against reality (registry verify command when it's a
-# managed tool, else a plain command -v), NOT against the selected tier — so a
-# pre-installed or org-managed tool still gets its config, and a bare install
-# lays down nothing orphaned.
+# Whether a config's owner is actually present (not whether the selected tier
+# includes it), so pre-installed and org-managed tools still get their config.
 config_owner_present() {
     local owner="$1"
     [[ -z "$owner" ]] && return 0
@@ -70,9 +59,7 @@ config_owner_present() {
     fi
 }
 
-# APT package groups. All apt installs live at the dev tier or above — the bash
-# tier is sudo-free (eget only). bat/fd/ripgrep/direnv moved to eget, so no
-# [modern] group and no direnv here.
+# APT package groups. Tier-owned APT starts at dev; the bash tier is sudo-free.
 declare -A PACKAGES=(
     [core]="git build-essential locales"
     [development]="zsh bison libevent-dev libncurses-dev xclip lsof psmisc"

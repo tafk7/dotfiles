@@ -1,19 +1,10 @@
 #!/bin/bash
 # Install the Rust toolchain via rustup (https://rustup.rs).
 #
-# rustup self-updates (`rustup update`), so this script only ensures the
-# toolchain is present — it does not pin or manage versions. Re-run with --force
-# to reinstall (e.g. to repair a broken install).
-#
-# rust is a "work" tier tool — a userspace language-version manager like nvm,
-# needing no sudo. Everything lands in ~/.cargo and ~/.rustup.
-#
-# rustup-init defaults to appending a `. "$HOME/.cargo/env"` line to shell rc
-# files. Our rc files are dotfiles symlinks, so that edit writes straight through
-# into the tracked repo — and it's redundant: shell/env.sh already puts
-# ~/.cargo/bin on PATH under the guarded single-source-of-truth. We pass
-# --no-modify-path to suppress it (the rustup equivalent of nvm's
-# PROFILE=/dev/null and opencode's --no-modify-path).
+# rustup self-updates (`rustup update`), so this only ensures the toolchain is
+# present; --force reinstalls. No sudo: everything lands in ~/.cargo and
+# ~/.rustup. --no-modify-path stops rustup-init editing the shell rc files
+# (symlinks into this repo); shell/env.sh already puts ~/.cargo/bin on PATH.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,8 +28,7 @@ fi
 
 log "Installing Rust toolchain via rustup..."
 
-# Download the installer to a file first (inspectable, logged) rather than
-# piping the network straight into sh.
+# Download to a file rather than piping the network into sh.
 rustup_installer="${DOTFILES_RUSTUP_INSTALLER_SCRIPT:-}"
 downloaded_installer=false
 if [[ -z "$rustup_installer" ]]; then

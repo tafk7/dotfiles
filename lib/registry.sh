@@ -1,9 +1,8 @@
 #!/bin/bash
 # Tool registry — single source of truth for all managed tools.
-# Sourced by setup.sh (via config.sh), bin/verify, bin/remove.
-# Data only. No side effects.
+# Sourced by setup.sh (via config.sh), bin/verify, bin/uninstall-tool, and
+# bin/cheatsheet. Data and lookup helpers only; no side effects.
 
-# Prevent double-sourcing
 [[ -n "${_DOTFILES_REGISTRY_LOADED:-}" ]] && return 0
 _DOTFILES_REGISTRY_LOADED=1
 
@@ -93,12 +92,9 @@ declare -A TOOL_EGET_REPO=(
     [gh]=cli/cli
 )
 
-# TOOL_TIER: tool name → minimum cumulative tier (bash|dev|work).
-# The cumulative chain is bash→dev→work. The "bash" tier is the non-sudo base:
-# every tool in it installs to ~/.local/bin via eget (no root). The sudo boundary
-# starts at dev (apt packages: zsh, build tools, clipboard). Orthogonal
-# membership lives in TOOL_CAPABILITIES. Components may be capability-only,
-# such as Tailscale.
+# TOOL_TIER: tool name → minimum cumulative tier (bash|dev|work). Bash-tier
+# tools must install without root. Capability-only components (e.g. Tailscale)
+# have no tier.
 declare -A TOOL_TIER=(
     [starship]=bash   [eza]=bash      [fzf]=bash       [zoxide]=bash
     [delta]=bash      [btop]=bash     [glow]=bash       [lazygit]=bash

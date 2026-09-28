@@ -18,7 +18,6 @@ if preserve_existing_tool tmux "$FORCE"; then exit 2; fi
 
 VERSION=$(github_latest_version "tmux/tmux" --strip-v)
 
-# Check existing installation
 if [[ "$FORCE" != true ]] && verify_binary tmux -V; then
     CURRENT=$(tmux -V 2>/dev/null | awk '{print $2}')
     if [[ "$CURRENT" == "$VERSION" ]]; then
@@ -28,7 +27,6 @@ if [[ "$FORCE" != true ]] && verify_binary tmux -V; then
     log "tmux $CURRENT installed, updating to $VERSION..."
 fi
 
-# Verify build dependencies
 for dep in bison libevent-dev libncurses-dev; do
     if ! dpkg -s "$dep" >/dev/null 2>&1; then
         error "Missing build dependency: $dep (install with: sudo apt install $dep)"
@@ -74,7 +72,6 @@ make install >>"$BUILD_LOG" 2>&1
 "$STAGE_PREFIX/bin/tmux" -V >/dev/null 2>&1 || { error "Staged tmux binary does not run"; exit 1; }
 atomic_replace_binary tmux "$STAGE_PREFIX/bin/tmux" "$HOME/.local/bin/tmux"
 
-# Verify
 if "$HOME/.local/bin/tmux" -V >/dev/null 2>&1; then
     success "tmux $VERSION installed successfully!"
     "$HOME/.local/bin/tmux" -V

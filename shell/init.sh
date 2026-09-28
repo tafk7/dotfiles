@@ -1,7 +1,6 @@
 #!/bin/bash
-# Single shared initialization sequence for all shells.
-# Sourced by entry/bash.sh and entry/zsh.sh after bridge.sh.
-# Entry files set SHELL_NAME before sourcing this.
+# Shared interactive initialization for bash and zsh. Entry files set
+# SHELL_NAME before sourcing this.
 
 if [[ -z "${DOTFILES_DIR:-}" ]]; then
     echo "Warning: DOTFILES_DIR not set." >&2
@@ -12,20 +11,16 @@ fi
 # project activation.
 source "$DOTFILES_DIR/shell/env-runtime.sh"
 
-# Static exports (guarded by _DOTFILES_ENV_LOADED)
 source "$DOTFILES_DIR/shell/env.sh"
 
 # Optional features begin here. Layer 0 above remains independent of theme
 # state, rendering, tmux, and plugins.
 source "$DOTFILES_DIR/shell/interactive/theme-env.sh"
 
-# Tool initialization (interactive only — evals)
 [[ $- == *i* ]] && source "$DOTFILES_DIR/shell/tool-init.sh"
 
-# FZF configuration
 [[ -f "$DOTFILES_DIR/shell/fzf.sh" ]] && source "$DOTFILES_DIR/shell/fzf.sh"
 
-# Tool modules (co-located functions + aliases per domain)
 for _tool_file in "$DOTFILES_DIR"/shell/tools/*.sh; do
     [[ -r "$_tool_file" ]] && source "$_tool_file"
 done
@@ -39,13 +34,11 @@ if [[ $- == *i* && -n "${SSH_CONNECTION:-}" && -z "${TMUX:-}" && "${TERM:-dumb}"
     fixmouse
 fi
 
-# WSL-specific (conditional)
 if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
     [[ -f "$DOTFILES_DIR/shell/platform/wsl.sh" ]] && \
         source "$DOTFILES_DIR/shell/platform/wsl.sh"
 fi
 
-# Prompt
 if command -v starship >/dev/null 2>&1; then
     eval "$(starship init "$SHELL_NAME")"
 elif [[ "$SHELL_NAME" == "zsh" ]]; then
@@ -68,24 +61,15 @@ if command -v fzf >/dev/null 2>&1 && [[ "$SHELL_NAME" != "zsh" ]]; then
     eval "$(fzf --bash)"
 fi
 
-# Zoxide
 command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init "$SHELL_NAME")"
 
-# NVM lazy loader
 source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
-# Local overrides (not tracked)
 source "$DOTFILES_DIR/shell/local.sh"
 
-# Collapse duplicate PATH entries. Must run LAST: vendor scripts sourced from
-# ~/.shell.local (e.g. Xilinx settings64.sh) prepend unconditionally, and
-# because this file is re-sourced by every nested interactive shell and by
-# `reload`, those entries accumulate — 330 entries / 35 unique / 16.8KB was the
-# observed steady state. Defined in shell/env-runtime.sh and shared with the
-# non-interactive path; see the comment there.
+# Must run last: vendor scripts sourced from ~/.shell.local prepend
+# unconditionally, and nested shells and `reload` would accumulate them.
 command -v _dotfiles_dedupe_path >/dev/null 2>&1 && _dotfiles_dedupe_path
 
-# Leave a clean exit status. A missing ~/.shell.local (or a non-zero last
-# command inside it) would otherwise leave $?=1 after startup, which a status-
-# aware prompt (e.g. starship) renders as an error on the very first prompt.
+# Leave a clean exit status, or the prompt shows an error on its first render.
 true

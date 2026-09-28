@@ -84,14 +84,10 @@ _tafk_tmux_buffer_set() {
     printf '%s' "$1" | tmux load-buffer -
 }
 
-# Reload shell config. Unsets idempotency guards so the guarded portion of
-# env.sh + profile.sh actually re-runs (alias-based 'source ~/.bashrc' would
-# skip them entirely — leaving stale PATH/env state).
-# Note: stale aliases/functions from removed tool modules persist across a
-# `reload`; use `exec $SHELL -l` for a true clean slate.
-# `unalias` is defensive for users upgrading from the previous version of
-# this file (which defined `reload` as an alias); zsh refuses to define a
-# function whose name is an existing alias.
+# Reload shell config, unsetting the guards so env.sh and profile.sh re-run.
+# Removed aliases/functions persist; use `exec $SHELL -l` for a clean slate.
+# The unalias clears an older alias definition, which zsh would refuse to
+# replace with a function.
 unalias reload 2>/dev/null
 reload() {
     unset _DOTFILES_ENV_LOADED _PROFILE_LOADED

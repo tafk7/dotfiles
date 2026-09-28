@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install Neovim from GitHub releases
-# Latest release on supported Ubuntu hosts.
+# Installs the latest release; the tree is staged before replacement.
 
 set -euo pipefail
 
@@ -25,7 +25,6 @@ nvim_version() {
 log "Installing Neovim..."
 if preserve_existing_tool neovim "$FORCE"; then exit 2; fi
 
-# Determine which version to install
 VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
         # If API fails (rate-limited) and --force, fall back to reinstalling current
         if [[ "$FORCE" == true ]] && verify_binary nvim; then
@@ -37,7 +36,6 @@ VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
         fi
 }
 
-# Check existing installation
 if [[ "$FORCE" != true ]] && verify_binary nvim; then
     CURRENT=$(nvim_version)
     if [[ "$CURRENT" == "$VERSION" ]]; then
@@ -49,9 +47,7 @@ elif command -v nvim >/dev/null 2>&1; then
     warn "Existing nvim binary is broken — reinstalling"
 fi
 
-# Download and install.
-# get_arch() returns aarch64, but upstream Neovim names its ARM asset
-# nvim-linux-arm64.tar.gz (and the dir inside likewise). Map accordingly.
+# Upstream names the ARM asset (and its directory) arm64, not aarch64.
 ARCH=$(get_arch)
 case "$ARCH" in
     x86_64)  NVIM_ARCH="x86_64" ;;
@@ -78,7 +74,6 @@ STAGED_TREE="$TEMP_DIR/nvim-linux-${NVIM_ARCH}"
 mkdir -p "$HOME/.local/bin" "$HOME/.local"
 atomic_replace_tree neovim "$STAGED_TREE" "$HOME/.local/nvim" bin/nvim "$HOME/.local/bin/nvim"
 
-# Verify
 if "$HOME/.local/bin/nvim" --version >/dev/null 2>&1; then
     success "Neovim v$VERSION installed successfully!"
     nvim_output="$("$HOME/.local/bin/nvim" --version)"

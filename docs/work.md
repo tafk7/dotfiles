@@ -110,21 +110,20 @@ curl -fsSL https://raw.githubusercontent.com/tafk7/dotfiles/main/bootstrap.sh \
   | bash -s -- --full --tail
 ```
 
-Bootstrap may install Git, clone or update the checkout, and run setup; it is
-not side-effect-free merely because setup receives `--dry-run`.
+Bootstrap installs Git and updates the checkout even when setup receives
+`--dry-run`.
 
 Reconnect if group membership changed, enroll Tailscale with the intended
 routing/SSH policy, run `sbx login`, authenticate GitHub and selected tools, and
 run `./bin/verify --tier work --tail`. Use `--smoke` only when image downloads
 and temporary resource use are acceptable.
 
-## Cloud CLI compatibility
+## Cloud CLIs
 
-Fresh `--work` and `--full` installs no longer install Azure CLI. Use
-`--work --azure` to retain that selection. Existing Azure installations remain;
-their Azure DevOps helper moves into an optional portable Git include without
-duplicate credential entries. Select Google Cloud with `--gcloud` and AWS CLI
-v2 with `--aws`. Setup never selects a CLI from cloud-provider detection.
+Cloud CLIs are always explicit: `--azure`, `--gcloud`, or `--aws`. Setup never
+infers one from the cloud provider it runs on, and `--work`/`--full` include
+none. `--azure` also installs the Azure DevOps Git credential helper through an
+optional portable Git include.
 
 Microsoft's current APT support table covers Ubuntu 22.04 and 24.04, so explicit
 `--azure` on 26.04 fails until Microsoft publishes support.
