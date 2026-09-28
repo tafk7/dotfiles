@@ -17,9 +17,12 @@ delete a local value. Asset files listed in the source are owned as a whole;
 unlisted files are never deleted. Account identity, project state, credentials,
 plugin registrations, hook trust, and session histories are not portable assets.
 
-Codex defaults to high reasoning with an 872,000-token context window and a
-784,800-token compaction threshold. Named profiles can explicitly override these
-defaults. Claude retains medium effort and disabled nonessential traffic. That
+Codex defaults to high reasoning. The model, provider, context window, and
+compaction threshold depend on where requests are served, so they are left to
+whatever configures the provider; named profiles can override any default.
+Provider-specific Claude environment, such as gateway compatibility flags,
+belongs to the provider configuration too. Claude retains medium effort and
+disabled nonessential traffic. That
 traffic setting disables automatic updates in the verified native version; use
 `bin/ai-update claude` for explicit maintenance. This command uses the official
 installer's existing `--force` update/repair path, including configuration and

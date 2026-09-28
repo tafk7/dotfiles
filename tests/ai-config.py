@@ -48,7 +48,9 @@ custom_binding = "ctrl-k"
         self.run_config()
         c = tomllib.loads(codex.read_text())
         self.assertEqual(c['model_reasoning_effort'], 'high')
-        self.assertEqual(c['model_auto_compact_token_limit'], 784800)
+        self.assertEqual(c['approval_policy'], 'on-request')
+        # Provider-dependent keys are left to the provider's own configuration.
+        self.assertNotIn('model_context_window', c)
         self.assertEqual(c['projects']['/a.b/#project']['trust_level'], 'trusted')
         self.assertTrue(c['tui']['screen_reader_detection_done'])
         self.assertEqual(c['tui']['keymap']['global'], {'open_external_editor': 'ctrl-e', 'custom_binding': 'ctrl-k'})

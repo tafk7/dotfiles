@@ -82,8 +82,8 @@ use_home "$TEST_ROOT/home-fresh"
 run_expect 0 "$REPO_ROOT/installers/install-codex.sh"
 [[ -L "$HOME/.local/bin/codex" ]] || fail "fresh install did not create launcher symlink"
 [[ -f "$HOME/.codex/config.toml" ]] || fail "fresh install did not provision config"
-grep -qx 'model = "gpt-6-astra"' "$HOME/.codex/config.toml" \
-    || fail "fresh config did not select gpt-6-astra"
+grep -qx 'model_reasoning_effort = "high"' "$HOME/.codex/config.toml" \
+    || fail "fresh config did not receive portable preferences"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "fresh install invocation count"
 [[ "$(cat "$TEST_STATE/environment")" == $'1\t/dev/null' ]] \
     || fail "official installer was not invoked noninteractively with profile writes disabled"
