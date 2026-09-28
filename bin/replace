@@ -4,7 +4,6 @@ set -euo pipefail
 
 source "${DOTFILES_DIR:-$(dirname "$(dirname "$(readlink -f "$0")")")}/lib/runtime.sh"
 
-# Require rg and sd
 for cmd in rg sd; do
     command_exists "$cmd" || { error "$cmd is required but not found"; exit 1; }
 done
@@ -26,7 +25,6 @@ fi
 
 FIND="$1"; REPLACE="$2"; TARGET="${3:-.}"
 
-# Show matches
 rg --color=always -n -F "$FIND" "$TARGET" || { echo "No matches found."; exit 0; }
 echo
 FILES=$(rg -l -F "$FIND" "$TARGET")

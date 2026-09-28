@@ -27,13 +27,10 @@ from the network into a shell and are never executed with `sudo`.
 Some upstream projects do not publish stable checksums or signatures for every
 asset. This repository records that limitation instead of embedding hashes from
 an unauthenticated source or implying a guarantee the upstream process does not
-provide. Download/validation failures preserve the working artifact. Replacement
-and ledger failures are reported and retain recovery information; a replacement
-may already have committed when its ledger write fails. Companion binaries are
-prevalidated together and promoted individually. See [recovery](maintenance.md).
-APT and vendor-managed in-place updates may leave partial
-upstream state; rerun the same setup selection after correcting the reported
-cause.
+provide. Download/validation failures preserve the working artifact; see
+[recovery](maintenance.md#recovery) for replacement and ledger failures. APT and
+vendor-managed in-place updates may leave partial upstream state; rerun the same
+setup selection after correcting the reported cause.
 
 APT runs noninteractively and waits a bounded 120 seconds for package-manager
 locks (`DOTFILES_APT_LOCK_TIMEOUT` overrides this). The dev tier installs
@@ -43,8 +40,8 @@ from failing an early `locale-gen` call. Lock files are never deleted.
 Repository configuration and package migration are separate. Adding Docker's
 repository for `sbx` never removes existing container runtimes. Docker Engine
 conflicts produce a manual migration diagnostic. The bundled AWS CLI Team key
-and fingerprint must be reviewed together when AWS rotates its signing key.
-As checked on 2026-09-11, AWS's current install page and current detached ZIP
-signature still use `FB5DB77FD5C118B80511ADA8A6310ACC4672475C`; `gpgv`
-validated that day's artifact even though the key's displayed expiration is
-2026-07-07. Treat any signer change or verification failure as a hard stop.
+and fingerprint (`FB5DB77FD5C118B80511ADA8A6310ACC4672475C`) must be reviewed
+together when AWS rotates its signing key. The key's displayed expiration
+(2026-07-07) has passed, but AWS still signs with it and `gpgv` accepts the
+signatures (last checked 2026-09-11). Treat any signer change or verification
+failure as a hard stop.

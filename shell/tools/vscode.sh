@@ -34,7 +34,6 @@ cf() {
     fi
 
     local file
-    # Use bat/batcat for preview if available, fallback to cat
     if command -v bat >/dev/null 2>&1; then
         file=$(fzf --preview 'bat --style=numbers --color=always {}')
     elif command -v batcat >/dev/null 2>&1; then
@@ -53,9 +52,3 @@ cdiff() {
     fi
     code --diff "$1" "$2"
 }
-
-# Note: EDITOR is set in shell/env.sh (nvim by default)
-# To use VS Code as your default editor, add to ~/.shell.local:
-#   export EDITOR='code --wait'
-#   export VISUAL='code --wait'
-#   export GIT_EDITOR='code --wait'

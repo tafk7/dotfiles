@@ -1,16 +1,11 @@
-" Modern Vim Configuration with Power User Features
-" Part of dotfiles
-
-" ==============================================================================
-" Vim-Plug Auto-Installation
-" ==============================================================================
-
-" Plugin installation is an explicit setup action. Ordinary editor startup
-" never downloads or executes remote code.
+" Neovim configuration (dotfiles)
 
 " ==============================================================================
 " Plugins
 " ==============================================================================
+
+" Installing plugins is an explicit action (bin/install-editor-plugins); editor
+" startup never downloads or executes remote code.
 
 let s:vim_plug = stdpath('config') . '/autoload/plug.vim'
 if filereadable(s:vim_plug)
@@ -65,30 +60,24 @@ unlet s:vim_plug
 " Basic Settings
 " ==============================================================================
 
-" Use Vim settings, not Vi
 set nocompatible
 
-" Enable modern Vim features
 set encoding=utf-8
 setglobal fileencoding=utf-8
 
-" Enable file type detection and plugins
 filetype plugin indent on
 
-" Enable syntax highlighting
 syntax enable
 
 " ==============================================================================
 " Visual Settings
 " ==============================================================================
 
-" Color scheme configuration
 set background=dark
 if (has("termguicolors"))
     set termguicolors
 endif
 
-" Configure terminal colors for better compatibility
 if &term =~ '256color'
     " Disable Background Color Erase (BCE)
     set t_ut=
@@ -99,7 +88,6 @@ if exists('$DOTFILES_DIR') && filereadable($DOTFILES_DIR . '/lib/theme.vim')
     execute 'set runtimepath^=' . fnameescape($DOTFILES_DIR . '/configs/nvim')
     execute 'source ' . fnameescape($DOTFILES_DIR . '/lib/theme.vim')
 else
-    " Default theme fallback
     try
         let g:gruvbox_material_background = 'medium'
         let g:gruvbox_material_better_performance = 1
@@ -109,24 +97,16 @@ else
     endtry
 endif
 
-" Show line numbers
 set number
-" Relative numbers disabled - using absolute line numbers only
-" set relativenumber
 
-" Highlight current line
 set cursorline
 
-" Show matching brackets
 set showmatch
 
-" Always show status line
 set laststatus=2
 
-" Show command in bottom bar
 set showcmd
 
-" Visual autocomplete for command menu
 set wildmenu
 set wildmode=longest:full,full
 set wildignorecase
@@ -138,16 +118,12 @@ set lazyredraw
 " Search Settings
 " ==============================================================================
 
-" Highlight search results
 set hlsearch
 
-" Incremental search
 set incsearch
 
-" Case-insensitive search
 set ignorecase
 
-" Smart case (case-sensitive if uppercase used)
 set smartcase
 
 " Clear search highlighting with Space
@@ -157,25 +133,20 @@ nnoremap <silent> <Space> :nohlsearch<CR>
 " Indentation and Formatting
 " ==============================================================================
 
-" Spaces instead of tabs
 set expandtab
 
-" Number of spaces per tab
 set tabstop=4
 set softtabstop=4
 set shiftwidth=4
 
-" Auto indent
 set autoindent
 set smartindent
 
-" Wrap lines at convenient points
 set linebreak
 
 " Don't wrap lines by default
 set nowrap
 
-" Show invisible characters
 set list
 set listchars=tab:▸\ ,trail:·,extends:❯,precedes:❮,nbsp:×
 
@@ -183,7 +154,6 @@ set listchars=tab:▸\ ,trail:·,extends:❯,precedes:❮,nbsp:×
 " Mouse and Clipboard
 " ==============================================================================
 
-" Enable mouse support
 if has('mouse')
     set mouse=a
     if !has('nvim')
@@ -191,7 +161,6 @@ if has('mouse')
     endif
 endif
 
-" Use system clipboard
 if has('clipboard')
     if has('unnamedplus')
         set clipboard=unnamedplus
@@ -204,14 +173,11 @@ endif
 " File Management
 " ==============================================================================
 
-" Disable swap files
 set noswapfile
 
-" Disable backup files
 set nobackup
 set nowritebackup
 
-" Keep undo history across sessions
 if has('persistent_undo')
     set undofile
     let &undodir = isdirectory(stdpath('config') . '/undo')
@@ -221,28 +187,23 @@ if has('persistent_undo')
     endif
 endif
 
-" Auto read when file is changed externally
 set autoread
 
-" Better path handling
 set path+=**
 
 " ==============================================================================
 " Window Management
 " ==============================================================================
 
-" Split windows to the right and below
 set splitright
 set splitbelow
 
-" Minimum window height
 set winminheight=0
 
 " ==============================================================================
 " Key Mappings
 " ==============================================================================
 
-" Set leader key
 let mapleader = ","
 let g:mapleader = ","
 
@@ -282,7 +243,7 @@ let g:fzf_layout = { 'window': { 'width': 0.9, 'height': 0.9 } }
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 
 " Airline
-" Theme will be set by theme loader, but provide a default
+" The theme loader normally sets this.
 if !exists('g:airline_theme')
     let g:airline_theme='gruvbox_material'
 endif
@@ -338,7 +299,6 @@ vnoremap <leader>/ :Commentary<CR>
 " Auto Commands
 " ==============================================================================
 
-
 " Remove trailing whitespace only for formats where it is not semantic. Keep
 " the view and search register stable so saving does not move the user.
 function! StripTrailingWhitespace()
@@ -357,7 +317,6 @@ augroup trim_whitespace
     autocmd BufWritePre * call StripTrailingWhitespace()
 augroup END
 
-" Disable automatic comment insertion
 augroup no_auto_comment
     autocmd!
     autocmd FileType * setlocal formatoptions-=cro
@@ -409,7 +368,6 @@ augroup END
 " Sound and Visual Bell Settings
 " ==============================================================================
 
-" Disable error bells
 set noerrorbells
 set visualbell
 set t_vb=
@@ -418,16 +376,13 @@ set t_vb=
 " Performance Settings
 " ==============================================================================
 
-" Limit syntax highlighting for long lines
 set synmaxcol=500
 
 " Don't highlight huge files
 autocmd BufWinEnter * if line('$') > 20000 | syntax clear | endif
 
-" Faster scrolling
 set ttyfast
 
-" Reduce timeout delays
 set timeoutlen=500
 set ttimeoutlen=10
 
@@ -435,7 +390,6 @@ set ttimeoutlen=10
 " Convenience Functions
 " ==============================================================================
 
-" Toggle line numbers on/off
 function! ToggleNumber()
     if(&number == 1)
         set nonumber
@@ -451,7 +405,6 @@ nnoremap <leader>ss :call StripTrailingWhitespace()<CR>
 " Local Configuration
 " ==============================================================================
 
-" Source local configuration if it exists
 if filereadable(stdpath('config') . '/init.local.vim')
     execute 'source ' . fnameescape(stdpath('config') . '/init.local.vim')
 endif

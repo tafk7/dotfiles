@@ -1,28 +1,17 @@
 #!/bin/bash
 
-# Claude Code: the native CLI on PATH (installed by `./setup.sh --ai`, normally
-# ~/.local/bin/claude). The wrapper exists solely to inject $CLAUDE_FLAGS.
-#
-# The VS Code extension binary is deliberately NOT discovered any more. Locating
-# it meant a `find` across ~13k files under ~/.vscode-server/extensions on every
-# single shell start (~126ms) to resolve a path that changes only when the
-# extension updates.
+# Claude Code: whatever `claude` is on PATH. The wrapper only injects
+# $CLAUDE_FLAGS. The VS Code extension's bundled binary is deliberately not
+# discovered; finding it cost a filesystem scan at every shell start.
 
-# Re-source safety: drop our own function so `command -v` resolves the PATH
-# binary, not the wrapper. `command -v` is portable across bash and zsh; `type -P`
-# is bash-only (zsh errors "bad option: -P", silently yielding no match).
+# Drop our own wrapper (and the retired *-vsc helper) on re-source so
+# `command -v` finds the PATH binary. `type -P` would be bash-only.
 unset -f claude claude-vsc 2>/dev/null
 
-# `command -v` as a bare condition is a builtin — no subshell, no fork. Capturing
-# it (`x=$(command -v ...)`) would fork, which is what this file used to do.
+# A bare `command -v` condition doesn't fork; capturing its output would.
 if command -v claude >/dev/null 2>&1; then
-    # `command` bypasses this function and runs the PATH binary.
-    #
-    # CLAUDE_FLAGS is intentionally split into separate arguments. zsh does NOT
-    # word-split unquoted parameter expansions, so the shared `${CLAUDE_FLAGS:-}`
-    # form silently passed a multi-flag CLAUDE_FLAGS to claude as a SINGLE
-    # argument under zsh while working under bash. ${=VAR} forces the split;
-    # keep the two branches in sync.
+    # zsh doesn't word-split unquoted expansions, so ${=VAR} is needed to pass
+    # CLAUDE_FLAGS as separate arguments. Keep both branches in sync.
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         claude() { command claude ${=CLAUDE_FLAGS} "$@"; }
     else

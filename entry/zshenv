@@ -1,36 +1,19 @@
 # shellcheck shell=bash
-# ~/.zshenv: every zsh context — login, interactive, AND non-interactive.
-# Sourced FIRST by zsh, before .zprofile or .zshrc.
-#
-# Establishes DOTFILES_DIR + the managed env (env-runtime + env via
-# ~/.profile). This gives zsh non-interactive subprocesses (e.g.,
-# `zsh -c "command"`, `#!/usr/bin/env zsh` scripts, tools that exec zsh
-# directly) the same PATH and environment that interactive zsh and bash
-# get — closing the long-standing gap where zsh -c saw an empty env.
-#
-# Idempotency-safe: ~/.profile guards via _PROFILE_LOADED, env.sh guards
-# via _DOTFILES_ENV_LOADED. Re-sourcing from .zprofile or .zshrc later is
-# a no-op (env-runtime.sh re-runs intentionally — it must, for `reload`).
+# ~/.zshenv: read first by every zsh, including non-interactive `zsh -c` and
+# zsh scripts, so they get the same Layer 0 environment as interactive shells.
+# Re-sourcing later is a no-op except env-runtime.sh, which re-runs on purpose.
 
-# Ubuntu's /etc/zsh/zshrc runs an unconditional `compinit` (full compaudit scan
-# of every fpath entry, ~60ms) before ~/.zshrc is even read, which made our own
-# cached `compinit -C` a redundant second pass. Opting out here — ~/.zshenv is
-# read before /etc/zsh/zshrc — leaves entry/zsh.sh as the single owner of
-# completion init. Documented escape hatch in /etc/zsh/zshrc itself.
+# Ubuntu's /etc/zsh/zshrc otherwise runs a full, uncached compinit before
+# ~/.zshrc. Opting out (its documented escape hatch) leaves entry/zsh.sh as the
+# single owner of completion init.
 [[ $- == *i* ]] && skip_global_compinit=1
 
-# Symlink derivation locates the repo for a fresh clone, but a bind-mount/copy
-# (containers, WSL, rsync) flattens the symlink so readlink resolves to the file
-# itself → a wrong dir. generated/bridge.sh holds the install-time truth, so let
-# it OVERRIDE the guess. New installs use the data-only XDG install-path file;
-# generated/bridge.sh remains a read-only compatibility fallback.
+# Locate the checkout through the symlink. A flattened copy or bind mount
+# defeats that, so fall back to the recorded install path; generated/bridge.sh
+# is legacy, read-only compatibility and overrides the guess when present.
 #
-# zsh parameter modifiers, not `readlink -f` + two `dirname` calls: :A resolves
-# symlinks to an absolute path (what readlink -f does) and :h takes the dirname.
-# The command-substitution form cost 4 forks in .zshenv, i.e. on EVERY zsh
-# context including `zsh -c` and script shebangs. Only zsh sources this file, so
-# the zsh-only syntax is safe (bash can still parse it, which keeps `bash -n`
-# usable if this file is ever added to the lint set).
+# :A:h:h (resolve symlinks, then dirname twice) avoids forking readlink and
+# dirname in every zsh process.
 _zshenv_self=~/.zshenv
 DOTFILES_DIR="${_zshenv_self:A:h:h}"
 unset _zshenv_self

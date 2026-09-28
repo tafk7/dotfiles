@@ -2,7 +2,6 @@
 # Runtime helpers — safe to source on every shell startup and bin/ invocation.
 # Must not contain install-time code.
 
-# Prevent double-sourcing
 [[ -n "${_DOTFILES_RUNTIME_LOADED:-}" ]] && return 0
 _DOTFILES_RUNTIME_LOADED=1
 
@@ -55,10 +54,8 @@ wsl_log() { echo -e "${PURPLE}[WSL]${NC} $1"; }
 # Helpers
 # ==============================================================================
 
-# Source a file if it exists
 source_if_exists() { [[ -f "$1" ]] && source "$1"; }
 
-# Check if a command is available
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 # ==============================================================================

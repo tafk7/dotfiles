@@ -1,10 +1,6 @@
 #!/bin/bash
-# Lazy NVM loader — defers nvm.sh sourcing until first use
-# Sourced by both bash.sh and zsh.sh for consistent behavior
-#
-# nvm.sh adds ~200ms to shell startup. This stub replaces nvm/node/npm
-# with thin wrappers that load nvm.sh on first call, then forward the
-# invocation.
+# Lazy NVM loader: nvm.sh is slow to source, so nvm/node/npm are thin wrappers
+# that load it on first call and then forward the invocation.
 
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
     _load_nvm() {

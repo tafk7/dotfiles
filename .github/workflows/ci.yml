@@ -173,8 +173,7 @@ jobs:
         shell: bash
     steps:
       # The structural jobs above never execute lib/install.sh. This one runs
-      # the real installer in a clean container as a non-root sudo user — the
-      # only job that exercises apt + eget + symlink + theme-init paths.
+      # the real installer in a clean container as a non-root sudo user.
       - name: Bootstrap container (git, sudo, locales, non-root user)
         run: |
           set -euo pipefail
@@ -240,9 +239,8 @@ jobs:
               command -v "$bin" >/dev/null 2>&1 \
                 || { echo "::error::shell-tier tool missing: $name ($bin)"; fail=1; }
           done
-          # AI CLIs (claude, codex) are --ai-gated and must NOT ride the shell
-          # tier's `eget --download-all`. Assert codex is absent here; the
-          # structure job tests its dedicated standalone-installer path.
+          # AI CLIs are --ai-gated and must not arrive with the bash tier. The
+          # structure job tests Codex's dedicated installer.
           if command -v codex >/dev/null 2>&1; then
               echo "::error::codex must not be installed at the shell tier (--ai only)"; fail=1
           fi

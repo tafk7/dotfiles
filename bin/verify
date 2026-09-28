@@ -79,7 +79,6 @@ component_expected() {
     esac
 }
 
-# Counters
 PASS=0
 WARN=0
 FAIL=0

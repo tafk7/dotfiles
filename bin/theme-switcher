@@ -67,9 +67,8 @@ validate_theme() {
     [[ $missing -eq 0 ]]
 }
 
-# Read `export NAME='value'` (or "value") from a theme's shell.sh.
-# Pure bash: the old `grep -oP ... | head -1` was two forks (~8ms here) to pull
-# one line out of a small file, and cmd_env calls this on every cold resolve.
+# Read `export NAME='value'` (or "value") from a theme's shell.sh, in pure
+# bash because cmd_env calls this on every cold resolve.
 extract_export() {
     local theme="$1" name="$2" line value
     local file="$THEMES_DIR/$theme/shell.sh"
@@ -78,7 +77,7 @@ extract_export() {
         [[ "$line" == "export $name="* ]] || continue
         value="${line#export $name=}"
         # Strip one matching pair of surrounding quotes, then any trailing
-        # comment/whitespace the original regex's [^'"]+ would have excluded.
+        # comment or whitespace.
         case "$value" in
             \'*) value="${value#\'}"; value="${value%%\'*}" ;;
             \"*) value="${value#\"}"; value="${value%%\"*}" ;;
@@ -111,11 +110,9 @@ ensure_theme_artifacts() {
     fi
     source_config="${BTOP_BASE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/btop/btop.conf}"
     config="$dir/btop.conf"
-    # Skip when the output is already newer than its only input — the awk +
-    # cmp + rm round trip ran on EVERY resolve (~30ms) just to rewrite a file
-    # that hadn't changed. Mirrors the starship.toml mtime check above.
-    # The no-source-config branch depends only on $theme, which is baked into
-    # the path, so an existing file there is always current.
+    # Skip when the output is newer than its only input; this runs on every
+    # resolve. Without a source config the output depends only on $theme, which
+    # is in the path, so an existing file is always current.
     if [[ -f "$config" ]] \
        && { [[ ! -f "$source_config" ]] || [[ "$config" -nt "$source_config" ]]; }; then
         return 0
@@ -132,9 +129,7 @@ ensure_theme_artifacts() {
     if [[ ! -f "$config" ]] || ! cmp -s "${config}.tmp.$$" "$config"; then
         mv "${config}.tmp.$$" "$config"
     else
-        # Touch so the mtime gate above sees this run's work next time; without
-        # it an unchanged-content run leaves $config older than $source_config
-        # forever and the gate never engages.
+        # Touch even when content is unchanged, or the mtime gate never engages.
         touch "$config"
         rm -f "${config}.tmp.$$"
     fi
@@ -606,9 +601,8 @@ cmd_env() {
     shell_quote_export DOTFILES_THEME_CONTEXT_SIGNATURE "$signature"
     shell_quote_export DOTFILES_THEME_SESSION_ID "$THEME_CONTEXT_SESSION"
     shell_quote_export DOTFILES_THEME_WINDOW_ID "$THEME_CONTEXT_WINDOW"
-    # Hot path: use the fork-free `_into` resolver. `$(resolve_surface_theme)`
-    # here cost ~15 subshells per call, and cmd_env runs on every shell start
-    # and every prompt refresh.
+    # Hot path (every shell start and prompt refresh): use the fork-free
+    # `_into` resolver rather than command substitution.
     for surface in $(list_all_surfaces); do
         resolve_surface_theme_into "$surface"; theme="$_THEME_REPLY"
         shell_quote_export "DOTFILES_THEME_${surface^^}_RESOLVED" "$theme"

@@ -7,12 +7,9 @@
 #   tmux              "0:@14.%117"      -- session:@window.%pane
 #   pid, statusUpdatedAt
 #
-# That is ground truth, and it makes every heuristic we would otherwise need
-# unnecessary. Hooks still drive the rich states (needs / busy-compacting /
-# waiting-on-subagents) because the file cannot express them -- but when a
-# hook is *missed*, this is what unsticks the badge. Missed hooks are not
-# hypothetical: an errored turn, a killed process, or a harness crash all leave
-# the last hook state pinned forever.
+# Hooks still drive the richer states (needs / compacting / waiting on
+# subagents) because the file cannot express them, but when a hook is missed --
+# an errored turn, a killed process, a harness crash -- this unsticks the badge.
 #
 # Deliberately DEMOTION-ONLY, for the states a missed hook strands:
 #   file says idle + badge says working/thinking  -> demote to idle
@@ -46,9 +43,8 @@ for f in "$sessdir"/*.json; do
     )
     [[ -n "$pid" && -n "$status" && -n "$tmuxref" && "$tmuxref" != "null" ]] || continue
 
-    # Stale files outlive their sessions -- some here were days old. Without this
-    # a dead session's last-known status would keep overwriting a live pane that
-    # tmux has since reused for something else.
+    # Session files outlive their sessions; a dead session's status must not
+    # overwrite a pane tmux has since reused.
     kill -0 "$pid" 2>/dev/null || continue
 
     pane="%${tmuxref##*.%}"
@@ -70,21 +66,11 @@ for f in "$sessdir"/*.json; do
             esac
             ;;
         busy)
-            # Nothing fires when you *grant* a permission. There is no
-            # PermissionGranted event -- verified against the manifest validator,
-            # which rejects PermissionGranted / PermissionResponse /
-            # PermissionResult / PermissionDecision / PermissionAllowed -- and
-            # PreToolUse is no help because it runs *before* PermissionRequest,
-            # which would just overwrite it.
-            #
-            # So `needs` survives the grant and stays lit for the entire tool
-            # run: observed at 3m35s on an approved `sudo du`, a window loudly
-            # asking for attention precisely while it needed none.
-            #
-            # The status file settles it, because it distinguishes the two cases
-            # that matter: "waiting" while a prompt is actually pending, "busy"
-            # once the tool is running. Both verified live against a real prompt.
-            # busy therefore means the decision has already been made.
+            # No hook fires when a permission is granted (there is no such event,
+            # and PreToolUse runs before PermissionRequest), so `needs` would stay
+            # lit for the whole tool run. The file reports "waiting" while a
+            # prompt is pending and "busy" once the tool runs, so busy means the
+            # decision has been made.
             case "$cur" in
                 needs)
                     tmux set -p -t "$pane" @cc_pane_state working 2>/dev/null

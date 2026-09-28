@@ -65,8 +65,7 @@ permitted hosts on startup and during a session. Measured beats documented.
 
 ## Keeping it honest over time
 
-opencode self-updates silently. `bin/opencode-contract egress` lists the
-outbound hosts referenced in the tracked source, and `bin/opencode-contract
-check` flags when the contract (incl. `config.mdx`) drifts — so a new endpoint
-introduced by an update surfaces for review instead of silently widening the
-egress surface. Re-run after updates.
+opencode self-updates silently. After an update, run
+`bin/opencode-contract egress` to list the outbound hosts referenced in current
+source and `bin/opencode-contract schema` to check the config schema, so a new
+endpoint surfaces for review instead of silently widening egress.

@@ -1,31 +1,19 @@
 #!/bin/bash
 # Install opencode via the official installer (opencode.ai/install).
 #
-# opencode self-updates (`opencode upgrade`), so this script only ensures the
-# binary is present — it does not pin or manage versions. Re-run with --force to
-# reinstall (e.g. to repair a broken binary).
+# opencode self-updates (`opencode upgrade`), so this only ensures it is present;
+# --force reinstalls. It refuses to shadow an org-managed opencode on PATH.
 #
-# opencode is an "ai" tier tool: installed only by --opencode (or --ai/--full),
-# never as a side effect of a tier. Like the other AI installers, it refuses to
-# shadow an org-managed opencode already on PATH.
+# The installer always uses ~/.opencode/bin and otherwise appends a PATH line to
+# a shell rc file (a symlink into this repo), so pass --no-modify-path and link
+# the binary into ~/.local/bin.
 #
-# The installer hardcodes its install dir to ~/.opencode/bin (no env override)
-# and, by default, appends a PATH line to a shell rc file. Our rc files are
-# dotfiles symlinks, so we pass --no-modify-path to prevent it writing through
-# into the tracked repo, then symlink the binary into ~/.local/bin — already on
-# PATH via shell/env.sh, and where the registry/verify/uninstall expect it (the
-# same approach used for bat/fd).
+# Not eget: opencode ships CPU/libc variants (baseline builds for CPUs without
+# AVX2, musl). The upstream installer detects the right one; a fixed asset
+# filter would SIGILL on older CPUs.
 #
-# WHY THE OFFICIAL SCRIPT, NOT eget: opencode ships CPU/libc VARIANT builds
-# (opencode-linux-x64, -x64-baseline for CPUs without AVX2, -musl for Alpine).
-# The upstream installer probes /proc/cpuinfo + ldd and picks the right one. A
-# fixed eget asset filter would always grab the AVX2 glibc build and SIGILL on
-# an older work VM (or fail on musl). Do NOT "pin it with eget" without
-# replicating that detection.
-#
-# This script also provisions a hardened, env-driven ~/.config/opencode config
-# (local-endpoint only, share disabled, OTEL local) when OPENCODE_ENDPOINT is
-# set — see configs/opencode.json and docs/opencode-secure.md.
+# With OPENCODE_ENDPOINT set, this also provisions the hardened config
+# (docs/opencode-secure.md).
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,12 +27,9 @@ FORCE=false
 OPENCODE_REAL="$HOME/.opencode/bin/opencode"   # hardcoded install location
 OPENCODE_LINK="$HOME/.local/bin/opencode"      # our PATH-visible symlink
 
-# Provision the hardened, env-driven config (configs/opencode.json) into
-# ~/.config/opencode. Gated on OPENCODE_ENDPOINT so we never touch a personal
-# machine's opencode config — setting that env var is the "I have a local secure
-# endpoint" signal. Idempotent: won't clobber an existing config without --force.
-# The config uses opencode's {env:VAR} substitution, so it reads OPENCODE_ENDPOINT
-# / OPENCODE_MODEL live at runtime — no re-provisioning needed when they change.
+# Provision configs/opencode.json only when OPENCODE_ENDPOINT signals a local
+# secure endpoint, so personal configs are never touched. An existing config
+# needs --force. The file reads its endpoint and model via {env:VAR} at runtime.
 provision_opencode_config() {
     local src="$DOTFILES_DIR/configs/opencode.json"
     local dest="$HOME/.config/opencode/opencode.json"
@@ -97,10 +82,7 @@ if [[ "$FORCE" != true && -x "$OPENCODE_REAL" ]] && "$OPENCODE_REAL" --version >
     exit 0
 fi
 
-# Don't shadow an externally-managed opencode. On org-managed machines the CLI
-# is provided elsewhere on PATH; installing our own copy would silently override
-# it (shell/env.sh prepends ~/.local/bin). Our own symlink and opencode's own
-# default install dir are not "external" — anything else is always preserved.
+# Don't shadow an externally managed opencode: ~/.local/bin comes first on PATH.
 EXTERNAL_OPENCODE="$(command -v opencode 2>/dev/null || true)"
 if [[ -n "$EXTERNAL_OPENCODE" \
       && "$EXTERNAL_OPENCODE" != "$OPENCODE_LINK" \

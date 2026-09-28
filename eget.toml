@@ -1,13 +1,9 @@
-# eget.toml — declarative binary tool management
-# Versions pinned to known-good releases.
+# eget.toml — pinned releases for the eget-managed tools. Install through
+# setup.sh, which adds tier selection, staging, and ownership recording.
 #
-# upgrade_only=true makes `eget --download-all` idempotent: a tool already
-# present at its pinned tag is skipped (eget compares the pinned release's date
-# against the installed binary's mtime), so re-running setup.sh no longer
-# re-downloads everything. To move to a newer release, bump its `tag` and
-# re-run — the newer release date triggers the download. To force a clean
-# re-download (repair or downgrade), use `./setup.sh --bash --force`; downloads
-# are staged and verified before atomically replacing the working binary.
+# upgrade_only skips a tool already at its pinned tag (eget compares the
+# release date with the installed binary's mtime). Bump `tag` and rerun setup to
+# upgrade; `./setup.sh --bash --force` re-downloads (repair or downgrade).
 #
 # Architecture: filters must leave exactly one asset per supported arch
 # (x86_64 and aarch64) after eget's native OS/arch detection. Never filter on an
@@ -99,9 +95,8 @@ tag = "jq-1.8.1"
 asset_filters = ["jq-linux-"]
 target = "~/.local/bin/jq"
 
-# NOTE: Codex is an "ai" tier tool and is intentionally NOT listed here. Its
-# dedicated installer uses OpenAI's standalone installer so that `--bash`'s
-# `eget --download-all` never pulls it in — AI CLIs install only under --ai/--full.
+# AI CLIs are deliberately absent: they use vendor installers and only install
+# with --ai/--full or their own flags.
 
 ["mame/wsl2-ssh-agent"]
 tag = "v0.9.7"

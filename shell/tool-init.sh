@@ -11,7 +11,7 @@ if command -v direnv >/dev/null 2>&1; then
     fi
 fi
 
-# uv completion (bash only — zsh completions loaded after compinit in zshrc)
+# uv completion (bash only; zsh generates it before compinit in entry/zsh.sh)
 if command -v uv >/dev/null 2>&1 && [[ -n "${BASH_VERSION:-}" ]]; then
     eval "$(uv generate-shell-completion bash 2>/dev/null || true)"
 fi

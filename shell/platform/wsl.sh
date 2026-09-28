@@ -1,31 +1,16 @@
 #!/bin/bash
-# All WSL-specific runtime concerns — functions and aliases.
-# Sourced conditionally by shell/init.sh when DOTFILES_WSL=1.
-# No WSL guard needed here — init.sh handles the check.
+# WSL-specific functions and aliases. shell/init.sh only sources this on WSL.
 
 # ==============================================================================
 # SSH agent bridge — OPT-IN per machine
 # ==============================================================================
 #
-# Forward the Windows ssh-agent (e.g. Bitwarden serving the standard
-# \\.\pipe\openssh-ssh-agent pipe) into WSL, so SSH keys live in the vault and
-# never touch disk — one agent then serves Windows, WSL, and VS Code.
-#
-# Enable on a PERSONAL machine by creating the marker file:
-#     touch ~/.ssh/use-windows-agent
-# (A marker file, not an env var: this runs before ~/.shell.local is sourced.)
-#
-# The relay DAEMON is owned by the systemd user service `wsl2-ssh-agent.service`
-# (installed by setup.sh on opt-in WSL machines) so it is up at BOOT — visible to
-# every shell, tmux pane, and captured environment, surviving reboots. This block
-# is now just the fallback: point SSH_AUTH_SOCK at the socket the service serves,
-# and start the relay inline ONLY if that socket is dead (no service yet: marker
-# added after setup, or a host without systemd).
-#
-# WORK machines that must use local on-disk keys: leave the marker ABSENT. This
-# block is skipped, SSH_AUTH_SOCK is untouched, and ssh uses the local agent /
-# ~/.ssh key files. Put work-specific Host/IdentityFile blocks in
-# ~/.ssh/config.local (included by ssh_config). See docs/customization.md.
+# Forwards the Windows ssh-agent into WSL so keys stay in the vault. Enabled by
+# the ~/.ssh/use-windows-agent marker (a file, not an env var, because this runs
+# before ~/.shell.local). The systemd user service normally runs the relay; this
+# points SSH_AUTH_SOCK at its socket and starts the relay inline only if the
+# socket is dead (no systemd, or marker added after setup). Without the marker,
+# SSH_AUTH_SOCK is untouched. See docs/customization.md.
 if [[ -f "$HOME/.ssh/use-windows-agent" ]]; then
     export SSH_AUTH_SOCK="$HOME/.ssh/wsl2-ssh-agent.sock"
     # exit 2 from ssh-add = "can't connect" (dead socket) -> revive inline.

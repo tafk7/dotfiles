@@ -1,8 +1,5 @@
-# EditorConfig is awesome: https://EditorConfig.org
-# This file defines coding styles for multiple editors and IDEs
-# Part of dotfiles
+# EditorConfig (https://editorconfig.org), linked to ~/.editorconfig.
 
-# Top-most EditorConfig file
 root = true
 
 # ==============================================================================
@@ -10,23 +7,12 @@ root = true
 # ==============================================================================
 
 [*]
-# Use spaces for indentation
 indent_style = space
-
-# Default indentation size
 indent_size = 4
-
-# Unix-style newlines with a newline ending every file
 end_of_line = lf
 insert_final_newline = true
-
-# Remove trailing whitespace
 trim_trailing_whitespace = true
-
-# UTF-8 encoding
 charset = utf-8
-
-# Maximum line length
 max_line_length = 100
 
 # ==============================================================================

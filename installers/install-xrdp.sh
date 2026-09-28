@@ -2,12 +2,8 @@
 # Configure the xrdp RDP server. Packages (xrdp, xorgxrdp, xfce4) are apt-installed
 # by install_rdp_packages before this runs; this script owns everything after:
 # TLS group, xrdp.ini port/security, ~/.xsession, the polkit colord fix, and the
-# systemd service. All /etc/xrdp state lives here, not CONFIG_MAP — the symlink
-# engine is (correctly) restricted to $HOME.
-#
-# xrdp is an "rdp" tool (./setup.sh --rdp): opt-in per machine, never implied by
-# a tier or --full, because installing it opens a network listener. Idempotent;
-# re-run with --force to reapply configuration.
+# systemd service. /etc/xrdp state lives here because CONFIG_MAP only manages
+# $HOME. Idempotent; --force reapplies configuration.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -60,11 +56,8 @@ if ! command -v xrdp >/dev/null 2>&1 || [[ ! -f "$XRDP_INI" ]]; then
     exit 1
 fi
 
-# Preflight: is the target port already held by something that ISN'T xrdp? A
-# stray listener (another RDP server, a leftover process, or a conflicting
-# service) would make xrdp fail to bind at start with an opaque error — catch it
-# here with an actionable message. A re-run where xrdp is already the listener
-# is fine and passes through.
+# Preflight: another listener on the port would make xrdp fail to bind with an
+# opaque error, so report it here. xrdp itself holding the port is fine.
 if command -v ss >/dev/null 2>&1 \
    && ss -Hltn "sport = :${RDP_PORT}" 2>/dev/null | grep -q . \
    && ! systemctl is-active --quiet xrdp 2>/dev/null; then

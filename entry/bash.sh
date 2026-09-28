@@ -2,11 +2,9 @@
 # Bash configuration
 # Owns: shell options, history, completion, bash-specific settings
 
-# Establish DOTFILES_DIR. Symlink derivation locates the repo for a fresh clone,
-# but a bind-mount/copy (containers, WSL, rsync) flattens the symlink so
-# readlink resolves to the file itself → a wrong dir. The data-only install-path
-# state file is the fallback; the old generated/bridge.sh remains read-only
-# compatibility for installations that have not migrated yet.
+# Locate the checkout through the symlink. A flattened copy or bind mount
+# defeats that, so fall back to the recorded install path. generated/bridge.sh
+# is legacy, read-only compatibility.
 DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
     _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
@@ -22,12 +20,9 @@ _bridge="$DOTFILES_DIR/generated/bridge.sh"
 [[ -f "$_bridge" ]] && source "$_bridge"
 unset _bridge
 
-# Non-interactive: just set PATH baseline and stop.
-#
-# This branch IS the agent shell. Coding harnesses run commands as `bash -lc`
-# (Codex) or snapshot a non-interactive login shell and source that snapshot on
-# every tool call (Claude Code, and Codex's unified_exec shell_snapshot). Either
-# way they land here, via entry/bash_profile -> ~/.bashrc.
+# Non-interactive: Layer 0 only. This is the agent shell: harnesses run
+# `bash -lc` per command or snapshot a non-interactive login shell, and both
+# arrive here through ~/.bash_profile.
 if [[ $- != *i* ]]; then
     [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
 
@@ -38,7 +33,7 @@ if [[ $- != *i* ]]; then
     return
 fi
 
-# PATH baseline for non-login interactive (VS Code terminals)
+# Non-login interactive shells (e.g. VS Code terminals) still need Layer 0.
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
 
 # ==============================================================================
