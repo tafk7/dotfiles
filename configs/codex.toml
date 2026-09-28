@@ -1,8 +1,7 @@
 # Portable keys reconciled by bin/ai-config. Unlisted local values are preserved.
+# Model, provider, context window and compaction limit depend on where requests
+# are served, so they belong to whatever configures the provider, not here.
 
-model = "gpt-6-astra"
-model_context_window = 872000
-model_auto_compact_token_limit = 784800
 model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 approvals_reviewer = "user"
