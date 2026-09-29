@@ -79,6 +79,7 @@ jobs:
           ./bin/ssh-bridge --help           >/dev/null
           ./bin/dotfiles-feature --help     >/dev/null
           ./bin/opencode-contract --help    >/dev/null
+          ./bin/viz --help                  >/dev/null
 
       - name: Codex installer ownership behavior
         run: |
@@ -95,6 +96,7 @@ jobs:
           python3 tests/theme-contrast.py
           python3 tests/documentation.py
           python3 tests/eget-selection.py
+          python3 tests/viz.py
 
       - name: Cheatsheet TSV is well-formed
         run: |

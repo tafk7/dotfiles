@@ -1,0 +1,371 @@
+#!/usr/bin/env python3
+# Show charts, diagrams and HTML reports from a remote shell in the connected VS Code.
+"""Show visualizations written on this machine in the VS Code window connected to it.
+
+Agents running in tmux over ssh cannot draw on the client screen, but VS Code
+Remote-SSH leaves an IPC socket per connected window. `viz open` finds a live
+one and drives that window with the server's remote CLI:
+
+- HTML, SVG and PDF are served from VIZ_DIR by a localhost server that reloads
+  pages when their file changes. `code --openExternal` opens the URL in the
+  client's browser, and VS Code forwards the port on the way.
+- Everything else (PNG, notebooks, Markdown with mermaid, ...) opens as a VS Code
+  tab, which renders those natively.
+
+Browser files outside VIZ_DIR are served through a link to their directory in
+VIZ_DIR/linked, so relative links between pages and reload on rebuild keep
+working. The server serves nothing outside VIZ_DIR and the linked directories.
+It binds 127.0.0.1 only, but other accounts on a shared host can reach it, so
+keep secrets out of what it serves.
+
+Environment:
+    VIZ_DIR    served root and home of `viz path` output (default ~/viz)
+    VIZ_PORT   server port (default 20000 + uid % 10000, stable per account)
+"""
+import argparse
+import datetime
+import glob
+import html
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import time
+import urllib.parse
+import urllib.request
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+ROOT = Path(os.environ.get('VIZ_DIR') or '~/viz').expanduser().resolve()
+PORT = int(os.environ.get('VIZ_PORT') or 20000 + os.getuid() % 10000)
+STATE = Path(os.environ.get('XDG_STATE_HOME') or '~/.local/state').expanduser() / 'viz'
+BROWSER_SUFFIXES = {'.html', '.htm', '.svg', '.pdf'}
+IMAGE_SUFFIXES = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
+LINKED = ROOT / 'linked'
+PING = f'viz {ROOT}'
+
+RELOAD_SCRIPT = """<script>(() => {
+  let seen = null;
+  setInterval(async () => {
+    try {
+      const r = await fetch('/__viz/version?path=' + encodeURIComponent(location.pathname), {cache: 'no-store'});
+      const v = await r.text();
+      if (seen !== null && v !== seen) location.reload();
+      seen = v;
+    } catch (e) {}
+  }, 1000);
+})();</script>"""
+
+
+def die(message):
+    print(f'viz: {message}', file=sys.stderr)
+    sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# VS Code bridge
+# ---------------------------------------------------------------------------
+
+def _socket_live(path):
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(0.5)
+    try:
+        s.connect(path)
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def vscode_socket():
+    """Newest IPC socket with a window behind it; most on disk are stale."""
+    current = os.environ.get('VSCODE_IPC_HOOK_CLI')
+    if current and _socket_live(current):
+        return current
+    runtime = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
+    candidates = glob.glob(os.path.join(runtime, 'vscode-ipc-*.sock'))
+    for path in sorted(candidates, key=_mtime, reverse=True):
+        if _socket_live(path):
+            return path
+    return None
+
+
+def vscode_cli():
+    """Remote CLI of a running VS Code server, else the newest installed one."""
+    home = os.path.expanduser('~')
+    clis = glob.glob(f'{home}/.vscode-server/cli/servers/*/server/bin/remote-cli/code')
+    clis += glob.glob(f'{home}/.vscode-server/bin/*/bin/remote-cli/code')
+    if not clis:
+        return None
+    running = set()
+    for cmdline in glob.glob('/proc/[0-9]*/cmdline'):
+        try:
+            with open(cmdline, 'rb') as f:
+                running.add(f.read().split(b'\0')[0].decode(errors='replace'))
+        except OSError:
+            continue
+    for cli in clis:
+        server = cli[:-len('bin/remote-cli/code')]
+        if any(exe.startswith(server) for exe in running):
+            return cli
+    return max(clis, key=_mtime)
+
+
+def vscode(*args):
+    """Run the remote CLI against a live window; False when none is connected."""
+    sock, cli = vscode_socket(), vscode_cli()
+    if not sock or not cli:
+        return False
+    env = dict(os.environ, VSCODE_IPC_HOOK_CLI=sock)
+    return subprocess.run([cli, *args], env=env, stdout=subprocess.DEVNULL).returncode == 0
+
+
+def _mtime(path):
+    try:
+        return os.stat(path).st_mtime
+    except OSError:
+        return 0
+
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+
+def tree_version(directory):
+    count, newest = 0, 0
+    for dirpath, dirnames, filenames in os.walk(directory):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        for name in filenames:
+            count += 1
+            try:
+                newest = max(newest, os.stat(os.path.join(dirpath, name)).st_mtime_ns)
+            except OSError:
+                continue
+    return f'{count}:{newest}'
+
+
+def gallery():
+    files = []
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        files += [Path(dirpath, n) for n in filenames if not n.startswith('.')]
+    for link in linked_dirs():
+        files += [f for f in link.iterdir() if f.is_file() and f.suffix.lower() in BROWSER_SUFFIXES]
+    files.sort(key=_mtime, reverse=True)
+    rows = []
+    for path in files:
+        rel = path.relative_to(ROOT).as_posix()
+        url = '/' + urllib.parse.quote(rel)
+        when = datetime.datetime.fromtimestamp(_mtime(path)).strftime('%Y-%m-%d %H:%M')
+        thumb = f'<img src="{url}" loading="lazy">' if path.suffix.lower() in IMAGE_SUFFIXES else ''
+        rows.append(f'<tr><td>{when}</td><td><a href="{url}">{html.escape(rel)}</a></td><td>{thumb}</td></tr>')
+    body = '\n'.join(rows) or '<tr><td colspan="3">Nothing yet. Write files with <code>viz path NAME</code>.</td></tr>'
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>viz</title>
+<style>
+  :root {{ color-scheme: light dark; font: 14px system-ui, sans-serif; }}
+  body {{ margin: 2rem; }}
+  td {{ padding: .3rem .8rem; vertical-align: middle; }}
+  td:first-child {{ opacity: .6; white-space: nowrap; }}
+  img {{ max-height: 60px; max-width: 160px; background: white; }}
+</style></head><body>
+<h1>{html.escape(str(ROOT))}</h1>
+<table>{body}</table>
+{RELOAD_SCRIPT}</body></html>"""
+
+
+class Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def do_GET(self):
+        url = urllib.parse.urlsplit(self.path)
+        if url.path == '/__viz/ping':
+            return self._send(PING, 'text/plain')
+        if url.path == '/__viz/version':
+            target = urllib.parse.parse_qs(url.query).get('path', ['/'])[0]
+            local = Path(self.translate_path(target))
+            if local.is_dir():
+                return self._send(tree_version(local), 'text/plain')
+            return self._send(str(local.stat().st_mtime_ns) if local.exists() else 'missing', 'text/plain')
+        if url.path == '/':
+            return self._send(gallery(), 'text/html')
+        local = Path(self.translate_path(url.path))
+        if local.is_file() and local.suffix.lower() in ('.html', '.htm'):
+            page = local.read_text(errors='replace')
+            match = None
+            for match in re.finditer(r'</body\s*>', page, re.IGNORECASE):
+                pass
+            cut = match.start() if match else len(page)
+            return self._send(page[:cut] + RELOAD_SCRIPT + page[cut:], 'text/html')
+        return super().do_GET()
+
+    def translate_path(self, path):
+        # Resolve symlinks and '..' before deciding what may be served.
+        local = os.path.realpath(super().translate_path(path))
+        allowed = [str(ROOT)] + [os.path.realpath(link) for link in linked_dirs()]
+        if not any(local == a or local.startswith(a + os.sep) for a in allowed):
+            return str(ROOT / '.viz-outside-root')
+        return local
+
+    def _send(self, text, content_type):
+        data = text.encode()
+        self.send_response(200)
+        self.send_header('Content-Type', f'{content_type}; charset=utf-8')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store')
+        super().end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+def linked_dirs():
+    return [p for p in LINKED.iterdir() if p.is_symlink() and p.is_dir()] if LINKED.is_dir() else []
+
+
+def link_dir(directory):
+    """The VIZ_DIR/linked entry for DIRECTORY, created on first use."""
+    for link in linked_dirs():
+        if link.resolve() == directory:
+            return link
+    LINKED.mkdir(parents=True, exist_ok=True)
+    name, n = directory.name or 'root', 1
+    link = LINKED / name
+    while link.exists() or link.is_symlink():
+        n += 1
+        link = LINKED / f'{name}-{n}'
+    link.symlink_to(directory, target_is_directory=True)
+    return link
+
+
+def server_state():
+    """'ours', 'other' (port taken by something else) or 'down'."""
+    try:
+        with urllib.request.urlopen(f'http://127.0.0.1:{PORT}/__viz/ping', timeout=1) as r:
+            return 'ours' if r.read().decode() == PING else 'other'
+    except OSError:
+        return 'down'
+
+
+def ensure_server():
+    state = server_state()
+    if state == 'other':
+        die(f'port {PORT} is taken by another server; set VIZ_PORT')
+    if state == 'ours':
+        return
+    STATE.mkdir(parents=True, exist_ok=True)
+    with open(STATE / 'serve.log', 'ab') as log:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), 'serve'],
+                         stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                         start_new_session=True)
+    for _ in range(30):
+        time.sleep(0.1)
+        if server_state() == 'ours':
+            return
+    die(f'server did not start; see {STATE / "serve.log"}')
+
+
+def url_for(path):
+    return f'http://localhost:{PORT}/' + urllib.parse.quote(path.relative_to(ROOT).as_posix())
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+def cmd_path(args):
+    name = Path(args.name)
+    if name.is_absolute() or '..' in name.parts:
+        die('NAME must be a relative path without ..')
+    path = ROOT / datetime.date.today().isoformat() / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    print(path)
+
+
+def cmd_open(args):
+    for arg in args.files:
+        path = Path(arg).expanduser().resolve()
+        if not path.exists():
+            die(f'no such file: {arg}')
+        browser = args.browser or (not args.vscode and path.suffix.lower() in BROWSER_SUFFIXES)
+        if not browser:
+            if vscode('--reuse-window', str(path)):
+                print(f'opened in VS Code: {path}')
+            else:
+                print(f'no connected VS Code window; open {path} yourself')
+            continue
+        if path != ROOT and ROOT not in path.parents:
+            directory = path if path.is_dir() else path.parent
+            link = link_dir(directory)
+            print(f'serving {directory} as {link}')
+            path = link if path.is_dir() else link / path.name
+        ensure_server()
+        url = url_for(path)
+        if vscode('--openExternal', url):
+            print(f'opened in browser: {url}')
+        else:
+            print(f'no connected VS Code window; forward port {PORT} and open {url}')
+
+
+def cmd_serve(args):
+    ROOT.mkdir(parents=True, exist_ok=True)
+    STATE.mkdir(parents=True, exist_ok=True)
+    server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    (STATE / 'serve.pid').write_text(str(os.getpid()))
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    print(f'serving {ROOT} at http://localhost:{PORT}/', flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        (STATE / 'serve.pid').unlink(missing_ok=True)
+
+
+def cmd_stop(args):
+    try:
+        pid = int((STATE / 'serve.pid').read_text())
+        os.kill(pid, signal.SIGTERM)
+        print(f'stopped server (pid {pid})')
+    except (OSError, ValueError):
+        print('server not running')
+
+
+def cmd_status(args):
+    state = server_state()
+    print(f'dir:     {ROOT}')
+    print(f'server:  ' + {'ours': f'http://localhost:{PORT}/',
+                          'other': f'port {PORT} taken by another server',
+                          'down': f'stopped (starts on demand, port {PORT})'}[state])
+    sock, cli = vscode_socket(), vscode_cli()
+    print('vscode:  ' + ('connected' if sock and cli else
+                         'no VS Code server installed' if not cli else 'no connected window'))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='viz', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest='command', required=True)
+    p = sub.add_parser('path', help="print (and create the directory of) today's path for NAME")
+    p.add_argument('name')
+    p.set_defaults(func=cmd_path)
+    p = sub.add_parser('open', help='show files in the connected VS Code or its browser')
+    target = p.add_mutually_exclusive_group()
+    target.add_argument('--browser', action='store_true', help='always serve and open in the browser')
+    target.add_argument('--vscode', action='store_true', help='always open as a VS Code tab')
+    p.add_argument('files', nargs='+')
+    p.set_defaults(func=cmd_open)
+    sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
+    sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
+    sub.add_parser('status', help='show server and VS Code connection state').set_defaults(func=cmd_status)
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == '__main__':
+    main()
