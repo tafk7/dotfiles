@@ -122,6 +122,18 @@ configuration. Settings not listed in those files are left alone. See
 ./bin/ai-update claude            # explicit update (auto-update is disabled)
 ```
 
+`bin/viz` shows an agent's charts and diagrams through the VS Code window
+connected over Remote-SSH, since agents in tmux cannot draw on the client
+screen. `viz open` sends HTML, SVG and PDF to the client browser through a
+localhost server that reloads pages on change, and opens other files as VS Code
+tabs. Claude's `viz` skill tells it where to write output and how to render it.
+
+```bash
+viz path report.html              # ~/viz/<today>/report.html
+viz open ~/viz/2026-09-28/report.html
+viz status                        # server and VS Code connection
+```
+
 ### Themes
 
 A single theme applies across Neovim, tmux, fzf, bat, Starship, delta, btop, and
