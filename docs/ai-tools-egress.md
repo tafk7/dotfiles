@@ -88,9 +88,9 @@ above user `config.toml`.
 Full detail in **`docs/opencode-secure.md`**. Summary: hosted-gateway default
 ("free models"), a default-on `models.dev` metadata fetch, opt-in share, and
 `experimental.openTelemetry` (off by default; when on, exports via OTLP-HTTP,
-which defaults to `localhost:4318` = no egress). We ship a hardened
-`configs/opencode.json` (provisioned when `OPENCODE_ENDPOINT` is set) that locks
-providers to a local endpoint, disables share, and enables local-only OTEL.
+which defaults to `localhost:4318` = no egress). `bin/ai-config opencode`
+disables share and turns silent self-updates into notices; locking providers to
+your endpoint (`enabled_providers`) is left to the provider configuration.
 
 ---
 
@@ -142,7 +142,7 @@ default-deny proxy or `tcpdump` on first launch of each tool.
 **Permit** (per your policy): your LLM endpoint(s) · your internal OTEL collector
 (if any) · `api.anthropic.com` + `downloads.claude.ai` (Claude Code, if you keep
 auto-update / managed settings) · `api.github.com` + `github.com` +
-`objects.githubusercontent.com` (opencode auto-update).
+`objects.githubusercontent.com` (opencode update check and explicit updates).
 
 **Deny:** `ab.chatgpt.com` (Codex Statsig metrics) · `models.dev` (opencode) ·
 `opencode.ai` (opencode zen/share) · `pi.dev` (Pi version check + install

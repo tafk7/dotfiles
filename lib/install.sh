@@ -227,6 +227,21 @@ download_installer_script() {
     chmod 700 "$destination"
 }
 
+# Vendor installers may append PATH lines to ~/.bashrc or ~/.zshrc, which are
+# symlinks into this checkout. Fingerprint the rc sources before the vendor step
+# and compare afterwards, so uncommitted local edits are not blamed on it.
+rc_snapshot() {
+    [[ -d "$DOTFILES_DIR/.git" ]] || return 0
+    git -C "$DOTFILES_DIR" diff -- entry/ shell/ 2>/dev/null | cksum
+}
+
+# warn_if_rc_changed SNAPSHOT [HINT]
+warn_if_rc_changed() {
+    [[ "$(rc_snapshot)" == "$1" ]] && return 0
+    warn "A shell rc file symlinked into the repo was modified during install."
+    warn "Review with: git -C \"$DOTFILES_DIR\" diff entry/ shell/   (revert if unwanted${2:+; $2})"
+}
+
 validate_tar_archive() {
     local archive="$1"
     tar -tf "$archive" | awk '

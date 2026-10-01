@@ -59,6 +59,48 @@ p() {
     fi
 }
 
+# Print a command's stdout as it runs and copy the same output to the clipboard.
+# Use the client clipboard from a remote tmux session when no local clipboard
+# tool is available. A private temporary file lets us wait for the copy to
+# finish and preserve the wrapped command's exit status in both Bash and Zsh.
+yo() (
+    if (( $# == 0 )); then
+        printf 'Usage: yo <command> [args...]\n' >&2
+        return 64
+    fi
+
+    local clipboard=() output_file command_status copy_status
+    if command -v pbcopy >/dev/null 2>&1; then
+        clipboard=(pbcopy)
+    elif [[ -n "${TMUX:-}" && -x "${DOTFILES_DIR:-}/bin/tmux-copy" ]]; then
+        clipboard=("$DOTFILES_DIR/bin/tmux-copy")
+    elif [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+        clipboard=(wl-copy)
+    elif [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
+        clipboard=(xclip -selection clipboard)
+    else
+        printf 'yo: no clipboard available (pbcopy, tmux, wl-copy, or xclip)\n' >&2
+        return 127
+    fi
+
+    output_file=$(mktemp) || return 1
+    trap 'rm -f -- "$output_file"' EXIT
+    set -o pipefail
+    if "$@" | tee "$output_file"; then
+        command_status=0
+    else
+        command_status=$?
+    fi
+    if "${clipboard[@]}" < "$output_file"; then
+        copy_status=0
+    else
+        copy_status=$?
+        printf 'yo: clipboard copy failed\n' >&2
+    fi
+    (( command_status == 0 )) || return "$command_status"
+    return "$copy_status"
+)
+
 # Process management
 alias killall='killall -v'
 

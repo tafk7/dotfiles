@@ -14,6 +14,11 @@ export _DOTFILES_ENV_LOADED=1
 # PATH Composition
 # ==============================================================================
 
+# opencode's self-update reruns its installer, which appends a PATH line to
+# ~/.bashrc (a repo symlink) unless this directory is already on PATH. The
+# ~/.local/bin launcher still resolves first.
+[[ -d "$HOME/.opencode/bin" ]] && PATH="$HOME/.opencode/bin:$PATH"
+
 # User directories
 [[ -d "$HOME/bin" ]] && PATH="$HOME/bin:$PATH"
 [[ -d "$HOME/.local/bin" ]] && PATH="$HOME/.local/bin:$PATH"

@@ -15,6 +15,8 @@ used=$(echo "$input"    | jq -r '.context_window.used_percentage     // 0')
 out_tok=$(echo "$input" | jq -r '.context_window.total_output_tokens // 0')
 win=$(echo "$input"     | jq -r '.context_window.context_window_size  // 0')
 model=$(echo "$input"   | jq -r '.model.display_name                 // "unknown"')
+cur=$(echo "$input"     | jq -r '.workspace.current_dir // .cwd       // ""')
+proj=$(echo "$input"    | jq -r '.workspace.project_dir               // ""')
 
 [[ "$used"    =~ ^[0-9.]+$ ]] || used=0
 [[ "$out_tok" =~ ^[0-9]+$  ]] || out_tok=0
@@ -51,8 +53,22 @@ repeat() { local n=$1 s=$2 out=''; while (( n-- > 0 )); do out+=$s; done; printf
 bar_in=$(repeat    "$in_cells" '█')
 bar_empty=$(repeat "$empty"    '░')
 
+# Agent's live shell cwd: project-relative when inside the project,
+# ~-abbreviated and amber when it has wandered outside.
+dir_lbl=''; DIR_COLOR=$SAGE
+if [[ -n "$cur" ]]; then
+    if [[ -n "$proj" && ( "$cur" == "$proj" || "$cur" == "$proj"/* ) ]]; then
+        dir_lbl="${proj##*/}${cur#"$proj"}"
+    else
+        dir_lbl="$cur"
+        [[ "$dir_lbl" == "$HOME" || "$dir_lbl" == "$HOME"/* ]] && dir_lbl="~${dir_lbl#"$HOME"}"
+        [[ -n "$proj" ]] && DIR_COLOR=$AMBER
+    fi
+fi
+
 printf '%b%s%b%s%b %b%d%%%b %b(+%s out)%b %b· %s%b' \
     "$COLOR" "$bar_in" "$GREY" "$bar_empty" "$RESET" \
     "$COLOR" "$used_int" "$RESET" \
     "$CYAN" "$out_lbl" "$RESET" \
     "$DIM" "$model" "$RESET"
+[[ -n "$dir_lbl" ]] && printf ' %b·%b %b%s%b' "$DIM" "$RESET" "$DIR_COLOR" "$dir_lbl" "$RESET"

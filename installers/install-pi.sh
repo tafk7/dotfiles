@@ -127,6 +127,7 @@ filter_pi_npm_stderr() {
 # --ignore-scripts is upstream's recommendation; the package has no lifecycle
 # scripts.
 mkdir -p "$PI_PREFIX"
+rc_before="$(rc_snapshot)"
 if ! npm install -g --prefix "$PI_PREFIX" --ignore-scripts "$PI_PACKAGE" \
     2> >(filter_pi_npm_stderr); then
     error "Pi installation failed (npm install $PI_PACKAGE)"
@@ -144,10 +145,7 @@ ln -sf "$PI_REAL" "$PI_LINK"
 
 # Safety net: we never invoke the upstream installer, so nothing should have
 # touched the rc files — but they are repo symlinks, so warn if anything did.
-if [[ -d "$DOTFILES_DIR/.git" ]] && ! git -C "$DOTFILES_DIR" diff --quiet -- entry/ shell/ 2>/dev/null; then
-    warn "A shell rc file symlinked into the repo was modified during install."
-    warn "Review with: git -C \"$DOTFILES_DIR\" diff entry/ shell/   (revert if unwanted)"
-fi
+warn_if_rc_changed "$rc_before"
 
 if [[ -x "$PI_LINK" ]] && "$PI_LINK" --version >/dev/null 2>&1; then
     success "Pi installed: $("$PI_LINK" --version 2>/dev/null | head -n1)"
