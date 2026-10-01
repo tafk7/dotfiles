@@ -14,6 +14,7 @@ local config = wezterm.config_builder()
 -- ---------------------------------------------------------------------------
 
 config.term = 'xterm-256color'
+config.default_prog = { 'powershell.exe', '-NoLogo' } -- instead of cmd.exe
 config.automatically_reload_config = true
 config.scrollback_lines = 5000 -- tmux keeps the long 50k-line history
 config.enable_scroll_bar = false
@@ -35,6 +36,106 @@ config.bypass_mouse_reporting_modifiers = 'SHIFT'
 -- Deliberately leave colors unset. WezTerm supplies its normal client palette,
 -- while remote shells, tmux, editors, and other applications emit their own
 -- ANSI/truecolor styling.
+
+-- ---------------------------------------------------------------------------
+-- Image paste over SSH
+-- ---------------------------------------------------------------------------
+
+-- An SSH session carries only text, and remote TUIs (Claude Code's Ctrl+V)
+-- read the server's clipboard, so a Windows clipboard image never arrives.
+-- Ctrl+Alt+V bridges it (Alt+V is tmux's compose pane): save the clipboard
+-- image to a temp PNG, copy it to the tab's SSH host, and paste the remote
+-- path, which Claude Code attaches as an image. The host is read from the
+-- tab's foreground `ssh` command line; PASTE_FALLBACK_HOST covers tabs where
+-- that fails. Uploads run with BatchMode, so plain `ssh <host>` must already
+-- authenticate without a prompt.
+local PASTE_FALLBACK_HOST = nil -- e.g. 'moonspawn'
+local PASTE_REMOTE_DIR = '.cache/wezterm-paste' -- relative to remote $HOME
+local PASTE_KEEP_DAYS = 7
+
+-- ssh options that consume the following argument.
+local SSH_VALUE_OPTS = 'BbcDEeFIiJLlmOoPpQRSWw'
+
+local function ssh_host_of(pane)
+  local info = pane:get_foreground_process_info()
+  if not info or not info.argv then
+    return nil
+  end
+  local name = (info.name or ''):lower()
+  if name ~= 'ssh.exe' and name ~= 'ssh' then
+    return nil
+  end
+  local argv, i = info.argv, 2
+  while i <= #argv do
+    local arg = argv[i]
+    if arg == '--' then
+      return argv[i + 1]
+    elseif arg:sub(1, 1) == '-' then
+      -- Flags may be bundled (-tA). A value-taking flag consumes the rest of
+      -- the word, or the next argument when it ends the word (-p 22).
+      for j = 2, #arg do
+        if SSH_VALUE_OPTS:find(arg:sub(j, j), 1, true) then
+          if j == #arg then
+            i = i + 1
+          end
+          break
+        end
+      end
+    else
+      return arg
+    end
+    i = i + 1
+  end
+  return nil
+end
+
+local function paste_clipboard_image(window, pane)
+  local function fail(msg)
+    window:toast_notification('Image paste', msg, nil, 5000)
+  end
+
+  local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
+  if not host then
+    return fail('No SSH host for this tab (set PASTE_FALLBACK_HOST).')
+  end
+
+  local name = os.date('clip-%Y%m%d-%H%M%S-') .. math.random(1000, 9999) .. '.png'
+  local local_path = os.getenv('TEMP') .. '\\' .. name
+  local save = table.concat({
+    'Add-Type -AssemblyName System.Windows.Forms, System.Drawing',
+    '$img = [System.Windows.Forms.Clipboard]::GetImage()',
+    'if ($null -eq $img) { exit 3 }',
+    "$img.Save('" .. local_path:gsub("'", "''") .. "', [System.Drawing.Imaging.ImageFormat]::Png)",
+  }, '; ')
+  if not wezterm.run_child_process {
+    'powershell.exe', '-NoProfile', '-NonInteractive', '-STA', '-Command', save,
+  } then
+    return fail('Clipboard has no image.')
+  end
+
+  -- Private upload dir; prune old pastes; print the absolute path to paste.
+  local ok, remote_dir, err = wezterm.run_child_process {
+    'ssh', '-o', 'BatchMode=yes', host,
+    string.format(
+      'umask 077 && mkdir -p %s && find %s -type f -mtime +%d -delete && cd %s && pwd',
+      PASTE_REMOTE_DIR, PASTE_REMOTE_DIR, PASTE_KEEP_DAYS, PASTE_REMOTE_DIR
+    ),
+  }
+  remote_dir = (remote_dir or ''):gsub('%s+$', '')
+  if ok and remote_dir ~= '' then
+    local remote_path = remote_dir .. '/' .. name
+    ok, _, err = wezterm.run_child_process {
+      'scp', '-q', '-o', 'BatchMode=yes', local_path, host .. ':' .. remote_path,
+    }
+    if ok then
+      pane:paste(remote_path)
+    end
+  end
+  os.remove(local_path)
+  if not ok then
+    fail('Upload to ' .. host .. ' failed: ' .. (err or ''):gsub('%s+$', ''))
+  end
+end
 
 -- ---------------------------------------------------------------------------
 -- Keyboard
@@ -111,6 +212,12 @@ config.keys = {
     key = 'v',
     mods = 'CTRL|SHIFT',
     action = act.PasteFrom 'Clipboard',
+  },
+  -- Clipboard image -> upload to the tab's SSH host -> paste its remote path.
+  {
+    key = 'v',
+    mods = 'CTRL|ALT',
+    action = wezterm.action_callback(paste_clipboard_image),
   },
 
   -- Ctrl+Shift+S as an extended key (xterm modifyOtherKeys), so it reaches
