@@ -22,11 +22,17 @@ def desired(component, home):
         overlay = tomllib.loads((ROOT / 'configs/codex.toml').read_text())
         text = reconcile_toml(original, overlay, header='# Portable keys are managed by dotfiles/bin/ai-config; other values are retained.\n')
     else:
-        directory = Path(os.environ.get('CLAUDE_CONFIG_DIR', directory)) if home == Path.home() else directory
-        target = directory / 'settings.json'
+        if component == 'opencode':
+            config_home = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) if home == Path.home() else home / '.config'
+            directory = config_home / 'opencode'
+            target = directory / 'opencode.json'
+            source = ROOT / 'configs/opencode.json'
+        else:
+            directory = Path(os.environ.get('CLAUDE_CONFIG_DIR', directory)) if home == Path.home() else directory
+            target = directory / 'settings.json'
+            source = ROOT / 'configs/claude-settings.json'
         original = load_json(target)
-        overlay = load_json(ROOT / 'configs/claude-settings.json')
-        data = merge(original, overlay)
+        data = merge(original, load_json(source))
         text = target.read_text() if target.exists() and equivalent(data, original) else json.dumps(data, indent=2) + '\n'
     outputs = [(target, text.encode(), 0o600)]
     assets = ROOT / 'configs/ai' / component
@@ -64,14 +70,14 @@ def check_plugin(component, directory):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('component', choices=['codex', 'claude', 'all'], nargs='?', default='all')
+    parser.add_argument('component', choices=['codex', 'claude', 'opencode', 'all'], nargs='?', default='all')
     parser.add_argument('--home', type=Path, default=Path.home())
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--plugins', action='store_true', help='also check enabled badge caches with --check')
     args = parser.parse_args()
     # Validate every document and target before writing any of them.
-    plans = [(c, *desired(c, args.home)) for c in (['codex', 'claude'] if args.component == 'all' else [args.component])]
+    plans = [(c, *desired(c, args.home)) for c in (['codex', 'claude', 'opencode'] if args.component == 'all' else [args.component])]
     ok = True
     for component, directory, outputs in plans:
         for path, data, mode in outputs:
@@ -81,12 +87,15 @@ def main():
                 ok = matches and ok
             else:
                 write_file(path, data, directory / 'backups', args.dry_run, mode)
-        if args.check and args.plugins:
+        if args.check and args.plugins and component != 'opencode':
             ok = check_plugin(component, directory) and ok
         if component == 'claude':
             env = load_json(ROOT / 'configs/claude-settings.json').get('env', {})
             print('info: Claude nonessential traffic disabled; updates are explicit (bin/ai-update claude).'
                   if env.get('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC') == '1' else 'info: Claude updater follows its runtime environment.')
+        if component == 'opencode':
+            print('info: opencode notifies about updates; install them with bin/ai-update opencode.'
+                  if load_json(ROOT / 'configs/opencode.json').get('autoupdate') == 'notify' else 'info: opencode updater follows its configuration.')
     return 0 if ok else 1
 
 

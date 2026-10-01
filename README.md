@@ -90,6 +90,7 @@ fgb / fgl / frg           # fzf branch switcher / commit browser / ripgrep
 gs ga gc gd gp gpl        # git status/add/commit/diff/push/pull
 lg                        # lazygit
 tm <name> / ta <name> / tr   # tmux new / attach / resume most recent
+yo <command>              # print output and copy it to the clipboard
 ```
 
 `proj` and `cproj` search the directories in `PROJECTS_DIRS` (default
@@ -112,7 +113,7 @@ tm <name> / ta <name> / tr   # tmux new / attach / resume most recent
 ### AI CLIs
 
 `bin/ai-config` merges the portable settings from `configs/codex.toml`,
-`configs/claude-settings.json`, and `configs/ai/` into each CLI's own
+`configs/claude-settings.json`, `configs/opencode.json`, and `configs/ai/` into each CLI's own
 configuration. Settings not listed in those files are left alone. See
 [docs/ai-configuration.md](docs/ai-configuration.md).
 
@@ -120,6 +121,7 @@ configuration. Settings not listed in those files are left alone. See
 ./bin/ai-config --dry-run
 ./bin/ai-config --check --plugins
 ./bin/ai-update claude            # explicit update (auto-update is disabled)
+./bin/ai-update opencode          # opencode only notifies about new releases
 ```
 
 `bin/viz` shows an agent's charts and diagrams through the VS Code window

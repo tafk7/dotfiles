@@ -84,6 +84,7 @@ elif [[ ! -s "$claude_installer" ]]; then
     error "DOTFILES_CLAUDE_INSTALLER_SCRIPT is missing or empty: $claude_installer"
     exit 1
 fi
+rc_before="$(rc_snapshot)"
 if ! env PROFILE=/dev/null bash "$claude_installer"; then
     [[ "$downloaded_installer" == true ]] && rm -f "$claude_installer"
     error "Claude Code installation failed"
@@ -91,10 +92,7 @@ if ! env PROFILE=/dev/null bash "$claude_installer"; then
 fi
 [[ "$downloaded_installer" == true ]] && rm -f "$claude_installer"
 
-if [[ -d "$DOTFILES_DIR/.git" ]] && ! git -C "$DOTFILES_DIR" diff --quiet -- entry/ shell/ 2>/dev/null; then
-    warn "The Claude installer modified a shell rc file that is symlinked into the repo."
-    warn "Review with: git -C \"$DOTFILES_DIR\" diff entry/ shell/   (revert if unwanted — PATH is already set by shell/env.sh)"
-fi
+warn_if_rc_changed "$rc_before" 'PATH is already set by shell/env.sh'
 
 if [[ -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
     success "Claude Code installed: $("$CLAUDE_BIN" --version 2>/dev/null | head -n1)"

@@ -156,6 +156,7 @@ shell│bat│Syntax-highlighted file viewer│batcat
 shell│view│Same as bat│batcat
 shell│md│Render Markdown in terminal│glow (TUI if interactive, print if piped)
 shell│p [path...]│Print canonical current directory or resolve supplied paths│pwd -P / realpath
+shell│yo <command>│Print command output and yank it to the clipboard│yo pwd
 # System info
 shell│df│Disk space (human readable)│df -h
 shell│du│Directory size (human readable)│du -h

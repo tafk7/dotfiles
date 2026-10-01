@@ -43,8 +43,7 @@ fi
 [[ -s "$rustup_installer" ]] || { error "Rust installer is missing or empty: $rustup_installer"; exit 1; }
 
 log "Running rustup installer from $rustup_installer"
-# -y: non-interactive, default profile/toolchain.
-# --no-modify-path: don't touch shell rc files (we own PATH via shell/env.sh).
+rc_before="$(rc_snapshot)"
 if ! sh "$rustup_installer" -y --no-modify-path; then
     error "rustup installation failed"
     [[ "$downloaded_installer" == true ]] && rm -f "$rustup_installer"
@@ -54,10 +53,7 @@ fi
 
 # Safety net: --no-modify-path should mean no rc edits, but the rc files are
 # repo symlinks — warn if anything wrote through anyway.
-if [[ -d "$DOTFILES_DIR/.git" ]] && ! git -C "$DOTFILES_DIR" diff --quiet -- entry/ shell/ 2>/dev/null; then
-    warn "A shell rc file symlinked into the repo was modified during install."
-    warn "Review with: git -C \"$DOTFILES_DIR\" diff entry/ shell/   (revert if unwanted)"
-fi
+warn_if_rc_changed "$rc_before"
 
 # Make cargo/rustc resolvable in this script's own shell for the verify below.
 PATH="$CARGO_HOME/bin:$PATH"

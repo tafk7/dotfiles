@@ -62,6 +62,17 @@ custom_binding = "ctrl-k"
         self.assertTrue(list((self.home / '.claude/backups').glob('*/settings.json')))
         self.assertFalse(list(self.home.rglob('.adapter-backups')))
 
+    def test_opencode_preferences_leave_providers_and_models_alone(self):
+        path = self.put('.config/opencode/opencode.json',
+                        '{"autoupdate":true,"model":"gw/big","provider":{"gw":{"models":{"big":{}}}}}')
+        self.run_config('opencode')
+        data = json.loads(path.read_text())
+        self.assertEqual(data['autoupdate'], 'notify')
+        self.assertEqual(data['share'], 'disabled')
+        self.assertEqual(data['model'], 'gw/big')
+        self.assertEqual(data['provider'], {'gw': {'models': {'big': {}}}})
+        self.assertTrue(list((self.home / '.config/opencode/backups').glob('*/opencode.json')))
+
     def test_repeat_and_check_are_byte_and_mtime_noops(self):
         self.run_config()
         before = self.snapshot()

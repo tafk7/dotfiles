@@ -1,6 +1,6 @@
 # Tracking opencode's contract
 
-opencode self-updates silently and ships patch releases constantly, with **no
+By default opencode self-updates silently and ships patch releases constantly, with **no
 versioned docs and no `llms.txt`**. To avoid writing integration code against a
 moving target (we already got burned once assuming a non-existent
 `OPENCODE_INSTALL_DIR`), treat these as the sources of truth, most → least
@@ -43,9 +43,10 @@ failure mode that started this.
 
 ## Recommended config hygiene
 
-Set `"autoupdate": "notify"` in `~/.config/opencode/opencode.json` so opencode
-tells you when a new version exists but doesn't silently change the contract
-under our tooling. Upgrade deliberately, then inspect the live contract.
+`configs/opencode.json` sets `"autoupdate": "notify"` (via `bin/ai-config`), so
+opencode tells you when a new version exists but doesn't silently change the
+contract under our tooling. Upgrade deliberately with `bin/ai-update opencode`,
+then inspect the live contract.
 
 ## Inspection command: `bin/opencode-contract`
 

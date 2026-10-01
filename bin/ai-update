@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
-    -h|--help) echo "Usage: ai-update claude|codex"; exit 0 ;;
-    claude|codex) exec "$ROOT/installers/install-$1.sh" --force ;;
-    *) echo 'Usage: ai-update claude|codex' >&2; exit 64 ;;
+    -h|--help) echo "Usage: ai-update claude|codex|opencode"; exit 0 ;;
+    claude|codex|opencode) exec "$ROOT/installers/install-$1.sh" --force ;;
+    *) echo 'Usage: ai-update claude|codex|opencode' >&2; exit 64 ;;
 esac

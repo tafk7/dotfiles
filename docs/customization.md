@@ -52,7 +52,8 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
    `PROFILE=/dev/null` for NVM, or install into a directory already on PATH as
    for Claude). If the vendor offers no suppression, drive the underlying package
    manager into a controlled prefix instead, as `installers/install-pi.sh` does.
-   End with the `git diff -- entry/ shell/` check the AI installers use.
+   Take `rc_before="$(rc_snapshot)"` before the vendor step and end with
+   `warn_if_rc_changed "$rc_before"`, as the AI installers do.
 2. Register it in `lib/registry.sh` with `TOOL_METHOD=installer`, its
    `TOOL_OWNERSHIP_ROOTS`, `TOOL_UPDATE_CONTRACT`, and any `TOOL_PATHS` that
    uninstall may remove.

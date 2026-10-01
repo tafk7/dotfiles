@@ -1,6 +1,6 @@
 # AI configuration ownership
 
-`bin/ai-config` updates preferences without downloading or updating a CLI. Both
+`bin/ai-config` updates preferences without downloading or updating a CLI. The
 native installers call it too. Run it from this checkout, or set `DOTFILES_DIR`
 when invoking an installer through another path. Python 3.11+ is required.
 
@@ -8,6 +8,7 @@ when invoking an installer through another path. Python 3.11+ is required.
 |---|---|
 | `configs/codex.toml` | Declared keys in `~/.codex/config.toml` |
 | `configs/claude-settings.json` | Declared keys in `~/.claude/settings.json` |
+| `configs/opencode.json` | Declared keys in `~/.config/opencode/opencode.json` |
 | `configs/ai/codex/` | Corresponding portable asset files under `~/.codex/` |
 | `configs/ai/claude/` | Corresponding portable asset files under `~/.claude/` |
 
@@ -21,14 +22,17 @@ Codex defaults to high reasoning. The model, provider, context window, and
 compaction threshold depend on where requests are served, so they are left to
 whatever configures the provider; named profiles can override any default.
 Provider-specific Claude environment, such as gateway compatibility flags,
-belongs to the provider configuration too. Claude keeps medium effort and
-disabled nonessential traffic, which also disables its automatic updater. Use
-`bin/ai-update claude` or `bin/ai-update codex` to update explicitly through the
-official installer's `--force` update/repair path, including configuration and
-plugin provisioning.
+belongs to the provider configuration too, as do opencode's providers, models
+and provider allowlist. Claude keeps medium effort and disabled nonessential
+traffic, which also disables its automatic updater. opencode only notifies about
+new releases and never shares sessions: its own updater reruns the upstream
+installer without `--no-modify-path`, which would append to the repo-owned
+`~/.bashrc`. Use `bin/ai-update claude`, `codex` or `opencode` to update
+explicitly through the official installer's `--force` path, including
+configuration and plugin provisioning.
 
 Before changes, files are copied into private, uniquely named subdirectories of
-`~/.claude/backups` or `~/.codex/backups`. Alternate configuration homes use their
+`~/.claude/backups`, `~/.codex/backups` or `~/.config/opencode/backups`. Alternate configuration homes use their
 own `backups` subdirectory. A semantic no-op retains original bytes and creates no
 backup. TOML formatting and comments normalize on a change; parsed values remain.
 Invalid JSON/TOML, incompatible object shapes, and symlinked targets fail before

@@ -39,12 +39,13 @@ run_shell_matrix() {
             [[ "$roots" == *"projects one"* && "$roots" == *"projects-two"* ]] || exit 31
             CLAUDE_FLAGS="--model sonnet"; CODEX_FLAGS="--profile work"
             OPENCODE_FLAGS="--model local"; PI_FLAGS="--provider test"
-            claude prompt; codex exec prompt; opencode run prompt; pi prompt
+            claude prompt; claude stop job; codex exec prompt; opencode run prompt; pi prompt
             unset DOTFILES_THEME_BTOP_RESOLVED BTOP_THEME_CONFIG BTOP_THEME_DIR LAZYGIT_THEME_CONFIG
             btop plain; lazygit plain
             dstopall
         ')"
     [[ "$output" == *'claude|--model|sonnet|prompt'* ]] || fail "$shell claude flag splitting"
+    [[ "$output" == *'claude|stop|job'* ]] || fail "$shell claude subcommand without flags"
     [[ "$output" == *'codex|--profile|work|exec|prompt'* ]] || fail "$shell codex flag splitting"
     [[ "$output" == *'opencode|--model|local|run|prompt'* ]] || fail "$shell opencode flag splitting"
     [[ "$output" == *'pi|--provider|test|prompt'* ]] || fail "$shell pi flag splitting"

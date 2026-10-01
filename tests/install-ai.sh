@@ -81,4 +81,20 @@ HOME="$fresh" PATH="$external:$TEST_SYSTEM_PATH" DOTFILES_DIR="$ROOT" \
     DOTFILES_AGENT_BADGE_ENABLED=0 "$ROOT/installers/install-claude.sh" --force >/dev/null 2>&1 || rc=$?
 [[ $rc -eq 2 && ! -e "$fresh/.local/bin/claude" ]] || fail "Claude external ownership"
 
+# The rc safety net reports only edits made during the install, not
+# uncommitted local changes that were already there.
+rc_repo="$TEST_ROOT/rc-repo"
+mkdir -p "$rc_repo/entry"
+printf 'export KEEP=1\n' > "$rc_repo/entry/bash.sh"
+git -C "$rc_repo" init -q && git -C "$rc_repo" add . \
+    && git -C "$rc_repo" -c user.name=t -c user.email=t@example.invalid commit -qm fixture
+printf '# local edit\n' >> "$rc_repo/entry/bash.sh"
+rc_output="$(DOTFILES_DIR="$rc_repo" bash -c '
+    source "$0/lib/install.sh"
+    before="$(rc_snapshot)"; warn_if_rc_changed "$before"; echo "[quiet]"
+    echo "export PATH=\$HOME/vendor:\$PATH" >> "$DOTFILES_DIR/entry/bash.sh"
+    warn_if_rc_changed "$before"' "$ROOT" 2>&1)"
+[[ "$rc_output" == *'[quiet]'* && "$rc_output" != *'modified during install'*'[quiet]'* ]] || fail "rc net blamed a local edit"
+[[ "$rc_output" == *'[quiet]'*'modified during install'* ]] || fail "rc net missed an installer edit"
+
 printf 'install-ai: ok\n'

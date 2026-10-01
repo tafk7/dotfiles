@@ -1,8 +1,9 @@
 #!/bin/bash
 # Install opencode via the official installer (opencode.ai/install).
 #
-# opencode self-updates (`opencode upgrade`), so this only ensures it is present;
-# --force reinstalls. It refuses to shadow an org-managed opencode on PATH.
+# A rerun only ensures it is present; --force (bin/ai-update opencode) reruns
+# the installer, which fetches the latest release. It refuses to shadow an
+# org-managed opencode on PATH.
 #
 # The installer always uses ~/.opencode/bin and otherwise appends a PATH line to
 # a shell rc file (a symlink into this repo), so pass --no-modify-path and link
@@ -12,8 +13,9 @@
 # AVX2, musl). The upstream installer detects the right one; a fixed asset
 # filter would SIGILL on older CPUs.
 #
-# With OPENCODE_ENDPOINT set, this also provisions the hardened config
-# (docs/opencode-secure.md).
+# Portable preferences are reconciled by bin/ai-config: update notices instead
+# of silent self-updates, because opencode's updater omits --no-modify-path.
+# Providers belong to whatever configures them.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,48 +29,15 @@ FORCE=false
 OPENCODE_REAL="$HOME/.opencode/bin/opencode"   # hardcoded install location
 OPENCODE_LINK="$HOME/.local/bin/opencode"      # our PATH-visible symlink
 
-# Provision configs/opencode.json only when OPENCODE_ENDPOINT signals a local
-# secure endpoint, so personal configs are never touched. An existing config
-# needs --force. The file reads its endpoint and model via {env:VAR} at runtime.
-provision_opencode_config() {
-    local src="$DOTFILES_DIR/configs/opencode.json"
-    local dest="$HOME/.config/opencode/opencode.json"
-
-    if [[ -z "${OPENCODE_ENDPOINT:-}" ]]; then
-        log "OPENCODE_ENDPOINT unset — skipping opencode config provisioning."
-        log "  For a hardened local-endpoint config: set OPENCODE_ENDPOINT (and"
-        log "  OPENCODE_MODEL) in ~/.shell.local, then re-run. See docs/opencode-secure.md."
-        return 0
-    fi
-    if [[ ! -f "$src" ]]; then
-        warn "configs/opencode.json not found — skipping config provisioning."
-        return 0
-    fi
-
-    mkdir -p "$(dirname "$dest")"
-    if [[ -e "$dest" && "$FORCE" != true ]]; then
-        log "opencode config already at $dest — leaving it (use --force to replace)."
-        return 0
-    fi
-    if [[ -e "$dest" ]]; then
-        local bak
-        bak="$dest.dotfiles-bak-$(date +%Y%m%d-%H%M%S)"
-        log "Backing up existing opencode config -> $bak"
-        mv "$dest" "$bak"
-    fi
-    cp "$src" "$dest"
-    success "Provisioned hardened opencode config -> $dest"
-    log "  (reads OPENCODE_ENDPOINT/OPENCODE_MODEL at runtime; providers locked to 'local')"
-}
-
-# Config is independent of the binary install state — provision on every run so
-# it lands even when the binary is already present (the early exits below).
-provision_opencode_config
+# Configuration is independent of the binary install state: reconcile it on
+# every run so it lands even when the binary is already present (the early
+# exits below).
+"$DOTFILES_DIR/bin/ai-config" opencode
 
 # Verify by absolute path: on a fresh machine ~/.local/bin is not guaranteed to
 # be on the installer process's PATH.
 if [[ "$FORCE" != true && -x "$OPENCODE_LINK" ]] && "$OPENCODE_LINK" --version >/dev/null 2>&1; then
-    success "opencode already installed ($("$OPENCODE_LINK" --version 2>/dev/null | head -n1)); it self-updates."
+    success "opencode already installed ($("$OPENCODE_LINK" --version 2>/dev/null | head -n1)); update with bin/ai-update opencode."
     exit 2
 fi
 
@@ -107,6 +76,7 @@ elif [[ ! -s "$opencode_installer" ]]; then
     error "DOTFILES_OPENCODE_INSTALLER_SCRIPT is missing or empty: $opencode_installer"
     exit 1
 fi
+rc_before="$(rc_snapshot)"
 if ! bash "$opencode_installer" --no-modify-path; then
     [[ "$downloaded_installer" == true ]] && rm -f "$opencode_installer"
     error "opencode installation failed"
@@ -126,10 +96,7 @@ ln -sf "$OPENCODE_REAL" "$OPENCODE_LINK"
 
 # Safety net: --no-modify-path should mean no rc edits, but the rc files are
 # repo symlinks — warn if anything wrote through anyway.
-if [[ -d "$DOTFILES_DIR/.git" ]] && ! git -C "$DOTFILES_DIR" diff --quiet -- entry/ shell/ 2>/dev/null; then
-    warn "A shell rc file symlinked into the repo was modified during install."
-    warn "Review with: git -C \"$DOTFILES_DIR\" diff entry/ shell/   (revert if unwanted)"
-fi
+warn_if_rc_changed "$rc_before"
 
 if [[ -x "$OPENCODE_LINK" ]] && "$OPENCODE_LINK" --version >/dev/null 2>&1; then
     success "opencode installed: $("$OPENCODE_LINK" --version 2>/dev/null | head -n1)"

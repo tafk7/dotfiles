@@ -8,14 +8,29 @@
 # `command -v` finds the PATH binary. `type -P` would be bash-only.
 unset -f claude claude-vsc 2>/dev/null
 
+# Claude only recognizes a subcommand as the first argument; behind injected
+# flags, `claude stop <id>` becomes the prompt "stop <id>". `agents` is left
+# out: it parses after flags and applies them to dispatched sessions.
+_claude_is_subcommand() {
+    case "${1:-}" in
+        attach|auth|auto-mode|doctor|gateway|import|install|logs|mcp|plugin|plugins|\
+        project|respawn|rm|setup-token|stop|kill|ultrareview|update|upgrade) return 0 ;;
+    esac
+    return 1
+}
+
 # A bare `command -v` condition doesn't fork; capturing its output would.
 if command -v claude >/dev/null 2>&1; then
     # zsh doesn't word-split unquoted expansions, so ${=VAR} is needed to pass
     # CLAUDE_FLAGS as separate arguments. Keep both branches in sync.
     if [[ -n "${ZSH_VERSION:-}" ]]; then
-        claude() { command claude ${=CLAUDE_FLAGS} "$@"; }
+        claude() {
+            if _claude_is_subcommand "$@"; then command claude "$@"
+            else command claude ${=CLAUDE_FLAGS} "$@"; fi
+        }
     else
         claude() {
+            _claude_is_subcommand "$@" && { command claude "$@"; return; }
             local -a flags=()
             read -r -a flags <<< "${CLAUDE_FLAGS:-}"
             command claude "${flags[@]}" "$@"
