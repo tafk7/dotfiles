@@ -3,24 +3,8 @@
 # zsh-only constructs below carry per-line `shellcheck disable` directives)
 # Owns: zsh options, history, completion, keybindings
 
-# ~/.zshenv normally establishes DOTFILES_DIR and the environment; this is the
-# fallback when only .zshrc is linked.
-if [[ -z "${DOTFILES_DIR:-}" ]]; then
-    # A flattened copy or bind mount defeats readlink; fall back to the recorded
-    # install path.
-    DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f ~/.zshrc)")")"
-    if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
-        _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
-        if [[ -r "$_dotfiles_path_file" ]]; then
-            IFS= read -r DOTFILES_DIR < "$_dotfiles_path_file"
-        else
-            DOTFILES_DIR="$HOME/dev/dotfiles"
-        fi
-        unset _dotfiles_path_file
-    fi
-    export DOTFILES_DIR
-    [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"
-fi
+# ~/.zshenv, always installed alongside this file, has already established
+# DOTFILES_DIR and the Layer 0 environment.
 
 # ==============================================================================
 # Zsh Options

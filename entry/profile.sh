@@ -57,16 +57,20 @@ fi
 
 # Part 2: bash/zsh only (env.sh is not POSIX).
 if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
-    if [ -z "${DOTFILES_DIR:-}" ]; then
+    # Checkout discovery (docs/architecture.md). The bash and zsh entries have
+    # already exported DOTFILES_DIR when their symlink resolves to a checkout;
+    # otherwise keep a valid inherited value, then use the recorded install
+    # path, then the default.
+    if [ -z "${DOTFILES_DIR:-}" ] || [ ! -f "$DOTFILES_DIR/shell/env.sh" ]; then
         _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
         if [ -r "$_dotfiles_path_file" ]; then
             IFS= read -r DOTFILES_DIR < "$_dotfiles_path_file"
         else
             DOTFILES_DIR="$HOME/dev/dotfiles"
         fi
-        export DOTFILES_DIR
         unset _dotfiles_path_file
     fi
+    export DOTFILES_DIR
     [ -f "$DOTFILES_DIR/shell/env-runtime.sh" ] && . "$DOTFILES_DIR/shell/env-runtime.sh"
     [ -f "$DOTFILES_DIR/shell/env.sh" ] && . "$DOTFILES_DIR/shell/env.sh"
 

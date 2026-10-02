@@ -8,24 +8,15 @@
 # single owner of completion init.
 [[ $- == *i* ]] && skip_global_compinit=1
 
-# Locate the checkout through the symlink. A flattened copy or bind mount
-# defeats that, so fall back to the recorded install path.
+# Locate the checkout through the symlink; it wins over an inherited value. A
+# flattened copy or bind mount defeats that, and ~/.profile falls back.
 #
 # :A:h:h (resolve symlinks, then dirname twice) avoids forking readlink and
 # dirname in every zsh process.
 _zshenv_self=~/.zshenv
-DOTFILES_DIR="${_zshenv_self:A:h:h}"
-unset _zshenv_self
-if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
-    _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
-    if [[ -r "$_dotfiles_path_file" ]]; then
-        IFS= read -r DOTFILES_DIR < "$_dotfiles_path_file"
-    else
-        DOTFILES_DIR="$HOME/dev/dotfiles"
-    fi
-    unset _dotfiles_path_file
-fi
-export DOTFILES_DIR
+_dotfiles_linked="${_zshenv_self:A:h:h}"
+[[ -f "$_dotfiles_linked/shell/env.sh" ]] && export DOTFILES_DIR="$_dotfiles_linked"
+unset _zshenv_self _dotfiles_linked
 
 # POSIX baseline + env (mirrors the bash entry chain via ~/.bashrc → ~/.profile)
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"

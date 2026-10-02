@@ -28,6 +28,19 @@ Zsh always reads `.zshenv`, which loads Layer 0, and reads `.zshrc` only for
 interactive sessions. Layer 0 does not resolve themes, query tmux, define public
 interactive commands, or remove externally owned functions.
 
+Startup locates the checkout (`DOTFILES_DIR`) in this order; a checkout is
+valid when `$DOTFILES_DIR/shell/env.sh` exists:
+
+1. the `.bashrc` or `.zshenv` symlink, when it resolves to a valid checkout;
+2. an inherited, valid `DOTFILES_DIR`;
+3. the recorded `install-path`;
+4. `~/dev/dotfiles`.
+
+Step 1 lives in `entry/bash.sh` and `entry/zshenv`; steps 2–4 live once, in
+`entry/profile.sh`. An inherited value never overrides a resolvable symlink, so
+a test HOME linked to a worktree, or a new tmux pane after a checkout switch,
+uses the linked checkout.
+
 Project activation follows shell startup semantics: `zsh -c` refreshes direnv
 through `.zshenv`; plain `bash -c` reads no dotfiles and inherits its parent's
 environment, while `bash -lc` refreshes through the login chain.
