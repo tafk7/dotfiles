@@ -2,19 +2,11 @@
 # Bash configuration
 # Owns: shell options, history, completion, bash-specific settings
 
-# Locate the checkout through the symlink. A flattened copy or bind mount
-# defeats that, so fall back to the recorded install path.
-DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
-if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
-    _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
-    if [[ -r "$_dotfiles_path_file" ]]; then
-        IFS= read -r DOTFILES_DIR < "$_dotfiles_path_file"
-    else
-        DOTFILES_DIR="$HOME/dev/dotfiles"
-    fi
-    unset _dotfiles_path_file
-fi
-export DOTFILES_DIR
+# Locate the checkout through the symlink; it wins over an inherited value. A
+# flattened copy or bind mount defeats that, and ~/.profile falls back.
+_dotfiles_linked="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+[[ -f "$_dotfiles_linked/shell/env.sh" ]] && export DOTFILES_DIR="$_dotfiles_linked"
+unset _dotfiles_linked
 
 # Non-interactive: Layer 0 only. This is the agent shell: harnesses run
 # `bash -lc` per command or snapshot a non-interactive login shell, and both
