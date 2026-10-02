@@ -254,9 +254,8 @@ as `profile.host`.
    username@hostname.
 6. **`lib/install.sh` `process_git_config`** — remove the
    `DOTFILES_GIT_NAME`/`DOTFILES_GIT_EMAIL` writes and the identity warning.
-   Setup keeps rendering the portable config and adding both includes; delta,
-   the theme include, and Azure credential integration depend on these, and
-   `bin/verify:256` fails without the Azure include.
+   Setup keeps rendering the portable config and its include; delta and the
+   theme include depend on it.
 7. **`setup.sh`** — remove `--git-name` / `--git-email` and the env vars from
    parsing and help. Fix stale comments claiming an interactive identity prompt
    exists (`setup.sh:65` and the `--no-git` help text); the current code never
@@ -276,8 +275,8 @@ as `profile.host`.
 - **gh after clone uses the active account.** Profiles pin git transport and
   identity, not gh's account for later `gh pr` / `gh issue` in that repo.
 - **Azure DevOps key upload is manual.** gh cannot register keys there; `add`
-  prints the public key and settings URL. HTTPS remotes continue to use
-  `git-credential-azdo`.
+  prints the public key and settings URL. HTTPS remotes can use the parked
+  `git-credential-azdo` snippet (`docs/work.md`).
 - **SSO authorization is manual** (§4 step 5).
 - **No central profile storage.** Regenerate per machine. A private companion
   repo or Bitwarden-rendered profiles are possible later, but not warranted for

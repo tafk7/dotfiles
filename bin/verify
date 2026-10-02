@@ -241,20 +241,6 @@ else
     check_warn "user not configured"
 fi
 
-azure_git_expected=false
-command -v az >/dev/null 2>&1 && azure_git_expected=true
-component_expected azure-cli && azure_git_expected=true
-if [[ "$azure_git_expected" == true ]]; then
-    azure_git="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig-azure"
-    portable_git="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
-    if [[ -f "$azure_git" ]] && grep -Fq "$azure_git" "$portable_git" 2>/dev/null \
-       && command -v git-credential-azdo >/dev/null 2>&1; then
-        check_pass "Azure DevOps portable credential integration"
-    else
-        check_fail "Azure CLI present/requested but portable Git integration is incomplete (run: setup.sh --config)"
-    fi
-fi
-
 # Configuration is checked separately from binary availability.
 for ai_component in codex claude; do
     if component_expected "$ai_component"; then

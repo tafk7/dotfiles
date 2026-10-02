@@ -302,7 +302,8 @@ TAILSCALE AND CLOUD (orthogonal - combine with any tier):
     --tail              Install Tailscale and enable tailscaled under systemd.
                         Does not enroll, configure routes/SSH, or change firewall
                         policy. Requires sudo on Ubuntu 22.04/24.04/26.04.
-    --azure             Azure CLI + Azure DevOps Git credential integration.
+    --azure             Azure CLI. The Azure DevOps Git credential helper is
+                        parked; see bin/git-credential-azdo.
     --gcloud            Google Cloud CLI from Google's signed APT repository.
     --aws               AWS CLI v2 from AWS's signature-verified distribution.
                         These selections require sudo independently of the tier.

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Install Azure CLI and its optional portable Azure DevOps Git integration.
+# Install Azure CLI. The Azure DevOps Git credential helper is parked; see
+# bin/git-credential-azdo.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,21 +18,17 @@ while (( $# )); do
 done
 
 if [[ "${DRY_RUN:-false}" == true ]]; then
-    log "[DRY RUN] Would add Microsoft's signed APT repository, install azure-cli, and link git-credential-azdo"
+    log "[DRY RUN] Would add Microsoft's signed APT repository and install azure-cli"
     exit 0
 fi
 
 already=false
 command -v az >/dev/null 2>&1 && dpkg-query -W azure-cli >/dev/null 2>&1 && already=true
 if command -v az >/dev/null 2>&1 && [[ "$already" != true ]]; then
-    mkdir -p "$HOME/.local/bin"
-    safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
     warn "Keeping externally managed Azure CLI: $(command -v az)"
     exit 2
 fi
 install_azure_cli || exit 1
-mkdir -p "$HOME/.local/bin"
-safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo"
 if command -v az >/dev/null 2>&1; then
     [[ "$already" == true && "${FORCE_REINSTALL:-false}" != true ]] && exit 2
     success "Azure CLI installed; authenticate separately with 'az login'"

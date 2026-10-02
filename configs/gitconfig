@@ -145,4 +145,3 @@
     # each shell/window, activates exactly one without rewriting this file.
 
 {{THEME_INCLUDE}}
-{{AZURE_INCLUDE}}

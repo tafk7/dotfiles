@@ -114,7 +114,7 @@ These untracked files keep machine-specific settings out of the repo:
 - `~/.shell.local.d/*.sh`: sourced in filename order after `~/.shell.local`.
   They run again on `reload`, so keep them idempotent.
 - `~/.gitconfig.local`: included last, so it overrides the tracked Git config.
-  Azure DevOps organization hosts go here too ([work](work.md#cloud-clis)).
+  So does the parked Azure DevOps credential snippet ([work](work.md#cloud-clis)).
 - `~/.ssh/config.local`: included first, so its values win. Named files in
   `~/.ssh/config.d/*.conf` follow it.
 
