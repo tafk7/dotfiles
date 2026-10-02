@@ -31,15 +31,13 @@ list_tools() {
     readarray -t names < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
 
     for name in "${names[@]}"; do
-        local verify_cmd
-        verify_cmd="$(tool_verify_command "$name")"
         local method="${TOOL_METHOD[$name]}"
         local paths
         paths="$(tool_uninstall_paths "$name")"
 
         local status="not found" ownership="unrecorded" removal="manual"
 
-        if eval "$verify_cmd"; then
+        if tool_is_present "$name"; then
             status="installed"
             local ledger=""
             ledger="$(ledger_line "$name" 2>/dev/null || true)"

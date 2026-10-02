@@ -117,15 +117,14 @@ observed_component_version() {
 
 reconcile_observed_components() {
     [[ "${DRY_RUN:-false}" == "true" ]] && return 0
-    local name verify_cmd path version ownership
+    local name path version ownership
     for name in "${!TOOL_BINARY[@]}"; do
         ledger_line "$name" >/dev/null 2>&1 && continue
         tool_applicable "$name" || {
             ledger_record "$name" no unknown not-applicable "" "" "platform/architecture" || return 1
             continue
         }
-        verify_cmd="$(tool_verify_command "$name")"
-        eval "$verify_cmd" || continue
+        tool_is_present "$name" || continue
         path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
         [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
         version="$(observed_component_version "$name" "$path")"
@@ -944,7 +943,6 @@ install_eget_tools() {
     # a pinned copy would shadow it. Skip it unless --force.
     if [[ "${FORCE_REINSTALL:-false}" != "true" ]]; then
         local -a to_download=() existing binary managed_target
-        local verify_cmd
         for name in "${eget_tools[@]}"; do
             binary="${TOOL_BINARY[$name]}"
             managed_target="$HOME/.local/bin/$binary"
@@ -954,8 +952,7 @@ install_eget_tools() {
                 existing="$(command -v "$binary" 2>/dev/null || true)"
             fi
             if [[ -n "$existing" && "$existing" != "$HOME/.local/bin/"* ]]; then
-                verify_cmd="$(tool_verify_command "$name")"
-                if eval "$verify_cmd"; then
+                if tool_is_present "$name"; then
                     log "Skipping $name — system copy at $existing (use --force to override)"
                     [[ "${DRY_RUN:-false}" != "true" ]] && track_install "$name" skip
                 else

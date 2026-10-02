@@ -99,12 +99,11 @@ show_tools() {
     # shellcheck source=../lib/registry.sh
     source "$DOTFILES_DIR/lib/registry.sh"
 
-    local name verify_cmd status membership
+    local name status membership
     while IFS= read -r name; do
-        verify_cmd="$(tool_verify_command "$name")"
         membership="tier=${TOOL_TIER[$name]:--}"
         [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || membership+="; cap=${TOOL_CAPABILITIES[$name]}"
-        if eval "$verify_cmd" >/dev/null 2>&1; then status=installed; else status="not installed"; fi
+        if tool_is_present "$name"; then status=installed; else status="not installed"; fi
         printf "    %-18s ${YELLOW}%-12s${RESET} ${DIM}(%s, %s, %s)${RESET}\n" \
             "$name" "${TOOL_BINARY[$name]}" "${TOOL_METHOD[$name]}" "$membership" "$status"
     done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)

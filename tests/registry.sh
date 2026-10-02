@@ -8,8 +8,25 @@ source "$ROOT/lib/registry.sh"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 
+(( ${#REGISTRY_ERRORS[@]} == 0 )) || fail "registry tables: ${REGISTRY_ERRORS[*]}"
+
 for name in "${!TOOL_BINARY[@]}"; do
-    [[ -n "${TOOL_METHOD[$name]:-}" ]] || fail "$name has no install method"
+    case "${TOOL_METHOD[$name]:-}" in
+        eget|apt|installer|external) ;;
+        *) fail "$name has unknown install method '${TOOL_METHOD[$name]:-}'" ;;
+    esac
+    case "${TOOL_TIER[$name]:-}" in
+        ""|bash|dev|work) ;;
+        *) fail "$name has unknown tier '${TOOL_TIER[$name]}'" ;;
+    esac
+    read -r verify_type verify_arg <<< "${TOOL_VERIFY[$name]:-}"
+    case "$verify_type" in
+        command|runs) ;;
+        service-active|file-nonempty) [[ -n "$verify_arg" ]] || fail "$name: $verify_type needs an argument" ;;
+        function) declare -F "$verify_arg" >/dev/null || fail "$name: verify function '$verify_arg' is undefined" ;;
+        *) fail "$name has unknown verify type '$verify_type'" ;;
+    esac
+    [[ -z "${TOOL_TIMEOUT[$name]:-}" || "$verify_type" == runs ]] || fail "$name: timeout only applies to verify runs"
     [[ -n "${TOOL_TIER[$name]:-}" || -n "${TOOL_CAPABILITIES[$name]:-}" ]] || fail "$name has no tier/capability"
     [[ -n "${TOOL_PLATFORM[$name]:-}" ]] || fail "$name has no platform"
     [[ -n "${TOOL_ARCHES[$name]:-}" ]] || fail "$name has no architectures"
@@ -61,5 +78,34 @@ assert_asset_args aarch64 '--asset wsl2-ssh-agent-arm64'
 if grep '^asset_filters' "$ROOT/eget.toml" | grep -Eq 'amd64|x86_64'; then
     fail "eget manifest contains architecture-specific filters; native selection would exclude ARM"
 fi
+
+# tool_is_present: each verify type against stub commands on a private PATH.
+STUBS="$(mktemp -d)"
+trap 'rm -rf "$STUBS"' EXIT
+stub() { printf '#!/bin/sh\n%s\n' "$2" > "$STUBS/$1"; chmod +x "$STUBS/$1"; }
+present() { PATH="$STUBS" HOME="$STUBS/home" tool_is_present "$1"; }
+TOOL_BINARY[t-command]=tc; TOOL_VERIFY[t-command]="command extra"; TOOL_COMPANIONS[t-command]=tcx
+TOOL_BINARY[t-runs]="tr"; TOOL_VERIFY[t-runs]="runs"; TOOL_VERSION_FLAG[t-runs]=-V
+TOOL_BINARY[t-slow]="ts"; TOOL_VERIFY[t-slow]="runs"; TOOL_TIMEOUT[t-slow]=1
+TOOL_BINARY[t-service]=tsv; TOOL_VERIFY[t-service]="service-active unit"
+TOOL_BINARY[t-file]=tf; TOOL_VERIFY[t-file]="file-nonempty $STUBS/home/marker"
+stub tc 'exit 0'; stub tcx 'exit 0'
+present t-command && fail "command verify passed without its extra command"
+stub extra 'exit 0'
+present t-command || fail "command verify failed with binary, companion, and extra"
+stub tr '[ "$1" = -V ]'
+present t-runs || fail "runs verify ignored the version flag"
+stub tr 'exit 1'
+present t-runs && fail "runs verify passed a broken launcher"
+ln -s "$(command -v timeout)" "$STUBS/timeout"; ln -s "$(command -v sleep)" "$STUBS/sleep"
+stub ts 'sleep 5'
+present t-slow && fail "runs verify ignored its timeout"
+stub systemctl '[ "$*" = "is-active --quiet unit" ]'
+present t-service || fail "service-active verify did not query the unit"
+mkdir -p "$STUBS/home"; : > "$STUBS/home/marker"
+present t-file && fail "file-nonempty verify passed an empty file"
+echo x > "$STUBS/home/marker"
+present t-file || fail "file-nonempty verify failed a nonempty file"
+present no-such-tool && fail "unknown tool reported present"
 
 printf 'registry: ok (ARM confidence: selection-only)\n'

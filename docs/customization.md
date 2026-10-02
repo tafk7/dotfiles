@@ -28,16 +28,17 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
    ```
    Filters must leave exactly one asset for each supported architecture. Refresh
    the recorded asset lists with `tests/eget-selection.py --refresh`.
-2. Register the tool in `lib/registry.sh`:
-   ```bash
-   TOOL_BINARY[mytool]=mytool
-   TOOL_METHOD[mytool]=eget
-   TOOL_TIER[mytool]=bash      # bash|dev|work; omit for capability-only tools
+2. Add one row to the core table in `lib/registry.sh`:
+   ```text
+   # name   binary  method  tier  capabilities  platform  arches  ubuntu  apt  verify
+   mytool   -       eget    bash  -             -         -       -       -    -
    ```
-   Add it to the ownership-root/update-contract loop for `~/.local/bin` tools.
-   Capability-only tools use `TOOL_CAPABILITIES` instead of a tier. Use
-   `TOOL_EGET_REPO` when the tool name differs from the repository basename,
-   and `TOOL_COMPANIONS` when the release ships extra executables.
+   `-` takes the documented default; eget tools are owned under `~/.local/bin`
+   with the staged-release contract automatically. Capability-only tools put
+   `-` in the tier column and name their capability instead. Add an override
+   line (`mytool eget-repo owner/repo`, `mytool companions extra`) only when
+   the tool name differs from the repository basename or the release ships
+   extra executables.
 3. Run `./setup.sh --bash` so selection, staging, and ownership recording apply.
    Direct `eget --download-all` bypasses all three.
 
@@ -54,9 +55,10 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
    manager into a controlled prefix instead, as `installers/install-pi.sh` does.
    Take `rc_before="$(rc_snapshot)"` before the vendor step and end with
    `warn_if_rc_changed "$rc_before"`, as the AI installers do.
-2. Register it in `lib/registry.sh` with `TOOL_METHOD=installer`, its
-   `TOOL_OWNERSHIP_ROOTS`, `TOOL_UPDATE_CONTRACT`, and any `TOOL_PATHS` that
-   uninstall may remove.
+2. Add a core-table row in `lib/registry.sh` with method `installer`, and
+   override lines for its `ownership-roots`, `update-contract`, and any `paths`
+   that uninstall may remove. Use verify `runs` when a present launcher can
+   still be broken.
 3. Call it from the appropriate `install_*_packages` function:
    ```bash
    run_installer "mytool" || failed=true
@@ -73,7 +75,7 @@ uses. Neither is loaded during shell startup.
 
 Capabilities such as `--tail` or `--aws` compose with any tier. Add a row to
 `CAPABILITIES` in `setup.sh` (name, requirements, installer, label) and give the
-registry components the capability in `TOOL_CAPABILITIES`. The `--NAME` flag,
+registry components the capability in the core table. The `--NAME` flag,
 preflight checks, install dispatch, banner, and summary all come from the row;
 the installer function receives the capability name. Document the flag in
 `show_help`.

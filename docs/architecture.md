@@ -105,14 +105,19 @@ user's existing `~/.gitconfig`. Identity and machine-local overrides stay in
 ## Component registry
 
 `lib/registry.sh` is the shared inventory for setup, verification, update
-reporting, and uninstall. Each component records a binary/service check,
-installation method, tier/feature, platform, supported architectures, ownership
-roots, update contract, and uninstall paths where automated removal is safe.
-`TOOL_TIER` records only cumulative membership. Composable, comma-separated
-`TOOL_CAPABILITIES` records AI, RDP, Tailscale, and cloud membership. Docker and
-sbx are ordinary work-tier components.
+reporting, and uninstall. Each component is one row in its core table (binary,
+installation method, tier, capabilities, platform, architectures, Ubuntu
+releases, APT package, and presence check), plus optional override lines for
+ownership roots, update contract, uninstall paths where automated removal is
+safe, and removal notes. Defaults follow from the method, so a typical eget tool
+needs no overrides. The tables are parsed once into `TOOL_*` arrays.
+The tier records only cumulative membership. Composable, comma-separated
+capabilities record AI, RDP, Tailscale, and cloud membership. Docker and sbx are
+ordinary work-tier components.
 
-Companion executables are declared in `TOOL_COMPANIONS` and participate in
+Presence is checked by `tool_is_present` from a typed verify column (`command`,
+`runs`, `service-active`, `file-nonempty`, or a named predicate), never by
+evaluating stored shell text. Companion executables participate in
 installation, verification, and uninstall. Successful installation establishes
 ownership; observing or skipping a local binary does not. See the
 [ownership and recovery contract](maintenance.md#updates-and-ownership).

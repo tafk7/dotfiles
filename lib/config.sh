@@ -53,7 +53,7 @@ config_owner_present() {
     local owner="$1"
     [[ -z "$owner" ]] && return 0
     if [[ -n "${TOOL_BINARY[$owner]:-}" ]]; then
-        eval "$(tool_verify_command "$owner")"
+        tool_is_present "$owner"
     else
         command -v "$owner" >/dev/null 2>&1
     fi
