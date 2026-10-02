@@ -239,7 +239,7 @@ emit_other_contracts() {
         [[ "$method" != eget ]] || continue
         [[ -z "$FILTER_TOOL" || "$FILTER_TOOL" == "$name" ]] || continue
         installed="not installed"
-        eval "$(tool_verify_command "$name")" && installed="installed"
+        tool_is_present "$name" && installed="installed"
         contract="${TOOL_UPDATE_CONTRACT[$name]:-unknown}"
         selection="${TOOL_TIER[$name]:--}"
         [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || selection+="/${TOOL_CAPABILITIES[$name]}"

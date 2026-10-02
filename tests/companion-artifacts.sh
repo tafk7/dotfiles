@@ -24,10 +24,10 @@ EOF
 chmod +x "$HOME/.local/bin/eget"
 install_eget_tools >/dev/null
 "$HOME/.local/bin/uvx" --version >/dev/null || fail "companion missing after install"
-eval "$(tool_verify_command uv)" || fail "complete component verification"
+tool_is_present uv || fail "complete component verification"
 [[ "$(tool_uninstall_paths uv)" == *"/uvx"* ]] || fail "companion not included in removal"
 rm "$HOME/.local/bin/uvx"
-if eval "$(tool_verify_command uv)"; then fail "verification missed companion loss"; fi
+if tool_is_present uv; then fail "verification missed companion loss"; fi
 install_eget_tools >/dev/null
 [[ -x "$HOME/.local/bin/uvx" ]] || fail "pinned primary prevented companion repair"
 export OMIT_COMPANION=1

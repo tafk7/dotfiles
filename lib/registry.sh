@@ -6,252 +6,227 @@
 [[ -n "${_DOTFILES_REGISTRY_LOADED:-}" ]] && return 0
 _DOTFILES_REGISTRY_LOADED=1
 
-# TOOL_BINARY: tool name → binary command name in PATH
-declare -A TOOL_BINARY=(
-    [starship]=starship
-    [eza]=eza
-    [fzf]=fzf
-    [zoxide]=zoxide
-    [delta]=delta
-    [btop]=btop
-    [gdu]=gdu
-    [glow]=glow
-    [lazygit]=lazygit
-    [gh]=gh
-    [uv]=uv
-    [bat]=bat
-    [fd]=fd
-    [ripgrep]=rg
-    [direnv]=direnv
-    [jq]=jq
-    [eget]=eget
-    [sd]=sd
-    [shellcheck]=shellcheck
-    [neovim]=nvim
-    [tmux]=tmux
-    [nvm]=nvm
-    [rust]=rustc
-    [claude]=claude
-    [codex]=codex
-    [opencode]=opencode
-    [pi]=pi
-    [wsl2-ssh-agent]=wsl2-ssh-agent
-    [xrdp]=xrdp
-    [zsh]=zsh
-    [docker]=docker
-    [azure-cli]=az
-    [sbx]=sbx
-    [tailscale]=tailscale
-    [gcloud]=gcloud
-    [aws-cli]=aws
-)
+# Tools are declared in two tables below and parsed once into the TOOL_*
+# associative arrays, which callers read directly (accessor functions would
+# fork a subshell per lookup). Treat the arrays as read-only outside tests.
+declare -A TOOL_BINARY=() TOOL_METHOD=() TOOL_TIER=() TOOL_CAPABILITIES=()
+declare -A TOOL_PLATFORM=() TOOL_ARCHES=() TOOL_UBUNTU_VERSIONS=()
+declare -A TOOL_APT_PACKAGE=() TOOL_VERIFY=()
+declare -A TOOL_EGET_REPO=() TOOL_UPDATE_SOURCE=() TOOL_RELATIVE_BINARY=()
+declare -A TOOL_VERSION_FLAG=() TOOL_TIMEOUT=() TOOL_COMPANIONS=()
+declare -A TOOL_OWNERSHIP_ROOTS=() TOOL_UPDATE_CONTRACT=() TOOL_PATHS=()
+declare -A TOOL_REMOVAL_MODE=() TOOL_REMOVAL_REQUIRES_SUDO=() TOOL_REMOVAL_INSTRUCTIONS=()
+# Problems found while parsing; tests/registry.sh requires this to stay empty.
+declare -a REGISTRY_ERRORS=()
 
-# TOOL_METHOD: tool name → install method (eget|apt|installer|external)
-declare -A TOOL_METHOD=(
-    [starship]=eget
-    [eza]=eget
-    [fzf]=eget
-    [zoxide]=eget
-    [delta]=eget
-    [btop]=eget
-    [gdu]=eget
-    [glow]=eget
-    [lazygit]=eget
-    [gh]=eget
-    [uv]=eget
-    [bat]=eget
-    [fd]=eget
-    [ripgrep]=eget
-    [direnv]=eget
-    [jq]=eget
-    [eget]=installer
-    [sd]=eget
-    [shellcheck]=eget
-    [neovim]=installer
-    [tmux]=installer
-    [nvm]=installer
-    [rust]=installer
-    [claude]=installer
-    [codex]=installer
-    [opencode]=installer
-    [pi]=installer
-    [wsl2-ssh-agent]=eget
-    [xrdp]=apt
-    [zsh]=apt
-    [docker]=apt
-    [azure-cli]=apt
-    [sbx]=apt
-    [tailscale]=apt
-    [gcloud]=apt
-    [aws-cli]=installer
-)
+# Core table: one row per tool. "-" takes the default.
+#   binary        command on PATH (default: the tool name)
+#   method        eget | apt | installer | external
+#   tier          minimum cumulative tier: bash | dev | work. Bash-tier tools
+#                 must install without root. Capability-only tools have none.
+#   capabilities  comma-separated orthogonal selections (see setup.sh)
+#   platform      ubuntu (default; native Ubuntu and WSL) | native-ubuntu | wsl
+#   arches        comma-separated (default: x86_64,aarch64). Explicit so
+#                 selection-only CI can validate ARM without executing it.
+#   ubuntu        comma-separated supported releases (default: any)
+#   apt           APT package name
+#   verify        how presence is checked (tool_is_present):
+#                   command [EXTRA...]  binary, companions, and EXTRA on PATH
+#                                       (default)
+#                   runs                also exits 0 with its version flag
+#                                       (and timeout); for launchers that can
+#                                       be present but broken
+#                   service-active UNIT the systemd unit is running
+#                   file-nonempty FILE  FILE exists and is not empty
+#                   function NAME       a predicate defined in this file
+_REGISTRY_TOOLS="
+# name          binary          method     tier  capabilities  platform       arches  ubuntu             apt               verify
+starship        -               eget       bash  -             -              -       -                  -                 -
+eza             -               eget       bash  -             -              -       -                  -                 -
+fzf             -               eget       bash  -             -              -       -                  -                 -
+zoxide          -               eget       bash  -             -              -       -                  -                 -
+delta           -               eget       bash  -             -              -       -                  -                 -
+btop            -               eget       bash  -             -              -       -                  -                 -
+gdu             -               eget       bash  -             -              -       -                  -                 -
+glow            -               eget       bash  -             -              -       -                  -                 -
+lazygit         -               eget       bash  -             -              -       -                  -                 -
+gh              -               eget       bash  -             -              -       -                  -                 -
+uv              -               eget       bash  -             -              -       -                  -                 -
+bat             -               eget       bash  -             -              -       -                  -                 -
+fd              -               eget       bash  -             -              -       -                  -                 -
+ripgrep         rg              eget       bash  -             -              -       -                  -                 function _registry_ripgrep_present
+direnv          -               eget       bash  -             -              -       -                  -                 -
+jq              -               eget       -     agent-badge   -              -       -                  -                 -
+eget            -               installer  bash  -             -              -       -                  -                 -
+sd              -               eget       bash  -             -              -       -                  -                 -
+shellcheck      -               eget       dev   -             -              -       -                  -                 -
+wsl2-ssh-agent  -               eget       bash  -             wsl            -       -                  -                 -
+neovim          nvim            installer  dev   -             -              -       -                  -                 -
+tmux            -               installer  dev   -             -              -       -                  -                 -
+nvm             -               installer  work  -             -              -       -                  -                 file-nonempty $HOME/.nvm/nvm.sh
+rust            rustc           installer  work  -             -              -       -                  -                 command cargo
+claude          -               installer  -     ai            -              -       -                  -                 -
+codex           -               installer  -     ai            -              -       -                  -                 runs
+opencode        -               installer  -     ai            -              -       -                  -                 -
+pi              -               installer  -     ai            -              -       -                  -                 runs
+xrdp            -               apt        -     rdp           -              -       -                  xrdp              service-active xrdp
+zsh             -               apt        dev   -             -              -       -                  zsh               -
+docker          -               apt        work  -             -              -       22.04,24.04,26.04  docker-ce         -
+azure-cli       az              apt        -     azure         -              -       22.04,24.04        azure-cli         -
+sbx             -               apt        work  -             native-ubuntu  -       24.04,26.04        docker-sbx        runs
+tailscale       -               apt        -     tail          -              -       22.04,24.04,26.04  tailscale         -
+gcloud          -               apt        -     gcloud        -              -       22.04,24.04,26.04  google-cloud-cli  -
+aws-cli         aws             installer  -     aws           -              -       22.04,24.04,26.04  -                 runs
+"
 
-# TOOL_EGET_REPO: tool name → eget.toml repo slug ("owner/repo")
-# Empty = the repo basename is the tool name (starship/starship → starship)
-declare -A TOOL_EGET_REPO=(
-    [gh]=cli/cli
-)
+# Overrides: "name field value" for fields most tools leave at their default.
+# $HOME expands where the table is defined. Method defaults: eget tools are owned under
+# ~/.local/bin with the staged-release update contract and uninstall to
+# ~/.local/bin/BINARY plus companions; apt tools update apt-in-place.
+#   eget-repo              eget.toml slug when its basename is not the tool name
+#   update-source          GitHub repo check-updates compares a non-eget tool to
+#   relative-binary        binary path inside the installed tree
+#   version-flag           version argument (default: --version)
+#   timeout                seconds allowed for the `runs` check
+#   companions             extra executables installed, verified, and removed
+#   ownership-roots        |-separated paths dotfiles may own
+#   update-contract        how an update replaces the tool
+#   paths                  |-separated paths uninstall removes
+#   removal-mode           manual: show instructions instead of apt removal
+#   removal-requires-sudo  yes: uninstall elevates for the paths
+#   removal-instructions   human-readable removal steps or retained state
+_REGISTRY_OVERRIDES="
+gh         eget-repo              cli/cli
+uv         companions             uvx
+neovim     update-source          neovim/neovim
+neovim     relative-binary        bin/nvim
+neovim     ownership-roots        $HOME/.local/bin|$HOME/.local/nvim|$HOME/.local/.dotfiles-neovim-rollback
+neovim     update-contract        staged-release
+neovim     paths                  $HOME/.local/bin/nvim|$HOME/.local/nvim
+tmux       update-source          tmux/tmux
+tmux       version-flag           -V
+tmux       ownership-roots        $HOME/.local/bin
+tmux       update-contract        staged-build
+tmux       paths                  $HOME/.local/bin/tmux
+# eget installs through its own installer, not method eget, so it needs an
+# explicit path: a fresh machine's PATH lacks ~/.local/bin.
+eget       ownership-roots        $HOME/.local/bin
+eget       update-contract        staged-release
+eget       paths                  $HOME/.local/bin/eget
+nvm        update-source          nvm-sh/nvm
+nvm        ownership-roots        $HOME/.nvm
+nvm        update-contract        vendor-installer-preserve-existing
+nvm        paths                  $HOME/.nvm
+rust       ownership-roots        $HOME/.cargo|$HOME/.rustup
+rust       update-contract        vendor-installer-in-place
+rust       removal-instructions   Run 'rustup self uninstall' after separately backing up any Cargo credentials/configuration.
+claude     ownership-roots        $HOME/.local/bin|$HOME/.local/share/claude
+claude     update-contract        moving-vendor-installer
+claude     paths                  $HOME/.local/bin/claude|$HOME/.local/share/claude
+claude     removal-instructions   $HOME/.claude configuration and sessions are preserved
+codex      ownership-roots        $HOME/.local/bin|$HOME/.codex/packages/standalone
+codex      update-contract        moving-vendor-installer-preserve-launcher
+codex      paths                  $HOME/.local/bin/codex|$HOME/.codex/packages/standalone
+codex      removal-instructions   $HOME/.codex configuration and sessions outside packages/standalone are preserved
+opencode   ownership-roots        $HOME/.local/bin|$HOME/.opencode
+opencode   update-contract        moving-vendor-installer
+opencode   paths                  $HOME/.local/bin/opencode|$HOME/.opencode
+opencode   removal-instructions   $HOME/.config/opencode configuration is preserved
+# pi is a node script: a broken node or a dangling symlink into
+# ~/.pi/agent/install still passes command -v, hence verify runs. Uninstall
+# removes only install/; ~/.pi/agent also holds settings.json, sessions/,
+# trust.json and models.json, which are user data.
+pi         ownership-roots        $HOME/.local/bin|$HOME/.pi/agent/install
+pi         update-contract        npm-prefix-in-place
+pi         paths                  $HOME/.local/bin/pi|$HOME/.pi/agent/install
+pi         removal-instructions   $HOME/.pi/agent settings, trust data, and sessions outside install/ are preserved
+# A service is present only while it runs, not merely when its binary exists.
+xrdp       update-contract        apt-and-service-in-place
+xrdp       removal-mode           manual
+xrdp       removal-instructions   sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*
+azure-cli  removal-instructions   $HOME/.azure credentials and configuration are preserved
+sbx        version-flag           version
+sbx        timeout                10
+sbx        update-contract        apt-in-place-preserve-user-state
+sbx        removal-instructions   Sandbox state, settings, credentials, and sessions under XDG directories are preserved
+tailscale  update-contract        apt-and-service-in-place-preserve-enrollment
+tailscale  removal-instructions   Tailscale identity and enrollment state under /var/lib/tailscale are preserved
+gcloud     removal-instructions   $HOME/.config/gcloud credentials and configuration are preserved
+aws-cli    ownership-roots        /usr/local/aws-cli|/usr/local/bin/aws|/usr/local/bin/aws_completer
+aws-cli    update-contract        signed-vendor-installer-in-place
+aws-cli    paths                  /usr/local/bin/aws|/usr/local/bin/aws_completer|/usr/local/aws-cli
+aws-cli    removal-requires-sudo  yes
+aws-cli    removal-instructions   $HOME/.aws credentials and configuration are preserved
+"
 
-# TOOL_TIER: tool name → minimum cumulative tier (bash|dev|work). Bash-tier
-# tools must install without root. Capability-only components (e.g. Tailscale)
-# have no tier.
-declare -A TOOL_TIER=(
-    [starship]=bash   [eza]=bash      [fzf]=bash       [zoxide]=bash
-    [delta]=bash      [btop]=bash     [glow]=bash       [lazygit]=bash
-    [gh]=bash         [uv]=bash       [bat]=bash       [fd]=bash
-    [ripgrep]=bash
-    [direnv]=bash     [eget]=bash     [sd]=bash        [gdu]=bash
-    [neovim]=dev      [tmux]=dev      [shellcheck]=dev
-    [wsl2-ssh-agent]=bash
-    [nvm]=work        [rust]=work      [sbx]=work
-    [zsh]=dev         [docker]=work
-)
+# Parsed in memory: `read` from a here-string or heredoc costs a syscall per
+# byte, which tripled the registry's load time. Splitting is deliberate, with
+# globbing off.
+# shellcheck disable=SC2206
+_registry_load() {
+    local - IFS line name binary method tier capabilities platform arches ubuntu apt verify field value
+    local -a lines
+    set -f
+    IFS=$'\n'; lines=($_REGISTRY_TOOLS); IFS=$' \t\n'
+    for line in "${lines[@]}"; do
+        [[ "$line" == \#* ]] && continue
+        set -- $line
+        (( $# >= 10 )) || { REGISTRY_ERRORS+=("$1: incomplete row"); continue; }
+        name="$1" binary="$2" method="$3" tier="$4" capabilities="$5" platform="$6"
+        arches="$7" ubuntu="$8" apt="$9"
+        shift 9; verify="$*"
+        [[ -z "${TOOL_BINARY[$name]:-}" ]] || REGISTRY_ERRORS+=("$name: duplicate row")
+        [[ "$binary" != - ]] || binary="$name"
+        [[ "$platform" != - ]] || platform="ubuntu"
+        [[ "$arches" != - ]] || arches="x86_64,aarch64"
+        [[ "$verify" != - ]] || verify="command"
+        TOOL_BINARY[$name]="$binary"
+        TOOL_METHOD[$name]="$method"
+        TOOL_PLATFORM[$name]="$platform"
+        TOOL_ARCHES[$name]="$arches"
+        TOOL_VERIFY[$name]="$verify"
+        [[ "$tier" == - ]] || TOOL_TIER[$name]="$tier"
+        [[ "$capabilities" == - ]] || TOOL_CAPABILITIES[$name]="$capabilities"
+        [[ "$ubuntu" == - ]] || TOOL_UBUNTU_VERSIONS[$name]="$ubuntu"
+        [[ "$apt" == - ]] || TOOL_APT_PACKAGE[$name]="$apt"
+        case "$method" in
+            eget)
+                TOOL_OWNERSHIP_ROOTS[$name]="$HOME/.local/bin"
+                TOOL_UPDATE_CONTRACT[$name]="staged-release"
+                ;;
+            apt) TOOL_UPDATE_CONTRACT[$name]="apt-in-place" ;;
+        esac
+    done
 
-# TOOL_CAPABILITIES: tool name → comma-separated orthogonal selections.
-# Capabilities compose with tiers and with one another. Empty tier membership is
-# intentional for capability-only components.
-declare -A TOOL_CAPABILITIES=(
-    [claude]=ai       [codex]=ai       [opencode]=ai    [pi]=ai
-    [xrdp]=rdp
-    [tailscale]=tail
-    [azure-cli]=azure [gcloud]=gcloud  [aws-cli]=aws
-    [jq]=agent-badge
-)
-
-# Supported platform and architecture inventory. "ubuntu" includes native
-# Ubuntu and WSL; wsl is restricted to WSL2. Architecture values are explicit
-# so selection-only CI can validate ARM support without pretending to execute
-# ARM binaries on an x86 runner.
-declare -A TOOL_PLATFORM=()
-declare -A TOOL_ARCHES=()
-declare -A TOOL_UBUNTU_VERSIONS=()
-declare -A TOOL_OWNERSHIP_ROOTS=()
-declare -A TOOL_UPDATE_CONTRACT=()
-declare -A TOOL_UPDATE_SOURCE=(
-    [neovim]="neovim/neovim"
-    [tmux]="tmux/tmux"
-    [nvm]="nvm-sh/nvm"
-)
-declare -A TOOL_RELATIVE_BINARY=(
-    [neovim]="bin/nvim"
-)
-# Companion executables are part of installation, verification, and removal.
-declare -A TOOL_COMPANIONS=([uv]="uvx")
-declare -A TOOL_VERSION_FLAG=([tmux]="-V" [sbx]="version")
-declare -A TOOL_REMOVAL_MODE=(
-    [xrdp]="manual"
-)
-declare -A TOOL_REMOVAL_REQUIRES_SUDO=(
-    [aws-cli]="yes"
-)
-declare -A TOOL_APT_PACKAGE=(
-    [zsh]="zsh"
-    [docker]="docker-ce"
-    [azure-cli]="azure-cli"
-    [xrdp]="xrdp"
-    [sbx]="docker-sbx"
-    [tailscale]="tailscale"
-    [gcloud]="google-cloud-cli"
-)
-
-for _registry_name in "${!TOOL_BINARY[@]}"; do
-    TOOL_PLATFORM["$_registry_name"]="ubuntu"
-    TOOL_ARCHES["$_registry_name"]="x86_64,aarch64"
-done
-unset _registry_name
-TOOL_PLATFORM[wsl2-ssh-agent]="wsl"
-TOOL_PLATFORM[sbx]="native-ubuntu"
-TOOL_PLATFORM[tailscale]="ubuntu"
-TOOL_UBUNTU_VERSIONS[sbx]="24.04,26.04"
-TOOL_UBUNTU_VERSIONS[tailscale]="22.04,24.04,26.04"
-TOOL_UBUNTU_VERSIONS[docker]="22.04,24.04,26.04"
-TOOL_UBUNTU_VERSIONS[azure-cli]="22.04,24.04"
-TOOL_UBUNTU_VERSIONS[gcloud]="22.04,24.04,26.04"
-TOOL_UBUNTU_VERSIONS[aws-cli]="22.04,24.04,26.04"
-
-for _registry_name in starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv jq sd shellcheck wsl2-ssh-agent; do
-    TOOL_OWNERSHIP_ROOTS["$_registry_name"]="$HOME/.local/bin"
-    TOOL_UPDATE_CONTRACT["$_registry_name"]="staged-release"
-done
-unset _registry_name
-TOOL_OWNERSHIP_ROOTS[eget]="$HOME/.local/bin"
-TOOL_OWNERSHIP_ROOTS[neovim]="$HOME/.local/bin|$HOME/.local/nvim|$HOME/.local/.dotfiles-neovim-rollback"
-TOOL_OWNERSHIP_ROOTS[tmux]="$HOME/.local/bin"
-TOOL_OWNERSHIP_ROOTS[nvm]="$HOME/.nvm"
-TOOL_OWNERSHIP_ROOTS[rust]="$HOME/.cargo|$HOME/.rustup"
-TOOL_OWNERSHIP_ROOTS[claude]="$HOME/.local/bin|$HOME/.local/share/claude"
-TOOL_OWNERSHIP_ROOTS[codex]="$HOME/.local/bin|$HOME/.codex/packages/standalone"
-TOOL_OWNERSHIP_ROOTS[opencode]="$HOME/.local/bin|$HOME/.opencode"
-TOOL_OWNERSHIP_ROOTS[pi]="$HOME/.local/bin|$HOME/.pi/agent/install"
-TOOL_OWNERSHIP_ROOTS[aws-cli]="/usr/local/aws-cli|/usr/local/bin/aws|/usr/local/bin/aws_completer"
-TOOL_UPDATE_CONTRACT[eget]="staged-release"
-TOOL_UPDATE_CONTRACT[neovim]="staged-release"
-TOOL_UPDATE_CONTRACT[tmux]="staged-build"
-TOOL_UPDATE_CONTRACT[nvm]="vendor-installer-preserve-existing"
-TOOL_UPDATE_CONTRACT[rust]="vendor-installer-in-place"
-TOOL_UPDATE_CONTRACT[claude]="moving-vendor-installer"
-TOOL_UPDATE_CONTRACT[codex]="moving-vendor-installer-preserve-launcher"
-TOOL_UPDATE_CONTRACT[opencode]="moving-vendor-installer"
-TOOL_UPDATE_CONTRACT[pi]="npm-prefix-in-place"
-TOOL_UPDATE_CONTRACT[zsh]="apt-in-place"
-TOOL_UPDATE_CONTRACT[docker]="apt-in-place"
-TOOL_UPDATE_CONTRACT[azure-cli]="apt-in-place"
-TOOL_UPDATE_CONTRACT[xrdp]="apt-and-service-in-place"
-TOOL_UPDATE_CONTRACT[sbx]="apt-in-place-preserve-user-state"
-TOOL_UPDATE_CONTRACT[tailscale]="apt-and-service-in-place-preserve-enrollment"
-TOOL_UPDATE_CONTRACT[gcloud]="apt-in-place"
-TOOL_UPDATE_CONTRACT[aws-cli]="signed-vendor-installer-in-place"
-
-# TOOL_VERIFY: tool name → verification command (exit 0 = pass)
-# Empty = use "command -v TOOL_BINARY[name]"
-declare -A TOOL_VERIFY=(
-    [nvm]='test -s "$HOME/.nvm/nvm.sh"'
-    [rust]='command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1'
-    [codex]='command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1'
-    # pi is a node script, not a native binary — a present-but-broken node (or a
-    # dangling symlink into ~/.pi/agent/install) still passes `command -v`.
-    [pi]='command -v pi >/dev/null 2>&1 && pi --version >/dev/null 2>&1'
-    # Binary present isn't success for a service — it must be running.
-    [xrdp]='systemctl is-active --quiet xrdp 2>/dev/null'
-    [ripgrep]='if [[ -x "$HOME/.local/bin/rg" ]]; then "$HOME/.local/bin/rg" --version >/dev/null 2>&1; else p=$(command -v rg 2>/dev/null || true); [[ -n "$p" && "$p" != */.codex/* && "$p" != */.vscode*/extensions/* ]]; fi'
-    [sbx]='command -v sbx >/dev/null 2>&1 && timeout --foreground 10 sbx version >/dev/null 2>&1'
-    [aws-cli]='command -v aws >/dev/null 2>&1 && aws --version >/dev/null 2>&1'
-)
-
-# TOOL_PATHS: tool name → space-separated paths to remove on uninstall
-# Empty = managed by install method (apt uses apt remove; eget uses ~/.local/bin/BINARY)
-declare -A TOOL_PATHS=(
-    # eget installs through its own installer, not TOOL_METHOD=eget, so it needs
-    # an explicit path: a fresh machine's PATH lacks ~/.local/bin.
-    [eget]="$HOME/.local/bin/eget"
-    [neovim]="$HOME/.local/bin/nvim|$HOME/.local/nvim"
-    [tmux]="$HOME/.local/bin/tmux"
-    [nvm]="$HOME/.nvm"
-    [rust]=""
-    [claude]="$HOME/.local/bin/claude|$HOME/.local/share/claude"
-    [codex]="$HOME/.local/bin/codex|$HOME/.codex/packages/standalone"
-    [opencode]="$HOME/.local/bin/opencode|$HOME/.opencode"
-    # Only the install/ subtree — ~/.pi/agent also holds settings.json,
-    # sessions/, trust.json and models.json, which are user data.
-    [pi]="$HOME/.local/bin/pi|$HOME/.pi/agent/install"
-    [aws-cli]="/usr/local/bin/aws|/usr/local/bin/aws_completer|/usr/local/aws-cli"
-)
-
-# TOOL_REMOVAL_INSTRUCTIONS: tool name → human-readable removal steps
-# Only for tools that need manual steps beyond path deletion.
-declare -A TOOL_REMOVAL_INSTRUCTIONS=(
-    [rust]="Run 'rustup self uninstall' after separately backing up any Cargo credentials/configuration."
-    [claude]="$HOME/.claude configuration and sessions are preserved"
-    [codex]="$HOME/.codex configuration and sessions outside packages/standalone are preserved"
-    [opencode]="$HOME/.config/opencode configuration is preserved"
-    [pi]="$HOME/.pi/agent settings, trust data, and sessions outside install/ are preserved"
-    [xrdp]="sudo systemctl disable --now xrdp && sudo apt remove xrdp xorgxrdp  # config backups: /etc/xrdp/xrdp.ini.dotfiles-bak*, ~/.xsession.dotfiles-bak*"
-    [sbx]="Sandbox state, settings, credentials, and sessions under XDG directories are preserved"
-    [tailscale]="Tailscale identity and enrollment state under /var/lib/tailscale are preserved"
-    [azure-cli]="$HOME/.azure credentials and configuration are preserved"
-    [gcloud]="$HOME/.config/gcloud credentials and configuration are preserved"
-    [aws-cli]="$HOME/.aws credentials and configuration are preserved"
-)
+    IFS=$'\n'; lines=($_REGISTRY_OVERRIDES); IFS=$' \t\n'
+    for line in "${lines[@]}"; do
+        [[ "$line" == \#* ]] && continue
+        set -- $line
+        (( $# >= 3 )) || { REGISTRY_ERRORS+=("incomplete override: $line"); continue; }
+        name="$1" field="$2"
+        # The value is the rest of the line, internal spacing preserved.
+        value="${line#*" $field "}"; value="$3${value#*"$3"}"
+        [[ -n "${TOOL_BINARY[$name]:-}" ]] || { REGISTRY_ERRORS+=("override for unknown tool: $name"); continue; }
+        case "$field" in
+            eget-repo) TOOL_EGET_REPO[$name]="$value" ;;
+            update-source) TOOL_UPDATE_SOURCE[$name]="$value" ;;
+            relative-binary) TOOL_RELATIVE_BINARY[$name]="$value" ;;
+            version-flag) TOOL_VERSION_FLAG[$name]="$value" ;;
+            timeout) TOOL_TIMEOUT[$name]="$value" ;;
+            companions) TOOL_COMPANIONS[$name]="$value" ;;
+            ownership-roots) TOOL_OWNERSHIP_ROOTS[$name]="$value" ;;
+            update-contract) TOOL_UPDATE_CONTRACT[$name]="$value" ;;
+            paths) TOOL_PATHS[$name]="$value" ;;
+            removal-mode) TOOL_REMOVAL_MODE[$name]="$value" ;;
+            removal-requires-sudo) TOOL_REMOVAL_REQUIRES_SUDO[$name]="$value" ;;
+            removal-instructions) TOOL_REMOVAL_INSTRUCTIONS[$name]="$value" ;;
+            *) REGISTRY_ERRORS+=("$name: unknown field $field") ;;
+        esac
+    done
+}
+_registry_load
+unset -f _registry_load
+unset _REGISTRY_TOOLS _REGISTRY_OVERRIDES
 
 # ==============================================================================
 # Helper Functions
@@ -292,19 +267,41 @@ tool_in_cumulative_tier() {
     esac
 }
 
-# Return the verification command for a tool.
-# Falls back to "command -v <binary>" if no custom verify is defined.
-tool_verify_command() {
-    local name="$1"
-    if [[ -n "${TOOL_VERIFY[$name]:-}" ]]; then
-        echo "${TOOL_VERIFY[$name]}"
+# Whether a tool is present and working, per its verify type (see the core
+# table). Prints nothing.
+tool_is_present() {
+    local name="$1" binary="${TOOL_BINARY[$1]:-}" type arg companion
+    [[ -n "$binary" ]] || return 1
+    read -r type arg <<< "${TOOL_VERIFY[$name]:-command}"
+    case "$type" in
+        command|runs)
+            command -v "$binary" >/dev/null 2>&1 || return 1
+            for companion in ${TOOL_COMPANIONS[$name]:-} $arg; do
+                command -v "$companion" >/dev/null 2>&1 || return 1
+            done
+            [[ "$type" == runs ]] || return 0
+            if [[ -n "${TOOL_TIMEOUT[$name]:-}" ]]; then
+                timeout --foreground "${TOOL_TIMEOUT[$name]}" "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
+            else
+                "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
+            fi
+            ;;
+        service-active) systemctl is-active --quiet "$arg" 2>/dev/null ;;
+        file-nonempty) [[ -s "$arg" ]] ;;
+        function) "$arg" ;;
+        *) return 1 ;;
+    esac
+}
+
+# The managed ~/.local/bin/rg wins. Otherwise accept rg on PATH, except copies
+# private to Codex or VS Code extensions, which are not installations.
+_registry_ripgrep_present() {
+    local path
+    if [[ -x "$HOME/.local/bin/rg" ]]; then
+        "$HOME/.local/bin/rg" --version >/dev/null 2>&1
     else
-        printf 'command -v %s >/dev/null 2>&1' "${TOOL_BINARY[$name]}"
-        local companion
-        for companion in ${TOOL_COMPANIONS[$name]:-}; do
-            printf ' && command -v %s >/dev/null 2>&1' "$companion"
-        done
-        printf '\n'
+        path="$(command -v rg 2>/dev/null || true)"
+        [[ -n "$path" && "$path" != */.codex/* && "$path" != */.vscode*/extensions/* ]]
     fi
 }
 

@@ -1,6 +1,6 @@
 # Spec: structural consolidation
 
-**Status:** proposed — not started.
+**Status:** implemented on branch `structural-consolidation`; not merged.
 **Problem:** the repo carries employer identifiers in public tracked files,
 compatibility code for migrations that have finished, four copies of checkout
 discovery, a selection model that exists twice in `setup.sh`, and a registry
@@ -289,14 +289,18 @@ Steps:
    the method where possible, so adding an eget tool really is one row:
    `eget` ⇒ ownership root `~/.local/bin`, update contract `staged-release`,
    uninstall path `~/.local/bin/BINARY`. Other defaults: binary = name, arches
-   = both, platform = ubuntu. Free-text values contain spaces, `&&`, `#`, and
-   `|`, so separate fields with tabs or `│`, not whitespace. Expand `$HOME` by
-   literal substitution, never `eval`. Parsing must stay cheap; `bin/verify`
-   and setup load the registry often.
-3. Populate the existing `TOOL_*` arrays from the parsed records at first, so
-   callers don't all change at once. Move callers to accessor functions, then
-   drop the arrays from the public surface once nothing reads them directly.
-   Callers include `lib/install.sh`, `lib/config.sh`, `lib/state.sh`,
+   = both, platform = ubuntu. The value of an override line is the rest of the
+   line, so free text with spaces, `&&`, `#`, and `|` needs no quoting. The
+   tables are double-quoted strings, so `$HOME` expands where they are defined
+   and nothing is evaluated. Parsing must stay cheap; `bin/verify` and setup
+   load the registry often. (As built: parsed in memory, because `read` from a
+   heredoc costs a syscall per byte; loading takes about 20 ms against 6 ms
+   before, on a loaded host, and never runs at shell startup.)
+3. Populate the existing `TOOL_*` arrays from the parsed records, so callers
+   don't change. **Decision while implementing:** the arrays stay the read
+   interface, read-only by convention. Accessor functions would need a command
+   substitution, and so a subshell, per lookup in loops that `bin/verify` and
+   setup run over every tool. Callers include `lib/install.sh`, `lib/config.sh`, `lib/state.sh`,
    `installers/install-sbx.sh`, the `bin/` tools, `tests/registry.sh`,
    `tests/uninstall-safety.sh`, `tests/state.sh`, the embedded bash in
    `tests/eget-selection.py`, and `.github/workflows/ci.yml` and `arm64.yml`.
