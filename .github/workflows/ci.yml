@@ -45,8 +45,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
+          # bin/ also holds Python commands; lint only shell scripts there,
+          # selected by shebang as the pre-commit hook does.
           find . -path ./.git -prune -o -path ./generated -prune -o \
             -type f \( -name '*.sh' -o -path './bin/*' \) -print0 \
+            | while IFS= read -r -d '' f; do
+                case "$f" in
+                  *.sh) printf '%s\0' "$f" ;;
+                  *) head -n1 "$f" | grep -qE '^#!.*\b(ba|da|k)?sh\b' && printf '%s\0' "$f" ;;
+                esac
+              done \
             | xargs -0 shellcheck --severity=warning
 
   structure:
