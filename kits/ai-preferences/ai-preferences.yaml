@@ -1,0 +1,27 @@
+# syntax=docker/sandbox-kit:3
+# The portable part of dotfiles' AI configuration, for sandboxes: Claude Code
+# preferences as managed settings, keybindings, and the skills that need nothing
+# from the host. Generated from configs/ by kits/sync-portable.py, which says
+# what is left out and why. Layer it with a harness kit (kits/harness/*).
+schemaVersion: "3"
+kind: mixin
+displayName: AI preferences (dotfiles)
+description: >-
+  Claude Code and Codex preferences, keybindings and portable skills from
+  dotfiles; no credentials, no provider or model selection.
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        # As root, then each copied path handed to the agent: install hooks
+        # run in no fixed order across kits, and ~/.claude is root-owned until
+        # the harness kit re-owns it (session volumes mount under it first).
+        - command: |
+            set -e
+            cp -R /usr/share/dotfiles-ai/home/. /home/agent/
+            cd /usr/share/dotfiles-ai/home
+            find . -mindepth 1 | while IFS= read -r path; do
+              chown agent:agent "/home/agent/$path"
+            done
+          user: "0"
+          description: Install the portable keybindings and skills into the agent's home
