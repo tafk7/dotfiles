@@ -6,7 +6,7 @@
   "model": "opus[1m]",
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh",
+    "command": "bash ~/.claude/statusline.sh",
     "padding": 0
   },
   "effortLevel": "medium",
