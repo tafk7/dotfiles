@@ -95,6 +95,21 @@ PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH" "$ROOT/bin/verify" --installed \
 grep -Fq 'uv (missing companion: uvx)' "$TEST_ROOT/missing-uvx.log" \
     || fail "missing companion was reported as a missing primary"
 
+# A self-updating CLI that moved within its ownership roots is still owned; a
+# component without that contract still reports the moved path.
+mkdir -p "$HOME/.local/share/claude/versions"
+cp /usr/bin/true "$HOME/.local/share/claude/versions/2"
+ln -sf "$HOME/.local/share/claude/versions/2" "$HOME/.local/bin/claude"
+ledger_record claude yes dotfiles installed 1 "$HOME/.local/share/claude/versions/1" test
+cp /usr/bin/true "$HOME/.local/bin/sd-moved"
+ln -sf "$HOME/.local/bin/sd-moved" "$HOME/.local/bin/sd"
+ledger_record sd yes dotfiles installed 1 "$HOME/.local/bin/sd" test
+PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH" "$ROOT/bin/verify" --installed \
+    > "$TEST_ROOT/moved.log" 2>&1 || true
+grep -Fq '✅ claude' "$TEST_ROOT/moved.log" \
+    || { cat "$TEST_ROOT/moved.log" >&2; fail "self-updated claude was not accepted"; }
+grep -Fq 'sd (path changed' "$TEST_ROOT/moved.log" || fail "moved staged-release tool was not reported"
+
 ledger_record starship yes dotfiles installed 1 "$HOME/.local/bin/starship" test
 if HOME="$HOME" XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" PATH="$TEST_SYSTEM_PATH" \
     "$ROOT/bin/verify" --installed >/dev/null 2>&1; then

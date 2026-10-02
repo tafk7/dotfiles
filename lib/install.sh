@@ -67,8 +67,10 @@ record_component_outcome() {
         else
             existing_record="$(ledger_line "$name" 2>/dev/null || true)"
             IFS=$'\t' read -r _ _ prior_owner _ _ prior_path _ _ <<< "$existing_record"
+            # Ownership holds for the recorded path, or anywhere inside the
+            # owned roots for a tool that moves itself when it self-updates.
             if [[ "$prior_owner" == dotfiles && "$prior_path" != - ]] \
-               && [[ "$(realpath -m -- "$prior_path")" == "$path" ]]; then
+               && { [[ "$(realpath -m -- "$prior_path")" == "$path" ]] || tool_moves_itself "$name"; }; then
                 ownership=dotfiles
             fi
         fi

@@ -27,7 +27,9 @@ for failed lookups, 2 for updates found with `--outdated`, and 0 otherwise.
 
 Only a successful installation establishes ownership. A binary that setup
 skipped because it already existed is not owned, even under `~/.local/bin`, and
-recorded ownership only holds for the same resolved path. Adopting an existing
+recorded ownership only holds for the same resolved path. Self-updating
+vendor CLIs (Claude, Codex, opencode) are the exception: they may move within
+their ownership roots, and setup records the new path. Adopting an existing
 local install requires `--force`. AI installers keep their vendor-specific
 contracts ([supply chain](supply-chain.md)).
 
