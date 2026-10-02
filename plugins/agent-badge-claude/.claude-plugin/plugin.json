@@ -1,6 +1,6 @@
 {
   "name": "agent-badge",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Per-window tmux status badges showing what every Claude Code and Codex session in your tmux server is doing: working, finished, blocked on permission, or compacting.",
   "author": {
     "name": "tkeller",
