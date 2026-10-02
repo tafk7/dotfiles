@@ -8,65 +8,6 @@ alias gl='git log --oneline --decorate --graph'
 # Clone operations
 alias gcl='git clone'
 
-# Clone a GitHub Enterprise Cloud repository through the machine-local work SSH
-# alias, then teach gh that the synthetic host maps to the real github.com API.
-# Set GH_WORK_USER in ~/.shell.local after authenticating that account with gh.
-gcl-work() {
-    if (( $# < 1 || $# > 2 )); then
-        echo "usage: gcl-work OWNER/REPO [DIRECTORY]" >&2
-        return 2
-    fi
-
-    if ! command -v gh >/dev/null 2>&1; then
-        echo "gcl-work: gh is required; run ./setup.sh --bash" >&2
-        return 1
-    fi
-
-    if [[ -z "${GH_WORK_USER:-}" ]]; then
-        echo "gcl-work: set GH_WORK_USER in ~/.shell.local" >&2
-        return 1
-    fi
-
-    local repo="$1"
-    local destination="${2:-}"
-    local token
-
-    repo="${repo#https://github.com/}"
-    repo="${repo#git@github.com:}"
-    repo="${repo#git@github.com-work:}"
-    repo="${repo%.git}"
-
-    case "$repo" in
-        */*) ;;
-        *)
-            echo "gcl-work: repository must be OWNER/REPO or a GitHub URL" >&2
-            return 2
-            ;;
-    esac
-
-    token="$(command gh auth token --hostname github.com --user "$GH_WORK_USER")" || {
-        echo "gcl-work: gh account '$GH_WORK_USER' is not authenticated" >&2
-        return 1
-    }
-
-    if [[ -n "$destination" ]]; then
-        git clone "git@github.com-work:${repo}.git" "$destination" || return
-    else
-        git clone "git@github.com-work:${repo}.git" || return
-        destination="${repo##*/}"
-    fi
-
-    (
-        cd "$destination" || exit 1
-        GH_TOKEN="$token" command gh repo set-default "github.com/$repo"
-    ) || {
-        echo "gcl-work: cloned successfully, but gh default setup failed" >&2
-        return 1
-    }
-
-    echo "Work repository ready: $destination"
-}
-
 # Staging and changes
 alias ga='git add'
 alias gaa='git add .'

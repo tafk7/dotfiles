@@ -35,4 +35,20 @@ if DOTFILES_DIR="$TEST_ROOT/linked" "$TEST_ROOT/linked/bin/install-git-hooks" --
 fi
 [[ ! -e "$repo/.git/hooks/pre-commit" ]] || { echo "FAIL: shared hook mutated" >&2; exit 1; }
 
+# Denylist: skipped when unset; whole words only; the list stays outside the repo.
+printf '# comment\n\nAcmeCorp\n' > "$TEST_ROOT/denylist"
+printf 'contact acmecorp support\n' > "$repo/notes.txt"
+git -C "$repo" add notes.txt
+(cd "$repo" && hooks/pre-commit) || { echo "FAIL: unset denylist blocked a commit" >&2; exit 1; }
+if (cd "$repo" && DOTFILES_DENYLIST="$TEST_ROOT/denylist" hooks/pre-commit 2>/dev/null); then
+    echo "FAIL: denylisted word was not blocked" >&2; exit 1
+fi
+printf 'contact acmecorporation support\n' > "$repo/notes.txt"
+git -C "$repo" add notes.txt
+(cd "$repo" && DOTFILES_DENYLIST="$TEST_ROOT/denylist" hooks/pre-commit) \
+    || { echo "FAIL: denylist matched inside a longer word" >&2; exit 1; }
+if (cd "$repo" && DOTFILES_DENYLIST="$TEST_ROOT/missing" hooks/pre-commit 2>/dev/null); then
+    echo "FAIL: unreadable denylist was ignored" >&2; exit 1
+fi
+
 printf 'git-hooks: ok\n'

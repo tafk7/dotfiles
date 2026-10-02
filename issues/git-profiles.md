@@ -3,7 +3,8 @@
 **Status:** proposed — not implemented.
 **Problem:** setup couples git identity to the install track (flags, a warning,
 and historically a prompt on every run), supports only one global identity, and
-the one multi-account helper (`gcl-work`) handles clone auth but not commit
+the one multi-account helper (a machine-local clone function in
+`~/.shell.local`) handles clone auth but not commit
 identity or signing. Work machines routinely need a second account.
 **Goal:** a machine has one default identity (`tafk7`), and specific repos opt
 into another profile (e.g. `work`) with one command — covering clone, push,
@@ -80,20 +81,20 @@ A profile is a small, untracked git config file:
 # ~/.config/git/profiles/work.gitconfig
 [user]
     email = you@work.example
-    signingkey = ~/.ssh/id_ed25519_amd.pub
+    signingkey = ~/.ssh/id_ed25519_work.pub
 [gpg]
     format = ssh
 [commit]
     gpgsign = true
 [core]
-    sshCommand = ssh -i ~/.ssh/id_ed25519_amd -o IdentitiesOnly=yes -o ControlMaster=no -o ControlPath=none
+    sshCommand = ssh -i ~/.ssh/id_ed25519_work -o IdentitiesOnly=yes -o ControlMaster=no -o ControlPath=none
 [profile]
     ghUser = work-login
     host = github.com
 ```
 
 - **`core.sshCommand` pins the key per repo.** The remote stays a normal
-  `git@github.com:` URL. This replaces the `github.com-work` SSH alias: no
+  `git@github.com:` URL. This replaces per-account SSH host aliases: no
   `~/.ssh/config.local` alias block, no URL rewriting, and no
   `gh repo set-default` step, since gh recognizes a normal remote.
 - **`ControlMaster=no ControlPath=none` is required.** `configs/ssh_config`
@@ -237,10 +238,9 @@ as `profile.host`.
 
 1. **`bin/git-profile`** — new (§3.1, §4). Sources `lib/runtime.sh`, uses the
    repo's usage/`log`/`error` conventions.
-2. **`shell/tools/git.sh`** — `gcl` alias → function (§3.2). `gcl-work` removed,
-   or reduced to `gcl -p work "$@"` during transition.
-3. **`shell/shortcuts-index.tsv`** — replace the `gcl-work` row; document
-   `gcl -p`.
+2. **`shell/tools/git.sh`** — `gcl` alias → function (§3.2). The machine-local
+   clone helper in `~/.shell.local` is deleted once `gcl -p` works.
+3. **`shell/shortcuts-index.tsv`** — document `gcl -p`.
 4. **`configs/ssh_config`** — disable multiplexing for git hosts, which also
    protects plain `git` and `ssh` usage:
    ```
@@ -263,7 +263,7 @@ as `profile.host`.
    prompts.
 8. **`bin/verify`** — keep the git-user check as warn-only, pointing at
    `git profile add NAME --default`.
-9. **`docs/customization.md`** — replace the `gcl-work` / `GH_WORK_USER` section
+9. **`docs/customization.md`** — replace the machine-local clone helper note
    and fold the signing example into a profiles section linking here.
 10. **Tests** — `git-profile use`/`whoami`/`list` against a temp `HOME`, with
     gh and ssh stubbed; `gcl -p` with a stubbed `git clone`; profile parsing;
@@ -291,8 +291,8 @@ as `profile.host`.
 2. **Per-repo gh account:** direnv (already in the bash tier) could export
    `GH_TOKEN="$(gh auth token --user LOGIN)"` from an untracked `.envrc` listed
    in `.git/info/exclude`. Worth it, or leave gh global?
-3. **Transition for `gcl-work`:** keep a wrapper for a release, or remove it
-   outright?
+3. **Transition for the clone helper:** resolved. Structural consolidation
+   moved it out of tracked files into `~/.shell.local`; delete it there.
 4. **`user.useConfigOnly` on fresh machines:** commits fail until
    `git profile add NAME --default` runs. Intended, but should setup's final
    summary say so?

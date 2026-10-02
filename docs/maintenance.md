@@ -12,6 +12,12 @@ point the live symlinks at it and record it as the install path. Adopting the
 code and reconciling config/state (`./setup.sh --config` or a tier) are separate
 steps; preview the setup command with `--dry-run` first.
 
+The repository is public. Keep employer names and internal hosts in untracked
+files (`~/.shell.local`, `~/.gitconfig.local`). To have the pre-commit hook
+enforce that, point `DOTFILES_DENYLIST` at an untracked file listing those words,
+one per line; check the whole tree with
+`git grep -n -i -w -F -f <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_DENYLIST")`.
+
 ## Updates and ownership
 
 Use `bin/check-updates`, bump the pin, and rerun setup with the component's

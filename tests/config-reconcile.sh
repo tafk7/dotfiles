@@ -48,7 +48,7 @@ grep -Fq "$XDG_CONFIG_HOME/dotfiles/gitconfig-azure" "$XDG_CONFIG_HOME/dotfiles/
     || fail "existing Azure CLI did not activate portable Azure include"
 [[ "$(grep -c '^\[credential ' "$XDG_CONFIG_HOME/dotfiles/gitconfig" || true)" == 0 ]] \
     || fail "Azure credential helpers remained duplicated in the portable base"
-[[ "$(grep -c '^\[credential ' "$XDG_CONFIG_HOME/dotfiles/gitconfig-azure")" == 2 ]] \
+[[ "$(grep -c '^\[credential ' "$XDG_CONFIG_HOME/dotfiles/gitconfig-azure")" == 1 ]] \
     || fail "Azure credential include is incomplete or duplicated"
 [[ -L "$HOME/.local/bin/git-credential-azdo" ]] || fail "Azure credential helper was not linked"
 assert_eq "$(stat -c %a "$HOME/.ssh")" 700 "SSH directory permissions"
