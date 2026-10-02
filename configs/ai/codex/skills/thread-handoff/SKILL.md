@@ -10,7 +10,7 @@ Create a concise, evidence-based checkpoint that another Codex thread can use wi
 ## Choose the source
 
 - For the active thread, synthesize the handoff from the conversation and current workspace state.
-- For a saved or broken thread ID, run `scripts/extract_thread.py <thread-id>` to recover its visible user and assistant messages. Increase `--last-messages` only when earlier context is necessary.
+- For a saved or broken thread ID, run `python3 scripts/extract_thread.py <thread-id>` to recover its visible user and assistant messages. Increase `--last-messages` only when earlier context is necessary.
 - Inspect the current repository state and relevant files when the handoff concerns code or artifacts. Treat the transcript as intent/history, not proof that a change still exists.
 
 ## Produce the handoff

@@ -1,8 +1,7 @@
 #!/bin/bash
 # Claude Code statusline — stacked context bar (input + last-response output) + model
-# Install: chmod +x ~/.claude/statusline.sh
-# Config in ~/.claude/settings.json:
-#   { "statusLine": { "type": "command", "command": "~/.claude/statusline.sh", "padding": 0 } }
+# Not executable; configs/claude-settings.json runs it as
+# `bash ~/.claude/statusline.sh`.
 
 input=$(cat)
 

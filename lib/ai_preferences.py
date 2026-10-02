@@ -40,7 +40,7 @@ def desired(component, home):
         if source.is_file() and '__pycache__' not in source.parts:
             dest = directory / source.relative_to(assets)
             check_target(dest)
-            outputs.append((dest, source.read_bytes(), 0o700 if os.access(source, os.X_OK) else 0o600))
+            outputs.append((dest, source.read_bytes(), 0o600))
     return directory, outputs
 
 
