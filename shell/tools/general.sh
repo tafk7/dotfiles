@@ -36,8 +36,6 @@ alias free='free -h'
 
 # Network
 alias ports='ss -tulanp'
-# Clear the pre-upgrade alias before Bash/Zsh parse the function on reload.
-unalias myip 2>/dev/null || true
 myip() {
     curl --fail --silent --show-error --max-time 10 --proto '=https' \
         https://ifconfig.me/ip
@@ -128,9 +126,6 @@ _tafk_tmux_buffer_set() {
 
 # Reload shell config, unsetting the guards so env.sh and profile.sh re-run.
 # Removed aliases/functions persist; use `exec $SHELL -l` for a clean slate.
-# The unalias clears an older alias definition, which zsh would refuse to
-# replace with a function.
-unalias reload 2>/dev/null
 reload() {
     unset _DOTFILES_ENV_LOADED _PROFILE_LOADED
     if [[ -n "$ZSH_VERSION" ]]; then

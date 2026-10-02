@@ -4,9 +4,9 @@
 # $CLAUDE_FLAGS. The VS Code extension's bundled binary is deliberately not
 # discovered; finding it cost a filesystem scan at every shell start.
 
-# Drop our own wrapper (and the retired *-vsc helper) on re-source so
-# `command -v` finds the PATH binary. `type -P` would be bash-only.
-unset -f claude claude-vsc 2>/dev/null
+# Drop our own wrapper on re-source so `command -v` finds the PATH binary.
+# `type -P` would be bash-only.
+unset -f claude 2>/dev/null
 
 # Claude only recognizes a subcommand as the first argument; behind injected
 # flags, `claude stop <id>` becomes the prompt "stop <id>". `agents` is left

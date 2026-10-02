@@ -114,6 +114,6 @@ rc=0
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
     XDG_CACHE_HOME="$XDG_CACHE_HOME" PATH="$TEST_SYSTEM_PATH" \
     "$ROOT/bin/verify" --tier ai >/dev/null 2>&1 || rc=$?
-[[ $rc -ne 64 ]] || fail "legacy --tier ai compatibility alias was rejected"
+[[ $rc -ne 64 ]] || fail "--tier ai was rejected"
 
 printf 'verify-profiles: ok\n'

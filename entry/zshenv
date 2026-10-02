@@ -9,8 +9,7 @@
 [[ $- == *i* ]] && skip_global_compinit=1
 
 # Locate the checkout through the symlink. A flattened copy or bind mount
-# defeats that, so fall back to the recorded install path; generated/bridge.sh
-# is legacy, read-only compatibility and overrides the guess when present.
+# defeats that, so fall back to the recorded install path.
 #
 # :A:h:h (resolve symlinks, then dirname twice) avoids forking readlink and
 # dirname in every zsh process.
@@ -27,10 +26,6 @@ if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
     unset _dotfiles_path_file
 fi
 export DOTFILES_DIR
-
-_bridge="$DOTFILES_DIR/generated/bridge.sh"
-[[ -f "$_bridge" ]] && source "$_bridge"
-unset _bridge
 
 # POSIX baseline + env (mirrors the bash entry chain via ~/.bashrc → ~/.profile)
 [[ -f "$HOME/.profile" ]] && source "$HOME/.profile"

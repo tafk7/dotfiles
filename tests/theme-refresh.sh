@@ -5,7 +5,6 @@ TEST_REPO_ROOT="$ROOT"
 source "$ROOT/tests/lib/harness.sh"
 fixture_init
 export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
-export DOTFILES_LEGACY_GENERATED_DIR="$TEST_ROOT/legacy"
 export TEST_REAL_REPO="$ROOT" CALL_LOG="$TEST_ROOT/resolver-calls"
 export DOTFILES_DIR="$TEST_ROOT/frontend"
 mkdir -p "$DOTFILES_DIR/bin"

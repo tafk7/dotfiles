@@ -114,7 +114,6 @@ class Fixture:
             "TMPDIR": str(self.root / "tmp"), "TMUX_TMPDIR": str(self.root / "tmux"),
             "TMUX": "", "DOTFILES_DIR": str(self.tree), "WIN_USER": "fixture",
             "DOTFILES_BENCH_TREE": str(self.tree),
-            "DOTFILES_LEGACY_GENERATED_DIR": str(self.root / "legacy"),
             # Hosted runners commonly expose writable /usr/local completion
             # directories. A real TTY makes compinit prompt about those paths,
             # turning a startup benchmark into an input wait. Benchmark only
@@ -122,7 +121,7 @@ class Fixture:
             # are represented by the controlled fixture cache below.
             "FPATH": distribution_zsh_fpath(),
         }
-        for name in ("home", "bin", "config", "data", "state", "cache", "tmp", "tmux", "legacy"):
+        for name in ("home", "bin", "config", "data", "state", "cache", "tmp", "tmux"):
             (self.root / name).mkdir()
         if not theme_enabled:
             state = self.root / "state/dotfiles"

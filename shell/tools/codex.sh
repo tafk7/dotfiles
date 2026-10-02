@@ -5,9 +5,9 @@
 # extension's bundled binary is deliberately not discovered; finding it cost a
 # filesystem scan at every shell start.
 
-# Drop our own wrapper (and the retired *-vsc helper) on re-source so
-# `command -v` finds the PATH binary. `type -P` would be bash-only.
-unset -f codex codex-vsc 2>/dev/null
+# Drop our own wrapper on re-source so `command -v` finds the PATH binary.
+# `type -P` would be bash-only.
+unset -f codex 2>/dev/null
 
 # A bare `command -v` condition doesn't fork; capturing its output would.
 if command -v codex >/dev/null 2>&1; then

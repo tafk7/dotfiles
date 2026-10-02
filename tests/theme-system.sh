@@ -7,7 +7,6 @@ trap 'tmux -L dotfiles-theme-tests kill-server 2>/dev/null || true; rm -rf "$TMP
 
 export DOTFILES_DIR="$ROOT"
 export DOTFILES_GENERATED_DIR="$TMP_ROOT/generated"
-export DOTFILES_LEGACY_GENERATED_DIR="$TMP_ROOT/legacy-generated"
 export DOTFILES_TMUX_SERVER=dotfiles-theme-tests
 export TMUX_TMPDIR="$TMP_ROOT/tmux"
 export HOME="$TMP_ROOT/home"
@@ -18,23 +17,22 @@ export XDG_DATA_HOME="$TMP_ROOT/data"
 # Never reuse the caller's durable state or cache overrides, including on reruns.
 unset DOTFILES_STATE_DIR DOTFILES_THEME_CACHE_DIR DOTFILES_CACHE_DIR
 export TMUX=
-mkdir -p "$TMUX_TMPDIR" "$HOME" "$DOTFILES_LEGACY_GENERATED_DIR"
-printf 'export DOTFILES_THEME="gruvbox"\n_DOTFILES_PREVIOUS_THEME="nord"\n' > "$DOTFILES_LEGACY_GENERATED_DIR/theme.sh"
-printf 'export DOTFILES_THEME=gruvbox\nexport DOTFILES_THEME_PREVIOUS=nord\nexport DOTFILES_THEME_GENERATION=42\nexport DOTFILES_THEME_CODE=catppuccin\n' \
-    > "$DOTFILES_LEGACY_GENERATED_DIR/theme-state.sh"
+mkdir -p "$TMUX_TMPDIR" "$HOME"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'${3:+ ($3)}"; }
 theme() { "$ROOT/bin/theme-switcher" "$@"; }
 t() { tmux -L "$DOTFILES_TMUX_SERVER" "$@"; }
 
-# Standalone/global compatibility and precedence.
+# Standalone/global precedence.
 theme --init
-assert_eq "$(theme resolve vim --global)" catppuccin "legacy global override migration"
+theme gruvbox >/dev/null
+theme set code catppuccin >/dev/null
+assert_eq "$(theme resolve vim --global)" catppuccin "global group override"
 theme unset code >/dev/null
 theme tokyo-night >/dev/null
 theme --revert >/dev/null
-assert_eq "$(theme resolve tmux --global)" gruvbox "global revert compatibility"
+assert_eq "$(theme resolve tmux --global)" gruvbox "global revert"
 theme tokyo-night >/dev/null
 theme set code catppuccin >/dev/null
 theme set vim gruvbox >/dev/null
@@ -44,7 +42,7 @@ assert_eq "$(theme resolve tmux --global)" tokyo-night "global fallback"
 theme unset vim >/dev/null
 assert_eq "$(theme resolve vim --global)" catppuccin "clear restores group"
 theme reset >/dev/null
-assert_eq "$(theme resolve vim --global)" tokyo-night "legacy reset clears overrides"
+assert_eq "$(theme resolve vim --global)" tokyo-night "reset clears overrides"
 
 relocated="$TMP_ROOT/relocated dotfiles"
 cp -a "$ROOT" "$relocated"

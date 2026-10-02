@@ -3,8 +3,7 @@
 # Owns: shell options, history, completion, bash-specific settings
 
 # Locate the checkout through the symlink. A flattened copy or bind mount
-# defeats that, so fall back to the recorded install path. generated/bridge.sh
-# is legacy, read-only compatibility.
+# defeats that, so fall back to the recorded install path.
 DOTFILES_DIR="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
 if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
     _dotfiles_path_file="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/install-path"
@@ -16,9 +15,6 @@ if [[ ! -f "$DOTFILES_DIR/shell/env.sh" ]]; then
     unset _dotfiles_path_file
 fi
 export DOTFILES_DIR
-_bridge="$DOTFILES_DIR/generated/bridge.sh"
-[[ -f "$_bridge" ]] && source "$_bridge"
-unset _bridge
 
 # Non-interactive: Layer 0 only. This is the agent shell: harnesses run
 # `bash -lc` per command or snapshot a non-interactive login shell, and both
