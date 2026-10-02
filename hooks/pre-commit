@@ -144,6 +144,20 @@ for f in "${STAGED[@]}"; do
     fi
 done
 
+# Check 5b: the ai-preferences sbx kit matches the portable configs/ it is
+# generated from (kits/sync-portable.py).
+for f in "${STAGED[@]}"; do
+    if [[ "$f" == configs/claude-settings.json || "$f" == configs/ai/* || "$f" == kits/ai-preferences/* ]]; then
+        if [[ -x kits/sync-portable.py ]] && ! kits/sync-portable.py --check 2>/tmp/precommit-kits.$$; then
+            fail "kits/ai-preferences is out of sync with configs/"
+            sed 's/^/  /' /tmp/precommit-kits.$$ >&2
+            ((errors++))
+        fi
+        rm -f /tmp/precommit-kits.$$
+        break
+    fi
+done
+
 # Check 6: denylisted words (employer and host identifiers) in staged content
 if [[ -n "${DOTFILES_DENYLIST:-}" ]]; then
     if [[ ! -r "$DOTFILES_DENYLIST" ]]; then

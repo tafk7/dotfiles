@@ -64,8 +64,10 @@ After setup:
 2. After `--dev`, run `./bin/install-editor-plugins` to install Neovim plugins.
 3. Run `gh auth login` on each machine that needs GitHub access.
 
-For `--work` host setup (KVM, `sbx login`, Tailscale enrollment), see
-[docs/work.md](docs/work.md).
+For `--work` host setup (KVM, `sbx login`, Tailscale enrollment, the pinned
+sbx and its kit builder), see [docs/work.md](docs/work.md). Generic sbx kits
+(Claude and Codex harnesses, an LLM gateway, your portable AI preferences) are
+in [kits/](kits/README.md).
 
 ## What you get
 

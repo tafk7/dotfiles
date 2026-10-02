@@ -7,6 +7,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/registry.sh"
 CONFIGS_DIR="$DOTFILES_DIR/configs"
 ENTRY_DIR="$DOTFILES_DIR/entry"
 
+# Docker Sandboxes, pinned like every other tool and held in APT: sbx changes
+# weekly, and kits and controllers built on it (Cardinal requires an exact
+# version) break on an unplanned upgrade. Bump deliberately.
+SBX_VERSION="0.46.0"
+# The docker-container BuildKit builder sbx kit builds use when Docker's image
+# store has no OCI exporter (BUILDX_BUILDER=sbx-kits). Optional, untracked
+# buildkitd settings such as a site's DNS servers: SBX_KITS_BUILDKITD_CONFIG.
+SBX_KITS_BUILDER="sbx-kits"
+SBX_KITS_BUILDKITD_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/buildkitd-sbx-kits.toml"
+
 # Configuration mappings: key → "target:type:owner". config_source_path()
 # resolves the key to entry/ or configs/.
 #

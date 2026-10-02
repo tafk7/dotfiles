@@ -100,6 +100,14 @@ work_sbx_daemon_ready() {
     host_timeout 10 sbx daemon status >/dev/null 2>&1
 }
 
+work_sbx_version() {
+    host_timeout 10 sbx version 2>/dev/null | sed -n 's/^sbx version: v\([0-9][0-9.]*\).*/\1/p'
+}
+
+work_sbx_kits_builder_present() {
+    host_timeout 10 docker buildx inspect "${SBX_KITS_BUILDER:-sbx-kits}" >/dev/null 2>&1
+}
+
 tail_state() {
     command -v tailscale >/dev/null 2>&1 || { printf 'missing\n'; return; }
     local output
@@ -129,7 +137,13 @@ work_verify_checks() {
     fi
 
     if command -v sbx >/dev/null 2>&1; then
-        if host_timeout 10 sbx version >/dev/null 2>&1; then check_pass "sbx executable health";
+        if host_timeout 10 sbx version >/dev/null 2>&1; then
+            check_pass "sbx executable health"
+            local sbx_version
+            sbx_version="$(work_sbx_version)"
+            if [[ -n "${SBX_VERSION:-}" && -n "$sbx_version" && "$sbx_version" != "$SBX_VERSION" ]]; then
+                check_warn "sbx $sbx_version differs from the pinned $SBX_VERSION (./setup.sh --work --force)"
+            fi
         else "$fail_fn" "sbx package present but executable health failed"; fi
     else
         "$fail_fn" "sbx package missing (run: ./setup.sh --work)"
@@ -179,6 +193,13 @@ work_verify_checks() {
                     && check_pass "docker service active" || "$fail_fn" "docker service stopped"
             fi
         fi
+    fi
+
+    # Optional: Docker's containerd image store builds kits without it.
+    if [[ "$rc" -eq 0 ]]; then
+        work_sbx_kits_builder_present \
+            && check_pass "sbx kit builder ${SBX_KITS_BUILDER:-sbx-kits}" \
+            || check_warn "no sbx kit builder ${SBX_KITS_BUILDER:-sbx-kits} (needed for kits unless Docker uses the containerd image store; ./setup.sh --work creates it)"
     fi
 
     if command -v sbx >/dev/null 2>&1; then

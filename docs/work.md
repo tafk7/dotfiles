@@ -72,8 +72,26 @@ preserved by `uninstall-tool sbx`. Tailscale identity/enrollment under
 Tailscale credentials.
 
 Host Claude, Codex, plugin, hook, and configuration state does not
-automatically propagate into a sandbox. Future integration should pass only
-explicitly selected, portable, allowlisted content.
+automatically propagate into a sandbox. The explicitly selected, portable part
+travels as the `kits/ai-preferences` kit, generated from `configs/` with an
+allowlist (see [the kits](../kits/README.md)); credentials never do.
+
+## sbx version and kits
+
+`docker-sbx` is pinned (`SBX_VERSION` in `lib/config.sh`) and held in APT, since
+sbx changes weekly and tools built on it, such as kits and controllers that
+require an exact version, break on an unplanned upgrade. Another installed
+version is reported by setup and `bin/verify`, never replaced silently; bump the
+pin deliberately and rerun `./setup.sh --work --force`.
+
+The work tier also creates `sbx-kits`, a `docker-container` BuildKit builder
+for building kits from source when Docker's image store has no OCI exporter
+(no containerd image store): use it with `BUILDX_BUILDER=sbx-kits`. It is not
+exported globally, because it would change every ordinary `docker build`.
+Site buildkitd settings, such as DNS servers a corporate network requires, go in
+the untracked `~/.config/dotfiles/buildkitd-sbx-kits.toml` before the builder is
+created. The generic kits themselves (Claude and Codex harnesses, an LLM
+gateway, the portable preferences) are in [`kits/`](../kits/README.md).
 
 ## Verification and smoke test
 

@@ -69,4 +69,36 @@ INSTALL_FAIL=()
 if install_docker_engine >/dev/null 2>&1; then fail "Docker conflict migration silently succeeded"; fi
 [[ " ${INSTALL_FAIL[*]} " == *" docker "* ]] || fail "Docker conflict not tracked as failure"
 
+# sbx is pinned: another installed version is reported, never silently moved.
+printf '#!/bin/sh\n[ "$1" = version ] && echo "sbx version: v0.1.0 abc"\n' > "$TEST_ROOT/bin/sbx"
+rc=0
+out="$(PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH" "$ROOT/installers/install-sbx.sh" 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || fail "install-sbx.sh with another version returned $rc instead of 2"
+[[ "$out" == *"pins $SBX_VERSION"* ]] || fail "install-sbx.sh did not report the pin: $out"
+grep -Fq 'apt-mark hold' "$ROOT/installers/install-sbx.sh" || fail "install-sbx.sh does not hold the pin"
+
+# The sbx kit builder: created once with the documented arguments, never
+# replaced, and nothing is run on a dry run.
+unset -f command dpkg-query dpkg
+docker_log="$TEST_ROOT/docker.log"; : > "$docker_log"
+builder_exists=false
+docker() {
+    printf '%s\n' "$*" >> "$docker_log"
+    case "$1 ${2:-}" in
+        "info "*) return 0 ;;
+        "buildx inspect") [[ "$builder_exists" == true ]] ;;
+        *) return 0 ;;
+    esac
+}
+SBX_KITS_BUILDKITD_CONFIG="$TEST_ROOT/buildkitd.toml"; : > "$SBX_KITS_BUILDKITD_CONFIG"
+DRY_RUN=true ensure_sbx_kits_builder >/dev/null
+[[ ! -s "$docker_log" ]] || fail "builder dry-run ran docker"
+DRY_RUN=false ensure_sbx_kits_builder >/dev/null 2>&1
+grep -Fxq "buildx create --name $SBX_KITS_BUILDER --driver docker-container --driver-opt network=host --buildkitd-config $SBX_KITS_BUILDKITD_CONFIG" "$docker_log" \
+    || fail "builder not created as documented: $(cat "$docker_log")"
+: > "$docker_log"; builder_exists=true
+DRY_RUN=false ensure_sbx_kits_builder >/dev/null 2>&1
+! grep -q 'buildx create' "$docker_log" || fail "an existing builder was recreated"
+unset -f docker
+
 printf 'work-installers: ok\n'

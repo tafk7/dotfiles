@@ -1366,6 +1366,34 @@ install_cloud_capability() {
     run_installer "$tool"
 }
 
+# The docker-container BuildKit builder sbx needs to build kits when Docker's
+# image store has no OCI exporter (no containerd image store). Created once,
+# never replaced; buildkitd settings (for example a site's DNS servers) come
+# from the untracked $SBX_KITS_BUILDKITD_CONFIG when it exists. Best effort:
+# Docker access may still await a new login.
+ensure_sbx_kits_builder() {
+    local args=(buildx create --name "$SBX_KITS_BUILDER" --driver docker-container
+        --driver-opt network=host)
+    [[ ! -f "$SBX_KITS_BUILDKITD_CONFIG" ]] || args+=(--buildkitd-config "$SBX_KITS_BUILDKITD_CONFIG")
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log "[DRY RUN] Would ensure the sbx kit builder: docker ${args[*]}"
+        return 0
+    fi
+    if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+        warn "Docker is not usable yet; rerun ./setup.sh --work to create the sbx kit builder"
+        return 0
+    fi
+    if docker buildx inspect "$SBX_KITS_BUILDER" >/dev/null 2>&1; then
+        log "sbx kit builder $SBX_KITS_BUILDER present"
+        return 0
+    fi
+    if docker "${args[@]}" >/dev/null; then
+        success "sbx kit builder $SBX_KITS_BUILDER created (BUILDX_BUILDER=$SBX_KITS_BUILDER for kit builds)"
+    else
+        warn "could not create the sbx kit builder $SBX_KITS_BUILDER"
+    fi
+}
+
 install_work_packages() {
     log "Installing work tier packages..."
     local failed=false
@@ -1375,6 +1403,7 @@ install_work_packages() {
     install_docker_engine || failed=true
     run_installer "sbx" || failed=true
     configure_work_host
+    ensure_sbx_kits_builder
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" || failed=true

@@ -1,0 +1,84 @@
+# syntax=docker/sandbox-kit:3
+# An API gateway for Claude Code and Codex, generic over gateways that take a
+# key in one request header (Azure API Management's Ocp-Apim-Subscription-Key,
+# for example). The key is a host-side sbx custom secret; the sandbox sees only
+# its placeholder, which the proxy replaces in requests to the gateway host:
+#
+#   sbx secret set-custom --host <gateway host> --env LLM_GATEWAY_KEY --command '<helper>'
+#
+# Nothing here, nor in the arguments, is secret.
+schemaVersion: "3"
+kind: mixin
+displayName: LLM gateway
+description: >-
+  Routes Claude Code and Codex through an API gateway that authenticates with a
+  key header; the key stays in the host's sbx secret store.
+args:
+  host:
+    required: true
+    pattern: '^[a-z0-9.-]+$'
+    description: Gateway host name (the custom secret's --host)
+  header:
+    required: true
+    pattern: '^[A-Za-z0-9-]+$'
+    description: Request header that carries the key
+  anthropic_base_url:
+    default: ""
+    pattern: '^(https://[^ ]+)?$'
+    description: Base URL for Claude Code (empty leaves Claude unconfigured)
+    env: ANTHROPIC_BASE_URL
+  openai_base_url:
+    default: ""
+    pattern: '^(https://[^ ]+)?$'
+    description: Base URL for Codex (empty leaves Codex unconfigured)
+    env: LLM_GATEWAY_OPENAI_BASE_URL
+  model:
+    default: ""
+    pattern: '^[A-Za-z0-9._:/-]*$'
+    description: Claude model to use through the gateway (empty keeps the default)
+    env: ANTHROPIC_MODEL
+capabilities:
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      runtime:
+        allow:
+          - "${{ kit.args.host }}:443"
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        # Claude Code: send the key header with the placeholder; the proxy
+        # substitutes the secret. Written for every Bash (BASH_ENV) and
+        # login shell; `$LLM_GATEWAY_KEY` expands when the shell starts.
+        - command: |
+            set -e
+            cat >> /etc/sandbox-persistent.sh <<'SH'
+            if [ -n "${LLM_GATEWAY_KEY:-}" ] && [ -n "${ANTHROPIC_BASE_URL:-}" ]; then
+              export ANTHROPIC_CUSTOM_HEADERS="${{ kit.args.header }}: $LLM_GATEWAY_KEY"
+              export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-gateway}"
+            fi
+            SH
+          user: "0"
+          description: Configure Claude Code for the gateway
+      startup:
+        # Codex: a model provider for the gateway, appended once after the
+        # codex kit has written its config.
+        - command: |
+            set -e
+            [ -n "${LLM_GATEWAY_OPENAI_BASE_URL:-}" ] || exit 0
+            cfg="$HOME/.codex/config.toml"
+            mkdir -p "$(dirname "$cfg")"; touch "$cfg"
+            grep -q '^\[model_providers.llm-gateway\]' "$cfg" && exit 0
+            tmp=$(mktemp)
+            # Replace any provider the codex kit chose; keys precede tables.
+            { echo 'model_provider = "llm-gateway"'; grep -v '^model_provider' "$cfg"; printf '\n[model_providers.llm-gateway]\nname = "LLM gateway"\nbase_url = "%s"\nenv_http_headers = { "%s" = "LLM_GATEWAY_KEY" }\nwire_api = "responses"\nrequires_openai_auth = false\n' "$LLM_GATEWAY_OPENAI_BASE_URL" '${{ kit.args.header }}'; } > "$tmp"
+            mv "$tmp" "$cfg"
+          user: agent
+          env: [LLM_GATEWAY_OPENAI_BASE_URL]
+          description: Configure Codex for the gateway
+  - type: com.docker.sandbox/agent-context@1
+    config:
+      content: |
+        ## Model gateway
+        Model requests go through ${{ kit.args.host }}. If they fail with an
+        authentication error, the host's gateway secret is missing or stale:
+        report it; do not look for or configure keys yourself.
