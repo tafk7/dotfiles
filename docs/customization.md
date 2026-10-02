@@ -14,7 +14,7 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
 - `install_dev_packages`: core, development, languages, terminal, diagramming
   (plus wsl on WSL), then the tmux and Neovim installers
 - `install_work_packages`: NVM/Node, Docker, sbx/KVM host access, Rust
-- `install_ai_packages`: the selected AI CLI installers
+- `install_ai_packages`: the named AI CLI installers
 - `install_rdp_packages`: rdp, then the xrdp configuration installer
 - `install_tail_packages`: Tailscale package/service without enrollment
 
@@ -68,6 +68,15 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
 Host mutations (groups, services) belong in `lib/install.sh`. Read-only
 KVM/service/group probes belong in `lib/work-host.sh`, which verification also
 uses. Neither is loaded during shell startup.
+
+## Adding an orthogonal capability
+
+Capabilities such as `--tail` or `--aws` compose with any tier. Add a row to
+`CAPABILITIES` in `setup.sh` (name, requirements, installer, label) and give the
+registry components the capability in `TOOL_CAPABILITIES`. The `--NAME` flag,
+preflight checks, install dispatch, banner, and summary all come from the row;
+the installer function receives the capability name. Document the flag in
+`show_help`.
 
 ## Adding a config file
 

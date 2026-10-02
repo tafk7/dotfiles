@@ -12,17 +12,15 @@ command() {
 calls=""
 install_eget_tools() { calls+=" dependency:$1"; }
 run_installer() { calls+=" cli:$1"; }
-AI_TOOLS=(claude)
 AGENT_BADGE_REQUEST=enabled
-install_ai_packages >/dev/null
+install_ai_packages claude >/dev/null
 assert_eq "$calls" ' dependency:jq cli:claude' 'badge dependency missing from AI-only selection'
 calls=""; AGENT_BADGE_REQUEST=disabled
-install_ai_packages >/dev/null
+install_ai_packages claude >/dev/null
 assert_eq "$calls" ' cli:claude' 'disabled badge installed dependency'
-calls=""; AGENT_BADGE_REQUEST=enabled; AI_TOOLS=(opencode)
-install_ai_packages >/dev/null
+calls=""; AGENT_BADGE_REQUEST=enabled
+install_ai_packages opencode >/dev/null
 assert_eq "$calls" ' cli:opencode' 'unsupported badge CLI installed dependency'
-AI_TOOLS=(codex)
 install_eget_tools() { return 73; }
-if install_ai_packages >/dev/null; then fail 'dependency failure reported success'; fi
+if install_ai_packages codex >/dev/null; then fail 'dependency failure reported success'; fi
 printf 'badge-dependency: ok\n'
