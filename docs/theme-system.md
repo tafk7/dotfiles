@@ -123,9 +123,7 @@ only Enter applies the selected theme and Escape cancels.
 
 Global settings are written atomically to
 `${XDG_STATE_HOME:-~/.local/state}/dotfiles/theme.tsv` and survive shell and
-machine restarts. Legacy checkout-local `generated/theme*.sh` files are read
-without `eval` only as a migration fallback (see
-[compatibility boundary](../generated/compatibility/README.md)).
+machine restarts. A missing or invalid file means the default theme.
 
 The switcher never deletes or rewrites live user configuration. Existing btop
 and lazygit files are treated as base user configuration and receive a scoped

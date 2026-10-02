@@ -80,7 +80,7 @@ _theme_clear_prefix() {
 }
 
 load_global_theme_state() {
-    local state legacy key value
+    local state key value
     unset DOTFILES_THEME DOTFILES_THEME_GENERATION DOTFILES_THEME_PREVIOUS
     for key in code chrome apps vim bat delta tmux starship fzf btop lazygit; do
         unset "DOTFILES_THEME_${key^^}"
@@ -100,24 +100,6 @@ load_global_theme_state() {
                     ;;
             esac
         done < "$state"
-    else
-        # Preserve the old global state during migration. Reading never writes.
-        local legacy_dir="${DOTFILES_LEGACY_GENERATED_DIR:-${DOTFILES_DIR:?}/generated}"
-        for legacy in "$legacy_dir/theme.sh" "$legacy_dir/theme-state.sh" "$legacy_dir/theme-overrides.sh"; do
-            [[ -f "$legacy" ]] || continue
-            while IFS='=' read -r key value; do
-                key="${key#export }"
-                value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
-                [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || continue
-                case "$key" in
-                    DOTFILES_THEME) DOTFILES_THEME="$value" ;;
-                    DOTFILES_THEME_PREVIOUS|_DOTFILES_PREVIOUS_THEME) DOTFILES_THEME_PREVIOUS="$value" ;;
-                    DOTFILES_THEME_GENERATION) DOTFILES_THEME_GENERATION="$value" ;;
-                    DOTFILES_THEME_CODE|DOTFILES_THEME_CHROME|DOTFILES_THEME_APPS|DOTFILES_THEME_VIM|DOTFILES_THEME_BAT|DOTFILES_THEME_DELTA|DOTFILES_THEME_TMUX|DOTFILES_THEME_STARSHIP|DOTFILES_THEME_FZF|DOTFILES_THEME_BTOP|DOTFILES_THEME_LAZYGIT)
-                        printf -v "$key" '%s' "$value"; export "${key?}" ;;
-                esac
-            done < "$legacy"
-        done
     fi
 
     export DOTFILES_THEME="${DOTFILES_THEME:-$THEME_DEFAULT}"

@@ -116,41 +116,6 @@ run_expect 0 "$REPO_ROOT/installers/install-codex.sh" --force
 [[ "$(tail -n 1 "$TEST_STATE/observations")" == $'2\tyes' ]] \
     || fail "forced update removed launcher before invoking installer"
 
-# A legacy direct binary is migrated on an ordinary run.
-use_home "$TEST_ROOT/home-legacy"
-mkdir -p "$HOME/.local/bin"
-cat > "$HOME/.local/bin/codex" <<'LEGACY'
-#!/bin/sh
-case "${1:-}" in
-    --version) echo 'codex-cli 0.141.0' ;;
-    plugin) exit 0 ;;
-    *) exit 0 ;;
-esac
-LEGACY
-chmod +x "$HOME/.local/bin/codex"
-run_expect 0 "$REPO_ROOT/installers/install-codex.sh"
-[[ -L "$HOME/.local/bin/codex" ]] || fail "legacy binary was not migrated"
-[[ "$(cat "$TEST_STATE/count")" == 3 ]] || fail "legacy migration invocation count"
-
-# A failed migration leaves the working legacy binary in place.
-use_home "$TEST_ROOT/home-failed-migration"
-mkdir -p "$HOME/.local/bin"
-cat > "$HOME/.local/bin/codex" <<'LEGACY'
-#!/bin/sh
-case "${1:-}" in
-    --version) echo 'codex-cli 0.141.0' ;;
-    plugin) exit 0 ;;
-    *) exit 0 ;;
-esac
-LEGACY
-chmod +x "$HOME/.local/bin/codex"
-failing_installer="$TEST_ROOT/failing-install.sh"
-printf '%s\n' '#!/bin/sh' 'exit 42' > "$failing_installer"
-export DOTFILES_CODEX_INSTALLER_SCRIPT="$failing_installer"
-run_expect 1 "$REPO_ROOT/installers/install-codex.sh"
-[[ -f "$HOME/.local/bin/codex" && ! -L "$HOME/.local/bin/codex" ]] \
-    || fail "failed migration removed the legacy binary"
-
 # A binary managed elsewhere on PATH is respected, even under --force.
 use_home "$TEST_ROOT/home-external"
 external_bin="$TEST_ROOT/external-bin"
@@ -166,7 +131,7 @@ EXTERNAL
 chmod +x "$external_bin/codex"
 export PATH="$external_bin:$SYSTEM_PATH"
 run_expect 2 "$REPO_ROOT/installers/install-codex.sh" --force
-[[ "$(cat "$TEST_STATE/count")" == 3 ]] || fail "external install was shadowed"
+[[ "$(cat "$TEST_STATE/count")" == 2 ]] || fail "external install was shadowed"
 [[ ! -e "$HOME/.local/bin/codex" ]] || fail "external install created a shadow launcher"
 
 printf 'Codex installer ownership tests passed.\n'

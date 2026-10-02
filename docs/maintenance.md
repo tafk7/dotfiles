@@ -50,10 +50,9 @@ across several executables is not atomic as a group.
 
 ## Compatibility code
 
-Legacy generated-state readers remain until every machine has valid XDG theme
-state and a correct `install-path`. Check each machine with
-`bin/verify --installed`, then remove the readers and their migration tests
-(see [compatibility boundary](../generated/compatibility/README.md)).
+Migration code is removed once every machine has migrated. Nothing reads a
+checkout's `generated/` directory any longer; an old checkout's copy is ignored
+and safe to delete.
 
 Whether `--work` should keep including sbx/KVM is an
 [open decision](../issues/work-tier-sandbox-boundary.md).

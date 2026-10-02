@@ -120,14 +120,9 @@ if [[ "$FORCE" != true && -L "$CODEX_BIN" && -x "$CODEX_BIN" ]] \
     exit 2
 fi
 
-# Migrate the previous dotfiles/eget installation, which was a regular binary at
-# this same path, into the official release-managed layout. Do not delete it
-# first: the official installer performs the replacement, and a failed download
-# therefore leaves the working legacy binary intact.
-if [[ "$FORCE" != true && -x "$CODEX_BIN" ]]; then
-    warn "Found a legacy direct Codex binary at $CODEX_BIN."
-    log "Migrating it to the official standalone installation..."
-elif [[ "$FORCE" == true && -x "$CODEX_BIN" ]]; then
+# Do not delete an existing launcher first: the official installer performs the
+# replacement, so a failed download leaves it intact.
+if [[ -x "$CODEX_BIN" ]]; then
     log "Updating or repairing Codex with the official standalone installer..."
 else
     log "Installing Codex with the official standalone installer..."

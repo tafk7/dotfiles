@@ -19,9 +19,7 @@ alias pytest='python3 -m pytest'
 alias pyt='python3 -m pytest -v'
 
 # Resolve optional tools on invocation. A missing-tool PATH search can traverse
-# Windows mounts on WSL; it should not delay every new shell. Clear old aliases
-# so an existing shell can adopt these functions through reload.
-unalias fmt lint lintf 2>/dev/null || true
+# Windows mounts on WSL; it should not delay every new shell.
 fmt() { command black . "$@"; }
 lint() { command ruff check . "$@"; }
 lintf() { command ruff check . --fix "$@"; }
