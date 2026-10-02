@@ -49,12 +49,16 @@ capabilities:
         # Claude Code: send the key header with the placeholder; the proxy
         # substitutes the secret. Written for every Bash (BASH_ENV) and
         # login shell; `$LLM_GATEWAY_KEY` expands when the shell starts.
+        # The credential variable is a dummy the gateway ignores, and it is
+        # ANTHROPIC_AUTH_TOKEN: Claude Code asks once, interactively, before
+        # it uses an ANTHROPIC_API_KEY, so background sessions (`claude --bg`)
+        # would start "Not logged in".
         - command: |
             set -e
             cat >> /etc/sandbox-persistent.sh <<'SH'
             if [ -n "${LLM_GATEWAY_KEY:-}" ] && [ -n "${ANTHROPIC_BASE_URL:-}" ]; then
               export ANTHROPIC_CUSTOM_HEADERS="${{ kit.args.header }}: $LLM_GATEWAY_KEY"
-              export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-gateway}"
+              export ANTHROPIC_AUTH_TOKEN="${ANTHROPIC_AUTH_TOKEN:-gateway}"
             fi
             SH
           user: "0"
