@@ -122,13 +122,17 @@ and temporary resource use are acceptable.
 
 Cloud CLIs are always explicit: `--azure`, `--gcloud`, or `--aws`. Setup never
 infers one from the cloud provider it runs on, and `--work`/`--full` include
-none. `--azure` also installs the Azure DevOps Git credential helper through an
-optional portable Git include. The include covers `https://dev.azure.com`;
-organization hosts are machine-local and go in `~/.gitconfig.local`:
+none. `--azure` installs only the Azure CLI.
+
+Azure DevOps Git credentials are parked, not installed by setup.
+`bin/git-credential-azdo` gets tokens from `az` (after `az login`). To use it,
+add a section per host to `~/.gitconfig.local`:
 
 ```ini
+[credential "https://dev.azure.com"]
+    helper = "/path/to/dotfiles/bin/git-credential-azdo"
 [credential "https://example.visualstudio.com"]
-    helper = azdo
+    helper = "/path/to/dotfiles/bin/git-credential-azdo"
 ```
 
 Microsoft's current APT support table covers Ubuntu 22.04 and 24.04, so explicit

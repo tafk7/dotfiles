@@ -118,6 +118,12 @@ Steps:
    still cannot reach existing clones. That decision belongs to the owner; do
    not rewrite history as part of this phase.
 
+**As built, superseded:** Azure DevOps is no longer used at work, so a
+follow-up commit parked the integration instead: `configs/gitconfig-azure`, the
+generated include, the helper link, and its verify check are gone, and
+`bin/git-credential-azdo` plus a `~/.gitconfig.local` snippet in
+`docs/work.md` remain for manual use.
+
 **Done when:** the denylist check passes on the whole tree, the moved helper
 behaves as before on the work machine, and the Azure helper still authenticates
 `dev.azure.com` and the locally configured organization host.

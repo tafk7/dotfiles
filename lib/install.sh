@@ -591,7 +591,7 @@ process_git_config() {
     local force="${3:-false}"
     local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
     local portable="$portable_dir/gitconfig"
-    local rendered git_version conflict_style="diff3" theme_cache azure_portable azure_enabled=false
+    local rendered git_version conflict_style="diff3" theme_cache
     local has_nvim=0 has_delta=0
     command -v nvim >/dev/null 2>&1 && has_nvim=1
     command -v delta >/dev/null 2>&1 && has_delta=1
@@ -604,22 +604,6 @@ process_git_config() {
         conflict_style="zdiff3"
     fi
     theme_cache="${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"
-    azure_portable="$portable_dir/gitconfig-azure"
-    local azure_present=false
-    case "${DOTFILES_TEST_AZURE_PRESENT:-}" in
-        1) azure_present=true ;;
-        0) azure_present=false ;;
-        *) command -v az >/dev/null 2>&1 && azure_present=true ;;
-    esac
-    if [[ "$azure_present" == true ]] \
-       || { declare -F capability_selected >/dev/null 2>&1 && capability_selected azure; }; then
-        azure_enabled=true
-        mkdir -p "$HOME/.local/bin" || return 1
-        safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo" || return 1
-        if [[ ! -f "$azure_portable" ]] || ! cmp -s "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable"; then
-            install -m 0600 "$DOTFILES_DIR/configs/gitconfig-azure" "$azure_portable" || return 1
-        fi
-    fi
 
     sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
         awk -v nvim="$has_nvim" -v delta="$has_delta" '
@@ -639,18 +623,7 @@ process_git_config() {
             '
         else
             awk '$0 != "{{THEME_INCLUDE}}" { print }'
-        fi |
-        awk -v enabled="$azure_enabled" -v path="$azure_portable" '
-            $0 == "{{AZURE_INCLUDE}}" {
-                if (enabled == "true") {
-                    print "[include]"
-                    print "    # Optional Azure DevOps credential integration."
-                    print "    path = \"" path "\""
-                }
-                next
-            }
-            { print }
-        ' > "$rendered" || { rm -f "$rendered"; return 1; }
+        fi > "$rendered" || { rm -f "$rendered"; return 1; }
 
     if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
         chmod 600 "$rendered" || return 1
