@@ -1,0 +1,1229 @@
+== --help
+Dotfiles Installation Script - Tiered Installation System
+
+USAGE:
+    ./setup.sh <TIER|ACTION> [OPTIONS]
+
+    Bare `./setup.sh` (no arguments) prints this help and changes nothing —
+    installing packages and rewriting $HOME configs must always be explicit.
+
+    --config            Reconcile action: (re)create symlinks for base configs
+                        plus configs for whatever tools are already installed.
+                        Zero package installs. No sudo. Safe to re-run anytime —
+                        it syncs your symlinks to what's actually on the system.
+
+TIERS (cumulative - each tier includes all previous tiers):
+    --bash              Config + modern CLI tools. NO SUDO — every tool installs
+                        to ~/.local/bin via eget: starship, eza, fzf, zoxide,
+                        delta, btop, gdu, glow, lazygit, gh, uv, sd, bat, fd,
+                        ripgrep, direnv. The non-sudo base for managed systems.
+                        (git is assumed present; a tool already installed
+                        system-wide is left alone unless --force.)
+
+    --dev               Bash + development tools. Requires sudo (first APT layer).
+                        Adds APT: zsh, build tools, clipboard, graphviz, etc.
+                        Adds: neovim, tmux
+
+    --work              Dev + local development/agent execution. Requires sudo.
+                        Adds: NVM, Docker, sbx, KVM host access, Rust
+                        Requires native Ubuntu 24.04/26.04 with KVM available
+                        for local sandbox readiness.
+                        AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave
+                        AI off where an organization manages those CLIs.
+
+    --full              Work tier plus all AI CLIs. Requires sudo.
+                        Equivalent to: --work --ai
+
+AI TOOLING (orthogonal - combines with any tier):
+    --ai                Install ALL AI CLIs (Claude Code, Codex, opencode, Pi) into
+                        ~/.local/bin. Leave this off when your org manages the
+                        install; the shell aliases/shortcuts load either way and
+                        resolve whatever binary is on PATH.
+    --claude            Install only Claude Code.
+    --codex             Install only Codex.
+    --opencode          Install only opencode.
+    --pi                Install only Pi. Unlike the others Pi is an npm package,
+                        so it needs Node >=22.19 (the work tier's NVM provides
+                        it); the requested install fails with instructions if
+                        Node is missing rather than pulling in a toolchain.
+                        (Per-tool flags combine: --claude --opencode installs
+                        just those two. --ai / --full install all of them.)
+
+RDP SERVER (orthogonal - combines with any tier):
+    --rdp               Install + configure the xrdp RDP server with an XFCE
+                        session. Requires sudo. NOT implied by --full (opens a
+                        WSL: listens on localhost:3390 for the Windows host
+                        (connect with mstsc). Native: port 3389 — keep it
+                        behind a VPN/firewall. See issues/xrdp-remote-desktop.md.
+
+TAILSCALE AND CLOUD (orthogonal - combine with any tier):
+    --tail              Install Tailscale and enable tailscaled under systemd.
+                        Does not enroll, configure routes/SSH, or change firewall
+                        policy. Requires sudo on Ubuntu 22.04/24.04/26.04.
+    --azure             Azure CLI + Azure DevOps Git credential integration.
+    --gcloud            Google Cloud CLI from Google's signed APT repository.
+    --aws               AWS CLI v2 from AWS's signature-verified distribution.
+                        These selections require sudo independently of the tier.
+
+OPTIONS:
+    --force             Force overwrite configs and reinstall tools
+    --dry-run           Preview actions without making changes
+    --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
+    --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
+                        one alone). Also skips the delta pager wiring.
+    --theme             Enable the coordinated theme feature (default).
+    --no-theme          Persistently disable theme generation and runtime hooks.
+    --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
+    --no-agent-badge    Install AI CLIs without registering agent-badge.
+    --git-name NAME     Set git user.name (for non-interactive installs)
+    --git-email EMAIL   Set git user.email (for non-interactive installs)
+    --help              Show this help message
+
+ENVIRONMENT:
+    DOTFILES_GIT_NAME   Same as --git-name
+    DOTFILES_GIT_EMAIL  Same as --git-email
+    DOTFILES_APT_LOCK_TIMEOUT
+                        Seconds APT waits for another package operation (default: 120)
+
+EXAMPLES:
+    ./setup.sh                       # Prints this help; changes nothing
+    ./setup.sh --config              # Reconcile symlinks to installed tools
+    ./setup.sh --bash                # Modern shell experience, NO sudo
+    ./setup.sh --dev                 # Development setup (no AI CLIs)
+    ./setup.sh --dev --ai            # Development setup + all AI CLIs
+    ./setup.sh --dev --claude        # Development setup + only Claude Code
+    ./setup.sh --claude --opencode   # Config + just those two AI CLIs
+    ./setup.sh --work                # Local work environment, AI stays separate
+    ./setup.sh --full                # Exactly --work --ai
+    ./setup.sh --work --tail         # Local sbx work environment + Tailscale
+    ./setup.sh --work --claude --codex --tail
+    ./setup.sh --full --tail --gcloud
+    ./setup.sh --work --azure        # Former --work cloud-tool behavior
+    ./setup.sh --dev --rdp           # Dev setup + RDP into this machine's desktop
+    ./setup.sh --bash --dry-run      # Preview bash tier installation
+
+TIER SUMMARY:
+    ┌──────────┬─────────────────────────────────────────────────┬───────────┐
+    │ Tier     │ What It Installs                                │ Sudo?     │
+    ├──────────┼─────────────────────────────────────────────────┼───────────┤
+    │ config   │ Symlinks only (reconcile to installed tools)    │ No        │
+    │ bash     │ + eget: starship, eza, fzf, zoxide, delta, btop,│ No        │
+    │          │   gdu, glow, lazygit, gh, uv, sd, bat, fd,      │           │
+    │          │   ripgrep, direnv  (all to ~/.local/bin)        │           │
+    │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
+    │ work     │ + NVM, Docker, sbx, KVM access, Rust            │ Yes       │
+    ├──────────┼─────────────────────────────────────────────────┼───────────┤
+    │ --ai     │ + Claude Code, Codex, opencode, Pi (orthogonal) │ No        │
+    │          │   (or --claude/--codex/--opencode/--pi singly)  │           │
+    │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
+    │ --tail   │ + Tailscale package/service (no enrollment)     │ Yes       │
+    │ cloud    │ --azure / --gcloud / --aws                      │ Yes       │
+    │ --full   │ = work + ai (no Tailscale, RDP, or cloud CLIs)  │ Yes       │
+    └──────────┴─────────────────────────────────────────────────┴───────────┘
+    The tier sudo boundary is at dev. Tailscale, RDP, and APT-backed cloud
+    selections require sudo independently of the selected tier.
+
+The script will:
+1. Verify system requirements
+2. Install packages based on selected tier
+3. Create symlinks for all configuration files
+4. Setup WSL integration if running on WSL
+
+All configuration files are backed up before being replaced.
+== --config
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+
+-- components
+
+-- install
+
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=0 probes=[curl git] applicable=[] 
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --bash
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: bash
+AI CLIs: none
+
+-- components
+bat btop delta direnv eget eza fd fzf gdu gh glow lazygit ripgrep sd starship uv wsl2-ssh-agent zoxide 
+-- install
+bash
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: bash)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify
+
+3. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --dev
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: dev
+AI CLIs: none
+
+-- components
+bat btop delta direnv eget eza fd fzf gdu gh glow lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+-- install
+bash dev
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: dev)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify
+
+3. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --work
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: work
+AI CLIs: none
+
+-- components
+bat btop delta direnv docker eget eza fd fzf gdu gh glow lazygit neovim nvm ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+-- install
+bash dev work
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: work)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify --tier work
+
+3. Authenticate and smoke-test local sandboxes manually:
+   sbx login
+   ./bin/verify --tier work --smoke
+
+4. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --full
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: work
+AI CLIs: all (claude, codex, opencode, pi)
+
+-- components
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+-- install
+bash dev work cli:claude cli:codex cli:opencode cli:pi
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[sbx] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: work +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify --tier work
+
+3. Authenticate and smoke-test local sandboxes manually:
+   sbx login
+   ./bin/verify --tier work --smoke
+
+4. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --ai
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: all (claude, codex, opencode, pi)
+
+-- components
+claude codex opencode pi 
+-- install
+cli:claude cli:codex cli:opencode cli:pi
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --claude
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: claude
+
+-- components
+claude codex opencode pi 
+-- install
+cli:claude
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --claude --codex
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: claude codex
+
+-- components
+claude codex opencode pi 
+-- install
+cli:claude cli:codex
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --claude --ai
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: all (claude, codex, opencode, pi)
+
+-- components
+claude codex opencode pi 
+-- install
+cli:claude cli:codex cli:opencode cli:pi
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --ai --claude
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: all (claude, codex, opencode, pi)
+
+-- components
+claude codex opencode pi 
+-- install
+cli:claude cli:codex cli:opencode cli:pi
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --claude --claude
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: claude claude
+
+-- components
+claude codex opencode pi 
+-- install
+cli:claude
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --pi --opencode
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: pi opencode
+
+-- components
+claude codex opencode pi 
+-- install
+cli:pi cli:opencode
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --rdp
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+RDP server (xrdp): yes (--rdp)
+
+-- components
+xrdp 
+-- install
+rdp
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo systemctl] applicable=[] 
+ubuntu-24.04 missing=curl rc=0 probes=[curl git apt-get sudo systemctl] applicable=[] 
+ubuntu-24.04 missing=git rc=0 probes=[curl git apt-get sudo systemctl] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=1 probes=[curl git apt-get sudo systemctl] applicable=[] [ERROR] Requested APT/service capability requires: systemctl
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +rdp)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Connect to the RDP desktop:
+   mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
+
+3. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --tail
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+Tailscale: yes (--tail)
+
+-- components
+tailscale 
+-- install
+tail
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[tailscale] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git apt-get sudo] applicable=[tailscale] 
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[tailscale] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +tail)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Enroll Tailscale with your intended routing/SSH policy:
+   sudo tailscale up
+
+3. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --azure
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+Azure CLI: yes (--azure)
+
+-- components
+azure-cli 
+-- install
+cloud:azure
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli] 
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +azure)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --gcloud
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+Google Cloud CLI: yes (--gcloud)
+
+-- components
+gcloud 
+-- install
+cloud:gcloud
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[gcloud] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git apt-get sudo] applicable=[gcloud] 
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[gcloud] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +gcloud)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --aws
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+AWS CLI v2: yes (--aws)
+
+-- components
+aws-cli 
+-- install
+cloud:aws
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[aws-cli] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git apt-get sudo] applicable=[aws-cli] 
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[aws-cli] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +aws)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --azure --aws
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: none
+Azure CLI: yes (--azure)
+AWS CLI v2: yes (--aws)
+
+-- components
+aws-cli azure-cli 
+-- install
+cloud:azure cloud:aws
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli aws-cli] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli aws-cli] 
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli aws-cli] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +azure +aws)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   ./bin/verify
+
+2. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --full --tail --gcloud
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: work
+AI CLIs: all (claude, codex, opencode, pi)
+Tailscale: yes (--tail)
+Google Cloud CLI: yes (--gcloud)
+
+-- components
+bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+-- install
+bash dev work cli:claude cli:codex cli:opencode cli:pi tail cloud:gcloud
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale gcloud] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale gcloud] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: work +ai +tail +gcloud)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify --tier work --tail
+
+3. Authenticate and smoke-test local sandboxes manually:
+   sbx login
+   ./bin/verify --tier work --smoke
+
+4. Enroll Tailscale with your intended routing/SSH policy:
+   sudo tailscale up
+
+5. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --dev --rdp
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: dev
+AI CLIs: none
+RDP server (xrdp): yes (--rdp)
+
+-- components
+bat btop delta direnv eget eza fd fzf gdu gh glow lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent xrdp zoxide zsh 
+-- install
+bash dev rdp
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo systemctl] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=1 probes=[curl git apt-get sudo systemctl] applicable=[] [ERROR] Requested APT/service capability requires: systemctl
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: dev +rdp)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify
+
+3. Connect to the RDP desktop:
+   mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
+
+4. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --work --claude --codex --tail
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: work
+AI CLIs: claude codex
+Tailscale: yes (--tail)
+
+-- components
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+-- install
+bash dev work cli:claude cli:codex tail
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale] 
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: work +ai +tail)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify --tier work --tail
+
+3. Authenticate and smoke-test local sandboxes manually:
+   sbx login
+   ./bin/verify --tier work --smoke
+
+4. Enroll Tailscale with your intended routing/SSH policy:
+   sudo tailscale up
+
+5. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --bash --pi --rdp --tail --azure --gcloud --aws
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: bash
+AI CLIs: pi
+RDP server (xrdp): yes (--rdp)
+Tailscale: yes (--tail)
+Azure CLI: yes (--azure)
+Google Cloud CLI: yes (--gcloud)
+AWS CLI v2: yes (--aws)
+
+-- components
+aws-cli azure-cli bat btop claude codex delta direnv eget eza fd fzf gcloud gdu gh glow lazygit opencode pi ripgrep sd starship tailscale uv wsl2-ssh-agent xrdp zoxide 
+-- install
+bash cli:pi rdp tail cloud:azure cloud:gcloud cloud:aws
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo systemctl] applicable=[tailscale azure-cli gcloud aws-cli] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=1 probes=[curl git] applicable=[] [ERROR] Required command not found: git
+ubuntu-24.04 missing=apt-get rc=1 probes=[curl git apt-get] applicable=[] [ERROR] Requested APT/service capability requires: apt-get
+ubuntu-24.04 missing=sudo rc=1 probes=[curl git apt-get sudo] applicable=[] [ERROR] Requested APT/service capability requires: sudo
+ubuntu-24.04 missing=systemctl rc=1 probes=[curl git apt-get sudo systemctl] applicable=[] [ERROR] Requested APT/service capability requires: systemctl
+ubuntu-20.04 missing=none rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=curl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=git rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=apt-get rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=sudo rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+ubuntu-20.04 missing=systemctl rc=1 probes=[] applicable=[] [ERROR] Unsupported Ubuntu release: 20.04 (supported: 22.04, 24.04, 26.04)
+debian missing=none rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=curl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=git rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=apt-get rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=sudo rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+debian missing=systemctl rc=1 probes=[] applicable=[] [ERROR] APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: debian)
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: bash +ai +rdp +tail +azure +gcloud +aws)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Restart your shell session:
+   - Type 'exit' then reconnect to your terminal
+   (Recommended for locale and shell changes)
+
+2. Verify installation:
+   ./bin/verify
+
+3. Enroll Tailscale with your intended routing/SSH policy:
+   sudo tailscale up
+
+4. Connect to the RDP desktop:
+   mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
+
+5. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
