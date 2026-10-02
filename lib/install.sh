@@ -612,7 +612,8 @@ process_git_config() {
         0) azure_present=false ;;
         *) command -v az >/dev/null 2>&1 && azure_present=true ;;
     esac
-    if [[ "${INSTALL_AZURE:-false}" == true || "$azure_present" == true ]]; then
+    if [[ "$azure_present" == true ]] \
+       || { declare -F capability_selected >/dev/null 2>&1 && capability_selected azure; }; then
         azure_enabled=true
         mkdir -p "$HOME/.local/bin" || return 1
         safe_symlink "$DOTFILES_DIR/bin/git-credential-azdo" "$HOME/.local/bin/git-credential-azdo" || return 1
@@ -1185,22 +1186,15 @@ install_dev_packages() {
     success "Dev tier installation complete"
 }
 
-# AI CLIs selected by setup.sh's AI_ALL (every registry tool with the ai
-# capability) or AI_TOOLS. Each installer refuses to shadow an external binary
-# already on PATH, so org-managed installs are left alone.
+# Install the named AI CLIs, de-duplicated in order (setup.sh resolves --ai to
+# every registry tool with the ai capability). Each installer refuses to shadow
+# an external binary already on PATH, so org-managed installs are left alone.
 install_ai_packages() {
     local -a tools=()
-    local failed=false
-    if [[ "${AI_ALL:-false}" == "true" ]]; then
-        readarray -t tools < <(tools_for_capability ai)
-    else
-        # Individual selections, de-duplicated while preserving order.
-        local t
-        for t in "${AI_TOOLS[@]:-}"; do
-            [[ -z "$t" ]] && continue
-            [[ " ${tools[*]-} " == *" $t "* ]] || tools+=("$t")
-        done
-    fi
+    local failed=false t
+    for t in "$@"; do
+        [[ " ${tools[*]-} " == *" $t "* ]] || tools+=("$t")
+    done
 
     [[ ${#tools[@]} -eq 0 ]] && return 0
 

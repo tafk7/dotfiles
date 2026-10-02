@@ -11,14 +11,41 @@ export DOTFILES_DIR
 source "$SCRIPT_DIR/lib/install.sh"
 
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
-INSTALL_AI=false       # Orthogonal: any AI CLI requested (--ai or a per-tool flag).
-AI_ALL=false           # --ai / --full: install every AI-capability tool.
-declare -a AI_TOOLS=() # Individual AI selections: --claude / --codex / --opencode / --pi.
-INSTALL_RDP=false      # Orthogonal: xrdp RDP server. Off by default; NOT implied by --full.
-INSTALL_TAIL=false     # Orthogonal: Tailscale package/service; no enrollment.
-INSTALL_AZURE=false
-INSTALL_GCLOUD=false
-INSTALL_AWS=false
+
+# Orthogonal capabilities, one row each, in banner, install, and summary order:
+#   name|requirements|installer|label
+# Requirements: ubuntu (a supported Ubuntu release), curl, apt (apt-get), sudo,
+# systemd (systemctl), and applicable (every registry component of the
+# capability must apply to this platform). The installer receives the
+# capability name. A flag --NAME selects the capability; ai also has per-tool
+# flags. agent-badge is a registry capability too (jq), but it is a feature
+# preference (--agent-badge / --no-agent-badge) that install_ai_packages acts
+# on, not a selection.
+CAPABILITIES=(
+    "ai|curl|install_ai_selection|AI CLIs"
+    "rdp|ubuntu apt sudo systemd|install_rdp_packages|RDP server (xrdp)"
+    "tail|ubuntu curl apt sudo applicable|install_tail_packages|Tailscale"
+    "azure|ubuntu curl apt sudo applicable|install_cloud_capability|Azure CLI"
+    "gcloud|ubuntu curl apt sudo applicable|install_cloud_capability|Google Cloud CLI"
+    "aws|ubuntu curl apt sudo applicable|install_cloud_capability|AWS CLI v2"
+)
+declare -a CAPABILITY_NAMES=()
+declare -A CAPABILITY_REQUIRES=() CAPABILITY_INSTALLER=() CAPABILITY_LABEL=()
+for _capability_row in "${CAPABILITIES[@]}"; do
+    IFS='|' read -r _capability_name _capability_requires _capability_installer _capability_label \
+        <<< "$_capability_row"
+    CAPABILITY_NAMES+=("$_capability_name")
+    CAPABILITY_REQUIRES[$_capability_name]="$_capability_requires"
+    CAPABILITY_INSTALLER[$_capability_name]="$_capability_installer"
+    CAPABILITY_LABEL[$_capability_name]="$_capability_label"
+done
+unset _capability_row _capability_name _capability_requires _capability_installer _capability_label
+
+# Selected capabilities. ai is "all" for --ai / --full (every registry tool
+# with the ai capability), else "some" for the per-tool flags recorded in
+# SELECTED_AI_TOOLS. rdp opens a network listener and is never implied by --full.
+declare -A SELECTED_CAPABILITIES=()
+declare -a SELECTED_AI_TOOLS=() # --claude / --codex / --opencode / --pi, in flag order.
 THEME_REQUEST=""       # Empty preserves preference; enabled/disabled are explicit changes.
 AGENT_BADGE_REQUEST=""
 FORCE_OVERWRITE=false
@@ -86,39 +113,16 @@ parse_arguments() {
             --full)
                 # Convenience: exactly --work --ai.
                 request_tier "work"
-                INSTALL_AI=true
-                AI_ALL=true
+                SELECTED_CAPABILITIES[ai]=all
                 shift
                 ;;
             --ai)
-                INSTALL_AI=true
-                AI_ALL=true
+                SELECTED_CAPABILITIES[ai]=all
                 shift
                 ;;
             --claude|--codex|--opencode|--pi)
-                INSTALL_AI=true
-                AI_TOOLS+=("${1#--}")
-                shift
-                ;;
-            --rdp)
-                # Never implied by --full: it opens a network listener.
-                INSTALL_RDP=true
-                shift
-                ;;
-            --tail)
-                INSTALL_TAIL=true
-                shift
-                ;;
-            --azure)
-                INSTALL_AZURE=true
-                shift
-                ;;
-            --gcloud)
-                INSTALL_GCLOUD=true
-                shift
-                ;;
-            --aws)
-                INSTALL_AWS=true
+                SELECTED_AI_TOOLS+=("${1#--}")
+                [[ "${SELECTED_CAPABILITIES[ai]:-}" == all ]] || SELECTED_CAPABILITIES[ai]=some
                 shift
                 ;;
             --theme)
@@ -169,8 +173,13 @@ parse_arguments() {
                 shift
                 ;;
             *)
-                error "Unknown option: $1"
-                PARSE_ERROR=true
+                # Any other capability is selected by its own --NAME flag.
+                if [[ "$1" == --?* && -n "${CAPABILITY_INSTALLER[${1#--}]:-}" ]]; then
+                    SELECTED_CAPABILITIES[${1#--}]=yes
+                else
+                    error "Unknown option: $1"
+                    PARSE_ERROR=true
+                fi
                 shift
                 ;;
         esac
@@ -191,24 +200,43 @@ tier_includes() {
 }
 
 capability_selected() {
-    case "$1" in
-        ai) [[ "$INSTALL_AI" == true ]] ;;
-        rdp) [[ "$INSTALL_RDP" == true ]] ;;
-        tail) [[ "$INSTALL_TAIL" == true ]] ;;
-        azure) [[ "$INSTALL_AZURE" == true ]] ;;
-        gcloud) [[ "$INSTALL_GCLOUD" == true ]] ;;
-        aws) [[ "$INSTALL_AWS" == true ]] ;;
-        *) return 1 ;;
-    esac
+    [[ -n "${SELECTED_CAPABILITIES[$1]:-}" ]]
+}
+
+any_capability_selected() {
+    (( ${#SELECTED_CAPABILITIES[@]} > 0 ))
+}
+
+capability_requires() {
+    [[ " ${CAPABILITY_REQUIRES[$1]:-} " == *" $2 "* ]]
+}
+
+# Whether any selected capability has requirement $1.
+selected_capabilities_need() {
+    local name
+    for name in "${!SELECTED_CAPABILITIES[@]}"; do
+        capability_requires "$name" "$1" && return 0
+    done
+    return 1
 }
 
 component_selected() {
     local name="$1" capability
     tool_in_cumulative_tier "$name" "$INSTALL_TIER" && return 0
-    for capability in ai rdp tail azure gcloud aws; do
+    for capability in "${CAPABILITY_NAMES[@]}"; do
         capability_selected "$capability" && tool_has_capability "$name" "$capability" && return 0
     done
     return 1
+}
+
+install_ai_selection() {
+    local -a tools=()
+    if [[ "${SELECTED_CAPABILITIES[ai]:-}" == all ]]; then
+        readarray -t tools < <(tools_for_capability ai)
+    else
+        tools=("${SELECTED_AI_TOOLS[@]}")
+    fi
+    install_ai_packages "${tools[@]}"
 }
 
 show_help() {
@@ -359,13 +387,13 @@ phase_verify_system() {
         os_version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' "$os_release")"
     fi
     if [[ "$os_id" != "ubuntu" ]]; then
-        if tier_includes "dev" || [[ "$INSTALL_RDP" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ]]; then
+        if tier_includes "dev" || selected_capabilities_need ubuntu; then
             error "APT-backed tiers, Tailscale, RDP, and cloud selections require Ubuntu (detected: ${os_id:-unknown})"
             return 1
         fi
         warn "Ubuntu not detected - APT-backed features are unavailable"
     elif [[ "$os_version" != 22.04 && "$os_version" != 24.04 && "$os_version" != 26.04 ]]; then
-        if tier_includes "dev" || [[ "$INSTALL_RDP" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ]]; then
+        if tier_includes "dev" || selected_capabilities_need ubuntu; then
             error "Unsupported Ubuntu release: ${os_version:-unknown} (supported: 22.04, 24.04, 26.04)"
             return 1
         fi
@@ -381,7 +409,7 @@ phase_verify_system() {
     # bootstrap + downloads) and git; apt is not involved until the dev tier.
     for cmd in curl git; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            if tier_includes "bash" || { [[ "$cmd" == curl && ( "$INSTALL_AI" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ) ]]; }; then
+            if tier_includes "bash" || { [[ "$cmd" == curl ]] && selected_capabilities_need curl; }; then
                 error "Required command not found: $cmd"
                 return 1
             else
@@ -389,12 +417,12 @@ phase_verify_system() {
             fi
         fi
     done
-    if [[ "$INSTALL_RDP" == true || "$INSTALL_TAIL" == true || "$INSTALL_AZURE" == true || "$INSTALL_GCLOUD" == true || "$INSTALL_AWS" == true ]]; then
-        for cmd in apt-get sudo systemctl; do
-            [[ "$cmd" != systemctl || "$INSTALL_RDP" == true ]] || continue
-            command -v "$cmd" >/dev/null 2>&1 || { error "Requested APT/service capability requires: $cmd"; return 1; }
-        done
-    fi
+    local requirement
+    for requirement in apt:apt-get sudo:sudo systemd:systemctl; do
+        selected_capabilities_need "${requirement%%:*}" || continue
+        cmd="${requirement#*:}"
+        command -v "$cmd" >/dev/null 2>&1 || { error "Requested APT/service capability requires: $cmd"; return 1; }
+    done
 
     local capability component
     if tier_includes work && ! tool_applicable sbx; then
@@ -402,8 +430,8 @@ phase_verify_system() {
         return 1
     fi
 
-    for capability in tail azure gcloud aws; do
-        capability_selected "$capability" || continue
+    for capability in "${CAPABILITY_NAMES[@]}"; do
+        capability_selected "$capability" && capability_requires "$capability" applicable || continue
         while IFS= read -r component; do
             tool_applicable "$component" || {
                 error "--$capability is unsupported on ${os_id:-unknown} ${os_version:-unknown}/$(tool_arch 2>/dev/null || printf unknown) ($component is not applicable)"
@@ -420,7 +448,7 @@ phase_verify_system() {
 phase_install_packages() {
     log "Phase 2: Package Installation"
 
-    if ! tier_includes "bash" && [[ "$INSTALL_AI" != true && "$INSTALL_RDP" != true && "$INSTALL_TAIL" != true && "$INSTALL_AZURE" != true && "$INSTALL_GCLOUD" != true && "$INSTALL_AWS" != true ]]; then
+    if ! tier_includes "bash" && ! any_capability_selected; then
         log "Config tier: skipping package installation"
         return 0
     fi
@@ -437,19 +465,11 @@ phase_install_packages() {
         install_work_packages || INSTALLATION_FAILED=true
     fi
 
-    if [[ "$INSTALL_AI" == "true" ]]; then
-        install_ai_packages || INSTALLATION_FAILED=true
-    fi
-
-    if [[ "$INSTALL_RDP" == "true" ]]; then
-        install_rdp_packages || INSTALLATION_FAILED=true
-    fi
-
-    [[ "$INSTALL_TAIL" != true ]] || install_tail_packages || INSTALLATION_FAILED=true
-
-    [[ "$INSTALL_AZURE" != true ]] || install_cloud_capability azure || INSTALLATION_FAILED=true
-    [[ "$INSTALL_GCLOUD" != true ]] || install_cloud_capability gcloud || INSTALLATION_FAILED=true
-    [[ "$INSTALL_AWS" != true ]] || install_cloud_capability aws || INSTALLATION_FAILED=true
+    local capability
+    for capability in "${CAPABILITY_NAMES[@]}"; do
+        capability_selected "$capability" || continue
+        "${CAPABILITY_INSTALLER[$capability]}" "$capability" || INSTALLATION_FAILED=true
+    done
 
     if [[ "$INSTALLATION_FAILED" == "true" ]]; then
         error "One or more requested package operations failed"
@@ -626,8 +646,12 @@ run_installation() {
         return 1
     fi
 
+    local summary="tier: $INSTALL_TIER" capability
+    for capability in "${CAPABILITY_NAMES[@]}"; do
+        if capability_selected "$capability"; then summary+=" +$capability"; fi
+    done
     echo
-    success "Dotfiles installation complete! (tier: $INSTALL_TIER$([[ "$INSTALL_AI" == true ]] && echo " +ai")$([[ "$INSTALL_RDP" == true ]] && echo " +rdp")$([[ "$INSTALL_TAIL" == true ]] && echo " +tail")$([[ "$INSTALL_AZURE" == true ]] && echo " +azure")$([[ "$INSTALL_GCLOUD" == true ]] && echo " +gcloud")$([[ "$INSTALL_AWS" == true ]] && echo " +aws"))"
+    success "Dotfiles installation complete! ($summary)"
     echo
 
     local needs_restart=false
@@ -674,7 +698,7 @@ run_installation() {
 
     echo "$step. Verify installation:"
     if tier_includes "work"; then
-        if [[ "$INSTALL_TAIL" == true ]]; then
+        if capability_selected tail; then
             echo "   ./bin/verify --tier work --tail"
         else
             echo "   ./bin/verify --tier work"
@@ -693,14 +717,14 @@ run_installation() {
         ((step++))
     fi
 
-    if [[ "$INSTALL_TAIL" == true ]]; then
+    if capability_selected tail; then
         echo "$step. Enroll Tailscale with your intended routing/SSH policy:"
         echo "   sudo tailscale up"
         echo
         ((step++))
     fi
 
-    if [[ "$INSTALL_RDP" == "true" ]]; then
+    if capability_selected rdp; then
         echo "$step. Connect to the RDP desktop:"
         if is_wsl; then
             echo "   From this machine's Windows host: mstsc -> localhost:3390"
@@ -767,20 +791,17 @@ main() {
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"
     echo "Tier: $INSTALL_TIER"
-    if [[ "$INSTALL_AI" == "true" ]]; then
-        if [[ "$AI_ALL" == "true" ]]; then
-            echo "AI CLIs: all (claude, codex, opencode, pi)"
-        else
-            echo "AI CLIs: ${AI_TOOLS[*]}"
+    case "${SELECTED_CAPABILITIES[ai]:-}" in
+        all) echo "${CAPABILITY_LABEL[ai]}: all (claude, codex, opencode, pi)" ;;
+        some) echo "${CAPABILITY_LABEL[ai]}: ${SELECTED_AI_TOOLS[*]}" ;;
+        *) echo "${CAPABILITY_LABEL[ai]}: none" ;;
+    esac
+    local capability
+    for capability in "${CAPABILITY_NAMES[@]}"; do
+        if [[ "$capability" != ai ]] && capability_selected "$capability"; then
+            echo "${CAPABILITY_LABEL[$capability]}: yes (--$capability)"
         fi
-    else
-        echo "AI CLIs: none"
-    fi
-    [[ "$INSTALL_RDP" == "true" ]] && echo "RDP server (xrdp): yes (--rdp)"
-    [[ "$INSTALL_TAIL" == true ]] && echo "Tailscale: yes (--tail)"
-    [[ "$INSTALL_AZURE" == true ]] && echo "Azure CLI: yes (--azure)"
-    [[ "$INSTALL_GCLOUD" == true ]] && echo "Google Cloud CLI: yes (--gcloud)"
-    [[ "$INSTALL_AWS" == true ]] && echo "AWS CLI v2: yes (--aws)"
+    done
     [[ "$DRY_RUN" == "true" ]] && echo "Mode: DRY RUN (no changes will be made)"
     echo
     
