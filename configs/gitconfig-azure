@@ -1,8 +1,7 @@
 # Optional Azure DevOps integration. Included from the portable base only when
 # --azure is selected or an existing Azure CLI installation is present.
-
-[credential "https://msasg.visualstudio.com"]
-    helper = azdo
+# Organization hosts (https://ORG.visualstudio.com) are machine-local; add
+# their credential sections to ~/.gitconfig.local.
 
 [credential "https://dev.azure.com"]
     helper = azdo

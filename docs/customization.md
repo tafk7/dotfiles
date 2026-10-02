@@ -103,6 +103,7 @@ These untracked files keep machine-specific settings out of the repo:
 - `~/.shell.local.d/*.sh`: sourced in filename order after `~/.shell.local`.
   They run again on `reload`, so keep them idempotent.
 - `~/.gitconfig.local`: included last, so it overrides the tracked Git config.
+  Azure DevOps organization hosts go here too ([work](work.md#cloud-clis)).
 - `~/.ssh/config.local`: included first, so its values win. Named files in
   `~/.ssh/config.d/*.conf` follow it.
 
@@ -110,16 +111,14 @@ These untracked files keep machine-specific settings out of the repo:
 # ~/.shell.local
 export PROJECTS_DIRS="$HOME/work/acme:$HOME/projects"
 export CODEX_DEFAULT_PROFILE=work     # an explicit -p/--profile still wins
-GH_AMD_USER=your-amd-github-login     # used by gcl-amd
 ```
 
 These are interactive hooks. Services, desktop applications, and plain
 non-interactive shells do not read them.
 
-`gcl-amd OWNER/REPO [DIRECTORY]` clones through the machine-local
-`github.com-amd` SSH alias and records the repository's real `github.com`
-identity for `gh`. It uses the AMD token only during setup and does not switch
-the active `gh` account.
+Employer- or account-specific helpers, such as a clone function pinned to a
+second GitHub account, belong in `~/.shell.local` until
+[git profiles](../issues/git-profiles.md) provides a tracked mechanism.
 
 ### Git identity and signing
 

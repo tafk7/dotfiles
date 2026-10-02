@@ -10,6 +10,10 @@
 #   2. bash -n on staged shell files
 #   3. shellcheck --severity=warning (skipped with info note if not installed)
 #   4. shell/shortcuts-index.tsv: every non-comment row has 4 │-separated fields
+#   5. agent-badge generated copies match plugins/shared/
+#   6. Denylist — staged files contain no word listed in the untracked file
+#      named by $DOTFILES_DENYLIST (one case-insensitive word per line; blank
+#      and # lines ignored). Skipped when unset, so the list never enters the repo.
 #
 # Bypass: ALLOW_PROTECTED=1 git commit   (protected-paths gate only)
 #         git commit --no-verify         (all checks)
@@ -139,6 +143,20 @@ for f in "${STAGED[@]}"; do
         break
     fi
 done
+
+# Check 6: denylisted words (employer and host identifiers) in staged content
+if [[ -n "${DOTFILES_DENYLIST:-}" ]]; then
+    if [[ ! -r "$DOTFILES_DENYLIST" ]]; then
+        fail "DOTFILES_DENYLIST is set but not readable: $DOTFILES_DENYLIST"
+        ((errors++))
+    elif hits="$(git grep --cached -n -I -i -w -F \
+            -f <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_DENYLIST") \
+            -- "${STAGED[@]}")"; then
+        fail "staged content contains denylisted words:"
+        printf '%s\n' "$hits" | sed 's/^/    /' >&2
+        ((errors++))
+    fi
+fi
 
 if [[ $errors -gt 0 ]]; then
     echo >&2
