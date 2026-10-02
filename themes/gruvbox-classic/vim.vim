@@ -11,4 +11,3 @@ let g:gruvbox_material_sign_column_background = 'none'
 let g:gruvbox_material_statusline_style = 'original'
 let g:gruvbox_material_better_performance = 1
 colorscheme gruvbox-material
-let g:airline_theme = 'dotfiles'

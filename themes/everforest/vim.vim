@@ -14,6 +14,3 @@ let g:everforest_current_word = 'grey background'
 
 " Set colorscheme
 colorscheme everforest
-
-" Airline theme
-let g:airline_theme = 'everforest'

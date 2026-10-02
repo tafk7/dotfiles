@@ -10,7 +10,3 @@ let g:catppuccin_flavour = "mocha"
 
 " Set colorscheme after selecting the flavour.
 colorscheme catppuccin_mocha
-
-" Integration settings
-let g:airline_theme = 'catppuccin_mocha'
-let g:lightline = { 'colorscheme': 'catppuccin_mocha' }
