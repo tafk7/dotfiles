@@ -199,7 +199,10 @@ for tier in bash dev work capabilities; do
                 elif [[ "$recorded_owner" == dotfiles && -n "$observed_path" ]] \
                      && ! tool_owned_path "$name" "$observed_path"; then
                     check_fail "$label (present outside recorded ownership: $observed_path)"
-                elif [[ "$recorded_path" != - && -n "$observed_path" && "$recorded_path" != "$observed_path" ]]; then
+                elif [[ "$recorded_path" != - && -n "$observed_path" && "$recorded_path" != "$observed_path" ]] \
+                     && ! { [[ "$recorded_owner" == dotfiles ]] && tool_moves_itself "$name"; }; then
+                    # A self-updating tool is expected to move within its
+                    # ownership roots, which the check above already enforces.
                     check_warn "$label (path changed: recorded $recorded_path, observed $observed_path)"
                 else
                     check_pass "$label"

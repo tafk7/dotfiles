@@ -305,6 +305,12 @@ _registry_ripgrep_present() {
     fi
 }
 
+# Whether the vendor updates the tool in place into a new versioned path, so a
+# recorded path inside its ownership roots goes stale by design.
+tool_moves_itself() {
+    [[ "${TOOL_UPDATE_CONTRACT[$1]:-}" == moving-vendor-installer* ]]
+}
+
 # Return the uninstall paths for a tool (expanded).
 # Falls back to ~/.local/bin/<binary> for eget tools.
 tool_uninstall_paths() {

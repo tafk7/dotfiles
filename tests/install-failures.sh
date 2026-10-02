@@ -43,4 +43,16 @@ PY
 validate_tar_archive "$TEST_ROOT/unsafe.tar" >/dev/null 2>&1 \
     && fail "unsafe archive path was accepted"
 
+# A skipped self-updating CLI keeps ownership after moving within its roots;
+# the ledger then records the new path.
+mkdir -p "$HOME/.local/share/claude/versions" "$HOME/.local/bin"
+cp /usr/bin/true "$HOME/.local/share/claude/versions/2"
+ln -sf "$HOME/.local/share/claude/versions/2" "$HOME/.local/bin/claude"
+ledger_record claude yes dotfiles installed 1 "$HOME/.local/share/claude/versions/1" test
+INSTALL_FAIL=()
+PATH="$HOME/.local/bin:$PATH" track_install claude skip
+IFS=$'\t' read -r _ _ owner status _ path _ _ <<< "$(ledger_line claude)"
+assert_eq "$owner/$status" dotfiles/installed "self-updated claude lost ownership"
+assert_eq "$path" "$HOME/.local/share/claude/versions/2" "self-updated claude path not refreshed"
+
 printf 'install-failures: ok\n'
