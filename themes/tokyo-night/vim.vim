@@ -21,12 +21,4 @@ require('tokyonight').setup({
 })
 EOF
 
-" Set colorscheme with error handling
-try
-    colorscheme tokyonight-night
-    let g:airline_theme='dotfiles'
-catch
-    " Fallback if tokyonight not available
-    colorscheme desert
-    let g:airline_theme='dark'
-endtry
+colorscheme tokyonight-night

@@ -9,4 +9,3 @@ require('github-theme').setup({
 })
 EOF
 colorscheme github_light_high_contrast
-let g:airline_theme = 'dotfiles'

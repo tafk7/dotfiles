@@ -16,6 +16,3 @@ require('kanagawa').setup({
 })
 EOF
 colorscheme kanagawa-wave
-
-" Airline theme (use a compatible dark theme)
-let g:airline_theme='dotfiles'

@@ -21,6 +21,3 @@ let g:gruvbox_material_better_performance = 1
 
 " Set colorscheme after every supported option has been configured.
 colorscheme gruvbox-material
-
-" Airline theme
-let g:airline_theme='gruvbox_material'

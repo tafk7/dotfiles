@@ -18,5 +18,3 @@ EOF
 
 " Set colorscheme
 colorscheme vesper
-
-let g:airline_theme = 'dotfiles'
