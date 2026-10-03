@@ -26,8 +26,11 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
    tag = "v1.2.3"
    asset_filters = [".tar.gz", "gnu"]
    ```
-   Filters must leave exactly one asset for each supported architecture. Refresh
-   the recorded asset lists with `tests/eget-selection.py --refresh`.
+   Filters must leave exactly one asset for each supported architecture. Then
+   run `python3 tests/eget-selection.py --refresh` (after any tag bump too): it
+   records the release's asset lists and writes `eget.lock`, the exact asset,
+   SHA-256 and file per architecture that setup downloads without asking the
+   GitHub API. Commit both.
 2. Add one row to the core table in `lib/registry.sh`:
    ```text
    # name   binary  method  tier  capabilities  platform  arches  ubuntu  apt  verify

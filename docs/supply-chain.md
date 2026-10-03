@@ -8,10 +8,10 @@ from the network into a shell and are never executed with `sudo`.
 | Component | Version policy | Authenticity / replacement contract |
 |---|---|---|
 | eget | pinned release | HTTPS-trusted release asset; staged executable check and atomic replacement |
-| eget-managed CLI tools | pinned in `eget.toml` | eget native architecture selection; staged executable check and atomic replacement |
-| Neovim | latest release on supported Ubuntu hosts | HTTPS-trusted release asset; archive-layout and executable checks; staged tree replacement |
+| eget-managed CLI tools | pinned in `eget.toml`; asset locked in `eget.lock` | exact asset by download URL (no GitHub API call), SHA-256 verified against the lock; staged executable check and atomic replacement |
+| Neovim | pinned release (`lib/config.sh`) | release asset SHA-256 verified against the pin; archive-layout and executable checks; staged tree replacement |
 | vim-plug | commit `88e31471818e9a29a8a20a0ee61360cfd7bdc1cd` | explicit `install-editor-plugins` action; HTTPS-trusted immutable source; existing manager preserved |
-| tmux | latest release | HTTPS-trusted source archive; staged build and executable check before replacement |
+| tmux | pinned release (`lib/config.sh`) | source archive SHA-256 verified against the pin; staged build and executable check before replacement |
 | NVM | pinned installer v0.40.4 | HTTPS-trusted installer file; no shell-RC modification; prior tree retained on installer failure |
 | Rust | moving rustup installer | HTTPS-trusted installer file; in-place upstream mutation; recover with `rustup update`/`rustup self uninstall` |
 | Claude Code | moving official installer | HTTPS-trusted installer file; verified owned launcher after execution |
@@ -23,6 +23,12 @@ from the network into a shell and are never executed with `sudo`.
 | Tailscale | Tailscale signed APT repository | release-specific official keyring/list; no enrollment or auth-key handling |
 | Google Cloud CLI | Google signed APT repository | official `google-cloud-cli` package; credentials preserved |
 | AWS CLI v2 | signed AWS distribution | amd64/arm64 ZIP plus detached signature verified with the AWS CLI Team key and pinned fingerprint; `/usr/local/aws-cli` ownership explicit |
+
+The `eget.lock`, Neovim and tmux checksums pin the bytes first seen over HTTPS
+when the version was bumped, cross-checked with the SHA-256 digest GitHub
+publishes for the asset where it has one. They make every later install
+identical and detect a release asset that changes afterwards; they do not vouch
+for the release itself.
 
 Some upstream projects do not publish stable checksums or signatures for every
 asset. This repository records that limitation instead of embedding hashes from

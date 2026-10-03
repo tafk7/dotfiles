@@ -341,8 +341,9 @@ tool_arch() {
 }
 
 # Per-arch eget --asset flags, one argument per line, for releases whose asset
-# names carry no OS and so defeat eget's native detection. Command-line --asset
-# replaces the tool's eget.toml asset_filters. Prints nothing for other tools.
+# names carry no OS and so defeat eget's native detection. They replace the
+# tool's eget.toml asset_filters when tests/eget-selection.py chooses the asset
+# eget.lock records. Prints nothing for other tools.
 tool_eget_asset_args() {
     local name="$1" arch
     arch="$(tool_arch)" || return 1

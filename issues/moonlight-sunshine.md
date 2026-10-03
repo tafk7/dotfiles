@@ -41,8 +41,8 @@ Trigger conditions — any of:
 ## Sketch if/when we do it
 
 - `installers/install-sunshine.sh` — Sunshine ships a `.deb` via GitHub releases, so
-  it fits the existing `github_latest_version` + apt/dpkg pattern; pin the version
-  like everything else. Needs udev rules + `setcap` for KMS capture, and a systemd
+  it fits the existing pinned-release + apt/dpkg pattern: pin the version and its
+  SHA-256 in `lib/config.sh` like Neovim and tmux (no GitHub API lookup). Needs udev rules + `setcap` for KMS capture, and a systemd
   user service.
 - Gate behind an orthogonal flag (e.g. `--stream`), same pattern as `--ai` / the
   proposed `--rdp`: hardware-specific, opt-in, never implied by a tier.

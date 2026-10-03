@@ -48,6 +48,15 @@ EOF
 DOTFILES_DIR="$TEST_ROOT/repo"
 mkdir -p "$DOTFILES_DIR"
 cp "$config" "$DOTFILES_DIR/eget.toml"
+# lock REPO TAG: an eget.lock entry for both architectures (the fake eget
+# ignores the asset; the installer only needs the entry to match the pin).
+lock() {
+    local arch
+    for arch in x86_64 aarch64; do
+        printf '%s\t%s\t%s\tasset.tar.gz\t%s\t-\n' "$1" "$2" "$arch" "$(printf '0%.0s' {1..64})"
+    done > "$DOTFILES_DIR/eget.lock"
+}
+lock example/demo v1
 FORCE_REINSTALL=true
 ledger_record demo yes dotfiles installed old "$HOME/.local/bin/demo" test
 
@@ -100,6 +109,7 @@ target = "~/.local/bin"
 ["BurntSushi/ripgrep"]
 tag = "15.2.0"
 EOF
+lock BurntSushi/ripgrep 15.2.0
 INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
 install_eget_tools >/dev/null
 [[ -x "$HOME/.local/bin/rg" ]] || fail "private Codex rg suppressed managed ripgrep"
@@ -142,6 +152,7 @@ target = "~/.local/bin"
 ["eza-community/eza"]
 tag = "v0.23.4"
 EOF
+lock eza-community/eza v0.23.4
 INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
 install_eget_tools >/dev/null
 [[ ! -e "$TEST_ROOT/unnecessary-download" ]] || fail "multi-line pinned version triggered a download"
@@ -154,5 +165,42 @@ if atomic_replace_tree demo "$TEST_ROOT/bad-tree" "$HOME/.local/demo" bin/demo >
     fail "invalid staged tree was accepted"
 fi
 assert_eq "$(sha256sum "$HOME/.local/demo/bin/demo" | awk '{print $1}')" "$before_tree" "invalid tree replaced working install"
+
+# The download is the locked asset by URL, verified against its checksum, with
+# the locked member extracted: no repository slug, so no GitHub API call.
+cat > "$HOME/.local/bin/eget" <<EOF
+#!/bin/sh
+if [ "\${1:-}" = --version ]; then echo 'eget 1.3.4'; exit 0; fi
+printf '%s\n' "\$@" > "$TEST_ROOT/eget-args"
+cat > "\$HOME/.local/bin/fd" <<'BIN'
+#!/bin/sh
+[ "\${1:-}" = --version ] && echo 'fd 10.4.2'
+BIN
+EOF
+chmod +x "$HOME/.local/bin/eget"
+TOOL_METHOD=(['fd']=eget)
+TOOL_BINARY=(['fd']=fd)
+TOOL_TIER=(['fd']=bash)
+TOOL_PLATFORM=(['fd']=ubuntu)
+TOOL_ARCHES=(['fd']='x86_64,aarch64')
+TOOL_OWNERSHIP_ROOTS=(['fd']="$HOME/.local/bin")
+TOOL_UPDATE_CONTRACT=(['fd']=staged-release)
+printf '[global]\ntarget = "~/.local/bin"\n["sharkdp/fd"]\ntag = "v10.4.2"\n' > "$DOTFILES_DIR/eget.toml"
+sha="$(printf 'a%.0s' {1..64})"
+printf 'sharkdp/fd\tv10.4.2\t%s\tfd-%s.tar.gz\t%s\tfd-dir/fd\n' \
+    x86_64 x86_64 "$sha" aarch64 aarch64 "$sha" > "$DOTFILES_DIR/eget.lock"
+INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
+DOTFILES_TEST_ARCH=aarch64 install_eget_tools >/dev/null
+eget_args="$(paste -sd ' ' "$TEST_ROOT/eget-args")"
+[[ "$eget_args" == "--file fd-dir/fd --to "*"/.local/bin/fd --verify-sha256 $sha https://github.com/sharkdp/fd/releases/download/v10.4.2/fd-aarch64.tar.gz" ]] \
+    || fail "eget was not given the locked asset: $eget_args"
+[[ -x "$HOME/.local/bin/fd" ]] || fail "a downloaded binary without its execute bit was not made executable"
+
+# A pin the lock does not follow fails before any download.
+rm -f "$TEST_ROOT/eget-args" "$HOME/.local/bin/fd"
+printf '[global]\ntarget = "~/.local/bin"\n["sharkdp/fd"]\ntag = "v10.5.0"\n' > "$DOTFILES_DIR/eget.toml"
+INSTALL_OK=() INSTALL_SKIP=() INSTALL_FAIL=()
+if install_eget_tools >/dev/null 2>&1; then fail "a stale eget.lock was accepted"; fi
+[[ ! -e "$TEST_ROOT/eget-args" ]] || fail "eget ran without a matching eget.lock entry"
 
 printf 'eget-staging: ok\n'

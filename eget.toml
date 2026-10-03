@@ -1,9 +1,15 @@
 # eget.toml — pinned releases for the eget-managed tools. Install through
 # setup.sh, which adds tier selection, staging, and ownership recording.
 #
-# upgrade_only skips a tool already at its pinned tag (eget compares the
-# release date with the installed binary's mtime). Bump `tag` and rerun setup to
-# upgrade; `./setup.sh --bash --force` re-downloads (repair or downgrade).
+# setup.sh does not resolve these entries itself: eget.lock records, per tool
+# and architecture, the asset these filters select, its SHA-256 and the file to
+# extract, and setup.sh downloads exactly that (no GitHub API call, so no
+# rate limit on a fresh machine). After bumping a `tag`, regenerate the lock:
+#
+#     python3 tests/eget-selection.py --refresh
+#
+# then rerun setup to upgrade; `./setup.sh --bash --force` re-downloads (repair
+# or downgrade). `eget -D` with this file still works for manual use.
 #
 # Architecture: filters must leave exactly one asset per supported arch
 # (x86_64 and aarch64) after eget's native OS/arch detection. Never filter on an
@@ -102,6 +108,6 @@ target = "~/.local/bin/jq"
 tag = "v0.9.7"
 # Release ships bare binaries: wsl2-ssh-agent (x86_64) and wsl2-ssh-agent-arm64.
 # Neither name carries an OS, so eget's native detection cannot choose between
-# them. Callers pass per-arch --asset flags from tool_eget_asset_args
+# them. Selection uses per-arch --asset flags from tool_eget_asset_args
 # (lib/registry.sh), which override this filter.
 asset_filters = ["wsl2-ssh-agent"]

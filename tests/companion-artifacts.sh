@@ -8,7 +8,7 @@ mkdir -p "$HOME/.local/bin" "$TEST_ROOT/repo"
 export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
 source "$ROOT/lib/install.sh"
 DOTFILES_DIR="$TEST_ROOT/repo"
-cp "$ROOT/eget.toml" "$DOTFILES_DIR/eget.toml"
+cp "$ROOT/eget.toml" "$ROOT/eget.lock" "$DOTFILES_DIR/"
 run_installer() { return 0; }
 TOOL_METHOD=(['uv']=eget)
 tier_includes() { return 0; }
