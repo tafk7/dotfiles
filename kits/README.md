@@ -2,8 +2,8 @@
 
 Docker Sandboxes (sbx) v3 kits that belong to no project: coding-agent
 harnesses, model-gateway access, the portable part of this repository's AI
-configuration. Layer them onto any workload, such as
-FINN's (`finn.yaml` in a FINN checkout). Validated with the sbx version
+configuration. Content kits (skills, prompts) come from their owners and
+layer the same way. Layer them onto any workload, such as FINN's (`finn.yaml` in a FINN checkout). Validated with the sbx version
 `lib/config.sh` pins (`SBX_VERSION`).
 
 | Kit | Kind | Adds |
@@ -38,8 +38,8 @@ untracked `~/.config/dotfiles/buildkitd-sbx-kits.toml`).
 `ai-preferences` is generated from `configs/`; edit those, then run
 `kits/sync-portable.py` (the pre-commit hook and the test suite run it with
 `--check`). It carries no credentials and selects no model or provider: the
-model belongs to whatever serves requests (a gateway names its own), the status
-line needs a host script, and the viz skill the host's VS Code window. Claude
+model belongs to whatever serves requests (a gateway names its own), and the
+status line needs a host script. Claude
 Code reads the settings as managed settings, so the harness kit's own
 `settings.json` (auth mode, bypass permissions) stays the harness's.
 

@@ -8,12 +8,11 @@ which the kit's image carries and its install hook places in the agent's home:
   configs/claude-settings.json   the keys in SETTINGS_KEYS, as Claude Code's
                                  managed settings (/etc/claude-code), which the
                                  harness kit's own settings.json cannot clobber
-  configs/ai/claude/             keybindings and the skills in CLAUDE_SKILLS
+  configs/ai/claude/             keybindings (content skills come from their owners' kits)
   configs/ai/codex/              the skills in CODEX_SKILLS
 
 Left out, because they depend on the host or the provider: the model (a
-gateway names its own), the status line (a host script and jq), and the viz
-skill (the host's VS Code window).
+gateway names its own), and the status line (a host script and jq).
 
 Usage: kits/sync-portable.py            write the kit's generated files
        kits/sync-portable.py --check    exit 1 if they are stale (pre-commit)
@@ -38,7 +37,6 @@ SETTINGS_KEYS = (
     "verbose",
 )
 CLAUDE_FILES = ("keybindings.json",)
-CLAUDE_SKILLS = ("hone", "modular-dev")
 CODEX_SKILLS = ("thread-handoff",)
 GENERATED = ("home", "etc")
 
@@ -55,8 +53,6 @@ def render(out: Path) -> None:
     (home / ".claude").mkdir(parents=True)
     for name in CLAUDE_FILES:
         shutil.copy2(claude / name, home / ".claude" / name)
-    for name in CLAUDE_SKILLS:
-        shutil.copytree(claude / "skills" / name, home / ".claude" / "skills" / name)
     for name in CODEX_SKILLS:
         shutil.copytree(codex / "skills" / name, home / ".codex" / "skills" / name)
 
