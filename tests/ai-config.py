@@ -73,6 +73,20 @@ custom_binding = "ctrl-k"
         self.assertEqual(data['provider'], {'gw': {'models': {'big': {}}}})
         self.assertTrue(list((self.home / '.config/opencode/backups').glob('*/opencode.json')))
 
+    def test_opencode_native_preferences_follow_verified_v2(self):
+        path = self.put('.config/opencode/opencode.json', '{"autoupdate":true,"update":"auto","providers":{"mine":{}}}')
+        cli = self.put('.local/bin/opencode', '#!/bin/sh\necho "opencode v2.0.22"\n')
+        cli.chmod(0o755)
+        self.run_config('opencode')
+        config = json.loads(path.read_text())
+        self.assertEqual(config['update'], 'notify')
+        self.assertNotIn('autoupdate', config)
+        self.assertEqual(config['providers'], {'mine': {}})
+        before = self.snapshot()
+        self.run_config('opencode')
+        self.run_config('opencode', '--check')
+        self.assertEqual(before, self.snapshot())
+
     def test_mod_plugins_require_the_claude_floor(self):
         import shutil
         source = ROOT / 'plugins/agent-badge-claude'

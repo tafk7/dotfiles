@@ -146,6 +146,11 @@ uninstall_tool() {
                     if [[ "$DRY_RUN" == true ]]; then
                         log "[DRY RUN] Would remove: $path"
                     else
+                        # Stop the V2 shared service before deleting its executable.
+                        if [[ "$name" == opencode && -x "$HOME/.opencode/bin/opencode" ]] &&
+                           [[ "$("$HOME/.opencode/bin/opencode" --version 2>/dev/null)" == *v2.* ]]; then
+                            "$HOME/.opencode/bin/opencode" service stop || return 1
+                        fi
                         if [[ "${TOOL_REMOVAL_REQUIRES_SUDO[$name]:-}" == yes ]]; then
                             sudo rm -rf -- "$path"
                         else

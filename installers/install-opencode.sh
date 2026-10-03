@@ -1,107 +1,82 @@
 #!/bin/bash
-# Install opencode via the official installer (opencode.ai/install).
-#
-# A rerun only ensures it is present; --force (bin/ai-update opencode) reruns
-# the installer, which fetches the latest release. It refuses to shadow an
-# org-managed opencode on PATH.
-#
-# The installer always uses ~/.opencode/bin and otherwise appends a PATH line to
-# a shell rc file (a symlink into this repo), so pass --no-modify-path and link
-# the binary into ~/.local/bin.
-#
-# Not eget: opencode ships CPU/libc variants (baseline builds for CPUs without
-# AVX2, musl). The upstream installer detects the right one; a fixed asset
-# filter would SIGILL on older CPUs.
-#
-# Portable preferences are reconciled by bin/ai-config: update notices instead
-# of silent self-updates, because opencode's updater omits --no-modify-path.
-# Providers belong to whatever configures them.
+# Install the stable OpenCode V2 CLI without modifying shell startup files.
+# Existing V2 installs are reconciled; --force updates. Owned V1 installs migrate.
 set -euo pipefail
-
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
 export DOTFILES_DIR
 source "$DOTFILES_DIR/lib/install.sh"
-
 FORCE=false
-[[ "${1:-}" == "--force" ]] && FORCE=true
+[[ "${1:-}" == --force ]] && FORCE=true
+OPENCODE_REAL="$HOME/.opencode/bin/opencode"
+OPENCODE_LINK="$HOME/.local/bin/opencode"
 
-OPENCODE_REAL="$HOME/.opencode/bin/opencode"   # hardcoded install location
-OPENCODE_LINK="$HOME/.local/bin/opencode"      # our PATH-visible symlink
+v2_version() {
+    local version
+    version="$("$1" --version 2>/dev/null)" || return 1
+    [[ "$version" =~ ^(opencode[[:space:]]+)?v?2\.[0-9]+\.[0-9]+$ ]]
+}
 
-# Configuration is independent of the binary install state: reconcile it on
-# every run so it lands even when the binary is already present (the early
-# exits below).
-"$DOTFILES_DIR/bin/ai-config" opencode
-
-# Verify by absolute path: on a fresh machine ~/.local/bin is not guaranteed to
-# be on the installer process's PATH.
-if [[ "$FORCE" != true && -x "$OPENCODE_LINK" ]] && "$OPENCODE_LINK" --version >/dev/null 2>&1; then
-    success "opencode already installed ($("$OPENCODE_LINK" --version 2>/dev/null | head -n1)); update with bin/ai-update opencode."
+# Check ownership before configuration or symlink changes, including --force.
+external="$(command -v opencode 2>/dev/null || true)"
+if [[ -n "$external" && "$external" != "$OPENCODE_REAL" && "$external" != "$OPENCODE_LINK" ]] ||
+   [[ -e "$OPENCODE_LINK" && "$(readlink -f "$OPENCODE_LINK")" != "$OPENCODE_REAL" ]]; then
+    warn "Externally managed opencode found; use its package manager to migrate to V2."
     exit 2
 fi
-
-# opencode already present at its real location but not yet linked (a prior
-# install, or the installer's own default PATH setup) — just adopt it by
-# (re)creating our symlink, no re-download needed.
-if [[ "$FORCE" != true && -x "$OPENCODE_REAL" ]] && "$OPENCODE_REAL" --version >/dev/null 2>&1; then
+if [[ "$FORCE" != true ]] && v2_version "$OPENCODE_REAL"; then
     mkdir -p "$HOME/.local/bin"
-    ln -sf "$OPENCODE_REAL" "$OPENCODE_LINK"
-    success "opencode already installed at $OPENCODE_REAL; linked into ~/.local/bin."
-    exit 0
-fi
-
-# Don't shadow an externally managed opencode: ~/.local/bin comes first on PATH.
-EXTERNAL_OPENCODE="$(command -v opencode 2>/dev/null || true)"
-if [[ -n "$EXTERNAL_OPENCODE" \
-      && "$EXTERNAL_OPENCODE" != "$OPENCODE_LINK" \
-      && "$EXTERNAL_OPENCODE" != "$OPENCODE_REAL" ]]; then
-    warn "Found an externally-managed opencode on PATH: $EXTERNAL_OPENCODE"
-    warn "Skipping install to avoid a shadow copy at $OPENCODE_LINK."
-    warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
+    ln -sfn "$OPENCODE_REAL" "$OPENCODE_LINK"
+    "$DOTFILES_DIR/bin/ai-config" opencode
+    success "OpenCode V2 already installed; update with bin/ai-update opencode."
     exit 2
 fi
 
-log "Installing opencode via opencode.ai/install..."
-
-# --no-modify-path: don't touch shell rc files (we own PATH via shell/env.sh and
-# the symlink below). Args are passed to the piped script via `bash -s --`.
-opencode_installer="${DOTFILES_OPENCODE_INSTALLER_SCRIPT:-}"
-downloaded_installer=false
-if [[ -z "$opencode_installer" ]]; then
-    opencode_installer="$(mktemp)"
-    downloaded_installer=true
-    download_installer_script https://opencode.ai/install "$opencode_installer" || exit 1
-elif [[ ! -s "$opencode_installer" ]]; then
-    error "DOTFILES_OPENCODE_INSTALLER_SCRIPT is missing or empty: $opencode_installer"
+installer="${DOTFILES_OPENCODE_INSTALLER_SCRIPT:-}"
+downloaded=false
+backup_dir=""
+cleanup() {
+    [[ "$downloaded" != true ]] || rm -f -- "$installer"
+    return 0
+}
+trap cleanup EXIT
+if [[ -z "$installer" ]]; then
+    installer="$(mktemp)"
+    downloaded=true
+    download_installer_script https://opencode.ai/v2/install "$installer" || exit 1
+elif [[ ! -s "$installer" ]]; then
+    error "DOTFILES_OPENCODE_INSTALLER_SCRIPT is missing or empty: $installer"
     exit 1
+fi
+args=(--no-modify-path)
+if [[ -n "${DOTFILES_OPENCODE_VERSION:-}" ]]; then
+    [[ "$DOTFILES_OPENCODE_VERSION" =~ ^2\.[0-9]+\.[0-9]+$ ]] || { error "Expected a stable V2 version"; exit 1; }
+    args+=(--version "$DOTFILES_OPENCODE_VERSION")
+fi
+if [[ -f "$OPENCODE_REAL" ]]; then
+    backup_dir="$(mktemp -d "${TMPDIR:-/tmp}/opencode-binary-backup.XXXXXX")"
+    cp -p "$OPENCODE_REAL" "$backup_dir/opencode"
+    # A shared V2 service must stop before its executable is replaced.
+    if v2_version "$OPENCODE_REAL"; then "$OPENCODE_REAL" service stop; fi
 fi
 rc_before="$(rc_snapshot)"
-if ! bash "$opencode_installer" --no-modify-path; then
-    [[ "$downloaded_installer" == true ]] && rm -f "$opencode_installer"
-    error "opencode installation failed"
+log "Installing stable OpenCode V2 via opencode.ai/v2/install..."
+if ! VERSION='' bash "$installer" "${args[@]}" || ! v2_version "$OPENCODE_REAL"; then
+    if [[ -n "$backup_dir" ]]; then
+        cp -p "$backup_dir/opencode" "$OPENCODE_REAL.restore"
+        mv -f "$OPENCODE_REAL.restore" "$OPENCODE_REAL"
+        warn "Restored the previous binary; backup retained at $backup_dir"
+    else
+        [[ ! -f "$OPENCODE_REAL" ]] || mv "$OPENCODE_REAL" "$OPENCODE_REAL.failed"
+    fi
+    warn_if_rc_changed "$rc_before"
+    error "OpenCode V2 installation/verification failed; configuration was not migrated"
     exit 1
 fi
-[[ "$downloaded_installer" == true ]] && rm -f "$opencode_installer"
-
-if [[ ! -x "$OPENCODE_REAL" ]]; then
-    error "opencode installer ran but $OPENCODE_REAL is missing"
-    exit 1
-fi
-
-# Link into ~/.local/bin so it resolves on PATH without an rc edit. opencode
-# self-updates in place at $OPENCODE_REAL, so the symlink stays valid.
 mkdir -p "$HOME/.local/bin"
-ln -sf "$OPENCODE_REAL" "$OPENCODE_LINK"
-
-# Safety net: --no-modify-path should mean no rc edits, but the rc files are
-# repo symlinks — warn if anything wrote through anyway.
+ln -sfn "$OPENCODE_REAL" "$OPENCODE_LINK"
 warn_if_rc_changed "$rc_before"
-
-if [[ -x "$OPENCODE_LINK" ]] && "$OPENCODE_LINK" --version >/dev/null 2>&1; then
-    success "opencode installed: $("$OPENCODE_LINK" --version 2>/dev/null | head -n1)"
-    exit 0
-fi
-
-error "opencode installed to $OPENCODE_REAL but $OPENCODE_LINK is not runnable"
-exit 1
+# Native preferences only after a verified V2 binary is available.
+"$DOTFILES_DIR/bin/ai-config" opencode
+[[ -z "$backup_dir" ]] || log "Previous binary retained at $backup_dir"
+success "Installed $("$OPENCODE_REAL" --version)"
