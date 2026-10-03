@@ -1,0 +1,9 @@
+{
+  "name": "yank",
+  "version": "0.1.0",
+  "description": "/yank: pick a recent message and copy it into the tmux buffer (Claude Code mod; needs 2.1.287).",
+  "author": { "name": "tkeller", "url": "https://github.com/tafk7" },
+  "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/yank-claude",
+  "repository": "https://github.com/tafk7/dotfiles",
+  "keywords": ["tmux", "clipboard", "copy", "mod"]
+}

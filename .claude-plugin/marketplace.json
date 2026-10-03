@@ -16,6 +16,15 @@
       "source": "./plugins/agent-badge-claude"
     },
     {
+      "name": "yank",
+      "description": "/yank: pick a recent message and copy it into the tmux buffer (Claude Code mod).",
+      "author": {
+        "name": "tkeller"
+      },
+      "category": "productivity",
+      "source": "./plugins/yank-claude"
+    },
+    {
       "name": "viz",
       "description": "Skill for showing charts and diagrams through bin/viz (VS Code viewer).",
       "author": {
