@@ -26,8 +26,8 @@ class ConfigurationTests(unittest.TestCase):
         path.write_text(text)
         return path
 
-    def run_config(self, *args, ok=True):
-        result = subprocess.run([str(ROOT / 'bin/ai-config'), '--home', str(self.home), *args], capture_output=True, text=True)
+    def run_config(self, *args, ok=True, env=None):
+        result = subprocess.run([str(ROOT / 'bin/ai-config'), '--home', str(self.home), *args], capture_output=True, text=True, env=env)
         self.assertEqual(result.returncode == 0, ok, result.stdout + result.stderr)
         return result
 
@@ -72,6 +72,33 @@ custom_binding = "ctrl-k"
         self.assertEqual(data['model'], 'gw/big')
         self.assertEqual(data['provider'], {'gw': {'models': {'big': {}}}})
         self.assertTrue(list((self.home / '.config/opencode/backups').glob('*/opencode.json')))
+
+    def test_mod_plugins_require_the_claude_floor(self):
+        import shutil
+        source = ROOT / 'plugins/agent-badge-claude'
+        version = json.loads((source / '.claude-plugin/plugin.json').read_text())['version']
+        cache = self.home / '.claude/plugins/cache/tafk7/agent-badge' / version
+        shutil.copytree(source, cache, ignore=shutil.ignore_patterns('types', '__pycache__'))
+        self.put('.claude/plugins/installed_plugins.json', json.dumps({'plugins': {'agent-badge@tafk7': [
+            {'scope': 'user', 'version': version, 'installPath': str(cache)}]}}))
+        self.run_config('claude')
+        settings = self.home / '.claude/settings.json'
+        data = json.loads(settings.read_text())
+        data.setdefault('enabledPlugins', {})['agent-badge@tafk7'] = True
+        settings.write_text(json.dumps(data))
+
+        def with_claude(reported):
+            bin_dir = self.home / 'bin'
+            bin_dir.mkdir(exist_ok=True)
+            stub = bin_dir / 'claude'
+            stub.write_text(f'#!/bin/sh\necho "{reported} (Claude Code)"\n')
+            stub.chmod(0o755)
+            return {**os.environ, 'PATH': f'{bin_dir}:{os.environ["PATH"]}'}
+
+        old = self.run_config('claude', '--check', '--plugins', ok=False, env=with_claude('2.1.286'))
+        self.assertIn('below the 2.1.287 floor', old.stdout)
+        new = self.run_config('claude', '--check', '--plugins', env=with_claude('2.1.287'))
+        self.assertIn('meets the 2.1.287 floor', new.stdout)
 
     def test_repeat_and_check_are_byte_and_mtime_noops(self):
         self.run_config()

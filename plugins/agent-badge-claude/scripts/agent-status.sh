@@ -246,11 +246,11 @@ glyph() {
     local g="${2:-✻}" c="${3:-#D97757}"
     case "$1" in
         # -- actionable: neutral --
-        needs)   printf '#[fg=yellow]◆#[default]' ;;
+        needs)   printf '#[fg=red]◆#[default]' ;;
         done)    printf '#[fg=green]●#[default]' ;;
-        # Finished with subagents still running: the agent glyph in teal
+        # Finished with subagents still running: the agent glyph in yellow
         # rather than new vocabulary, since mistaking it for done is cheap.
-        waiting) printf '#[fg=#10b981]%s#[default]' "$g" ;;
+        waiting) printf '#[fg=yellow]%s#[default]' "$g" ;;
         # -- ambient: agent-specific --
         working|thinking) printf '#[fg=%s]%s#[default]' "$c" "$g" ;;
         idle)             printf '#[fg=brightblack]%s#[default]' "$g" ;;

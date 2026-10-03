@@ -24,7 +24,9 @@ whatever configures the provider; named profiles can override any default.
 Provider-specific Claude environment, such as gateway compatibility flags,
 belongs to the provider configuration too, as do opencode's providers, models
 and provider allowlist. Claude keeps medium effort and disabled nonessential
-traffic, which also disables its automatic updater. opencode only notifies about
+traffic, which also disables its automatic updater and makes `$.http.fetch`
+fail in Claude Code mods (use `$.process.run` instead). A provider configuration
+may declare `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` too, with the same value. opencode only notifies about
 new releases and never shares sessions: its own updater reruns the upstream
 installer without `--no-modify-path`, which would append to the repo-owned
 `~/.bashrc`. Use `bin/ai-update claude`, `codex` or `opencode` to update

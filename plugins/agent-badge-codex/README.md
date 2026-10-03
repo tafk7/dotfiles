@@ -22,9 +22,9 @@ identity buys nothing and costs the "scan for green" affordance.
 
 | | State | Meaning |
 |---|---|---|
-| `◆` yellow | `needs` | Blocked on a permission decision |
+| `◆` red | `needs` | Blocked on a permission decision |
 | `●` green | `done` | Finished a turn, you haven't looked yet |
-| `✻` teal | `waiting` | Finished, but background subagents are still running. **Claude only** — see below |
+| `✻` yellow | `waiting` | Finished, but background subagents are still running. **Claude only** — see below |
 
 **Ambient — agent-specific.** Nothing is being asked of you, so the useful
 information is *what is running where*.
@@ -94,6 +94,15 @@ To repair an already-running server without restarting it, run the plugin's
 
 Wiring replaces only badge-owned hook entries and preserves other tmux hooks.
 
+## Claude Code requirements
+
+From 1.1.0 the Claude plugin drives the badge from a Claude Code mod
+(`hooks/register.ts`) instead of settings hooks, so it needs **Claude Code
+2.1.287 or newer**; `bin/ai-config --check --plugins` reports an older client.
+The mod still calls `scripts/agent-status.sh`, so tmux wiring and the Codex
+plugin are unchanged. It does nothing outside tmux and in headless (`claude -p`)
+sessions, so child agents no longer flip the parent's badge.
+
 ## Why two plugins
 
 `agent-badge-claude` and `agent-badge-codex` are separate plugins carrying
@@ -136,7 +145,7 @@ until it restarts.
 
 ## How it works
 
-Hooks in both harnesses call `scripts/agent-status.sh <state>`, which writes the
+Codex hooks, and the Claude mod, call `scripts/agent-status.sh <state>`, which writes the
 calling pane's state to a tmux pane option, aggregates every pane in the window
 to the highest-severity state, pre-renders the badge string into
 `@cc_win_badge`, and forces a redraw. `window-status-format` renders it with
