@@ -65,4 +65,21 @@ theme_output="$(HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="
         '+quit' 2>&1)" || fail "palette colorscheme did not load: $theme_output"
 [[ "$theme_output" != *'E185'* ]] || fail "palette colorscheme emitted E185"
 
+# A pin swaps the palette indices for one theme's RGB values; follow undoes it.
+nvim_run() {
+    HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+        XDG_CACHE_HOME="$XDG_CACHE_HOME" DOTFILES_DIR="$ROOT" PATH="$PATH" \
+        "$NVIM_BIN" --headless -u "$ROOT/configs/init.vim" "$@" '+quit' 2>&1
+}
+bg_is() { printf '+if synIDattr(hlID("Normal"), "bg#", "gui") !=# "%s" | cquit %s | endif' "$1" "$2"; }
+gruvbox_bg="$(source "$ROOT/themes/gruvbox.sh"; printf '%s' "$THEME_BG_HEX")"
+light_bg="$(source "$ROOT/themes/github-light.sh"; printf '%s' "$THEME_BG_HEX")"
+output="$(nvim_run '+Theme gruvbox' '+if !&termguicolors | cquit 37 | endif' "$(bg_is "$gruvbox_bg" 38)" \
+    '+Theme follow' '+if &termguicolors | cquit 39 | endif')" || fail ":Theme pin and follow failed: $output"
+"$ROOT/bin/theme-switcher" --nvim github-light >/dev/null
+output="$(nvim_run "$(bg_is "$light_bg" 40)" '+if &background !=# "light" | cquit 41 | endif')" \
+    || fail "saved Neovim pin was not applied: $output"
+"$ROOT/bin/theme-switcher" --nvim follow >/dev/null
+output="$(nvim_run '+if &termguicolors | cquit 42 | endif')" || fail "theme --nvim follow did not clear the pin: $output"
+
 printf 'neovim: ok\n'

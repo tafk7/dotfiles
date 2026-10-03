@@ -67,6 +67,16 @@ assert_eq "$(t show-options -qwv -t "$w2" 'pane-colours[1]')" "" "cleared window
 theme --revert >/dev/null
 assert_eq "$(expand "$w1" '#{@theme}')" kanagawa "revert"
 
+# The Neovim pin is independent of tmux and survives global changes.
+theme --nvim gruvbox >/dev/null
+theme tokyo-night >/dev/null
+assert_eq "$(awk -F '\t' '$1 == "nvim" { print $2 }' "$XDG_STATE_HOME/dotfiles/theme.tsv")" gruvbox "Neovim pin survives a global change"
+assert_eq "$(expand "$w1" '#{@theme}')" tokyo-night "Neovim pin does not affect tmux"
+theme --nvim no-such-theme >/dev/null 2>&1 && fail "unknown Neovim pin accepted"
+theme --nvim follow >/dev/null
+assert_eq "$(awk -F '\t' '$1 == "nvim" { print $2 }' "$XDG_STATE_HOME/dotfiles/theme.tsv")" "" "Neovim follow clears the pin"
+theme kanagawa >/dev/null
+
 # Unknown names and window ids fail without changing anything.
 theme no-such-theme >/dev/null 2>&1 && fail "unknown theme accepted"
 theme --window=@999 vesper >/dev/null 2>&1 && fail "unknown window accepted"

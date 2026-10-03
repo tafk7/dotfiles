@@ -148,6 +148,7 @@ Starship, delta, btop, and lazygit. Any tmux window can have its own theme. See
 theme                                   # interactive picker (global)
 theme -w vesper                         # theme only the current tmux window
 theme -w clear                          # window follows the global theme again
+theme --nvim gruvbox                    # Neovim keeps gruvbox (:Theme NAME for one editor)
 ```
 
 Available themes: Gruvbox Material (four variants), Tokyo Night, Kanagawa
