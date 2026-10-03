@@ -54,6 +54,12 @@ for dir in themes/*; do
         || { echo "$theme Starship palette name mismatch" >&2; exit 1; }
 done
 
+# EditorConfig has no inline comments; a trailing one becomes part of the value.
+if grep -nE '^[^#;[]*=.*[[:space:]][#;]' configs/editorconfig; then
+    echo "configs/editorconfig: put comments on their own line" >&2
+    exit 1
+fi
+
 plugins/sync-shared.sh --check
 python3 kits/sync-portable.py --check
 if grep -Fq 'plugins/shared/agent-badge.tmux' configs/tmux.conf; then
