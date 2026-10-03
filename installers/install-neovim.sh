@@ -1,6 +1,7 @@
 #!/bin/bash
 # Install Neovim from GitHub releases
-# Installs the latest release; the tree is staged before replacement.
+# Installs the pinned release (NVIM_VERSION in lib/config.sh), checksum-verified;
+# the tree is staged before replacement.
 
 set -euo pipefail
 
@@ -25,16 +26,7 @@ nvim_version() {
 log "Installing Neovim..."
 if preserve_existing_tool neovim "$FORCE"; then exit 2; fi
 
-VERSION=$(github_latest_version "neovim/neovim" --strip-v) || {
-        # If API fails (rate-limited) and --force, fall back to reinstalling current
-        if [[ "$FORCE" == true ]] && verify_binary nvim; then
-            VERSION=$(nvim_version)
-            warn "GitHub API unavailable — reinstalling current v$VERSION"
-        else
-            error "Failed to fetch latest Neovim version"
-            exit 1
-        fi
-}
+VERSION="$NVIM_VERSION"
 
 if [[ "$FORCE" != true ]] && verify_binary nvim; then
     CURRENT=$(nvim_version)
@@ -63,6 +55,7 @@ DOWNLOAD_URL="https://github.com/neovim/neovim/releases/download/v${VERSION}/${T
 
 log "Downloading Neovim v${VERSION}..."
 download_https "$DOWNLOAD_URL" "$TARBALL"
+verify_sha256 "$TARBALL" "${NVIM_SHA256[$NVIM_ARCH]}" || exit 1
 
 log "Extracting staged Neovim tree..."
 validate_tar_archive "$TARBALL"

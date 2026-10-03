@@ -46,7 +46,8 @@ or first-prompt rendering. Don't run them concurrently with other tests.
 - **aarch64:** registry checks on x86 runners report `selection-only`.
   `tests/eget-selection.py` replays eget's asset selection for every
   `eget.toml` entry on both architectures against recorded asset lists in
-  `tests/fixtures/eget-assets/` (refresh with `--refresh` after bumping a tag).
+  `tests/fixtures/eget-assets/` (refresh with `--refresh` after bumping a tag),
+  and checks that `eget.lock` records exactly those assets.
   `.github/workflows/arm64.yml` runs the real `--bash` installer on
   `ubuntu-24.04-arm` weekly and on installer changes. Dev/work tiers and APT
   repositories are not exercised on ARM.

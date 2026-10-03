@@ -16,7 +16,7 @@ FORCE=false
 log "Installing tmux..."
 if preserve_existing_tool tmux "$FORCE"; then exit 2; fi
 
-VERSION=$(github_latest_version "tmux/tmux" --strip-v)
+VERSION="$TMUX_VERSION"   # pinned in lib/config.sh, with its checksum
 
 if [[ "$FORCE" != true ]] && verify_binary tmux -V; then
     CURRENT=$(tmux -V 2>/dev/null | awk '{print $2}')
@@ -43,6 +43,7 @@ DOWNLOAD_URL="https://github.com/tmux/tmux/releases/download/${VERSION}/${TARBAL
 
 log "Downloading tmux $VERSION..."
 download_https "$DOWNLOAD_URL" "$TARBALL"
+verify_sha256 "$TARBALL" "$TMUX_SHA256" || exit 1
 
 log "Extracting..."
 validate_tar_archive "$TARBALL"

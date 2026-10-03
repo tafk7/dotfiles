@@ -186,29 +186,6 @@ detect_environment() {
     fi
 }
 
-# Fetch latest release version from GitHub. Args: "owner/repo" [--strip-v]
-github_latest_version() {
-    local repo="$1"
-    local strip_v=false
-    [[ "${2:-}" == "--strip-v" ]] && strip_v=true
-
-    local tag
-    tag=$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --max-time 30 \
-        "https://api.github.com/repos/${repo}/releases/latest" \
-        | grep -Po '"tag_name": "\K[^"]*')
-
-    if [[ -z "$tag" ]]; then
-        error "Failed to fetch latest version from $repo (rate-limited or network error)"
-        return 1
-    fi
-
-    if [[ "$strip_v" == true ]]; then
-        echo "${tag#v}"
-    else
-        echo "$tag"
-    fi
-}
-
 download_https() {
     local url="$1" destination="$2"
     [[ "$url" == https://* ]] || { error "Refusing non-HTTPS download: $url"; return 1; }
@@ -216,6 +193,15 @@ download_https() {
         --connect-timeout 10 --max-time "${DOTFILES_DOWNLOAD_TIMEOUT:-300}" \
         --output "$destination" "$url" || return 1
     [[ -s "$destination" ]] || { error "Downloaded artifact is empty: $url"; return 1; }
+}
+
+# Fail unless FILE's SHA-256 is EXPECTED. Args: file expected
+verify_sha256() {
+    local actual
+    actual="$(sha256sum "$1" | awk '{print $1}')"
+    [[ "$actual" == "$2" ]] && return 0
+    error "Checksum mismatch for $(basename "$1"): expected $2, got $actual"
+    return 1
 }
 
 download_installer_script() {
@@ -886,10 +872,10 @@ run_installer() {
     esac
 }
 
-# Install all binary tools declared in eget.toml
+# Install the binary tools declared in eget.toml, as the assets eget.lock pins
 install_eget_tools() {
-    local config="$DOTFILES_DIR/eget.toml"
-    local requested="${1:-}"
+    local config="$DOTFILES_DIR/eget.toml" lock="$DOTFILES_DIR/eget.lock"
+    local requested="${1:-}" arch
     if [[ ! -f "$config" ]]; then
         error "eget.toml not found at $config"
         return 1
@@ -961,6 +947,12 @@ install_eget_tools() {
         return 0
     fi
 
+    if [[ ! -f "$lock" ]]; then
+        error "eget.lock not found at $lock"
+        return 1
+    fi
+    arch="$(tool_arch)" || return 1
+
     # ~/.local/bin may not be on PATH yet on a fresh machine.
     local eget_bin="$HOME/.local/bin/eget"
     command -v eget >/dev/null 2>&1 && eget_bin="$(command -v eget)"
@@ -1028,21 +1020,46 @@ install_eget_tools() {
             fi
         fi
 
+        # The asset, its checksum and the file to extract come from eget.lock,
+        # so the download names an exact URL and eget never asks the GitHub API
+        # (anonymous calls are limited per address, which fresh machines and CI
+        # runners share).
+        local lock_row lock_tag asset asset_sha256 member
+        lock_row="$(awk -F'\t' -v repo="$slug" -v arch="$arch" \
+            '!/^#/ && $1 == repo && $3 == arch { print; exit }' "$lock")"
+        IFS=$'\t' read -r _ lock_tag _ asset asset_sha256 member <<< "$lock_row"
+        if [[ -z "$lock_row" || "$lock_tag" != "$pinned" ]]; then
+            warn "eget.lock has no $slug $pinned asset for $arch (run: python3 tests/eget-selection.py --refresh)"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+
         local stage_home stage_config staged staged_hash companion companions_ok
         stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")"
         stage_config="$stage_home/eget.toml"
         mkdir -p "$stage_home/.local/bin"
-        sed "s|~/.local/bin|$stage_home/.local/bin|g" "$config" > "$stage_config"
+        : > "$stage_config"   # no [global] defaults: the lock says what to fetch
         local -a extract_args=()
-        [[ -z "${TOOL_COMPANIONS[$name]:-}" ]] || extract_args+=(--all)
-        mapfile -t -O "${#extract_args[@]}" extract_args < <(tool_eget_asset_args "$name")
-        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "${extract_args[@]}" "$slug"; then
+        if [[ -n "${TOOL_COMPANIONS[$name]:-}" ]]; then
+            extract_args+=(--all --to "$stage_home/.local/bin")
+        else
+            [[ "$member" == - ]] || extract_args+=(--file "$member")
+            extract_args+=(--to "$stage_home/.local/bin/${TOOL_BINARY[$name]}")
+        fi
+        extract_args+=(--verify-sha256 "$asset_sha256")
+        if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "${extract_args[@]}" \
+                "https://github.com/$slug/releases/download/$lock_tag/$asset" < /dev/null; then
             rm -rf "$stage_home"
             track_install "$name" fail
             any_missing=true
             continue
         fi
         staged="$stage_home/.local/bin/${TOOL_BINARY[$name]}"
+        # eget leaves a bare binary downloaded from a URL without its execute bit.
+        for companion in "${TOOL_BINARY[$name]}" ${TOOL_COMPANIONS[$name]:-}; do
+            [[ ! -f "$stage_home/.local/bin/$companion" ]] || chmod +x "$stage_home/.local/bin/$companion"
+        done
         if [[ ! -x "$staged" ]] || ! "$staged" --version >/dev/null 2>&1; then
             rm -rf "$stage_home"
             track_install "$name" fail
