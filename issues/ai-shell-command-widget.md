@@ -182,7 +182,9 @@ Run Claude with the safest practical configuration:
 - No tools.
 - No shell execution.
 - No project instructions, plugins, hooks, MCP servers, or unrelated
-  coding-agent customization if those can be disabled safely.
+  coding-agent customization if those can be disabled safely. Installed mods
+  also run in `claude -p`; `--bare` (or `--safe-mode`) excludes them, but
+  built-in mods still run (verified on 2.1.287).
 - Structured output if supported reliably.
 - A narrowly scoped system prompt.
 - An optional fast-model override suitable for short shell-command generation.

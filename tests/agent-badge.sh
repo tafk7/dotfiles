@@ -86,4 +86,16 @@ PATH="$TEST_ROOT/bin" TMUX=test TMUX_PANE=%1 \
 grep -Fq 'jq is required on PATH' "$TEST_ROOT/hook.err" \
     || { echo 'FAIL: missing jq was silent' >&2; exit 1; }
 
+# The Claude side is a mod; run its own tests when this claude can load mods.
+if command -v claude >/dev/null 2>&1 \
+   && [[ "$(claude --version 2>/dev/null | awk '{print $1}' | tr -d '\n')" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+   && [[ "$(printf '2.1.287\n%s\n' "$(claude --version | awk '{print $1}')" | sort -V | head -1)" == 2.1.287 ]]; then
+    claude plugin validate --strict "$ROOT/plugins/agent-badge-claude" >/dev/null \
+        || { echo 'FAIL: agent-badge-claude fails plugin validate' >&2; exit 1; }
+    claude plugin test "$ROOT/plugins/agent-badge-claude" >/dev/null \
+        || { echo 'FAIL: agent-badge-claude mod tests failed' >&2; exit 1; }
+else
+    echo 'agent-badge: skipped mod tests (claude >= 2.1.287 not found)'
+fi
+
 printf 'agent-badge: ok\n'

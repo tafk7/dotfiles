@@ -4,6 +4,9 @@ import argparse
 import hashlib
 import json
 import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
 import sys
 import tomllib
@@ -45,6 +48,9 @@ def desired(component, home):
     return directory, outputs
 
 
+MODS_FLOOR = (2, 1, 287)
+
+
 def retired(component, directory):
     """Files dotfiles once wrote that another owner now ships: {path, sha256}."""
     listed = load_json(ROOT / 'configs/ai/retired.json').get(component, {})
@@ -72,6 +78,24 @@ def retire(path, digest, backup_dir, dry_run):
     return True
 
 
+def check_mods_floor(source):
+    # A plugin whose hooks.json declares `modules` needs a Claude Code that loads mods.
+    hooks = source / 'hooks/hooks.json'
+    if not hooks.is_file() or not load_json(hooks).get('modules'):
+        return True
+    floor = '.'.join(map(str, MODS_FLOOR))
+    claude = shutil.which('claude')
+    found = None
+    if claude:
+        out = subprocess.run([claude, '--version'], capture_output=True, text=True).stdout
+        match = re.search(r'(\d+)\.(\d+)\.(\d+)', out)
+        found = tuple(map(int, match.groups())) if match else None
+    ok = found is not None and found >= MODS_FLOOR
+    shown = '.'.join(map(str, found)) if found else 'not found'
+    print(f'{"ok" if ok else "CHECK"}: claude {shown} {"meets" if ok else "is below"} the {floor} floor for mod plugins')
+    return ok
+
+
 def check_plugin(component, directory):
     config = tomllib.loads((directory / 'config.toml').read_text()) if component == 'codex' else load_json(directory / 'settings.json')
     enabled = config.get('plugins', {}).get('agent-badge@tafk7', {}).get('enabled', False) if component == 'codex' else config.get('enabledPlugins', {}).get('agent-badge@tafk7', False)
@@ -79,6 +103,7 @@ def check_plugin(component, directory):
         print(f'info: {component} badge plugin not enabled')
         return True
     source = ROOT / 'plugins' / ('agent-badge-' + component)
+    floor_ok = component != 'claude' or check_mods_floor(source)
     manifest = '.codex-plugin/plugin.json' if component == 'codex' else '.claude-plugin/plugin.json'
     version = load_json(source / manifest)['version']
     cache = directory / 'plugins/cache/tafk7/agent-badge' / version
@@ -91,9 +116,9 @@ def check_plugin(component, directory):
             return False
         cache = Path(entry['installPath'])
     ok = all((cache / p.relative_to(source)).is_file() and (cache / p.relative_to(source)).read_bytes() == p.read_bytes()
-             for p in source.rglob('*') if p.is_file())
+             for p in source.rglob('*') if p.is_file() and '.claude-plugin/types' not in p.as_posix())
     print(f'{"ok" if ok else "CHECK"}: {component} badge cache matches source: {ok}')
-    return ok
+    return ok and floor_ok
 
 
 def main():
