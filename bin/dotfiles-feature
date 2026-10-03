@@ -30,8 +30,8 @@ set_feature() {
     case "$feature" in theme|agent-badge) ;; *) error "Unknown feature: $feature"; return 64 ;; esac
     preference_set "feature.$feature" "$value"
     case "$feature:$value" in
-        theme:enabled) "$DOTFILES_DIR/bin/theme-switcher" --init ;;
-        theme:disabled) "$DOTFILES_DIR/bin/theme-switcher" tmux-unwire ;;
+        theme:enabled) "$DOTFILES_DIR/bin/theme-switcher" tmux-init ;;
+        theme:disabled) "$DOTFILES_DIR/bin/theme-switcher" tmux-off ;;
         agent-badge:disabled)
             if [[ -x "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" ]]; then
                 "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" unwire || true

@@ -314,8 +314,8 @@ OPTIONS:
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
-    --theme             Enable the coordinated theme feature (default).
-    --no-theme          Persistently disable theme generation and runtime hooks.
+    --theme             Enable tmux themes (default).
+    --no-theme          Persistently disable tmux themes.
     --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
     --no-agent-badge    Install AI CLIs without registering agent-badge.
     --git-name NAME     Set git user.name (for non-interactive installs)
@@ -565,13 +565,13 @@ phase_setup_configs() {
 
     if feature_enabled theme; then
         if [[ "$DRY_RUN" == "true" ]]; then
-            log "[DRY RUN] Would initialize theme feature"
+            log "[DRY RUN] Would apply the theme to a running tmux server"
         else
-            "$DOTFILES_DIR/bin/theme-switcher" --init || failed=true
+            "$DOTFILES_DIR/bin/theme-switcher" tmux-init || failed=true
         fi
     else
-        log "Theme feature disabled; skipping generated artifacts"
-        [[ "$DRY_RUN" == "true" ]] || "$DOTFILES_DIR/bin/theme-switcher" tmux-unwire || failed=true
+        log "Theme feature disabled; tmux uses the terminal's colors"
+        [[ "$DRY_RUN" == "true" ]] || "$DOTFILES_DIR/bin/theme-switcher" tmux-off || failed=true
     fi
 
     if [[ "$NO_HOOKS" == "true" ]]; then

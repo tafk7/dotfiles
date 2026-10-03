@@ -13,16 +13,12 @@ status="$("$ROOT/bin/dotfiles-feature" status)"
 
 "$ROOT/bin/dotfiles-feature" disable theme >/dev/null
 "$ROOT/bin/theme-switcher" enabled && fail "theme disable did not persist"
-[[ ! -e "$XDG_CACHE_HOME/dotfiles/theme" ]] || fail "disable unexpectedly rendered theme cache"
-export DOTFILES_THEME=stale STARSHIP_CONFIG=stale BAT_THEME=stale DELTA_FEATURES=stale
-source "$ROOT/shell/interactive/theme-env.sh"
-[[ -z "${DOTFILES_THEME:-}" && -z "${STARSHIP_CONFIG:-}" && -z "${BAT_THEME:-}" ]] \
-    || fail "disabled theme left stale interactive environment"
+"$ROOT/bin/theme-switcher" kanagawa >/dev/null 2>&1 && fail "disabled theme feature accepted a theme"
 
 "$ROOT/bin/dotfiles-feature" enable theme >/dev/null
 "$ROOT/bin/theme-switcher" enabled || fail "theme enable did not persist"
-[[ -f "$XDG_STATE_HOME/dotfiles/theme.tsv" ]] || fail "theme state was not initialized"
-[[ -f "$XDG_CACHE_HOME/dotfiles/theme/delta.gitconfig" ]] || fail "theme cache was not rendered"
+"$ROOT/bin/theme-switcher" kanagawa >/dev/null || fail "enabled theme feature rejected a theme"
+assert_eq "$("$ROOT/bin/theme-switcher" --current)" "global: kanagawa" "theme state was not written"
 
 "$ROOT/bin/dotfiles-feature" disable agent-badge >/dev/null
 assert_eq "$("$ROOT/bin/dotfiles-feature" status | awk '$1 == "agent-badge" { print $2 }')" disabled

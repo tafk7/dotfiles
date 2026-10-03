@@ -31,7 +31,7 @@ if grep -Fq 'wsl2-ssh-agent (requested capability is unsupported' "$TEST_ROOT/na
     fail "native bash verification required the WSL-only SSH bridge"
 fi
 
-# Theme includes are nested through the portable Git config, not written
+# Delta settings are nested through the portable Git config, not written
 # directly into ~/.gitconfig. Verification must follow include chains.
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
@@ -41,8 +41,8 @@ HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
     "$ROOT/bin/verify" --tier config > "$TEST_ROOT/theme-verify.log" \
     || fail "theme-enabled config verification failed"
-grep -Fq 'delta: ~/.gitconfig includes the XDG theme cache' "$TEST_ROOT/theme-verify.log" \
-    || fail "nested Delta include was not verified"
+grep -Fq 'delta: palette-based colors' "$TEST_ROOT/theme-verify.log" \
+    || fail "nested Delta settings were not verified"
 grep -Fq 'user: Fixture <fixture@example.com>' "$TEST_ROOT/theme-verify.log" \
     || fail "identity in the local Git include was not verified"
 

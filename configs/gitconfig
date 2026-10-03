@@ -141,7 +141,22 @@
     navigate = true
     line-numbers = true
     hyperlinks = true
-    # All named theme features are loaded below. DELTA_FEATURES, resolved for
-    # each shell/window, activates exactly one without rewriting this file.
-
-{{THEME_INCLUDE}}
+    # Palette indices, which tmux maps to the window's theme: ANSI syntax
+    # colors, 22/28 added and 52/88 removed backgrounds, 240 border,
+    # 245 secondary (see bin/theme-switcher).
+    syntax-theme = ansi
+    plus-style = syntax 22
+    plus-non-emph-style = syntax 22
+    plus-emph-style = syntax 28 bold
+    minus-style = syntax 52
+    minus-non-emph-style = syntax 52
+    minus-emph-style = syntax 88 bold
+    file-style = 4 bold
+    file-decoration-style = 240 ul
+    hunk-header-style = syntax bold
+    hunk-header-decoration-style = 240 box
+    line-numbers-zero-style = 245
+    line-numbers-left-style = 4
+    line-numbers-right-style = 4
+    line-numbers-minus-style = 1
+    line-numbers-plus-style = 2

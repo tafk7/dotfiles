@@ -1,0 +1,20 @@
+# shellcheck shell=bash
+# Gruvbox Material Light palette for bin/theme-switcher. Sourced, never executed.
+NAME="Gruvbox Material Light"
+DESCRIPTION="Warm cream daytime palette with classic Gruvbox accents"
+THEME_BG_HEX='#fbf1c7'
+THEME_FG_HEX='#3c3836'
+THEME_SECONDARY_HEX='#665c54'
+THEME_SURFACE_HEX='#f2e5bc'
+THEME_SURFACE_2_HEX='#e5d5ad'
+THEME_BORDER_HEX='#7c6f64'
+THEME_ACCENT_HEX='#076678'
+THEME_ACCENT_2_HEX='#8f3f71'
+THEME_RED_HEX='#9d0006'
+THEME_YELLOW_HEX='#8f5f00'
+THEME_GREEN_HEX='#5f650b'
+THEME_ANSI=('#3c3836' '#9d0006' '#5f650b' '#8f5f00' '#076678' '#8f3f71' '#356a4a' '#665c54' '#665c54' '#a50f15' '#5f650b' '#8f5f00' '#076678' '#8f3f71' '#356a4a' '#3c3836')
+# Pane tint backgrounds (pane-tint 1-3).
+THEME_TINT_1='#F2E5BC'
+THEME_TINT_2='#E5D5AD'
+THEME_TINT_3='#D5C4A1'

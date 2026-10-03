@@ -35,29 +35,31 @@ resolved="$(HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" DOTFILES_DI
 [[ "$resolved" == "$SPACED" ]] || { echo "FAIL: flattened Zsh entrypoint did not use durable install path" >&2; exit 1; }
 
 # Start the server from "inside" another tmux, as a nested tmux or an agent in a
-# pane would. Its theme wiring must act on itself, never on the outer server.
+# pane would. Its theme must be applied to itself, never to the outer server.
 tmux -L "$OUTER" -f /dev/null new-session -d -s outer
-tmux -L "$OUTER" set-hook -g 'after-select-window[90]' 'display-message theme-switcher'
+tmux -L "$OUTER" set-option -gw @theme sentinel
 outer_tmux="$(tmux -L "$OUTER" display-message -p '#{socket_path},#{pid},0')"
 
-HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" XDG_CACHE_HOME="$TEST_ROOT/cache" \
+# Fresh state: the theme feature is on by default, so the server gets gruvbox.
+mkdir -p "$TEST_ROOT/state-themed"
+HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state-themed" XDG_CACHE_HOME="$TEST_ROOT/cache" \
     DOTFILES_DIR="$SPACED" TMUX="$outer_tmux" \
     tmux -L "$SERVER" -f "$SPACED/configs/tmux.conf" new-session -d -s test
 
-# Theme wiring runs in the background; unwiring finishes by bumping this option.
+# tmux.conf applies the theme in the background.
 for _ in {1..50}; do
-    tmux -L "$SERVER" show-options -gqv @dotfiles_theme_generation | grep -q . && break
+    [[ "$(tmux -L "$SERVER" show-options -gwqv @theme)" == gruvbox ]] && break
     sleep 0.1
 done
-tmux -L "$SERVER" show-options -gqv @dotfiles_theme_generation | grep -q . \
-    || { echo "FAIL: tmux.conf did not run theme wiring on its own server" >&2; exit 1; }
-tmux -L "$OUTER" show-hooks -g after-select-window | grep -Fq 'theme-switcher' \
-    || { echo "FAIL: theme wiring of a nested server unwired the outer server" >&2; exit 1; }
+[[ "$(tmux -L "$SERVER" show-options -gwqv @theme)" == gruvbox ]] \
+    || { echo "FAIL: tmux.conf did not apply the theme to its own server" >&2; exit 1; }
+[[ "$(tmux -L "$OUTER" show-options -gwqv @theme)" == sentinel ]] \
+    || { echo "FAIL: a nested server's theme setup changed the outer server" >&2; exit 1; }
 
 observed="$(tmux -L "$SERVER" show-environment -g DOTFILES_DIR)"
 [[ "$observed" == "DOTFILES_DIR=$SPACED" ]] || { echo "FAIL: tmux did not capture custom DOTFILES_DIR" >&2; exit 1; }
-if tmux -L "$SERVER" show-hooks -g after-select-window | grep -Fq 'theme-switcher'; then
-    echo "FAIL: disabled theme installed tmux hooks" >&2
+if tmux -L "$SERVER" show-hooks -g | grep -Fq 'theme-switcher'; then
+    echo "FAIL: themes must not need tmux hooks" >&2
     exit 1
 fi
 

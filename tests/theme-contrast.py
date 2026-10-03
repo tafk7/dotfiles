@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Contrast checks for informational theme roles and light ANSI palettes."""
+"""Structure and contrast checks for themes/*.sh palettes."""
 
 from pathlib import Path
 import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+ROLES = ("BG", "FG", "SECONDARY", "SURFACE", "SURFACE_2", "BORDER", "ACCENT", "ACCENT_2", "RED", "YELLOW", "GREEN")
 
 
 def rgb(value: str):
@@ -25,30 +26,57 @@ def contrast(a: str, b: str):
     return (hi + 0.05) / (lo + 0.05)
 
 
+def blend(a: str, b: str, pct: int):
+    """Same integer mix as bin/theme-switcher's blend()."""
+    a, b = a.lstrip("#"), b.lstrip("#")
+    return "#" + "".join(
+        f"{(int(a[i:i + 2], 16) * pct + int(b[i:i + 2], 16) * (100 - pct)) // 100:02x}" for i in (0, 2, 4)
+    )
+
+
 def parse_palette(path: Path):
     text = path.read_text()
     values = dict(re.findall(r"^(THEME_[A-Z0-9_]+)='(#[0-9A-Fa-f]{6})'", text, re.M))
+    meta = dict(re.findall(r'^(NAME|DESCRIPTION)="([^"]+)"', text, re.M))
     ansi_match = re.search(r"THEME_ANSI=\((.*?)\)", text, re.S)
     ansi = re.findall(r"#[0-9A-Fa-f]{6}", ansi_match.group(1)) if ansi_match else []
-    return values, ansi
+    return values, meta, ansi
 
 
 failures = []
-for path in sorted((ROOT / "themes").glob("*/palette.sh")):
-    theme = path.parent.name
-    values, ansi = parse_palette(path)
-    bg = values["THEME_BG_HEX"]
+themes = sorted((ROOT / "themes").glob("*.sh"))
+if not themes:
+    failures.append("no themes found")
+for path in themes:
+    theme = path.stem
+    values, meta, ansi = parse_palette(path)
+    missing = [f"THEME_{role}_HEX" for role in ROLES if f"THEME_{role}_HEX" not in values]
+    missing += [f"THEME_TINT_{n}" for n in (1, 2, 3) if f"THEME_TINT_{n}" not in values]
+    missing += [key for key in ("NAME", "DESCRIPTION") if key not in meta]
+    if not re.fullmatch(r"[a-z0-9-]+", theme):
+        failures.append(f"{theme} file name must be lowercase letters, digits, and dashes")
+    if missing:
+        failures.append(f"{theme} missing {', '.join(missing)}")
+        continue
     if len(ansi) != 16:
         failures.append(f"{theme} ANSI palette has {len(ansi)} entries")
+
+    bg, fg = values["THEME_BG_HEX"], values["THEME_FG_HEX"]
     for role in ("THEME_FG_HEX", "THEME_SECONDARY_HEX"):
         ratio = contrast(values[role], bg)
         if ratio < 4.5:
             failures.append(f"{theme} {role} {ratio:.2f}:1")
-    for label, foreground, background in (
-        ("selected", values["THEME_FG_HEX"], values["THEME_SURFACE_HEX"]),
-        ("search", values["THEME_BG_HEX"], values["THEME_YELLOW_HEX"]),
-        ("active-search", values["THEME_BG_HEX"], values["THEME_ACCENT_HEX"]),
-    ):
+    checks = [
+        ("selected", fg, values["THEME_SURFACE_HEX"]),
+        ("selection", fg, values["THEME_SURFACE_2_HEX"]),
+        ("search", bg, values["THEME_YELLOW_HEX"]),
+        ("active-search", bg, values["THEME_ACCENT_HEX"]),
+    ]
+    # Diff lines keep syntax colors on these backgrounds; normal text must stay readable.
+    for label, color in (("added", "THEME_GREEN_HEX"), ("removed", "THEME_RED_HEX")):
+        for pct in (14, 24):
+            checks.append((f"{label}-{pct}", fg, blend(values[color], bg, pct)))
+    for label, foreground, background in checks:
         ratio = contrast(foreground, background)
         if ratio < 4.5:
             failures.append(f"{theme} {label} {ratio:.2f}:1")
@@ -57,26 +85,6 @@ for path in sorted((ROOT / "themes").glob("*/palette.sh")):
             ratio = contrast(color, bg)
             if ratio < 4.5:
                 failures.append(f"{theme} ANSI {index} {color} {ratio:.2f}:1")
-
-    # The same secondary role must feed the major informational surfaces.
-    btop = (path.parent / "btop.theme").read_text()
-    starship = (path.parent / "starship.palette.toml").read_text()
-    if values["THEME_SECONDARY_HEX"].lower() not in btop.lower():
-        failures.append(f"{theme} btop does not use secondary role")
-    if values["THEME_SECONDARY_HEX"].lower() not in starship.lower():
-        failures.append(f"{theme} Starship does not use secondary role")
-    btop_roles = dict(re.findall(r'theme\[([^]]+)\]="(#[0-9A-Fa-f]{6})"', btop))
-    if "selected_fg" in btop_roles and contrast(btop_roles["selected_fg"], btop_roles["selected_bg"]) < 4.5:
-        failures.append(f"{theme} btop selected text is below 4.5:1")
-    lazygit = (path.parent / "lazygit.yml").read_text()
-    def yaml_color(key):
-        match = re.search(rf"{key}:\s*(?:\n\s*-\s*)?\[?['\"](#[0-9A-Fa-f]{{6}})", lazygit)
-        return match.group(1) if match else None
-    lazy_fg = yaml_color("defaultFgColor")
-    for key in ("selectedLineBgColor", "inactiveViewSelectedLineBgColor"):
-        lazy_bg = yaml_color(key)
-        if lazy_fg and lazy_bg and contrast(lazy_fg, lazy_bg) < 4.5:
-            failures.append(f"{theme} lazygit {key} text is below 4.5:1")
 
 if failures:
     print("theme contrast failures:", file=sys.stderr)

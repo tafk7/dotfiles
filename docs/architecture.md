@@ -15,7 +15,6 @@ Layer 1: shell/init.sh
   shell options, history, completion, aliases/functions, prompt fallback
 
 Layer 2: optional/default features
-  shell/interactive/theme-env.sh and shell/theme-runtime.sh
   WSL adapter and independently installed agent-badge plugins
 ```
 
@@ -75,7 +74,7 @@ Durable state lives under
 - `preferences.tsv`: explicit feature preferences;
 - `components.tsv`: observed component status, ownership, version, path, and
   update contract;
-- `theme.tsv`: global theme selection and overrides;
+- `theme.tsv`: global theme selection;
 - `install-path`: fallback checkout discovery for flattened deployments;
 - `transaction.tsv`: an interrupted artifact replacement journal;
 - `backups/`: displaced user configuration.
@@ -84,11 +83,8 @@ These files have a version header, contain data only, are validated before use,
 and are atomically replaced. Read-modify-write operations use a bounded
 inter-process lock with conservative stale-lock recovery. Setup reconciles an
 incomplete artifact journal before starting another install; verification
-reports a pending journal as a failure.
-
-Rebuildable theme output lives under
-`${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme/`. The checkout is not the
-machine-state database.
+reports a pending journal as a failure. The checkout is not the machine-state
+database.
 
 ## Configuration ownership
 
@@ -137,16 +133,12 @@ XDG roots, the checkout, and paths outside ownership.
 
 ## Theme feature
 
-The theme feature owns global theme state, cache rendering, tmux theme hooks,
-and launch-time adapters for Starship, FZF, bat, Delta, Neovim, btop, and
-lazygit. When disabled:
-
-- no theme state is resolved during shell startup;
-- Starship, FZF, bat, and Delta use native defaults;
-- btop and lazygit wrappers delegate directly;
-- Neovim uses its built-in fallback;
-- tmux removes theme hooks and generated styles while preserving session/window
-  override values for a later re-enable.
+The theme feature owns the global theme state and the `@theme_*` and
+`pane-colours[]` tmux options. Shells hold no theme state: program configs use
+palette colors, and tmux maps them per window (see
+[theme-system](theme-system.md)). When disabled, every tmux color resolves to
+the terminal default and window themes are removed; program configs are
+unchanged and take their colors from the terminal.
 
 `bin/theme-switcher enable|disable` performs the explicit feature transition.
 `bin/dotfiles-feature` provides the common feature preference interface.
@@ -166,7 +158,6 @@ entry/                         shell entrypoints (symlinked to ~/.bashrc etc.)
 shell/env*.sh                  Layer 0 implementation
 shell/init.sh                  Layer 1 loader
 shell/tools/, shell/platform/  interactive aliases/functions and platform adapters
-shell/interactive/             Layer 2 feature adapters
 lib/runtime.sh                 side-effect-free command helpers
 lib/config.sh                  CONFIG_MAP and APT package groups
 lib/registry.sh                component inventory and ownership

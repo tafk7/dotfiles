@@ -71,9 +71,8 @@ jobs:
       - name: Theme catalog parses
         run: |
           set -euo pipefail
-          # `--list` walks every themes/<name>/meta.sh and prints the catalog.
-          # If a theme dir is malformed (missing meta.sh / palette.sh / shell.sh),
-          # this fails before any installation step.
+          # `--list` sources every themes/<name>.sh and prints the catalog, so a
+          # malformed palette fails before any installation step.
           ./bin/theme-switcher --list
 
       - name: --help endpoints execute cleanly
@@ -136,42 +135,6 @@ jobs:
             fi
           done
           exit "$fail"
-
-  theme-cycle:
-    name: Theme cycling smoke test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Cycle every theme via --init/apply
-        run: |
-          set -euo pipefail
-          export DOTFILES_DIR="$PWD"
-          test_root="$(mktemp -d "$RUNNER_TEMP/dotfiles-theme-cycle.XXXXXX")"
-          export HOME="$test_root/home"
-          export XDG_CONFIG_HOME="$test_root/config"
-          export XDG_DATA_HOME="$test_root/data"
-          export XDG_STATE_HOME="$test_root/state"
-          export XDG_CACHE_HOME="$test_root/cache"
-          export TMUX=""
-          mkdir -p "$HOME"
-          # Discover themes the same way theme-switcher does: every dir
-          # under themes/ that contains a meta.sh is a valid theme.
-          themes=$(find themes -mindepth 2 -maxdepth 2 -name meta.sh \
-            | sed 's|^themes/||; s|/meta.sh$||' | sort)
-          [[ -z "$themes" ]] && { echo "no themes discovered"; exit 1; }
-          for t in $themes; do
-            echo "::group::Apply theme: $t"
-            ./bin/theme-switcher "$t"
-            state="$XDG_STATE_HOME/dotfiles/theme.tsv"
-            actual="$(awk -F '\t' '$1 == "default" { print $2 }' "$state")"
-            [[ "$actual" == "$t" ]] \
-              || { echo "::error::theme state did not select $t (got: ${actual:-missing})"; exit 1; }
-            [[ -f "$XDG_CACHE_HOME/dotfiles/theme/themes/$t/starship.toml" ]] \
-              || { echo "::error::theme cache missing for $t"; exit 1; }
-            echo "::endgroup::"
-          done
-          echo "All themes cycled successfully."
 
   install-test:
     name: Containerized install (--bash)

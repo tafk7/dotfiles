@@ -191,7 +191,7 @@ Host github.com
 
 ## Adding a theme
 
-See [adding a complete theme](theme-system.md#adding-a-complete-theme).
+See [adding a theme](theme-system.md#adding-a-theme).
 
 ## Checking changes
 

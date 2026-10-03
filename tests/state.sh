@@ -16,7 +16,7 @@ wait "$first"; wait "$second"
 assert_eq "$(preference_get feature.theme)" disabled "concurrent theme preference"
 assert_eq "$(preference_get feature.agent-badge)" enabled "concurrent badge preference"
 state_validate || fail "valid state rejected"
-THEME_REQUEST=""; DOTFILES_THEME_ENABLED=""
+THEME_REQUEST=""
 feature_enabled theme && fail "disabled theme preference did not persist"
 THEME_REQUEST=enabled
 feature_enabled theme || fail "explicit theme enable did not override stored preference"
@@ -61,10 +61,7 @@ line="$(ledger_line recovered)"
 journal_pending && fail "recovered journal was not cleared"
 
 printf 'schema\t999\ndefault\tbroken\n' > "$DOTFILES_THEME_STATE_FILE"
-source "$ROOT/lib/theme-resolve.sh"
-unset DOTFILES_THEME
-load_global_theme_state
-assert_eq "$DOTFILES_THEME" gruvbox "corrupt theme state did not fall back"
+assert_eq "$("$ROOT/bin/theme-switcher" --current)" "global: gruvbox" "corrupt theme state did not fall back"
 
 printf 'schema\t1\nfeature.theme\t$(touch %s)\n' "$TEST_ROOT/executed" > "$DOTFILES_PREFERENCES_FILE"
 preference_get feature.theme >/dev/null
