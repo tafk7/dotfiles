@@ -80,19 +80,24 @@ drag-selection copies on release to the tmux buffer, and over SSH via OSC 52.
   `~/.claude/projects/` as text, open it in `less`/`nvim`. Independent of the
   renderer.
 
-**Mods** (`github.com/anthropics/claude-code/tree/main/mods`)
-- Plugins with a TypeScript hooks module (`register(on, options)`); early
-  access, API may change without notice. Installed mods load only with
-  `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+**Mods** (`github.com/anthropics/claude-code/tree/main/mods`; verified on
+Claude Code 2.1.287, 2026-10-01)
+- Mods are on by default from 2.1.287; `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` is
+  ignored. A plugin's `hooks/hooks.json` names a TypeScript module
+  (`register(on, options)`).
 - Relevant surface: `$.session.messages()` (newest 4096 messages as plain
   data), panes docked beside the fullscreen transcript (as `/diff` does),
   `Client` components with raw key and pointer events, `$.command.register`,
-  `$.process.run`.
-- Gaps: no clipboard API, no custom keybinding actions, no hook into the main
+  `$.process.run`, and `$.ui.copy`, which lands in the tmux buffer even with
+  `set-clipboard off`. `Button({ action })` binds to existing keybinding
+  actions; there are still no custom actions and no hook into the main
   transcript's selection.
-- Candidate: a `/copy` mod in `plugins/` opening a docked pane of transcript
-  lines with `j`/`k`, `v`, `y` and mouse drag, yanking through
-  `bin/tmux-copy`.
+- `Image` does not render inside tmux (alt text only), so graphics in a pane
+  are not an option.
+- A built-in `/copy` exists and cannot be overridden. It supports the latest
+  reply, `/copy N`, and individual code blocks through the terminal clipboard.
+  A `/yank` pane (`plugins/yank-claude/`) adds older messages of any role and
+  copies whole messages into the tmux buffer.
 
 ## Sketch if we do it
 
@@ -102,8 +107,8 @@ drag-selection copies on release to the tmux buffer, and over SSH via OSC 52.
    WezTerm passes through.
 3. Add the tmux `C-a v` dump binding (cheap, renderer-dependent) or the popup
    viewer (more work, renderer-independent).
-4. Prototype the `/copy` mod only if steps 1–3 leave a gap worth an unstable
-   API.
+4. Use the `/yank` plugin for older messages and copying into the tmux buffer
+   if steps 1–3 leave a gap worth an unstable API.
 5. Set `tui`, mouse mode and any mod env in `configs/claude-settings.json` so
    agent view sessions match.
 
@@ -122,8 +127,8 @@ drag-selection copies on release to the tmux buffer, and over SSH via OSC 52.
 
 - When the classic renderer is deprecated or degrades, or agent view becomes
   the main way of working.
-- When the mods API leaves early access or gains a clipboard or keybinding
-  surface.
+- When mods gain custom keybinding actions or a hook into the transcript
+  selection.
 
 ## References
 
