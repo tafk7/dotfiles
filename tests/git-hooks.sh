@@ -36,6 +36,7 @@ fi
 [[ ! -e "$repo/.git/hooks/pre-commit" ]] || { echo "FAIL: shared hook mutated" >&2; exit 1; }
 
 # Denylist: skipped when unset; whole words only; the list stays outside the repo.
+export XDG_CONFIG_HOME="$TEST_ROOT/xdg"
 printf '# comment\n\nAcmeCorp\n' > "$TEST_ROOT/denylist"
 printf 'contact acmecorp support\n' > "$repo/notes.txt"
 git -C "$repo" add notes.txt
@@ -47,6 +48,17 @@ printf 'contact acmecorporation support\n' > "$repo/notes.txt"
 git -C "$repo" add notes.txt
 (cd "$repo" && DOTFILES_DENYLIST="$TEST_ROOT/denylist" hooks/pre-commit) \
     || { echo "FAIL: denylist matched inside a longer word" >&2; exit 1; }
+# Unset variable: the default path under XDG_CONFIG_HOME is used when present.
+mkdir -p "$XDG_CONFIG_HOME/dotfiles"
+cp "$TEST_ROOT/denylist" "$XDG_CONFIG_HOME/dotfiles/denylist"
+printf 'contact acmecorp support\n' > "$repo/notes.txt"
+git -C "$repo" add notes.txt
+if (cd "$repo" && hooks/pre-commit 2>/dev/null); then
+    echo "FAIL: default denylist path was not read" >&2; exit 1
+fi
+rm -r "$XDG_CONFIG_HOME/dotfiles"
+printf 'contact acmecorporation support\n' > "$repo/notes.txt"
+git -C "$repo" add notes.txt
 if (cd "$repo" && DOTFILES_DENYLIST="$TEST_ROOT/missing" hooks/pre-commit 2>/dev/null); then
     echo "FAIL: unreadable denylist was ignored" >&2; exit 1
 fi
