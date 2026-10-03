@@ -1,0 +1,42 @@
+{
+  "schema": "agent-invariants/v1",
+  "rules": [
+    {
+      "id": "denylisted-words",
+      "message": "Written content contains a word from the dotfiles denylist (employer or host identifier). The repository is public; keep those in untracked local files.",
+      "tools": ["Edit", "Write", "NotebookEdit"],
+      "paths": ["**"],
+      "content": null,
+      "command": null,
+      "listFile": "~/.config/dotfiles/denylist",
+      "severity": "deny"
+    },
+    {
+      "id": "no-exec-bit-in-configs",
+      "message": "Files under configs/ must not be executable; they are copied or merged, never run.",
+      "tools": ["Bash"],
+      "paths": [],
+      "content": null,
+      "command": "chmod\\s+[^;&|]*\\+x[^;&|]*\\bconfigs/",
+      "listFile": null,
+      "severity": "deny"
+    },
+    {
+      "id": "agent-badge-generated-copies",
+      "message": "This file is a generated copy. Edit plugins/shared/ and run plugins/sync-shared.sh.",
+      "tools": ["Edit", "Write", "NotebookEdit"],
+      "paths": [
+        "plugins/agent-badge-claude/scripts/**",
+        "plugins/agent-badge-claude/agent-badge.tmux",
+        "plugins/agent-badge-claude/README.md",
+        "plugins/agent-badge-codex/scripts/**",
+        "plugins/agent-badge-codex/agent-badge.tmux",
+        "plugins/agent-badge-codex/README.md"
+      ],
+      "content": null,
+      "command": null,
+      "listFile": null,
+      "severity": "deny"
+    }
+  ]
+}

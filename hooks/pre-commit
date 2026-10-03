@@ -13,7 +13,10 @@
 #   5. agent-badge generated copies match plugins/shared/
 #   6. Denylist — staged files contain no word listed in the untracked file
 #      named by $DOTFILES_DENYLIST (one case-insensitive word per line; blank
-#      and # lines ignored). Skipped when unset, so the list never enters the repo.
+#      and # lines ignored). When unset, defaults to
+#      ${XDG_CONFIG_HOME:-~/.config}/dotfiles/denylist if that file exists (the
+#      Claude invariant guard reads the same file at write time). Skipped when
+#      neither exists, so the list never enters the repo.
 #
 # Bypass: ALLOW_PROTECTED=1 git commit   (protected-paths gate only)
 #         git commit --no-verify         (all checks)
@@ -159,6 +162,9 @@ for f in "${STAGED[@]}"; do
 done
 
 # Check 6: denylisted words (employer and host identifiers) in staged content
+if [[ -z "${DOTFILES_DENYLIST:-}" && -r "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/denylist" ]]; then
+    DOTFILES_DENYLIST="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/denylist"
+fi
 if [[ -n "${DOTFILES_DENYLIST:-}" ]]; then
     if [[ ! -r "$DOTFILES_DENYLIST" ]]; then
         fail "DOTFILES_DENYLIST is set but not readable: $DOTFILES_DENYLIST"
