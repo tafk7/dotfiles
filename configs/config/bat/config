@@ -1,6 +1,7 @@
-# bat configuration (dotfiles). The theme comes from BAT_THEME, which the theme
-# feature sets per shell.
+# bat configuration (dotfiles).
 
+# ANSI colors only, so tmux maps them to the window's theme.
+--theme="ansi"
 --number
 --paging="auto"
 --pager="less -RF"

@@ -140,15 +140,14 @@ viz status                        # server and VS Code connection
 
 ### Themes
 
-A single theme applies across Neovim, tmux, fzf, bat, Starship, delta, btop, and
-lazygit. You can set it globally or per tmux session or window, and override it
-for individual tools. See [docs/theme-system.md](docs/theme-system.md).
+One global theme colors tmux and everything running in it: Neovim, fzf, bat,
+Starship, delta, btop, and lazygit. Any tmux window can have its own theme. See
+[docs/theme-system.md](docs/theme-system.md).
 
 ```bash
 theme                                   # interactive picker (global)
-theme --window                          # picker for the current tmux window
-theme set --window vim gruvbox          # override one tool in this window
-theme explain --window                  # show which setting won, and from where
+theme -w vesper                         # theme only the current tmux window
+theme -w clear                          # window follows the global theme again
 ```
 
 Available themes: Gruvbox Material (four variants), Tokyo Night, Kanagawa
@@ -185,7 +184,7 @@ ls ~/.local/state/dotfiles/backups/   # configs replaced during setup
 | [maintenance](docs/maintenance.md) | Development workflow, updates, ownership, recovery |
 | [testing](docs/testing.md) | Test isolation, platform coverage, manual checklists |
 | [supply-chain](docs/supply-chain.md) | Download trust and replacement guarantees per component |
-| [theme-system](docs/theme-system.md) | Theme scopes, resolution order, runtime behavior, adding themes |
+| [theme-system](docs/theme-system.md) | Global and window themes, how programs follow them, adding themes |
 | [work](docs/work.md) | Work-tier sandbox host, Tailscale, cloud CLIs |
 | [ai-configuration](docs/ai-configuration.md), [ai-tools-egress](docs/ai-tools-egress.md), [opencode-secure](docs/opencode-secure.md) | AI CLI configuration and network egress |
 

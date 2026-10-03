@@ -7,7 +7,6 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
-source "$DOTFILES_DIR/lib/theme-resolve.sh"
 source "$DOTFILES_DIR/lib/state.sh"
 source "$DOTFILES_DIR/lib/work-host.sh"
 
@@ -351,21 +350,29 @@ else
 fi
 
 if feature_enabled theme; then
-    if load_theme_context; then
-        theme="$DOTFILES_THEME"
+    theme="$("$DOTFILES_DIR/bin/theme-switcher" --current | sed -n 's/^global: //p')"
+    if _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 2>/dev/null; then
         check_pass "global theme: $theme"
     else
-        check_fail "theme state is invalid"
-        theme=""
+        check_fail "theme state is invalid (using $theme)"
+    fi
+    tmux_version="$(tmux -V 2>/dev/null | awk '{print $2}' | sed 's/[^0-9.].*$//' || true)"
+    if [[ -n "$tmux_version" ]] && ! version_gte "$tmux_version" 3.3; then
+        check_warn "tmux $tmux_version: themes color tmux itself, but programs keep the terminal palette (needs 3.3+)"
     fi
 else
     check_pass "theme feature disabled"
-    theme=""
 fi
 
-# ==============================================================================
-# 6b. Theme integration — per-surface wiring (cascade-aware)
-# ==============================================================================
+# Programs follow window themes through palette colors; delta's come from the
+# portable Git config.
+if [[ -f "$HOME/.gitconfig" ]]; then
+    if [[ "$(git config --global --includes --get delta.syntax-theme 2>/dev/null || true)" == ansi ]]; then
+        check_pass "delta: palette-based colors"
+    else
+        check_warn "delta: ~/.gitconfig lacks the palette-based delta settings (run setup.sh --config)"
+    fi
+fi
 
 if feature_enabled agent-badge \
    && { component_expected claude || component_expected codex; }; then
@@ -373,81 +380,6 @@ if feature_enabled agent-badge \
         check_pass 'agent-badge JSON dependency (jq)'
     else
         check_warn 'agent-badge requires jq on PATH (see plugins/shared/README.md)'
-    fi
-fi
-
-if [[ -n "$theme" ]]; then
-    # Resolve the current shell's window/session when inside tmux, otherwise
-    # verify the standalone global scope.
-    load_theme_context
-    r_bat="$(resolve_surface_theme bat)"
-    r_starship="$(resolve_surface_theme starship)"
-    r_delta="$(resolve_surface_theme delta)"
-    r_btop="$(resolve_surface_theme btop)"
-    r_lazygit="$(resolve_surface_theme lazygit)"
-
-    echo
-    echo "Theme integration [global=$theme${THEME_CONTEXT_SESSION:+ session=$THEME_CONTEXT_SESSION}${THEME_CONTEXT_WINDOW:+ window=$THEME_CONTEXT_WINDOW}]"
-    echo "─────────────────────────────────────"
-
-    # bat: built-in themes such as gruvbox-dark need no vendored file
-    if [[ -d "$DOTFILES_DIR/themes/$r_bat/bat" ]]; then
-        bat_files=("$DOTFILES_DIR/themes/$r_bat/bat"/*.tmTheme)
-        if [[ -e "${bat_files[0]}" ]]; then
-            check_pass "bat [$r_bat]: vendored ${#bat_files[@]} .tmTheme file(s)"
-            if [[ -f "$(_theme_generated_dir)/bat/cache/themes.bin" ]]; then
-                check_pass "bat: isolated XDG cache built"
-            else
-                check_warn "bat: isolated cache missing (run bin/theme-switcher $r_bat)"
-            fi
-        else
-            check_warn "bat [$r_bat]: themes/$r_bat/bat exists but is empty"
-        fi
-    else
-        check_pass "bat [$r_bat]: uses bat built-in (no vendored .tmTheme needed)"
-    fi
-
-    # starship: immutable per-theme generated config
-    starship_config="$(_theme_generated_dir)/themes/$r_starship/starship.toml"
-    if [[ -f "$starship_config" ]]; then
-        if grep -q "^palette = \"$r_starship\"" "$starship_config"; then
-            check_pass "starship [$r_starship]: scoped artifact ready"
-        else
-            check_warn "starship: scoped artifact palette mismatch for '$r_starship'"
-        fi
-    else
-        check_warn "starship: scoped artifact missing (run bin/theme-switcher --init)"
-    fi
-
-    # delta: one shared definition index; DELTA_FEATURES selects per process.
-    if [[ -f "$(_theme_generated_dir)/delta.gitconfig" ]]; then
-        if grep -Fq "path = $DOTFILES_DIR/themes/$r_delta/delta.gitconfig" "$(_theme_generated_dir)/delta.gitconfig"; then
-            check_pass "delta [$r_delta]: feature definition indexed"
-        else
-            check_warn "delta: generated index is missing '$r_delta'"
-        fi
-        if git config --global --includes --get-all include.path 2>/dev/null | grep -Fxq "$(_theme_generated_dir)/delta.gitconfig"; then
-            check_pass "delta: ~/.gitconfig includes the XDG theme cache"
-        else
-            check_warn "delta: ~/.gitconfig missing the XDG theme-cache include"
-        fi
-    else
-        if [[ -f "$DOTFILES_DIR/themes/$r_delta/delta.gitconfig" ]]; then
-            check_warn "delta: XDG theme-cache index missing"
-        fi
-    fi
-
-    # btop and lazygit use launch-time config paths and never patch user files.
-    if [[ -f "$(_theme_generated_dir)/themes/$r_btop/btop.conf" ]]; then
-        check_pass "btop [$r_btop]: scoped config ready"
-    else
-        check_warn "btop [$r_btop]: scoped config missing"
-    fi
-
-    if [[ -f "$DOTFILES_DIR/themes/$r_lazygit/lazygit.yml" ]]; then
-        check_pass "lazygit [$r_lazygit]: launch overlay ready"
-    else
-        check_warn "lazygit [$r_lazygit]: theme overlay missing"
     fi
 fi
 

@@ -208,10 +208,7 @@ class Fixture:
         else:
             checks.append('[[ "${_PROFILE_LOADED:-}" == 1 ]] || exit 85')
         if mode == "interactive":
-            checks += ['typeset -f reload >/dev/null || exit 86',
-                       ('[[ -n "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" ]] || exit 87' if self.theme_enabled
-                        else '[[ "${DOTFILES_THEME_ENABLED:-}" == 0 && -z "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" ]] || exit 87'),
-                       'unset HISTFILE']
+            checks += ['typeset -f reload >/dev/null || exit 86', 'unset HISTFILE']
         checks.append('printf "DOTFILES_BENCH_OK\\n"')
         env = self.env if mode == "first-env" else self.inherited[shell]
         elapsed, output = execute(self.command(shell, mode, "; ".join(checks)), env, self.tree, mode == "interactive")

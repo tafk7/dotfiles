@@ -43,17 +43,6 @@ for key in "${!CONFIG_MAP[@]}"; do
         || { echo "CONFIG_MAP[$key] has unknown owner: $owner" >&2; exit 1; }
 done
 
-required=(meta.sh palette.sh vim.vim shell.sh starship.palette.toml delta.gitconfig btop.theme lazygit.yml)
-for dir in themes/*; do
-    [[ -d "$dir" ]] || continue
-    theme="${dir##*/}"
-    for file in "${required[@]}"; do
-        [[ -f "$dir/$file" ]] || { echo "$theme missing $file" >&2; exit 1; }
-    done
-    grep -Fq "[palettes.$theme]" "$dir/starship.palette.toml" \
-        || { echo "$theme Starship palette name mismatch" >&2; exit 1; }
-done
-
 # EditorConfig has no inline comments; a trailing one becomes part of the value.
 if grep -nE '^[^#;[]*=.*[[:space:]][#;]' configs/editorconfig; then
     echo "configs/editorconfig: put comments on their own line" >&2

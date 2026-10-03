@@ -183,12 +183,11 @@ shell│ducks│Show largest items in current directory│du -cks * | sort -rn |
 shell│fixmouse│Reset stale terminal mouse-reporting modes│disable DEC/Xterm mouse modes
 # Configuration
 shell│reload│Reload shell configuration│source ~/.bashrc
-shell│themes│List available themes and show usage│ls $DOTFILES_DIR/themes/
-shell│theme│Apply theme globally / interactive picker│theme [name]
-shell│theme-set│Override a group or surface theme│theme set <target> <theme>
-shell│theme-unset│Remove one theme override│theme unset <target>
-shell│theme-reset│Clear ALL theme overrides│theme reset
-shell│theme-show│Show effective theme cascade tree│theme show
+shell│themes│List available themes│theme --list
+shell│theme│Set the global theme / interactive picker│theme [name]
+shell│theme-window│Theme only this tmux window / picker│theme -w [name]
+shell│theme-window-clear│Make this window follow the global theme│theme -w clear
+shell│theme-current│Show the global and window themes│theme --current
 shell│pane-tint│Tint current tmux pane background│pane-tint <0|1|2|3>
 shell│vimrc│Edit neovim config│nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
 shell│vplug│Install vim plugins│nvim +PlugInstall +qall

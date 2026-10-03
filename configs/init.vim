@@ -16,16 +16,6 @@ let s:plug_dir = isdirectory(stdpath('config') . '/plugged')
 call plug#begin(s:plug_dir)
 unlet s:plug_dir
 
-" Color schemes
-Plug 'morhetz/gruvbox', { 'commit': '5d15b2765f59754d7ac263c88a0f6e3e58124951' }
-Plug 'sainnhe/gruvbox-material', { 'commit': '11d779b26a9ab2b3db8c22c6ac9fb6e8ed4fea79' }
-Plug 'folke/tokyonight.nvim', { 'commit': 'cdc07ac78467a233fd62c493de29a17e0cf2b2b6' }
-Plug 'rebelot/kanagawa.nvim', { 'commit': 'bb85e4bfc8d89b0e62c8fa53ccdd13d12e2f77b3' }
-Plug 'catppuccin/vim', { 'as': 'catppuccin', 'commit': 'ee7d87e1c3f753069dae41df139f7d3fd914f7e9' }
-Plug 'sainnhe/everforest', { 'commit': '85a86eb62409e3ec88713bff3d1b9d7374e112e4' }
-Plug 'datsfilipe/vesper.nvim', { 'commit': '1717b1ad657c94bec3fc2bdebb0c55452d9fe46d' }
-Plug 'projekt0n/github-nvim-theme', { 'commit': 'c106c9472154d6b2c74b74565616b877ae8ed31d' }
-
 " Essential tpope plugins
 Plug 'tpope/vim-fugitive', { 'commit': '3b753cf8c6a4dcde6edee8827d464ba9b8c4a6f0' }
 Plug 'tpope/vim-surround', { 'commit': '3d188ed2113431cf8dac77be61b842acb64433d9' }
@@ -73,29 +63,18 @@ syntax enable
 " Visual Settings
 " ==============================================================================
 
-set background=dark
-if (has("termguicolors"))
-    set termguicolors
-endif
-
 if &term =~ '256color'
     " Disable Background Color Erase (BCE)
     set t_ut=
 endif
 
-" Dynamic scoped theme loading
-if exists('$DOTFILES_DIR') && filereadable($DOTFILES_DIR . '/lib/theme.vim')
+" Palette colors, not RGB: tmux maps them to the window's theme, so the editor
+" follows `theme` changes while it runs (see configs/nvim/colors/dotfiles.vim).
+set notermguicolors
+if exists('$DOTFILES_DIR') && isdirectory($DOTFILES_DIR . '/configs/nvim')
     execute 'set runtimepath^=' . fnameescape($DOTFILES_DIR . '/configs/nvim')
-    execute 'source ' . fnameescape($DOTFILES_DIR . '/lib/theme.vim')
-else
-    try
-        let g:gruvbox_material_background = 'medium'
-        let g:gruvbox_material_better_performance = 1
-        colorscheme gruvbox-material
-    catch
-        colorscheme desert
-    endtry
 endif
+silent! colorscheme dotfiles
 
 set number
 
@@ -243,9 +222,8 @@ let g:fzf_layout = { 'window': { 'width': 0.9, 'height': 0.9 } }
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 
 " Airline
-" The theme loader normally sets this.
-if !exists('g:airline_theme')
-    let g:airline_theme='gruvbox_material'
+if get(g:, 'colors_name', '') ==# 'dotfiles'
+    let g:airline_theme = 'dotfiles'
 endif
 " Portable default: do not assume a patched Powerline/Nerd Font. Users who
 " install one can set this back to 1 in ~/.config/nvim/init.local.vim.

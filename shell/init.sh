@@ -13,9 +13,19 @@ source "$DOTFILES_DIR/shell/env-runtime.sh"
 
 source "$DOTFILES_DIR/shell/env.sh"
 
-# Optional features begin here. Layer 0 above remains independent of theme
-# state, rendering, tmux, and plugins.
-source "$DOTFILES_DIR/shell/interactive/theme-env.sh"
+# The previous theme system exported per-shell theme variables, and a tmux
+# server started from such a shell hands them to every new pane. Drop them, or
+# stale BAT_THEME/STARSHIP_CONFIG values override the palette-based configs.
+if [[ -n "${DOTFILES_THEME_CONTEXT_SIGNATURE:-}" ]]; then
+    unset DOTFILES_THEME DOTFILES_THEME_CONTEXT_SIGNATURE DOTFILES_THEME_ENABLED \
+        DOTFILES_THEME_SESSION_ID DOTFILES_THEME_WINDOW_ID \
+        DOTFILES_THEME_VIM_RESOLVED DOTFILES_THEME_BAT_RESOLVED DOTFILES_THEME_DELTA_RESOLVED \
+        DOTFILES_THEME_TMUX_RESOLVED DOTFILES_THEME_STARSHIP_RESOLVED DOTFILES_THEME_FZF_RESOLVED \
+        DOTFILES_THEME_BTOP_RESOLVED DOTFILES_THEME_LAZYGIT_RESOLVED \
+        BAT_THEME BAT_CACHE_PATH STARSHIP_CONFIG STARSHIP_PALETTE DELTA_FEATURE DELTA_FEATURES \
+        BTOP_THEME_CONFIG BTOP_THEME_DIR LAZYGIT_THEME_CONFIG FZF_THEME_COLORS \
+        THEME_TINT_1 THEME_TINT_2 THEME_TINT_3
+fi
 
 [[ $- == *i* ]] && source "$DOTFILES_DIR/shell/tool-init.sh"
 
@@ -46,14 +56,6 @@ elif [[ "$SHELL_NAME" == "zsh" ]]; then
 else
     PS1='\[\e[38;5;108m\]\u\[\e[0m\]@\[\e[38;5;214m\]\h\[\e[0m\]:\[\e[38;5;108m\]\w\[\e[0m\] \$ '
 fi
-
-# Existing interactive shells adopt scoped changes at the next prompt. The
-# signature check avoids rebuilding or re-exporting anything when state is
-# unchanged; the only steady-state work in tmux is reading one user option.
-if [[ "${_DOTFILES_THEME_ACTIVE:-0}" == 1 && -f "$DOTFILES_DIR/shell/theme-runtime.sh" ]]; then
-    source "$DOTFILES_DIR/shell/theme-runtime.sh"
-fi
-unset _DOTFILES_THEME_ACTIVE
 
 # FZF key bindings + completion (fzf >= 0.48 generates its own shell integration)
 # zsh: deferred to entry/zsh.sh after compinit so tab completion integrates properly

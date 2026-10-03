@@ -72,8 +72,8 @@ OPTIONS:
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
-    --theme             Enable the coordinated theme feature (default).
-    --no-theme          Persistently disable theme generation and runtime hooks.
+    --theme             Enable tmux themes (default).
+    --no-theme          Persistently disable tmux themes.
     --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
     --no-agent-badge    Install AI CLIs without registering agent-badge.
     --git-name NAME     Set git user.name (for non-interactive installs)

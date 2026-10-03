@@ -1,9 +1,8 @@
 # Third-party theme notices
 
-The theme data in `themes/` contains locally adapted palettes and, for some
-themes, vendored TextMate (`.tmTheme`) files derived from the projects below.
-Local changes translate colors into the repository's shell, tmux, Vim,
-Starship, Delta, btop, lazygit, and bat formats.
+The palettes in `themes/` are locally adapted from the projects below. Local
+changes select and adjust colors for the repository's tmux palette, including
+contrast adjustments for light themes.
 
 | Theme family | Upstream | License |
 |---|---|---|

@@ -143,27 +143,22 @@ fi
 
 # Theme management
 alias theme='$DOTFILES_DIR/bin/theme-switcher'
-alias themes='ls -1 "$DOTFILES_DIR/themes/" 2>/dev/null | sed "s/^/  - /" && echo "" && echo "Use: theme <name>  (or: theme set <target> <name>)"'
+alias themes='$DOTFILES_DIR/bin/theme-switcher --list'
 
-# These applications accept a config path at launch, which keeps their theme
-# local to this shell's tmux context instead of patching a shared user file.
+# btop's built-in TTY theme draws with ANSI colors, which tmux maps to the
+# window's theme. Launch with a copy of the user's config that selects it, so
+# their own btop.conf is never rewritten.
 btop() {
-    if [[ -n "${DOTFILES_THEME_BTOP_RESOLVED:-}" && -n "${BTOP_THEME_CONFIG:-}" ]]; then
-        "$DOTFILES_DIR/bin/theme-switcher" prepare "$DOTFILES_THEME_BTOP_RESOLVED" >/dev/null
-        command btop --config "$BTOP_THEME_CONFIG" --themes-dir "${BTOP_THEME_DIR:?}" "$@"
-    else
-        command btop "$@"
+    local base="${XDG_CONFIG_HOME:-$HOME/.config}/btop/btop.conf"
+    local config="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/btop.conf"
+    if [[ ! -f "$config" || ( -f "$base" && "$base" -nt "$config" ) ]]; then
+        mkdir -p "${config%/*}" || return
+        {
+            [[ -f "$base" ]] && grep -Ev '^[[:space:]]*(color_theme|theme_background)[[:space:]]*=' "$base"
+            printf 'color_theme = "TTY"\ntheme_background = False\n'
+        } > "$config" || return
     fi
-}
-
-lazygit() {
-    local files="${LAZYGIT_THEME_CONFIG:-}"
-    if [[ -n "$files" ]]; then
-        [[ -f "$HOME/.config/lazygit/config.yml" ]] && files="$HOME/.config/lazygit/config.yml,$files"
-        command lazygit --use-config-file="$files" "$@"
-    else
-        command lazygit "$@"
-    fi
+    command btop --config "$config" "$@"
 }
 
 # Find and replace utility

@@ -1,9 +1,9 @@
 #!/bin/bash
 # FZF configuration — layout, commands, and preview integration
 
-# Default options (layout/keybinds kept separate so prompt-time theme refreshes
-# can replace colors without duplicating the static flags).
-_DOTFILES_FZF_BASE_OPTS="
+# Colors are palette indices, which tmux maps to the window's theme (235
+# surface, 240 border, 245 secondary; see bin/theme-switcher).
+export FZF_DEFAULT_OPTS="
     --height 60%
     --layout=reverse
     --border=rounded
@@ -12,12 +12,9 @@ _DOTFILES_FZF_BASE_OPTS="
     --bind 'ctrl-p:toggle-preview'
     --bind 'ctrl-right:forward-word'
     --bind 'ctrl-backspace:backward-kill-word'
-    --bind 'ctrl-delete:kill-word'"
-
-_dotfiles_fzf_apply_theme() {
-    export FZF_DEFAULT_OPTS="$_DOTFILES_FZF_BASE_OPTS ${FZF_THEME_COLORS:-}"
-}
-_dotfiles_fzf_apply_theme
+    --bind 'ctrl-delete:kill-word'
+    --color=fg:-1,bg:-1,hl:4,fg+:-1,bg+:235,hl+:12,gutter:-1
+    --color=info:245,header:245,border:240,prompt:4,pointer:5,marker:2,spinner:5"
 
 # Use fd for better file/directory listing
 if command -v fd >/dev/null 2>&1; then

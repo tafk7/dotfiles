@@ -1,12 +1,8 @@
-# Starship template. bin/theme-switcher renders one immutable config per theme
-# into the XDG theme cache by substituting the palette marker and appending
-# themes/<name>/starship.palette.toml. STARSHIP_CONFIG selects the rendered file
-# for the current window/session.
+# Starship configuration (dotfiles). Colors are ANSI names and palette indices,
+# which tmux maps to the window's theme (see bin/theme-switcher).
 
 command_timeout = 1000
-# DOTFILES_PALETTE_MARKER — substituted into a per-theme generated artifact.
-# Do not edit: change palette by switching themes (bin/theme-switcher <name>).
-palette = "__DOTFILES_PALETTE__"
+palette = "dotfiles"
 
 format = """
 [╭─](bracket) $directory$git_branch$git_status$cmd_duration
@@ -108,4 +104,7 @@ disabled = true
 [swift]
 disabled = true
 
-# The selected themes/<name>/starship.palette.toml is appended during rendering.
+[palettes.dotfiles]
+bracket = "5"
+bracket_alt = "4"
+fg_dim = "245"

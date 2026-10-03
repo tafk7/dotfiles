@@ -579,7 +579,7 @@ process_git_config() {
     local force="${3:-false}"
     local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
     local portable="$portable_dir/gitconfig"
-    local rendered git_version conflict_style="diff3" theme_cache
+    local rendered git_version conflict_style="diff3"
     local has_nvim=0 has_delta=0
     command -v nvim >/dev/null 2>&1 && has_nvim=1
     command -v delta >/dev/null 2>&1 && has_delta=1
@@ -591,27 +591,13 @@ process_git_config() {
     if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
         conflict_style="zdiff3"
     fi
-    theme_cache="${DOTFILES_THEME_CACHE_DIR:-${DOTFILES_GENERATED_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/theme}}"
 
     sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
         awk -v nvim="$has_nvim" -v delta="$has_delta" '
             !nvim && /^[[:space:]]*(editor = nvim|tool = nvimdiff)$/ { next }
             !delta && /^[[:space:]]*(pager = delta|diffFilter = delta --color-only)$/ { next }
             { print }
-        ' |
-        if feature_enabled theme; then
-            awk -v path="$theme_cache/delta.gitconfig" '
-                $0 == "{{THEME_INCLUDE}}" {
-                    print "[include]"
-                    print "    # Optional theme feature index."
-                    print "    path = \"" path "\""
-                    next
-                }
-                { print }
-            '
-        else
-            awk '$0 != "{{THEME_INCLUDE}}" { print }'
-        fi > "$rendered" || { rm -f "$rendered"; return 1; }
+        ' > "$rendered" || { rm -f "$rendered"; return 1; }
 
     if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
         chmod 600 "$rendered" || return 1

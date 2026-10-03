@@ -167,11 +167,6 @@ apply_feature_requests() {
     else
         export DOTFILES_AGENT_BADGE_ENABLED=0
     fi
-    if feature_enabled theme; then
-        export DOTFILES_THEME_ENABLED=1
-    else
-        export DOTFILES_THEME_ENABLED=0
-    fi
 }
 
 ledger_record() {

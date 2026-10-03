@@ -40,7 +40,6 @@ run_shell_matrix() {
             CLAUDE_FLAGS="--model sonnet"; CODEX_FLAGS="--profile work"
             OPENCODE_FLAGS="--model local"; PI_FLAGS="--provider test"
             claude prompt; claude stop job; codex exec prompt; opencode run prompt; opencode service status; pi prompt
-            unset DOTFILES_THEME_BTOP_RESOLVED BTOP_THEME_CONFIG BTOP_THEME_DIR LAZYGIT_THEME_CONFIG
             btop plain; lazygit plain
             dstopall
         ')"
@@ -50,8 +49,9 @@ run_shell_matrix() {
     [[ "$output" == *'opencode|run|--model|local|prompt'* ]] || fail "$shell opencode flag splitting"
     [[ "$output" == *'opencode|service|status'* ]] || fail "$shell opencode administrative flags"
     [[ "$output" == *'pi|--provider|test|prompt'* ]] || fail "$shell pi flag splitting"
-    [[ "$output" == *'btop|plain'* && "$output" != *'btop|--config'* ]] || fail "$shell btop neutral fallback"
-    [[ "$output" == *'lazygit|plain'* && "$output" != *'lazygit|--use-config-file'* ]] || fail "$shell lazygit neutral fallback"
+    [[ "$output" == *"btop|--config|$XDG_CACHE_HOME/dotfiles/btop.conf|plain"* ]] || fail "$shell btop palette config"
+    grep -Fxq 'color_theme = "TTY"' "$XDG_CACHE_HOME/dotfiles/btop.conf" || fail "$shell btop config does not select the TTY theme"
+    [[ "$output" == *'lazygit|plain'* ]] || fail "$shell lazygit passthrough"
     [[ "$output" == *'argument-recorder|stop|alpha|beta'* ]] || fail "$shell docker array handling"
 }
 
