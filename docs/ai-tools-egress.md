@@ -85,12 +85,13 @@ above user `config.toml`.
 
 ## opencode
 
-Full detail in **`docs/opencode-secure.md`**. Summary: hosted-gateway default
-("free models"), a default-on `models.dev` metadata fetch, opt-in share, and
-`experimental.openTelemetry` (off by default; when on, exports via OTLP-HTTP,
-which defaults to `localhost:4318` = no egress). `bin/ai-config opencode`
-disables share and turns silent self-updates into notices; locking providers to
-your endpoint (`enabled_providers`) is left to the provider configuration.
+Full detail in **`docs/opencode-secure.md`**. V2 uses configured providers for
+inference, `models.dev` for catalog metadata, and `opencode.ai` plus
+`registry.npmjs.org` for update metadata and installer artifacts. `bin/ai-config
+opencode` selects update notifications and disables sharing. Provider
+restrictions belong to endpoint configuration. V1's `experimental.openTelemetry`
+setting is unsupported in V2. The shared service has its own environment and
+lifecycle; use standalone mode when each launch should inherit the shell.
 
 ---
 
@@ -142,10 +143,11 @@ default-deny proxy or `tcpdump` on first launch of each tool.
 **Permit** (per your policy): your LLM endpoint(s) · your internal OTEL collector
 (if any) · `api.anthropic.com` + `downloads.claude.ai` (Claude Code, if you keep
 auto-update / managed settings) · `api.github.com` + `github.com` +
-`objects.githubusercontent.com` (opencode update check and explicit updates).
+`objects.githubusercontent.com` (source inspection) · `opencode.ai` +
+`registry.npmjs.org` (OpenCode update check and explicit updates).
 
 **Deny:** `ab.chatgpt.com` (Codex Statsig metrics) · `models.dev` (opencode) ·
-`opencode.ai` (opencode zen/share) · `pi.dev` (Pi version check + install
+`pi.dev` (Pi version check + install
 telemetry; also `registry.npmjs.org` if you don't want `pi update` / `pi
 install` to reach npm) · everything else.
 

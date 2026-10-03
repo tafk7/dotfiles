@@ -36,7 +36,28 @@ def desired(component, home):
             target = directory / 'settings.json'
             source = ROOT / 'configs/claude-settings.json'
         original = load_json(target)
-        data = merge(original, load_json(source))
+        overlay = load_json(source)
+        if component == 'opencode':
+            # Until a V2 binary is installed, keep the supported V1 spelling.
+            # Configuration can be provisioned before installing any CLI.
+            cli = (shutil.which('opencode') if home == Path.home() else None) or str(home / '.local/bin/opencode')
+            try:
+                version = subprocess.run([cli, '--version'], capture_output=True, text=True, timeout=15)
+                v2 = version.returncode == 0 and re.search(r'\bv?2\.\d+\.\d+', version.stdout)
+            except (OSError, subprocess.TimeoutExpired):
+                v2 = False
+            overlay = dict(overlay)
+            base = dict(original)
+            if v2:
+                base.pop('autoupdate', None)
+                if base.get('$schema') == 'https://opencode.ai/config.json':
+                    base.pop('$schema')
+            else:
+                overlay['autoupdate'] = overlay.pop('update')
+                # Preserve any native value until V2 is available to own it.
+            data = merge(base, overlay)
+        else:
+            data = merge(original, overlay)
         text = target.read_text() if target.exists() and equivalent(data, original) else json.dumps(data, indent=2) + '\n'
     outputs = [(target, text.encode(), 0o600)]
     assets = ROOT / 'configs/ai' / component
@@ -156,7 +177,7 @@ def main():
                   if env.get('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC') == '1' else 'info: Claude updater follows its runtime environment.')
         if component == 'opencode':
             print('info: opencode notifies about updates; install them with bin/ai-update opencode.'
-                  if load_json(ROOT / 'configs/opencode.json').get('autoupdate') == 'notify' else 'info: opencode updater follows its configuration.')
+                  if load_json(ROOT / 'configs/opencode.json').get('update') == 'notify' else 'info: opencode updater follows its configuration.')
     return 0 if ok else 1
 
 

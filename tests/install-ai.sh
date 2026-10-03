@@ -28,10 +28,11 @@ opencode_installer="$TEST_ROOT/opencode-install.sh"
 cat > "$opencode_installer" <<'EOF'
 #!/bin/sh
 set -eu
+[ "$1" = --no-modify-path ] || exit 1
 mkdir -p "$HOME/.opencode/bin"
 cat > "$HOME/.opencode/bin/opencode" <<'BIN'
 #!/bin/sh
-[ "${1:-}" = --version ] && echo 'opencode test'
+[ "${1:-}" = --version ] && echo 'opencode v2.0.22'
 BIN
 chmod +x "$HOME/.opencode/bin/opencode"
 EOF
