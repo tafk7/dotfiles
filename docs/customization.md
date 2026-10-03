@@ -113,6 +113,9 @@ These untracked files keep machine-specific settings out of the repo:
   Gate shell-specific syntax on `$ZSH_VERSION` or `$BASH_VERSION`.
 - `~/.shell.local.d/*.sh`: sourced in filename order after `~/.shell.local`.
   They run again on `reload`, so keep them idempotent.
+- `CLAUDE_FLAGS`: a stable extension point. The `claude` wrapper
+  (`shell/tools/claude.sh`) injects it as separate arguments, so a fragment in
+  `~/.shell.local.d/` can export extra flags such as `--plugin-dir`.
 - `~/.gitconfig.local`: included last, so it overrides the tracked Git config.
   So does the parked Azure DevOps credential snippet ([work](work.md#cloud-clis)).
 - `~/.ssh/config.local`: included first, so its values win. Named files in
