@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile portable AI preferences and assets without installing binaries."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,7 +10,7 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'lib'))
-from config_files import check_target, equivalent, load_json, merge, reconcile_toml, write_file
+from config_files import backup, check_target, equivalent, load_json, merge, reconcile_toml, write_file
 
 
 def desired(component, home):
@@ -42,6 +43,33 @@ def desired(component, home):
             check_target(dest)
             outputs.append((dest, source.read_bytes(), 0o600))
     return directory, outputs
+
+
+def retired(component, directory):
+    """Files dotfiles once wrote that another owner now ships: {path, sha256}."""
+    listed = load_json(ROOT / 'configs/ai/retired.json').get(component, {})
+    return [(directory / rel, digest) for rel, digest in sorted(listed.items())]
+
+
+def retire(path, digest, backup_dir, dry_run):
+    """Remove a retired file only if it still holds what dotfiles last wrote."""
+    check_target(path)
+    if not path.is_file():
+        return True
+    if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        print(f'kept (edited since dotfiles wrote it): {path}')
+        return True
+    if dry_run:
+        print(f'would remove retired: {path} (backups: {backup_dir})')
+        return True
+    print(f'backup: {backup(path, backup_dir)}')
+    path.unlink()
+    try:
+        path.parent.rmdir()
+    except OSError:
+        pass
+    print(f'removed retired: {path}')
+    return True
 
 
 def check_plugin(component, directory):
@@ -87,6 +115,14 @@ def main():
                 ok = matches and ok
             else:
                 write_file(path, data, directory / 'backups', args.dry_run, mode)
+        for path, digest in retired(component, directory):
+            if args.check:
+                if path.is_file():
+                    stale = hashlib.sha256(path.read_bytes()).hexdigest() == digest
+                    print(f'{"CHECK" if stale else "kept"}: retired file present: {path}')
+                    ok = (not stale) and ok
+            else:
+                retire(path, digest, directory / 'backups', args.dry_run)
         if args.check and args.plugins and component != 'opencode':
             ok = check_plugin(component, directory) and ok
         if component == 'claude':

@@ -124,6 +124,23 @@ command = "second"
         data['emoji 🔧'] = 'control \x7f and 🔧'
         self.assertTrue(equivalent(data, tomllib.loads(dump_toml(data))))
 
+    def test_retired_files_are_removed_only_when_unmodified(self):
+        retired = json.loads((ROOT / 'configs/ai/retired.json').read_text())['claude']
+        clean = self.put('.claude/skills/hone/SKILL.md', 'x')
+        kept = self.put('.claude/skills/modular-dev/SKILL.md', 'locally edited')
+        import hashlib
+        self.assertIn('skills/hone/SKILL.md', retired)
+        sys.path.insert(0, str(ROOT / 'lib'))
+        import ai_preferences
+        digest = hashlib.sha256(b'x').hexdigest()
+        self.assertTrue(ai_preferences.retire(clean, digest, self.home / '.claude/backups', True))
+        self.assertTrue(clean.exists())
+        ai_preferences.retire(clean, digest, self.home / '.claude/backups', False)
+        self.assertFalse(clean.exists())
+        self.assertEqual(len(list((self.home / '.claude/backups').rglob('SKILL.md'))), 1)
+        ai_preferences.retire(kept, retired['skills/modular-dev/SKILL.md'], self.home / '.claude/backups', False)
+        self.assertTrue(kept.exists())
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

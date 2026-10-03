@@ -14,6 +14,15 @@
       },
       "category": "productivity",
       "source": "./plugins/agent-badge-claude"
+    },
+    {
+      "name": "viz",
+      "description": "Skill for showing charts and diagrams through bin/viz (VS Code viewer).",
+      "author": {
+        "name": "tkeller"
+      },
+      "category": "productivity",
+      "source": "./plugins/viz-claude"
     }
   ]
 }
