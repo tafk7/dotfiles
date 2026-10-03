@@ -1,8 +1,19 @@
-" dotfiles colorscheme. Uses only palette indices, never RGB: ANSI 0-15 plus
-" the role slots that bin/theme-switcher maps per tmux window (235 surface,
-" 238 selection, 240 border, 245 secondary, 22/28 added, 52/88 removed). A
-" theme change in tmux therefore recolors running editors too. Requires
-" 'notermguicolors'.
+" dotfiles colorscheme. Colors are palette indices: ANSI 0-15 plus the role
+" slots that bin/theme-switcher maps per tmux window (235 surface, 238
+" selection, 240 border, 245 secondary, 22/28 added, 52/88 removed).
+"
+" Following (the default) uses the indices themselves with 'notermguicolors',
+" so a theme change in tmux recolors running editors too. When pinned
+" (g:dotfiles_nvim_theme, set by :Theme), each index becomes that theme's RGB
+" value with 'termguicolors', and the editor paints its own canvas.
+
+let s:palette = dotfiles#theme#palette(get(g:, 'dotfiles_nvim_theme', ''))
+let s:pinned = !empty(s:palette)
+let &termguicolors = s:pinned
+if s:pinned
+  let s:bg = s:palette.bg
+  let &background = str2nr(s:bg[1:2], 16) + str2nr(s:bg[3:4], 16) + str2nr(s:bg[5:6], 16) > 384 ? 'light' : 'dark'
+endif
 
 hi clear
 if exists('syntax_on')
@@ -10,12 +21,27 @@ if exists('syntax_on')
 endif
 let g:colors_name = 'dotfiles'
 
+" fg/bg are 'fg' and 'bg' for the canvas, a palette index, or NONE.
 function! s:hi(group, fg, bg, attr) abort
-  execute 'hi' a:group 'ctermfg=' . a:fg 'ctermbg=' . a:bg 'cterm=' . a:attr
+  let l:cmd = ['hi', a:group, 'cterm=' . a:attr, 'gui=' . a:attr]
+  for [l:key, l:value] in [['fg', a:fg], ['bg', a:bg]]
+    call add(l:cmd, 'cterm' . l:key . '=' . (l:value =~# '^\d\+$' ? l:value : 'NONE'))
+    call add(l:cmd, 'gui' . l:key . '=' . get(s:palette, l:value, 'NONE'))
+  endfor
+  execute join(l:cmd)
 endfunction
 
+" :terminal buffers use the pinned theme's ANSI colors too.
+for s:i in range(16)
+  if s:pinned
+    let g:terminal_color_{s:i} = s:palette[string(s:i)]
+  elseif exists('g:terminal_color_' . s:i)
+    unlet g:terminal_color_{s:i}
+  endif
+endfor
+
 " Editor text
-call s:hi('Normal',       'NONE', 'NONE', 'NONE')
+call s:hi('Normal',       'fg',   'bg',   'NONE')
 call s:hi('Comment',      '245',  'NONE', 'italic')
 call s:hi('Constant',     '3',    'NONE', 'NONE')
 call s:hi('String',       '2',    'NONE', 'NONE')

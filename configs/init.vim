@@ -70,11 +70,15 @@ endif
 
 " Palette colors, not RGB: tmux maps them to the window's theme, so the editor
 " follows `theme` changes while it runs (see configs/nvim/colors/dotfiles.vim).
+" `:Theme NAME` pins this editor to one theme instead; `theme --nvim NAME` pins
+" every new editor (see docs/theme-system.md).
 set notermguicolors
 if exists('$DOTFILES_DIR') && isdirectory($DOTFILES_DIR . '/configs/nvim')
     execute 'set runtimepath^=' . fnameescape($DOTFILES_DIR . '/configs/nvim')
+    let g:dotfiles_nvim_theme = dotfiles#theme#saved()
+    command! -nargs=? -complete=customlist,dotfiles#theme#complete Theme call dotfiles#theme#set(<q-args>)
+    silent! colorscheme dotfiles
 endif
-silent! colorscheme dotfiles
 
 set number
 

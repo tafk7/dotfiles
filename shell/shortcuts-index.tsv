@@ -126,6 +126,7 @@ vim│Ctrl+F│Move to split right│<C-w>l
 # ALE (linting)
 vim│,af│Auto-fix linting issues│:ALEFix
 vim│,an│Jump to next lint error│:ALENext
+vim│:Theme│Pin this editor to a theme (follow = window theme)│:Theme <name|follow>
 
 # Shell shortcuts
 # Line editing
@@ -187,7 +188,8 @@ shell│themes│List available themes│theme --list
 shell│theme│Set the global theme / interactive picker│theme [name]
 shell│theme-window│Theme only this tmux window / picker│theme -w [name]
 shell│theme-window-clear│Make this window follow the global theme│theme -w clear
-shell│theme-current│Show the global and window themes│theme --current
+shell│theme-current│Show the global, window, and Neovim themes│theme --current
+shell│theme-nvim│Pin new Neovim instances to a theme (follow = window theme)│theme --nvim [name|follow]
 shell│pane-tint│Tint current tmux pane background│pane-tint <0|1|2|3>
 shell│vimrc│Edit neovim config│nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
 shell│vplug│Install vim plugins│nvim +PlugInstall +qall

@@ -14,6 +14,8 @@ theme --current          # global and window themes
 theme --list
 theme --revert           # previous global theme
 theme --window=@3 vesper # another window, by id
+theme --nvim gruvbox     # new Neovim instances use gruvbox, whatever the window
+theme --nvim follow      # new Neovim instances follow the window again
 ```
 
 `theme` is an alias for `bin/theme-switcher`. Window themes live on the tmux
@@ -62,6 +64,22 @@ tmux owns the colors; programs only name them.
 | lazygit | its default theme, which uses ANSI colors |
 
 Programs that emit their own RGB colors are not recolored.
+
+## Pinning Neovim to a theme
+
+Neovim can keep its own theme instead of following the window, for example
+Gruvbox in Neovim inside a Vesper window:
+
+- `:Theme gruvbox` pins this editor; `:Theme follow` returns it to the window's
+  theme; `:Theme` alone shows the current mode. Names tab-complete.
+- `theme --nvim gruvbox` pins every Neovim started afterwards (stored as `nvim`
+  in `theme.tsv`); `theme --nvim follow` removes it. Running editors keep their
+  mode until you use `:Theme`.
+
+A pinned editor uses the same colorscheme with each palette index replaced by
+the pinned theme's RGB value (`termguicolors`), so it paints its own canvas and
+`:terminal` colors, and no longer changes with `theme` or `theme -w`. Every
+theme in `themes/` can be pinned; none needs a colorscheme plugin.
 
 ## Limits
 

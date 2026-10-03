@@ -162,14 +162,37 @@ require_enabled() {
     return 1
 }
 
+# The theme new Neovim instances are pinned to, or nothing when they follow
+# the window (configs/nvim/autoload/dotfiles/theme.vim reads the same key).
+nvim_pin() {
+    local theme
+    theme="$(theme_state_value nvim 2>/dev/null || true)"
+    theme_exists "$theme" && printf '%s\n' "$theme" || true
+}
+
 set_global() {
     local theme="$1" previous
     require_enabled
     theme_exists "$theme" || { error "Theme not found: $theme"; return 1; }
     previous="$(global_theme)"
-    [[ "$previous" == "$theme" ]] || theme_state_write default "$theme" previous "$previous"
+    [[ "$previous" == "$theme" ]] || theme_state_write default "$theme" previous "$previous" nvim "$(nvim_pin)"
     tmux_running && tmux_apply global "$theme"
     success "Global theme: $theme"
+}
+
+set_nvim() {
+    local theme="$1"
+    if [[ "$theme" == follow ]]; then
+        theme=""
+    else
+        theme_exists "$theme" || { error "Theme not found: $theme"; return 1; }
+    fi
+    theme_state_write default "$(global_theme)" previous "$(theme_state_value previous 2>/dev/null || true)" nvim "$theme"
+    if [[ -n "$theme" ]]; then
+        success "New Neovim instances use $theme (:Theme follow undoes it in one editor)"
+    else
+        success "New Neovim instances follow the window theme"
+    fi
 }
 
 set_window() {
@@ -210,6 +233,8 @@ show_current() {
         theme="$(theme_tmux show-options -qv -w -t "$window" @theme 2>/dev/null || true)"
         printf 'window %s: %s\n' "$window" "${theme:-follows global}"
     fi
+    theme="$(nvim_pin)"
+    [[ -z "$theme" ]] || printf 'nvim: %s\n' "$theme"
 }
 
 list_themes() {
@@ -275,16 +300,24 @@ theme-switcher — one global theme, optionally overridden per tmux window
   theme-switcher -w [NAME]         pick or set this window's theme
   theme-switcher -w clear          make this window follow the global theme again
   theme-switcher --window=@N NAME  target another window by id
+  theme-switcher --nvim [NAME]     pin new Neovim instances to a theme
+  theme-switcher --nvim follow     new Neovim instances follow the window again
   theme-switcher --list | --current | --revert | --preview NAME | diagnose
   theme-switcher enable | disable
 
-Window themes live on the tmux window and end with it.
+Window themes live on the tmux window and end with it. Inside Neovim,
+:Theme NAME pins that editor and :Theme follow undoes it.
 EOF
 }
 
 main() {
     local window name
     case "${1:-}" in
+        --nvim)
+            name="${2:-}"
+            [[ -n "$name" ]] || name="$(pick Neovim)"
+            [[ -z "$name" ]] || set_nvim "$name"
+            ;;
         -w|--window|--window=*)
             [[ "$1" == --window=* ]] && window="${1#--window=}" || window=""
             window="$(current_window "$window")"
