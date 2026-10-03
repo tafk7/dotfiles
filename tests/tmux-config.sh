@@ -4,8 +4,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_ROOT="$(mktemp -d)"
 SERVER="dotfiles-config-$RANDOM-$$"
-trap 'TMUX_TMPDIR="$TEST_ROOT/tmux" tmux -L "$SERVER" kill-server 2>/dev/null || true; rm -rf "$TEST_ROOT"' EXIT
+OUTER="$SERVER-outer"
+trap 'tmux -L "$OUTER" kill-server 2>/dev/null || true; tmux -L "$SERVER" kill-server 2>/dev/null || true; rm -rf "$TEST_ROOT"' EXIT
 mkdir -p "$TEST_ROOT/home/dev" "$TEST_ROOT/tmux" "$TEST_ROOT/state" "$TEST_ROOT/cache"
+# Every tmux call below, including setup.sh's theme unwiring, must stay off the
+# caller's real tmux server.
+export TMUX_TMPDIR="$TEST_ROOT/tmux" TMUX=""
 SPACED="$TEST_ROOT/home/dev/dotfiles with spaces"
 mkdir -p "$SPACED"
 tar -C "$ROOT" --exclude=.git --exclude=generated --exclude=.backups -cf - . | tar -x -C "$SPACED"
@@ -30,14 +34,29 @@ resolved="$(HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" DOTFILES_DI
     zsh -dfc 'source "$1"; print -rn -- "$DOTFILES_DIR"' _ "$TEST_ROOT/home/zshenv-flat")"
 [[ "$resolved" == "$SPACED" ]] || { echo "FAIL: flattened Zsh entrypoint did not use durable install path" >&2; exit 1; }
 
+# Start the server from "inside" another tmux, as a nested tmux or an agent in a
+# pane would. Its theme wiring must act on itself, never on the outer server.
+tmux -L "$OUTER" -f /dev/null new-session -d -s outer
+tmux -L "$OUTER" set-hook -g 'after-select-window[90]' 'display-message theme-switcher'
+outer_tmux="$(tmux -L "$OUTER" display-message -p '#{socket_path},#{pid},0')"
+
 HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" XDG_CACHE_HOME="$TEST_ROOT/cache" \
-    TMUX_TMPDIR="$TEST_ROOT/tmux" DOTFILES_DIR="$SPACED" \
+    DOTFILES_DIR="$SPACED" TMUX="$outer_tmux" \
     tmux -L "$SERVER" -f "$SPACED/configs/tmux.conf" new-session -d -s test
 
-observed="$(TMUX_TMPDIR="$TEST_ROOT/tmux" tmux -L "$SERVER" show-environment -g DOTFILES_DIR)"
+# Theme wiring runs in the background; unwiring finishes by bumping this option.
+for _ in {1..50}; do
+    tmux -L "$SERVER" show-options -gqv @dotfiles_theme_generation | grep -q . && break
+    sleep 0.1
+done
+tmux -L "$SERVER" show-options -gqv @dotfiles_theme_generation | grep -q . \
+    || { echo "FAIL: tmux.conf did not run theme wiring on its own server" >&2; exit 1; }
+tmux -L "$OUTER" show-hooks -g after-select-window | grep -Fq 'theme-switcher' \
+    || { echo "FAIL: theme wiring of a nested server unwired the outer server" >&2; exit 1; }
+
+observed="$(tmux -L "$SERVER" show-environment -g DOTFILES_DIR)"
 [[ "$observed" == "DOTFILES_DIR=$SPACED" ]] || { echo "FAIL: tmux did not capture custom DOTFILES_DIR" >&2; exit 1; }
-if TMUX_TMPDIR="$TEST_ROOT/tmux" tmux -L "$SERVER" show-hooks -g after-select-window \
-    | grep -Fq 'theme-switcher'; then
+if tmux -L "$SERVER" show-hooks -g after-select-window | grep -Fq 'theme-switcher'; then
     echo "FAIL: disabled theme installed tmux hooks" >&2
     exit 1
 fi
