@@ -296,7 +296,8 @@ RDP SERVER (orthogonal - combines with any tier):
                         session. Requires sudo. NOT implied by --full (opens a
                         WSL: listens on localhost:3390 for the Windows host
                         (connect with mstsc). Native: port 3389 — keep it
-                        behind a VPN/firewall. See issues/xrdp-remote-desktop.md.
+                        behind a VPN/firewall. See
+                        docs/history/xrdp-remote-desktop.md.
 
 TAILSCALE AND CLOUD (orthogonal - combine with any tier):
     --tail              Install Tailscale and enable tailscaled under systemd.

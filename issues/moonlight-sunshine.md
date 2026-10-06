@@ -1,7 +1,8 @@
 # Idea: Moonlight/Sunshine game-stream stack as a remote desktop alternative
 
-**Status:** parked — revisit after the xrdp layer (see `xrdp-remote-desktop.md`) has been
-in use for a while and its limitations are felt in practice.
+**Status:** parked — revisit after the xrdp layer (see
+`docs/history/xrdp-remote-desktop.md`) has been in use for a while and its
+limitations are felt in practice.
 
 ## What it is
 
