@@ -167,10 +167,10 @@ command = "second"
 
     def test_retired_files_are_removed_only_when_unmodified(self):
         retired = json.loads((ROOT / 'configs/ai/retired.json').read_text())['claude']
-        clean = self.put('.claude/skills/hone/SKILL.md', 'x')
-        kept = self.put('.claude/skills/modular-dev/SKILL.md', 'locally edited')
+        clean = self.put('.claude/skills/viz/SKILL.md', 'x')
+        kept = self.put('.claude/skills/viz-edited/SKILL.md', 'locally edited')
         import hashlib
-        self.assertIn('skills/hone/SKILL.md', retired)
+        self.assertIn('skills/viz/SKILL.md', retired)
         sys.path.insert(0, str(ROOT / 'lib'))
         import ai_preferences
         digest = hashlib.sha256(b'x').hexdigest()
@@ -179,7 +179,7 @@ command = "second"
         ai_preferences.retire(clean, digest, self.home / '.claude/backups', False)
         self.assertFalse(clean.exists())
         self.assertEqual(len(list((self.home / '.claude/backups').rglob('SKILL.md'))), 1)
-        ai_preferences.retire(kept, retired['skills/modular-dev/SKILL.md'], self.home / '.claude/backups', False)
+        ai_preferences.retire(kept, retired['skills/viz/SKILL.md'], self.home / '.claude/backups', False)
         self.assertTrue(kept.exists())
 
 
