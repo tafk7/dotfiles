@@ -3,7 +3,7 @@
     "commit": "",
     "pr": ""
   },
-  "autoCompactEnabled": false,
+  "autoCompactEnabled": true,
   "effortLevel": "medium",
   "env": {
     "CLAUDE_CODE_DISABLE_MOUSE": "1",
@@ -13,6 +13,5 @@
     "ENABLE_TOOL_SEARCH": "true"
   },
   "skipWorkflowUsageWarning": true,
-  "theme": "dark",
-  "verbose": true
+  "theme": "dark"
 }

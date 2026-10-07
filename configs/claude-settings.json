@@ -13,8 +13,7 @@
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
-  "verbose": true,
-  "autoCompactEnabled": false,
+  "autoCompactEnabled": true,
   "env": {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "ENABLE_TOOL_SEARCH": "true",
