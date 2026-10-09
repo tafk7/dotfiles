@@ -5,6 +5,11 @@ operator's startup files, use the default tmux server, install packages, rotate
 real backups, or register plugins in a real CLI profile. Host-mutating commands
 (APT, sudo, services, groups, Docker, KVM, `sbx`) are faked.
 
+tmux binding tests use `tests/lib/tmux-keys.sh`: an isolated server loaded
+with `configs/tmux.conf`, a client attached through `script` inside a second
+server, raw key sequences typed as WezTerm sends them, and a logging stub that
+stands in for Claude, Codex, or OpenCode by name.
+
 Run the suite (CI runs the same set, discovering every `tests/*.sh`):
 
 ```bash
