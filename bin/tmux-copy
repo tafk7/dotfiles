@@ -1,58 +1,88 @@
 #!/usr/bin/env bash
-# Copy a tmux selection to the local system clipboard via OSC 52, size-gated.
+# Export tmux copies to the client clipboard via OSC 52, size-gated.
 #
 # Why not `set -g set-clipboard on`: over Windows -> ssh -> Linux, OSC 52 is the
 # only clipboard path (no clip.exe, wl-copy, or reachable X display), but tmux's
 # own OSC 52 has no size limit. A large selection becomes one huge escape
 # sequence that stalls the terminal for seconds. So tmux stays out of it
-# (`set-clipboard off`) and the copy bindings pipe here, where the payload is
+# (`set-clipboard off`) and every copy comes here, where the payload is
 # bounded. Over the limit the clipboard is skipped with a message; the tmux
 # buffer is always set, so prefix+p pastes at any size.
 #
-# `off` is also safer with agents running: with `on`, any program writing to a
-# pane can set the system clipboard.
+# Usage:
+#     tmux-copy [--always]          copy-mode copies (tmux copy-command; stdin)
+#     tmux-copy --hook NAME         buffers loaded from outside (after-load-buffer)
+#     tmux-copy --buffer [--notify] export the newest buffer now (prefix+e)
+#
+# The hook passes the load's -b name and exports only automatic buffers (no
+# name), so named ones, such as compose pastes, stay in tmux. The first two
+# modes do nothing while @clipboard-export is off (Pause / prefix+E); --always
+# and --buffer ignore it.
+#
+# Turning export off is a latency switch, not a security boundary: tmux has
+# allow-passthrough on, so any program in a pane can already set the clipboard
+# with a passthrough-wrapped OSC 52, which is how Codex and OpenCode copy.
 #
 # Limit is @clipboard-limit (bytes of raw text, before base64). Retune live:
 #     tmux set -g @clipboard-limit 32768
 # Terminals drop sequences above roughly 100 KB (about 75 KB of text), so larger
 # limits only add latency.
-#
-# Usage: as a tmux copy-pipe target --
-#     bind -T copy-mode-vi y send -X copy-pipe-and-cancel "…/bin/tmux-copy"
-# The tmux bindings only invoke this helper when @clipboard-osc52 is `on`.
-#
-# Or explicitly export tmux's newest buffer with feedback --
-#     tmux-copy --buffer --notify
 
 set -uo pipefail
 
 DEFAULT_LIMIT=65536
 
-read_buffer=false
+mode=stdin
+always=false
 notify=false
-for arg in "$@"; do
-    case "$arg" in
-        --buffer) read_buffer=true ;;
+hook_buffer=
+while (($#)); do
+    case "$1" in
+        --always) always=true ;;
+        --buffer) mode=buffer ;;
         --notify) notify=true ;;
+        --hook)
+            mode=hook
+            hook_buffer=${2:-}
+            shift
+            ;;
         *)
-            tmux display-message "clipboard export: unknown option $arg" 2>/dev/null
+            tmux display-message "clipboard export: unknown option $1" 2>/dev/null
             exit 2
             ;;
     esac
+    shift
 done
+
+export_enabled() {
+    [[ "$always" == true || "$mode" == buffer ]] && return 0
+    [[ "$(tmux show -gv @clipboard-export 2>/dev/null)" != off ]]
+}
+
+case "$mode" in
+    stdin)
+        if ! export_enabled; then
+            cat >/dev/null
+            exit 0
+        fi
+        payload=$(cat)
+        ;;
+    hook)
+        [[ -z "$hook_buffer" ]] || exit 0
+        export_enabled || exit 0
+        payload=$(tmux show-buffer 2>/dev/null) || exit 0
+        ;;
+    buffer)
+        if ! payload=$(tmux show-buffer 2>/dev/null); then
+            tmux display-message "clipboard export: tmux buffer is empty" 2>/dev/null
+            exit 1
+        fi
+        ;;
+esac
+size=${#payload}
 
 limit=$(tmux show -gv @clipboard-limit 2>/dev/null)
 [[ "$limit" =~ ^[0-9]+$ ]] || limit=$DEFAULT_LIMIT
-
-if [[ "$read_buffer" == true ]]; then
-    if ! payload=$(tmux show-buffer 2>/dev/null); then
-        tmux display-message "clipboard export: tmux buffer is empty" 2>/dev/null
-        exit 1
-    fi
-else
-    payload=$(cat)
-fi
-size=${#payload}
 
 if (( size > limit )); then
     tmux display-message \

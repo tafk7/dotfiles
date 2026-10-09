@@ -101,9 +101,10 @@ yo <command>              # print output and copy it to the clipboard
 ### Terminal and tmux
 
 - **tmux:** `Alt+Copy` enters copy mode and copies the selection, and
-  `Alt+Paste` pastes the tmux buffer. `<prefix> e` sends the buffer to the
-  client clipboard (up to 64 KiB). OSC 52 is off by default; turn it on with
-  `tmux set -g @clipboard-osc52 on`.
+  `Alt+Paste` pastes the tmux buffer. Every copy, including nvim yanks and
+  shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB).
+  Pause or `<prefix> E` turns that off (`CLIP OFF` shows in the status bar);
+  `<prefix> e` still sends the buffer.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.

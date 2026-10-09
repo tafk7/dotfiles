@@ -71,7 +71,7 @@ yo() (
     if command -v pbcopy >/dev/null 2>&1; then
         clipboard=(pbcopy)
     elif [[ -n "${TMUX:-}" && -x "${DOTFILES_DIR:-}/bin/tmux-copy" ]]; then
-        clipboard=("$DOTFILES_DIR/bin/tmux-copy")
+        clipboard=("$DOTFILES_DIR/bin/tmux-copy" --always)
     elif [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
         clipboard=(wl-copy)
     elif [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then

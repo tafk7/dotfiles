@@ -15,8 +15,12 @@
 #   tk_input LOG                  what a stub received, through `cat -v`
 #   tk_wait FORMAT VALUE [PANE]   poll a format until it expands to VALUE
 #   tk_until COMMAND...           retry COMMAND for up to five seconds
+#   tk_expect WANT LABEL CMD...   retry until CMD prints WANT
+#   tk_contains / tk_lacks TEXT CMD...   whether CMD's output contains TEXT
 #   tk_screen_has TEXT [PANE]     whether TEXT is on the pane's screen
+#   tk_client_screen              what the client shows, status line included
 #   tk_mark / tk_osc52            OSC 52 payloads written since the mark
+#   TK_TMUX                       $TMUX value for commands run "inside" tmux
 
 # shellcheck source=tests/lib/harness.sh
 source "$(dirname "${BASH_SOURCE[0]}")/harness.sh"
@@ -48,12 +52,8 @@ tk_start() {
     ti -f "$TK_CONFIG" new-session -d -s test -x 120 -y 40 'exec sleep 3600'
     tmux -L "$TK_OUTER" -f /dev/null new-session -d -s outer -x 120 -y 41 \
         "env -u TMUX TERM=xterm-256color script -qfc 'tmux -L $TK_INNER attach -t test' '$TK_LOG'"
-    local _
-    for _ in {1..50}; do
-        [[ -n "$(ti list-clients -F x 2>/dev/null)" ]] && return 0
-        sleep 0.1
-    done
-    fail "the test client never attached"
+    tk_until tk_contains x ti list-clients -F x || fail "the test client never attached"
+    TK_TMUX=$(ti display-message -p '#{socket_path},#{pid},0')
 }
 
 tk_raw() {
@@ -97,19 +97,40 @@ tk_until() {
     return 1
 }
 
+tk_expect() {
+    local want="$1" label="$2" got _
+    shift 2
+    for _ in {1..50}; do
+        got=$("$@" 2>/dev/null || true)
+        [[ "$got" == "$want" ]] && return 0
+        sleep 0.1
+    done
+    fail "$label: expected '$want', got '$got'"
+}
+
+tk_contains() {
+    local text="$1"
+    shift
+    [[ "$("$@" 2>/dev/null)" == *"$text"* ]]
+}
+
+tk_lacks() { ! tk_contains "$@"; }
+
+tk_client_screen() { tmux -L "$TK_OUTER" capture-pane -p -t outer; }
+
 tk_screen_has() { [[ "$(ti capture-pane -p ${2:+-t "$2"})" == *"$1"* ]]; }
 
 tk_mark() { TK_MARK=$(stat -c %s "$TK_LOG"); }
 
-# Print each OSC 52 payload written to the client since the mark, NUL-terminated.
+# Print each OSC 52 payload written to the client since the mark, one per line.
 tk_osc52() {
     python3 - "$TK_LOG" "$TK_MARK" <<'PY'
 import base64, re, sys
 data = open(sys.argv[1], "rb").read()[int(sys.argv[2]):]
 for match in re.finditer(rb"\x1b\]52;[^;]*;([A-Za-z0-9+/=]*)(?:\x07|\x1b\\)", data):
-    sys.stdout.buffer.write(base64.b64decode(match.group(1)) + b"\0")
+    sys.stdout.buffer.write(base64.b64decode(match.group(1)) + b"\n")
 PY
 }
 
-# Most recent status message shown to a client.
-tk_last_message() { ti show-messages | tail -n1; }
+# Most recent status message shown to a client (the log is newest first).
+tk_last_message() { ti show-messages | grep -m1 ' message: ' || true; }
