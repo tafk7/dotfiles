@@ -77,7 +77,9 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 11. **OpenCode's `C-x y` copies the last reply** without a selection, through
     OSC 52 only (spike).
 12. **Alt+C is fzf's directory-jump widget** in both shells (`fzf --bash`,
-    `fzf --zsh`, configured in `shell/fzf.sh`), not readline's capitalize-word.
+    `fzf --zsh`, configured in `shell/fzf.sh`), so compose uses Alt+V, which is
+    unbound in bash, zsh, tmux, WezTerm, Claude (on Linux), Codex, and
+    OpenCode.
 
 ---
 
@@ -112,7 +114,7 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 | Alt+1…0 | Window 1–10 |
 | Alt+W / Alt+R | Previous / next window; retire after the transition, which frees Alt+R for Codex |
 | Alt+Shift+W / Alt+Shift+T | Window picker / new window after this one |
-| **Alt+C** ★ | Open or focus the compose pane (§5) |
+| **Alt+V** ★ | Open or focus the compose pane (§5) |
 
 ### 3.2 Browse (live)
 
@@ -240,7 +242,7 @@ history; OpenCode's review is already nvim.
 │   conversation …                             │  the prompt floats at the bottom
 │   ❯ <pasted prompt>                          │  where Send lands
 ├──────────────────────────────────────────────┤
-│ compose pane (30%): nvim, prose profile      │  Alt+C opens or focuses
+│ compose pane (30%): nvim, prose profile      │  Alt+V opens or focuses
 │   spell, harper-ls, Ctrl+L fixes last typo   │  Ctrl+S sends
 └──────────────────────────────────────────────┘
 ```
@@ -249,7 +251,7 @@ history; OpenCode's review is already nvim.
 
 | Key | Where | Action |
 |---|---|---|
-| Alt+C | any pane | No compose pane for this pane: split below (`@compose-size`, default 30%) and open the draft. Otherwise move focus between the pane and its compose pane |
+| Alt+V | any pane | No compose pane for this pane: split below (`@compose-size`, default 30%) and open the draft. Otherwise move focus between the pane and its compose pane |
 | Ctrl+S | compose, insert and normal mode | Write the draft, paste it into the target with a bracketed paste, submit with the target's non-interrupting key, clear the buffer, and append the text to the compose history |
 | `,s` | compose, normal mode | Stage: paste without submitting |
 | PgUp/PgDn, Ctrl+Home/End | compose | Sent to the target, so the conversation scrolls without leaving the editor |
@@ -266,9 +268,12 @@ history; OpenCode's review is already nvim.
   on the compose pane, `@compose_pane` on the target). If the target is gone,
   Send reports it and keeps the draft.
 - Drafts live in `${XDG_STATE_HOME:-~/.local/state}/dotfiles/compose/`, one per
-  target pane, with a shared history file of sent prompts.
-- The paste uses `set-buffer -b compose-<pid>` and `paste-buffer -p -d`, so it
-  neither fires the export hook nor leaves a buffer behind.
+  target pane (keyed by server start time and pane ID, so a restarted server
+  never reopens another pane's draft), with a shared history file of sent
+  prompts.
+- The paste uses a named buffer (`load-buffer -b compose-<pid>`, then
+  `paste-buffer -p -d`), which the export hook ignores and which is deleted
+  after the paste.
 - Long pastes may appear as a placeholder in the agent's prompt; the text is
   intact. OpenCode can show it in full with `prompt.paste: "full"`.
 - Nothing waits on the editor, so a killed compose pane cannot hang the agent.
@@ -295,68 +300,15 @@ config; ordinary nvim, `git commit`, and other editors are unchanged.
 
 ## 6. Phases
 
-Each phase is one commit or a small series, lands with the suite green, and is
-independently revertible. Develop in a worktree; never run setup against the
-live HOME.
+The step-by-step execution plan, with tests and adoption checks, is in
+[scrollback-copy-compose-plan.md](scrollback-copy-compose-plan.md).
 
-### Phase 1 — Clipboard export
-
-- `configs/tmux.conf`: `@clipboard-export on`; `after-load-buffer` hook
-  filtered to `buffer[0-9]+`; copy-mode and Alt+mouse copies pipe through
-  `tmux-copy` while export is on; Pause / `C-a E` toggle with a status-line
-  marker while off; retire `@clipboard-osc52`.
-- `bin/tmux-copy`: accept a buffer name; correct the security comment.
-- Tests (`tests/tmux-config.sh` pattern, isolated server): hook exports
-  automatic buffers only; toggle suppresses hook and copy-mode exports;
-  `C-a e` ignores the toggle; size gate.
-
-**Done when** every source in §4 reaches the expected destinations in the test
-harness.
-
-### Phase 2 — Fullscreen and mouse
-
-- `configs/claude-settings.json`: `"tui": "fullscreen"`; drop
-  `CLAUDE_CODE_DISABLE_MOUSE`.
-- `configs/ai/claude/keybindings.json`: reduce to real overrides; bind
-  `ctrl+insert` to `selection:copy` in `Scroll`.
-- `configs/tmux.conf`: focus-only click on inactive panes; unbind
-  `C-MouseDown1Pane`.
-- Tests: `tests/ai-config.py` for the settings; tmux test for the click rule.
-
-### Phase 3 — Navigation and review
-
-- `configs/tmux.conf`: Alt+E/S/D/F and Alt+arrows edge crossing; PgUp and
-  Ctrl+Home routing; ScrollLock and `C-a v` review; review key table (§3.3);
-  `pane-mode-changed` hook returning Claude to fullscreen.
-- `bin/tmux-review` ★: per-app dispatch, the Claude dump with a "loading
-  transcript…" message and a 10 s timeout, and the `o` popup.
-- `configs/codex.toml`: pager E/D and `ctrl-home`/`ctrl-end`.
-- OpenCode `cli.json` ★ (reconciled by `bin/ai-config` like `opencode.json`):
-  `session.first`/`session.last` on `ctrl+home`/`ctrl+end`. Tab switching keeps
-  its `ctrl+tab` / `ctrl+shift+tab` defaults; drop the unreachable
-  `alt+up`/`alt+down`.
-- Done early, with the Copy key: `configs/wezterm.lua` maps firmware F17/F18
-  (the ScrollLock and Pause positions) to Shift+F5/F6 and forwards Copy when
-  WezTerm has no selection; `configs/tmux.conf` routes `C-IC` (copy-mode copy,
-  Claude passthrough, swallowed elsewhere), binds Shift+F5 to a copy-mode
-  toggle, and reserves Shift+F6. This phase replaces the Shift+F5 toggle with
-  the review dispatch and adds `configs/windows-terminal-keybindings.jsonc`
-  equivalents.
-- Shell prompt: emit OSC 133 prompt marks.
-- `shell/shortcuts-index.tsv`: rows for everything above.
-- Tests: dispatch per `pane_current_command` with stub panes; edge crossing;
-  review key table; `D` no longer copies.
-
-### Phase 4 — Compose pane and prose profile
-
-- `bin/tmux-compose` ★: `toggle`, `send`, `stage`, `forward`.
-- `configs/tmux.conf`: Alt+C.
-- `configs/init.vim` hook and `configs/nvim/lua/dotfiles/prose.lua`.
-- `lib/registry.sh` and `eget.toml`: pinned `harper-ls` row with the `ai`
-  capability.
-- Tests: toggle and pane options; send per target with a stub pane; drafts
-  survive close; Send to a dead target keeps the draft; normal nvim does not
-  load the layer.
+| Phase | Delivers |
+|---|---|
+| 1 | Clipboard export: one copy path, the export hook, the Pause / `C-a E` toggle |
+| 2 | Claude fullscreen with mouse capture; trimmed keybindings; focus-only clicks |
+| 3 | Alt+E/S/D/F edge crossing, browse keys, review dispatch and key table, agent keymaps, prompt marks |
+| 4 | harper-ls; the Alt+V compose pane and prose profile |
 
 ### Phase 5 — Parked: popup transcript viewer
 
@@ -387,5 +339,3 @@ limit or the app-side viewers prove insufficient.
    nothing). The keyboard firmware sends F17/F18 from those positions instead;
    `configs/wezterm.lua` maps them to Shift+F5/F6, and tmux binds those.
    Pending: the firmware change, and whether Windows Terminal binds F17/F18.
-2. **Compose key:** Alt+C displaces fzf's directory jump in shells (§1.2.12).
-   Either move that widget to another key or compose on a different one.
