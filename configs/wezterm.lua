@@ -83,10 +83,19 @@ config.keys = {
   },
 
   -- Native Windows clipboard. Ctrl+C/Ctrl+V remain available to applications.
+  -- Mouse selections already copy on release, so the Copy key only copies a
+  -- WezTerm selection made otherwise. With none, it goes to tmux, which copies
+  -- its copy-mode selection or hands the key to Claude.
   {
     key = 'Insert',
     mods = 'CTRL',
-    action = act.CopyTo 'Clipboard',
+    action = wezterm.action_callback(function(window, pane)
+      if window:get_selection_text_for_pane(pane) ~= '' then
+        window:perform_action(act.CopyTo 'Clipboard', pane)
+      else
+        window:perform_action(act.SendKey { key = 'Insert', mods = 'CTRL' }, pane)
+      end
+    end),
   },
   {
     key = 'Insert',
@@ -137,6 +146,20 @@ config.keys = {
     key = 'Delete',
     mods = 'ALT|SHIFT',
     action = act.SendString '\x1b[1;2S',
+  },
+
+  -- Review and clipboard-export keys. WezTerm never receives ScrollLock or
+  -- Pause, so the keyboard firmware sends F17/F18 from those positions. They
+  -- travel as Shift+F5/F6, clear of the Shift+F1-F4 cut transport above.
+  {
+    key = 'F17',
+    mods = 'NONE',
+    action = act.SendString '\x1b[15;2~',
+  },
+  {
+    key = 'F18',
+    mods = 'NONE',
+    action = act.SendString '\x1b[17;2~',
   },
 
   -- Client utilities retained from the Windows Terminal surface.
