@@ -56,7 +56,8 @@ says *how*, in order. Section references (§) point into the spec.
     `M-MouseDragEnd1Pane`, and the root and copy-mode `M-DoubleClick1Pane` /
     `M-TripleClick1Pane`.
   - `set-hook -g after-load-buffer` runs
-    `"$DOTFILES_DIR/bin/tmux-copy" --hook "#{buffer_name}"` in the background.
+    `"$DOTFILES_DIR/bin/tmux-copy" --hook "#{hook_flag_b}"` in the background
+    (`#{buffer_name}` turned out to be the newest automatic buffer).
   - `bind E` and `bind -n S-F6` toggle `@clipboard-export` with a message,
     replacing the reserved Shift+F6 placeholder.
   - `status-right` gains a reverse-video `CLIP OFF` marker while off. Check
@@ -65,8 +66,8 @@ says *how*, in order. Section references (§) point into the spec.
 - `bin/tmux-copy`:
   - **stdin mode** (copy-pipe): drains stdin, exports only while
     `@clipboard-export` is on; `--always` overrides.
-  - **`--hook NAME`**: exports only `buffer[0-9]+` names while on, reading
-    `show-buffer -b NAME`.
+  - **`--hook NAME`**: NAME is the load's `-b` name; exports only unnamed
+    loads while on, reading `show-buffer`.
   - **`--buffer [--notify]`**: explicit export, ignores the toggle (`C-a e`).
   - Header rewritten: the size gate, the toggle, and that `allow-passthrough`
     already lets any pane set the clipboard (§1.2.1), replacing the "off is

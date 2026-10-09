@@ -41,8 +41,10 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
    unbounded and skips the tmux buffer, because `allow-passthrough` is on
    (spike). Any program in a pane can therefore already set the Windows
    clipboard, so the "off is safer" claim in `bin/tmux-copy` is wrong.
-2. **`after-load-buffer` fires for every external `tmux load-buffer`** and
-   expands `#{buffer_name}`; it does not fire for copy-mode copies (spike).
+2. **`after-load-buffer` fires for every external `tmux load-buffer`**; it
+   does not fire for copy-mode copies (spike). In the hook, `#{buffer_name}`
+   is the newest automatic buffer, not the loaded one; `#{hook_flag_b}` holds
+   the `-b` name (test).
    Producers: Claude, nvim (its clipboard provider resolves to tmux), shell cut
    widgets.
 3. **Fullscreen keeps the prompt live while scrolling.** In Claude, PgUp
@@ -226,8 +228,8 @@ history; OpenCode's review is already nvim.
   Off stops only the ★ exports; the apps' own OSC 52 still goes through.
   Disabling `allow-passthrough` would stop those too, at the cost of every
   Codex and OpenCode copy.
-- The hook exports only automatically named buffers (`buffer[0-9]+`), so
-  named buffers such as compose pastes never reach the Windows clipboard.
+- The hook skips loads with a `-b` name, so named buffers such as compose
+  pastes never reach the Windows clipboard.
 - Exports run in the background and skip anything over `@clipboard-limit`
   (64 KB). If WezTerm stalls on large sequences, lower the limit before turning
   the export off.

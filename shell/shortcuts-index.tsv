@@ -74,17 +74,18 @@ tmux│Ctrl+a $│Rename current session│command-prompt rename-session
 tmux│Ctrl+a v│Toggle transcript view without changing scroll position│copy-mode / cancel
 tmux│v│Toggle the single tmux highlight in transcript view│begin-selection / clear-selection
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
-tmux│Alt+Copy / y│Enter copy mode or copy selection to the tmux buffer│C-M-Insert / copy-selection
-tmux│Copy│Copy the copy-mode selection; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection)
+tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
+tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection)
 tmux│ScrollLock key│Toggle transcript view (keyboard firmware sends F17)│Shift+F5 → copy-mode / cancel
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
 tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M
-tmux│Alt+mouse drag│Copy directly to the tmux buffer on release│copy-selection-and-cancel
-tmux│Alt+double-click│Copy clicked word directly to tmux buffer│select-word; copy-selection-and-cancel
-tmux│Alt+triple-click│Copy clicked line directly to tmux buffer│select-line; copy-selection-and-cancel
+tmux│Alt+mouse drag│Copy to the tmux buffer and clipboard on release│copy-pipe-and-cancel
+tmux│Alt+double-click│Copy clicked word to the tmux buffer and clipboard│select-word; copy-pipe-and-cancel
+tmux│Alt+triple-click│Copy clicked line to the tmux buffer and clipboard│select-line; copy-pipe-and-cancel
 tmux│Shift+mouse drag│Select natively in Windows Terminal│client-side selection
 tmux│Ctrl+a p│Paste from tmux buffer with bracketed-paste markers when supported│paste-buffer -p
-tmux│Ctrl+a e│Export current tmux buffer to the client/Windows clipboard│size-gated OSC 52 export
+tmux│Ctrl+a e│Export current tmux buffer to the client/Windows clipboard, even with export off│size-gated OSC 52 export
+tmux│Pause key / Ctrl+a E│Toggle automatic clipboard export; CLIP OFF shows while off│Shift+F6 (firmware F18) → @clipboard-export
 # Utility
 tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
 tmux│Ctrl+a R│Force current window to attached-client size and resume automatic sizing│resize-window -A; setw window-size latest; refresh-client

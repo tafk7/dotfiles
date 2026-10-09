@@ -46,7 +46,7 @@ tk_raw "$REVIEW"
 tk_wait '#{pane_in_mode}' 0
 assert_eq "$(tk_input "$app_log")" 'x' "review key leaked to the app"
 
-# Pause is swallowed.
+# Pause stays in tmux (it toggles clipboard export).
 tk_raw "${PAUSE}y"
 tk_until grep -q y "$app_log" || fail "app stub got no input"
 assert_eq "$(tk_input "$app_log")" 'xy' "Pause key leaked to the app"
