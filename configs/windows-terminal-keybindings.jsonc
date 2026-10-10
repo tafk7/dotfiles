@@ -60,6 +60,26 @@
                 "input": "\u001b[1;2S"
             },
             "id": "User.TmuxCutForwardLine"
+        },
+
+        // The keyboard firmware sends F17/F18 from the ScrollLock and Pause
+        // positions. They travel as Shift+F5/F6 (tmux review and the clipboard
+        // export toggle), clear of the Shift+F1-F4 cut transport above.
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[15;2~"
+            },
+            "id": "User.TmuxReview"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[17;2~"
+            },
+            "id": "User.TmuxClipboardToggle"
         }
     ],
 
@@ -118,6 +138,16 @@
         {
             "id": "User.TmuxCutForwardLine",
             "keys": "alt+shift+delete"
+        },
+
+        // ScrollLock and Pause positions (firmware F17/F18).
+        {
+            "id": "User.TmuxReview",
+            "keys": "f17"
+        },
+        {
+            "id": "User.TmuxClipboardToggle",
+            "keys": "f18"
         },
 
         // Ctrl+C must remain interrupt/cancel and Ctrl+V must reach Vim/TUIs.

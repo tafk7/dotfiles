@@ -194,9 +194,9 @@ says *how*, in order. Section references (§) point into the spec.
   `lib/ai_preferences.py` into `~/.config/opencode/cli.json`, only when the V2
   CLI is detected, preserving everything else OpenCode writes there.
   Keybinds: `session.first` `ctrl+home,ctrl+g,home,alt+home`, `session.last`
-  `ctrl+end,ctrl+alt+g,end`, `session.tab.next` `ctrl+tab`,
-  `session.tab.previous` `ctrl+shift+tab`. `tests/ai-config.py` covers the
-  merge, preservation, and skipping on V1.
+  `ctrl+end,ctrl+alt+g,end`. Ctrl+Tab is already the default for
+  `session.tab.next`, so the tab keys aren't overridden. `tests/ai-config.py`
+  covers the merge, preservation, and skipping on V1.
 - `shell/init.sh`: in interactive shells only, mark each prompt with OSC 133
   (`\e]133;A\e\\`): bash appends a `PROMPT_COMMAND` step after Starship's that
   prefixes `PS1`; zsh adds a `precmd` function after Starship's. Fork-free.

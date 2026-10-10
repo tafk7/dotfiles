@@ -54,6 +54,7 @@ custom_binding = "ctrl-k"
         self.assertEqual(c['projects']['/a.b/#project']['trust_level'], 'trusted')
         self.assertTrue(c['tui']['screen_reader_detection_done'])
         self.assertEqual(c['tui']['keymap']['global'], {'open_external_editor': 'ctrl-e', 'custom_binding': 'ctrl-k'})
+        self.assertEqual(c['tui']['keymap']['pager']['jump_top'], ['home', 'ctrl-home'])
         d = json.loads(claude.read_text())
         self.assertEqual(d['env']['LOCAL_VALUE'], 'keep')
         self.assertEqual(d['permissions'], {'defaultMode': 'manual'})
@@ -97,6 +98,20 @@ custom_binding = "ctrl-k"
         self.run_config('opencode')
         self.run_config('opencode', '--check')
         self.assertEqual(before, self.snapshot())
+
+    def test_opencode_v2_keybinds_merge_into_cli_json(self):
+        cli_json = self.put('.config/opencode/cli.json', '{"theme":{"name":"mine"},"keybinds":{"messages.copy":"<leader>w"}}')
+        self.run_config('opencode')
+        self.assertEqual(json.loads(cli_json.read_text())['keybinds'], {'messages.copy': '<leader>w'})
+        cli = self.put('.local/bin/opencode', '#!/bin/sh\necho "opencode v2.0.22"\n')
+        cli.chmod(0o755)
+        self.run_config('opencode')
+        data = json.loads(cli_json.read_text())
+        self.assertEqual(data['theme'], {'name': 'mine'})
+        self.assertEqual(data['keybinds']['messages.copy'], '<leader>w')
+        self.assertTrue(data['keybinds']['session.first'].startswith('ctrl+home,'))
+        self.assertTrue(data['keybinds']['session.last'].startswith('ctrl+end,'))
+        self.run_config('opencode', '--check')
 
     def test_mod_plugins_require_the_claude_floor(self):
         import shutil
