@@ -121,10 +121,11 @@ says *how*, in order. Section references (§) point into the spec.
 ### 3.1 Pane and window navigation, browse keys
 
 - `configs/tmux.conf`:
-  - `M-s`/`M-Left`: at `pane_at_left`, if not `window_start_flag`, run
-    `previous-window` then `select-pane -t '{right}'`; at the first window,
-    show a message. Otherwise `select-pane -L`. `M-f`/`M-Right` mirror it with
-    `window_end_flag` and `{left}`.
+  - `M-s`/`M-Left`: at `pane_at_left`, run `previous-window` then
+    `select-pane -t '{right}'` (wrapping; a lone window stays put). Otherwise
+    `select-pane -L`. `M-f`/`M-Right` mirror it with `{left}`. `M-S`/`M-F`
+    select the first and last window. (First built to stop at the ends;
+    changed to wrap after the live test.)
   - `M-e`/`M-d`/`M-Up`/`M-Down`: move only when not at the edge. Today they
     wrap; this is a deliberate change.
   - `PPage` (root): `alternate_on` → forward; otherwise `copy-mode -eu`. Test
@@ -133,9 +134,10 @@ says *how*, in order. Section references (§) point into the spec.
     `history-top`.
   - Alt+W/R unchanged; their removal is a separate later commit when you ask.
 - `tests/tmux-navigation.sh` ★: two windows × two panes; edge crossing lands
-  on the facing pane; wraps past the first and last window (changed after the live test); vertical moves stop
-  at the edge; PgUp in a shell enters copy-mode scrolled up; PgUp and
-  Ctrl+Home in an alternate-screen stub reach the stub.
+  on the facing pane; wraps past the first and last window; Alt+Shift+S/F
+  reach the ends; vertical moves stop at the edge; PgUp in a shell enters
+  copy-mode scrolled up; PgUp and Ctrl+Home in an alternate-screen stub reach
+  the stub.
 - `shell/shortcuts-index.tsv`: navigation and browse rows.
 
 ### 3.2 Review
@@ -209,6 +211,25 @@ says *how*, in order. Section references (§) point into the spec.
 - `configs/windows-terminal-keybindings.jsonc`: `sendInput` actions on `f17` and
   `f18`, matching `wezterm.lua`.
 
+### 3.4 Copy the last reply (`C-a y`)
+
+Added after the Phase 3 live test; it was in the spec (§3.6) but no step.
+
+| Pane | `C-a y` | Reaches |
+|---|---|---|
+| `claude` | Find the Claude process whose stdin is the pane's tty, read `sessions/<pid>.json` under its `CLAUDE_CONFIG_DIR` (default `~/.claude`) for the session, take the last main-thread assistant message with text from `projects/*/<session>.jsonl`, `load-buffer` it | tmux buffer; clipboard through the export hook. The prompt draft is untouched |
+| `codex` | send `Ctrl+O` (its Copy) | clipboard only (its OSC 52) |
+| `opencode` | send `C-x y` (its Copy message) | clipboard only (its OSC 52) |
+| anything else | message, nothing sent | — |
+
+- `bin/tmux-last-reply` ★ (Python); `bind y` in `configs/tmux.conf`.
+- `tests/tmux-last-reply.sh` ★: a Claude stub with a session record and a
+  transcript (older reply, a reply split over text blocks, thinking and tool
+  calls after it, a subagent's reply) yields exactly the reply's text in the
+  buffer and as OSC 52, and nothing typed into Claude; the Codex and
+  OpenCode stubs receive their keys; a plain pane gets a message.
+- `shell/shortcuts-index.tsv`: the `C-a y` row.
+
 **Done when** all Phase 3 tests pass, startup doesn't regress, and the manual
 Phase 3 checks pass.
 
@@ -271,7 +292,7 @@ After each phase is fast-forwarded into the live checkout:
 |---|---|---|
 | 1 | `C-a r` | tmux copy, nvim yank, shell cut, and Claude copy all reach the Windows clipboard; Pause / `C-a E` toggles and the marker shows; a >64 KB copy shows the skip message |
 | 2 | `bin/ai-config`; restart Claude sessions (`/tui` reports fullscreen) | drag-select in Claude copies to both destinations; clicking an inactive Claude pane only focuses it; wheel scrolls Claude |
-| 3 | `C-a r`; `bin/ai-config`; new shells | Alt+S/F cross windows; ScrollLock (or `C-a v`) reviews shell, Claude, Codex, OpenCode panes; `q` returns Claude to fullscreen; `o` opens the popup; Codex pager `e`/`d`; OpenCode Ctrl+Home/End and Ctrl+Tab; prompt jumps in a shell pane |
+| 3 | `C-a r`; `bin/ai-config`; new shells | Alt+S/F cross windows; ScrollLock (or `C-a v`) reviews shell, Claude, Codex, OpenCode panes; `q` returns Claude to fullscreen; `o` opens the popup; Codex review opens its search; OpenCode review opens the export in the popup; OpenCode Ctrl+Home/End and Ctrl+Tab; prompt jumps in a shell pane; `C-a y` in each agent |
 | 4 | `./setup.sh --ai --dry-run`, then for real; `C-a r` | Alt+V opens compose under Claude, Codex and OpenCode; Ctrl+S submits without interrupting a running turn; spelling and grammar marks appear; Alt+V toggles focus |
 
 Pending outside the repo: the keyboard firmware change (F17/F18), and whether

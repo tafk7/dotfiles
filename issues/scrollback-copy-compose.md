@@ -323,7 +323,7 @@ The step-by-step execution plan, with tests and adoption checks, is in
 |---|---|
 | 1 | Clipboard export: one copy path, the export hook, the Pause / `C-a E` toggle |
 | 2 | Claude fullscreen with mouse capture; trimmed keybindings; focus-only clicks |
-| 3 | Alt+E/S/D/F edge crossing, browse keys, review dispatch and key table, agent keymaps, prompt marks |
+| 3 | Alt+E/S/D/F edge crossing, browse keys, review dispatch and key table, agent keymaps, prompt marks, `C-a y` |
 | 4 | harper-ls; the Alt+V compose pane and prose profile |
 
 ### Phase 5 — Parked: popup transcript viewer
