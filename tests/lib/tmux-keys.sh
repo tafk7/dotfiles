@@ -13,7 +13,7 @@
 #   tk_esc                        type a lone Esc and let tmux take it as Escape
 #   tk_stub NAME LOG [ARGS...]    pane command running the logging stub as NAME
 #   tk_ready LOG                  wait until that stub is reading raw input
-#   tk_input LOG                  what a stub received, through `cat -v`
+#   tk_input LOG                  what a stub received, through `cat -vT`
 #   tk_wait FORMAT VALUE [PANE]   poll a format until it expands to VALUE
 #   tk_until COMMAND...           retry COMMAND for up to five seconds
 #   tk_expect WANT LABEL CMD...   retry until CMD prints WANT
@@ -84,7 +84,7 @@ tk_stub() {
 
 tk_ready() { tk_until test -e "$1.ready" || fail "stub for $1 never started"; }
 
-tk_input() { cat -v -- "$1"; }
+tk_input() { cat -vT -- "$1"; }
 
 tk_wait() {
     local format="$1" want="$2" pane="${3:-}" got _

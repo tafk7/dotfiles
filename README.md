@@ -105,9 +105,10 @@ yo <command>              # print output and copy it to the clipboard
   shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB).
   Pause or `<prefix> E` turns that off (`CLIP OFF` shows in the status bar);
   `<prefix> e` still sends the buffer. ScrollLock or `<prefix> v` reviews a
-  pane: copy mode for shells and Claude's transcript, the pager in Codex, the
-  editor view in OpenCode. In review, E/S/D/F move, Shift selects, `/`
-  searches upward, and `o` opens the history in nvim.
+  pane: copy mode for shells and Claude's transcript, transcript search in
+  Codex, the exported session in an nvim popup for OpenCode. In review,
+  E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
+  in nvim.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.

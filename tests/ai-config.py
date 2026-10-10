@@ -54,7 +54,6 @@ custom_binding = "ctrl-k"
         self.assertEqual(c['projects']['/a.b/#project']['trust_level'], 'trusted')
         self.assertTrue(c['tui']['screen_reader_detection_done'])
         self.assertEqual(c['tui']['keymap']['global'], {'open_external_editor': 'ctrl-e', 'custom_binding': 'ctrl-k'})
-        self.assertEqual(c['tui']['keymap']['pager']['jump_top'], ['home', 'ctrl-home'])
         d = json.loads(claude.read_text())
         self.assertEqual(d['env']['LOCAL_VALUE'], 'keep')
         self.assertEqual(d['permissions'], {'defaultMode': 'manual'})

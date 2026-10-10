@@ -25,23 +25,47 @@ tk_until grep -q $'\e' "$hook_log" || fail "leaving review did not send Esc to t
 assert_eq "$(ti show -pqv -t "$right" @review)" "" "@review survived leaving review"
 ti kill-pane -t "$right"
 
-# Codex opens its pager, OpenCode its editor view; a shell gets copy-mode.
+# The popup's nvim records how it was started and what it was shown.
+nvim_log="$TEST_ROOT/nvim.log"
+cat > "$TEST_ROOT/bin/nvim" <<EOF
+#!/bin/bash
+file=\${@: -1}
+{
+    printf 'args=%s\n' "\$*"
+    printf 'review=%s\n' "\$NVIM_REVIEW"
+    printf 'mode=%s\n' "\$(stat -c %a "\$file")"
+    printf 'first=%s\n' "\$(head -n 1 "\$file")"
+    printf 'line=%s\n' "\$(sed -n "\${2#+}p" "\$file")"
+} > "$nvim_log"
+EOF
+chmod +x "$TEST_ROOT/bin/nvim"
+no_review_files() { ! compgen -G "$TMPDIR/tmux-review.*" >/dev/null; }
+
+# Codex gets its transcript search.
 codex_log="$TEST_ROOT/codex.log"
 ti new-window -t test "$(tk_stub codex "$codex_log" --alt)"
 tk_ready "$codex_log"
 tk_wait '#{pane_current_command}' codex
 tk_raw "$REVIEW"
-tk_until grep -q $'\x14' "$codex_log" || fail "Codex got no Ctrl+T"
-tk_raw "$REVIEW"
-tk_expect '^T^T' "ScrollLock again closes Codex's pager" tk_input "$codex_log"
+tk_expect '^[OR' "Codex review sends F3" tk_input "$codex_log"
 tk_wait '#{pane_in_mode}' 0
 
+# OpenCode: its export dialog is driven to Export, the dialog is closed, and the
+# exported file moves into the popup.
 opencode_log="$TEST_ROOT/opencode.log"
-ti new-window -t test "$(tk_stub opencode "$opencode_log" --alt)"
+mkdir -p "$TEST_ROOT/project"
+ti new-window -t test -c "$TEST_ROOT/project" "$(tk_stub opencode "$opencode_log" --opencode)"
 tk_ready "$opencode_log"
 tk_wait '#{pane_current_command}' opencode
 tk_raw "$REVIEW"
-tk_expect '^Xx' "OpenCode review" tk_input "$opencode_log"
+tk_until test -s "$nvim_log" || fail "OpenCode review opened no popup: $(tk_input "$opencode_log")"
+assert_eq "$(tk_input "$opencode_log")" '^Xx^I^I^I^I^I^M^[' "OpenCode review keys"
+grep -q '^args=-R + -- ' "$nvim_log" || fail "nvim arguments: $(cat "$nvim_log")"
+grep -qx 'first=❯ first question' "$nvim_log" || fail "popup did not show the export: $(cat "$nvim_log")"
+grep -qx 'mode=600' "$nvim_log" || fail "export file mode: $(cat "$nvim_log")"
+[[ ! -e "$TMPDIR/session-stub.md" ]] || fail "the export was left behind"
+tk_until no_review_files || fail "export file left behind"
+: > "$nvim_log"
 
 shell=$(ti new-window -t test -P -F '#{pane_id}' 'seq 1 100; exec sleep 3600')
 tk_until tk_screen_has 100 "$shell" || fail "fixture text never appeared"
@@ -117,6 +141,17 @@ tk_raw "$REVIEW"
 tk_wait '#{pane_in_mode}' 0 "$claude"
 tk_wait '#{alternate_on}' 1 "$claude"
 
+# A transcript that fits on the screen never grows history; review opens anyway.
+short_log="$TEST_ROOT/short.log"
+short=$(ti new-window -t test -P -F '#{pane_id}' "$(tk_stub claude "$short_log" --claude short)")
+tk_ready "$short_log"
+tk_wait '#{alternate_on}' 1 "$short"
+tk_raw "$REVIEW"
+tk_wait '#{pane_in_mode}' 1 "$short"
+tk_screen_has 'first question' "$short" || fail "short transcript missing from review"
+tk_raw q
+tk_wait '#{alternate_on}' 1 "$short"
+
 # A Claude that never dumps: the wait times out, Claude gets Esc, no review.
 stuck_log="$TEST_ROOT/stuck.log"
 stuck=$(ti new-window -t test -P -F '#{pane_id}' "$(tk_stub claude "$stuck_log" --claude never)")
@@ -131,18 +166,6 @@ assert_eq "$(ti show -pqv -t "$stuck" @review)" "" "@review after a timeout"
 
 # `o` opens the history read-only in nvim, at the line being viewed, from a
 # private temporary file that is gone afterwards.
-nvim_log="$TEST_ROOT/nvim.log"
-cat > "$TEST_ROOT/bin/nvim" <<EOF
-#!/bin/bash
-file=\${@: -1}
-{
-    printf 'args=%s\n' "\$*"
-    printf 'review=%s\n' "\$NVIM_REVIEW"
-    printf 'mode=%s\n' "\$(stat -c %a "\$file")"
-    printf 'line=%s\n' "\$(sed -n "\${2#+}p" "\$file")"
-} > "$nvim_log"
-EOF
-chmod +x "$TEST_ROOT/bin/nvim"
 ti select-window -t "$(ti display-message -p -t "$shell" '#{window_id}')"
 tk_raw "$REVIEW"
 tk_wait '#{pane_in_mode}' 1 "$shell"
@@ -155,7 +178,6 @@ grep -qx 'review=1' "$nvim_log" || fail "NVIM_REVIEW not set: $(cat "$nvim_log")
 grep -qx 'mode=600' "$nvim_log" || fail "history file mode: $(cat "$nvim_log")"
 grep -qx 'line=42' "$nvim_log" || fail "nvim did not open at the viewed line: $(cat "$nvim_log")"
 tk_wait '#{pane_in_mode}' 1 "$shell"
-no_history_files() { ! compgen -G "$TMPDIR/tmux-review.*" >/dev/null; }
-tk_until no_history_files || fail "history file left behind"
+tk_until no_review_files || fail "history file left behind"
 
 printf 'tmux-review: ok\n'
