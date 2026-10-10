@@ -78,6 +78,7 @@ tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer a
 tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C
 tmux│ScrollLock key│Toggle transcript view (keyboard firmware sends F17)│Shift+F5 → copy-mode / cancel
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
+tmux│Click an inactive pane│Focus it only; the application sees neither the click nor a drag after it│MouseDown1Pane → select-pane
 tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M
 tmux│Alt+mouse drag│Copy to the tmux buffer and clipboard on release│copy-pipe-and-cancel
 tmux│Alt+double-click│Copy clicked word to the tmux buffer and clipboard│select-word; copy-pipe-and-cancel
