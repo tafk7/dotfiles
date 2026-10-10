@@ -28,8 +28,8 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 | Mouse capture | `CLAUDE_CODE_DISABLE_MOUSE` / `_CLICKS` | On; off only when tmux `mouse` is off | `mouse` in `cli.json` |
 | Inline alternative | Classic renderer | `tui.fullscreen_transcript = false` | `opencode mini` |
 | Scroll keys | PgUp/PgDn, Ctrl+Home/End, wheel | PgUp/PgDn, wheel | PgUp/PgDn, Home/End, wheel |
-| Transcript search | `Ctrl+O`, then `/` | `Ctrl+T` pager, then `/` or `F3` | none |
-| Transcript as text | `Ctrl+O [` into scrollback; `Ctrl+O v` into `$EDITOR` | none | `C-x x` into `$EDITOR` |
+| Transcript search | `Ctrl+O`, then `/` | `F3` in the live view (`Ctrl+T` only expands output in fullscreen) | none |
+| Transcript as text | `Ctrl+O [` into scrollback; `Ctrl+O v` into `$EDITOR` | none | `C-x x` export dialog: Markdown to a temporary file |
 | Copy route inside tmux | `tmux load-buffer -w`, plus OSC 52 raw and passthrough-wrapped | OSC 52 passthrough only (≤100 KB) while `set-clipboard` is off | OSC 52 passthrough only |
 | Non-interrupting submit | `Ctrl+X Enter` (`chat:queueSubmit`) | `Tab` (queue key) | `C-x Enter` (`prompt.queue`) |
 | Config | `settings.json`, `keybindings.json` | `config.toml` `[tui]`, `tui.keymap.*` | `~/.config/opencode/cli.json` |
@@ -57,7 +57,11 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
    the final screen (spike). Each dump appends a full copy: two dumps of a small
    session went from 442 to 880 lines. Claude overwrites the screen from the
    top rather than scrolling it away, so with the history cleared first a
-   second review still leaves exactly one copy (spike).
+   second review still leaves exactly one copy (spike). Claude leaves the
+   alternate screen at once but writes nothing for up to about a second while
+   it prepares the dump (0.5 s for 34 MB), so "history stopped changing" is
+   not a completion signal until history has started to grow (spike, fixed
+   after the first live test).
 5. **Claude blanks its screen during `Ctrl+G`.** While the external editor runs,
    the pane stays on the alternate screen but shows nothing (spike), and Claude
    reads no input until the editor exits. An editor in a split below would sit
@@ -84,7 +88,13 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
     be bound to `selection:copy`; tmux sends Claude `Ctrl+Shift+C` instead.
     Sent to an app that hasn't asked for extended keys, tmux turns that into a
     plain `Ctrl+C`; Claude asks for them (`pane_key_mode` is `Ext 2`) (spike).
-13. **Alt+C is fzf's directory-jump widget** in both shells (`fzf --bash`,
+13. **Fullscreen Codex has no transcript pager.** `Ctrl+T` expands command
+    output in place, and the `tui.keymap.pager` keys never apply there; `F3`
+    searches the full transcript (Codex 0.162.1, live test).
+14. **OpenCode V2's `C-x x` opens an export dialog**, not `$EDITOR`. Tab
+    cycles Markdown, JSON, thinking, tools, Copy, Export; Export writes
+    `session-<id>.md` to the temporary directory and shows its path (spike).
+15. **Alt+C is fzf's directory-jump widget** in both shells (`fzf --bash`,
     `fzf --zsh`, configured in `shell/fzf.sh`), so compose uses Alt+V, which is
     unbound in bash, zsh, tmux, WezTerm, Claude (on Linux), Codex, and
     OpenCode.
@@ -140,8 +150,8 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 |---|---|
 | Shell, or a fullscreen app without special handling | tmux copy-mode |
 | Claude | clear the pane's history, send `Ctrl+O [`, wait for the text to settle, open copy-mode at the bottom. Leaving copy-mode sends `Esc`, which returns Claude to fullscreen |
-| Codex | `Ctrl+T` pager; ScrollLock again closes it |
-| OpenCode | `C-x x`: the session in `$EDITOR` |
+| Codex | `F3`: its search over the full transcript; the live view scrolls with PgUp/PgDn and Ctrl+Home/End (§1.2.13) |
+| OpenCode | the export dialog driven to Export; the Markdown opens in the review popup (§1.2.14) |
 
 Clearing first keeps exactly one copy of the conversation in history, so search
 hits aren't duplicated and the 50k-line limit isn't consumed by stale dumps.
@@ -176,9 +186,6 @@ Prompt jumps use tmux's `previous-prompt`/`next-prompt`, which need the shell
 to emit OSC 133 prompt marks. Claude's dump carries no marks; in a Claude
 review the keys search for `^❯ ` instead (§1.2.9).
 
-Codex's pager gets E/D, `Ctrl+Home`/`Ctrl+End` through its keymap; its live
-view already has Ctrl+Home/End. S/F have no meaning in the pager: it has no
-cursor.
 
 ### 3.4 Open in editor
 

@@ -147,7 +147,9 @@ says *how*, in order. Section references (§) point into the spec.
       show "loading transcript…", poll until `alternate_on` is 0 and
       `history_size` has stopped changing (10 s cap), then `copy-mode` at the
       bottom. On timeout: message, send `Escape`, unset `@review`.
-    - `codex`: send `C-t`. `opencode`: send `C-x x`.
+    - `codex`: send `F3` (changed after the live test; §1.2.13).
+    - `opencode`: drive the export dialog (`C-x x`, five Tabs, Enter), take
+      the exported file, close the dialog, open the popup (§1.2.14).
     - otherwise: `copy-mode`.
   - **open:** capture the pane's history with `-J` into a mode-600 temporary
     file, open `display-popup -E -w 90% -h 90%` running

@@ -42,11 +42,3 @@ open_external_editor = "ctrl-e"
 [tui.keymap.chat]
 next_permission_mode = "ctrl-g"
 previous_permission_mode = "ctrl-shift-g"
-
-# Codex's transcript pager (Ctrl+T, the review key) moves with the ESDF diamond
-# like tmux review; Ctrl+Home/End match the live view and the other agents.
-[tui.keymap.pager]
-scroll_up = ["up", "k", "e"]
-scroll_down = ["down", "j", "d"]
-jump_top = ["home", "ctrl-home"]
-jump_bottom = ["end", "ctrl-end"]

@@ -2,7 +2,8 @@
 # Review a pane: a frozen, searchable, selectable view of its conversation or
 # history (ScrollLock, prefix+v). See issues/scrollback-copy-compose.md §3.3.
 #
-#     tmux-review toggle PANE   open review, or close it if the pane is in a mode
+#     tmux-review toggle PANE [CLIENT]
+#                               open review, or close it if the pane is in a mode
 #     tmux-review open PANE [CLIENT]
 #                               the pane's history in a read-only nvim popup (`o`)
 #
@@ -13,8 +14,12 @@
 #             the bottom. Leaving copy-mode sends Esc (the pane-mode-changed hook
 #             in tmux.conf), which returns Claude to fullscreen. Clearing first
 #             keeps exactly one copy of the conversation in history.
-#   codex     its own transcript pager (Ctrl+T), which the same key closes
-#   opencode  the session in $EDITOR (Ctrl+X x)
+#   codex     its transcript search (F3). Fullscreen Codex has no separate
+#             transcript viewer: Ctrl+T only expands output in place.
+#   opencode  OpenCode V2 has no viewer or search either. Its export dialog
+#             (Ctrl+X x) writes the session as Markdown to a temporary file;
+#             drive it (Tab to Export, Enter), take the file, close the dialog,
+#             and open the file in the review popup.
 #   anything else: tmux copy-mode
 #
 # @review-timeout (seconds, default 10) bounds the wait for Claude's transcript.
@@ -28,21 +33,28 @@ client=${3:-}
 
 pane_format() { tmux display-message -p -t "$pane" "$1"; }
 
-# Wait until Claude has left the alternate screen and history stops growing.
+# Claude leaves the alternate screen at once, then prepares the dump before any
+# of it reaches history (0.5 s for a 34 MB session). So once it is off the
+# alternate screen, wait for history to grow and then hold still for 0.3 s. A
+# transcript that fits on the screen never grows history; after 2 s without
+# growth, take the screen as it is.
 await_transcript() {
-    local timeout last=-1 size stable=0 polls=0
+    local timeout polls=0 off=-1 grew=-1 last=0 size
     timeout=$(tmux show -gv @review-timeout 2>/dev/null)
     [[ "$timeout" =~ ^[0-9]+$ ]] || timeout=10
     while (( polls < timeout * 10 )); do
         sleep 0.1
         ((polls++))
-        [[ "$(pane_format '#{alternate_on}')" == 0 ]] || continue
+        if (( off < 0 )); then
+            [[ "$(pane_format '#{alternate_on}')" == 0 ]] && off=$polls
+            continue
+        fi
         size=$(pane_format '#{history_size}')
-        if [[ "$size" == "$last" ]]; then
-            ((++stable >= 5)) && return 0
-        else
-            stable=0
+        if (( size != last )); then
             last=$size
+            grew=$polls
+        elif (( grew >= 0 ? polls - grew >= 3 : polls - off >= 20 )); then
+            return 0
         fi
     done
     return 1
@@ -75,10 +87,50 @@ toggle() {
                 tmux copy-mode -t "$pane"
             fi
             ;;
-        codex) tmux send-keys -t "$pane" C-t ;;
-        opencode) tmux send-keys -t "$pane" C-x x ;;
+        codex) tmux send-keys -t "$pane" F3 ;;
+        opencode) review_opencode ;;
         *) tmux copy-mode -t "$pane" ;;
     esac
+}
+
+review_opencode() {
+    local dir marker file review _
+    dir=$(pane_format '#{pane_current_path}')
+    marker=$(mktemp "${TMPDIR:-/tmp}/tmux-review.XXXXXX") || return
+    tmux send-keys -t "$pane" C-x x Tab Tab Tab Tab Tab Enter
+    file=
+    for _ in {1..50}; do
+        file=$(find "${TMPDIR:-/tmp}" /tmp "$dir" -maxdepth 1 -name 'session-*.md' -newer "$marker" \
+            -print -quit 2>/dev/null)
+        [[ -n "$file" ]] && break
+        sleep 0.1
+    done
+    rm -f -- "$marker"
+    if [[ -z "$file" ]]; then
+        tmux display-message -t "$pane" "review: OpenCode did not export the session"
+        return
+    fi
+    # Esc closes the "Session exported" dialog; sent only once it shows, since
+    # Esc on its own interrupts a running turn.
+    for _ in {1..20}; do
+        if tmux capture-pane -p -t "$pane" | grep -q 'Session exported'; then
+            tmux send-keys -t "$pane" Escape
+            break
+        fi
+        sleep 0.1
+    done
+    review=$(mktemp "${TMPDIR:-/tmp}/tmux-review.XXXXXX.md") || return
+    mv -f -- "$file" "$review"
+    chmod 600 "$review"
+    popup "$review" ''
+}
+
+# Show FILE read-only in nvim at LINE (empty: the end), then delete it.
+popup() {
+    local file="$1" line="$2"
+    tmux display-popup -E -w 90% -h 90% ${client:+-c "$client"} -d "$(pane_format '#{pane_current_path}')" \
+        "NVIM_REVIEW=1 nvim -R +$line -- $(printf '%q' "$file"); rm -f -- $(printf '%q' "$file")"
+    rm -f -- "$file"
 }
 
 # Open the pane's history in nvim at the line being viewed. -J joins lines that
@@ -96,10 +148,7 @@ open_history() {
         line=$(pane_format '#{e|+:#{history_size},#{e|+:#{cursor_y},1}}')
         cursor=
     fi
-    line=$(nearest_line "$file" "$line" "$cursor")
-    tmux display-popup -E -w 90% -h 90% ${client:+-c "$client"} -d "$(pane_format '#{pane_current_path}')" \
-        "NVIM_REVIEW=1 nvim -R +$line -- $(printf '%q' "$file"); rm -f -- $(printf '%q' "$file")"
-    rm -f -- "$file"
+    popup "$file" "$(nearest_line "$file" "$line" "$cursor")"
 }
 
 nearest_line() {
