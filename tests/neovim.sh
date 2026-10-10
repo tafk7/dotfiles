@@ -82,4 +82,9 @@ output="$(nvim_run "$(bg_is "$light_bg" 40)" '+if &background !=# "light" | cqui
 "$ROOT/bin/theme-switcher" --nvim follow >/dev/null
 output="$(nvim_run '+if &termguicolors | cquit 42 | endif')" || fail "theme --nvim follow did not clear the pin: $output"
 
+# The review profile loads only in the tmux review popup.
+output="$(nvim_run '+if maparg("e", "n") !=# "" | cquit 43 | endif')" || fail "review mappings leaked into plain nvim: $output"
+output="$(NVIM_REVIEW=1 nvim_run '+if maparg("e", "n") !=# "k" || maparg("q", "n") !~# "qall" | cquit 44 | endif')" \
+    || fail "review profile did not load: $output"
+
 printf 'neovim: ok\n'
