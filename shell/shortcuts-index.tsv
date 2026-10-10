@@ -95,6 +95,7 @@ tmux│Alt+double-click│Copy clicked word to the tmux buffer and clipboard│s
 tmux│Alt+triple-click│Copy clicked line to the tmux buffer and clipboard│select-line; copy-pipe-and-cancel
 tmux│Shift+mouse drag│Select natively in Windows Terminal│client-side selection
 tmux│Ctrl+a p│Paste from tmux buffer with bracketed-paste markers when supported│paste-buffer -p
+tmux│Ctrl+a y│Copy the agent's last reply (Claude: from its session file, draft untouched; Codex/OpenCode: their copy keys)│bin/tmux-last-reply
 tmux│Ctrl+a e│Export current tmux buffer to the client/Windows clipboard, even with export off│size-gated OSC 52 export
 tmux│Pause key / Ctrl+a E│Toggle automatic clipboard export; CLIP OFF shows while off│Shift+F6 (firmware F18) → @clipboard-export
 # Utility
