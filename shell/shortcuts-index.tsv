@@ -75,7 +75,7 @@ tmux│Ctrl+a v│Toggle transcript view without changing scroll position│copy
 tmux│v│Toggle the single tmux highlight in transcript view│begin-selection / clear-selection
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
-tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection)
+tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C
 tmux│ScrollLock key│Toggle transcript view (keyboard firmware sends F17)│Shift+F5 → copy-mode / cancel
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
 tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M

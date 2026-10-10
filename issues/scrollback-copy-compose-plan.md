@@ -96,10 +96,12 @@ says *how*, in order. Section references (§) point into the spec.
   `bin/ai-config` merges and would keep the live `"1"`. `"0"` enables capture
   (spike).
 - `configs/ai/claude/keybindings.json`: rewrite to real overrides. Diff the
-  current dump against the documented defaults; expected result is only
-  `Scroll: ctrl+insert → selection:copy`. Anything else that differs is
+  current dump against the defaults in the binary. Anything that differs is
   listed for your confirmation before it's dropped. The asset is written
   wholesale, and `bin/ai-config` backs up the live file first.
+  `ctrl+insert` turned out not to be bindable (§1.2.12): tmux sends Claude
+  `Ctrl+Shift+C` for the Copy key instead, only while `pane_key_mode` is
+  `Ext 2`.
 - `tests/ai-config.py`: `tui` and the env value merge without disturbing local
   keys; the keybindings asset matches.
 
