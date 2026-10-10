@@ -22,14 +22,31 @@ tk_raw "$COPY"
 tk_wait '#{pane_in_mode}' 0 test
 assert_eq "$(ti show-buffer)" "alpha beta gamma" "Copy key in copy-mode"
 
-# In Claude the key reaches the application; in any other pane it is swallowed.
+# In Claude the key arrives as Ctrl+Shift+C (selection:copy), and only while
+# Claude reads extended keys: as a plain Ctrl+C it would interrupt. In any other
+# pane it is swallowed.
 claude_log="$TEST_ROOT/claude.log"
-ti new-window -t test "$(tk_stub claude "$claude_log")"
+ti new-window -t test "$(tk_stub claude "$claude_log" --extkeys)"
 tk_ready "$claude_log"
 tk_wait '#{pane_current_command}' claude
+if [[ -n "$(ti display-message -p '#{pane_key_mode}')" ]]; then
+    tk_wait '#{pane_key_mode}' 'Ext 2'
+    tk_raw "${COPY}x"
+    tk_until grep -q x "$claude_log" || fail "Claude stub got no input"
+    assert_eq "$(tk_input "$claude_log")" '^[[27;6;99~x' "Copy key in Claude"
+else
+    tk_raw "${COPY}x"
+    tk_until grep -q x "$claude_log" || fail "Claude stub got no input"
+    assert_eq "$(tk_input "$claude_log")" 'x' "Copy key in Claude without pane_key_mode"
+fi
+
+plain_log="$TEST_ROOT/claude-plain.log"
+ti new-window -t test "$(tk_stub claude "$plain_log")"
+tk_ready "$plain_log"
+tk_wait '#{pane_current_command}' claude
 tk_raw "${COPY}x"
-tk_until grep -q x "$claude_log" || fail "Claude stub got no input"
-assert_eq "$(tk_input "$claude_log")" '^[[2;5~x' "Copy key in Claude"
+tk_until grep -q x "$plain_log" || fail "Claude stub got no input"
+assert_eq "$(tk_input "$plain_log")" 'x' "Copy key in Claude without extended keys"
 
 app_log="$TEST_ROOT/app.log"
 ti new-window -t test "$(tk_stub app "$app_log")"

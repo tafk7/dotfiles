@@ -78,7 +78,11 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
     plain Home/End stay with the composer (spike, Codex 0.161.0).
 11. **OpenCode's `C-x y` copies the last reply** without a selection, through
     OSC 52 only (spike).
-12. **Alt+C is fzf's directory-jump widget** in both shells (`fzf --bash`,
+12. **Claude's keybindings have no name for Insert**, so `ctrl+insert` can't
+    be bound to `selection:copy`; tmux sends Claude `Ctrl+Shift+C` instead.
+    Sent to an app that hasn't asked for extended keys, tmux turns that into a
+    plain `Ctrl+C`; Claude asks for them (`pane_key_mode` is `Ext 2`) (spike).
+13. **Alt+C is fzf's directory-jump widget** in both shells (`fzf --bash`,
     `fzf --zsh`, configured in `shell/fzf.sh`), so compose uses Alt+V, which is
     unbound in bash, zsh, tmux, WezTerm, Claude (on Linux), Codex, and
     OpenCode.
@@ -202,7 +206,7 @@ history; OpenCode's review is already nvim.
 
 | Key | Action |
 |---|---|
-| Copy (Ctrl+Insert) ★ | WezTerm already copies its own selections on mouse release. With no WezTerm selection, the key goes to tmux, which decides: in copy-mode, copy the selection; in a Claude pane, pass it on for `selection:copy`; anywhere else, swallow it so no stray escape sequence reaches a shell |
+| Copy (Ctrl+Insert) ★ | WezTerm already copies its own selections on mouse release. With no WezTerm selection, the key goes to tmux, which decides: in copy-mode, copy the selection; in a Claude pane, send `Ctrl+Shift+C` (`selection:copy`) while Claude reads extended keys (§1.2.12); anywhere else, swallow it so no stray escape sequence reaches a shell |
 | Alt+Copy | Enter copy-mode, or copy the selection in it |
 | Paste (Shift+Insert) | Paste the Windows clipboard (WezTerm, bracketed) |
 | Alt+Paste, `C-a p` | Paste the tmux buffer, any size |

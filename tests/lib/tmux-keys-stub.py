@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--log", required=True, help="append raw input bytes here")
 parser.add_argument("--alt", action="store_true", help="draw on the alternate screen")
 parser.add_argument("--mouse", action="store_true", help="enable SGR mouse reporting")
+parser.add_argument("--extkeys", action="store_true", help="request extended keys (modifyOtherKeys 2), as Claude does")
 args = parser.parse_args()
 
 fd = sys.stdin.fileno()
@@ -30,6 +31,8 @@ if args.alt:
     write("\x1b[?1049h\x1b[H\x1b[2Jstub on the alternate screen\r\n")
 if args.mouse:
     write("\x1b[?1000h\x1b[?1006h")
+if args.extkeys:
+    write("\x1b[>4;2m")
 
 with open(args.log, "ab", buffering=0) as log:
     open(args.log + ".ready", "w").close()
