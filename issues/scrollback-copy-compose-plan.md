@@ -133,7 +133,7 @@ says *how*, in order. Section references (§) point into the spec.
     `history-top`.
   - Alt+W/R unchanged; their removal is a separate later commit when you ask.
 - `tests/tmux-navigation.sh` ★: two windows × two panes; edge crossing lands
-  on the facing pane; stops at the first and last window; vertical moves stop
+  on the facing pane; wraps past the first and last window (changed after the live test); vertical moves stop
   at the edge; PgUp in a shell enters copy-mode scrolled up; PgUp and
   Ctrl+Home in an alternate-screen stub reach the stub.
 - `shell/shortcuts-index.tsv`: navigation and browse rows.
