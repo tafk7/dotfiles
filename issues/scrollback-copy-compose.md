@@ -55,7 +55,9 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
    largest local session (34 MB of JSONL) wrote 5,710 lines into tmux history
    in about 1.2 s, and sent 5.9 KB to the terminal, because tmux redraws only
    the final screen (spike). Each dump appends a full copy: two dumps of a small
-   session went from 442 to 880 lines.
+   session went from 442 to 880 lines. Claude overwrites the screen from the
+   top rather than scrolling it away, so with the history cleared first a
+   second review still leaves exactly one copy (spike).
 5. **Claude blanks its screen during `Ctrl+G`.** While the external editor runs,
    the pane stays on the alternate screen but shows nothing (spike), and Claude
    reads no input until the editor exits. An editor in a split below would sit

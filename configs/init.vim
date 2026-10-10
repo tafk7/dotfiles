@@ -384,6 +384,15 @@ nnoremap <leader>n :call ToggleNumber()<CR>
 nnoremap <leader>ss :call StripTrailingWhitespace()<CR>
 
 " ==============================================================================
+" Single-purpose profiles
+" ==============================================================================
+
+" The tmux review popup (bin/tmux-review) sets NVIM_REVIEW.
+if !empty($NVIM_REVIEW) && !empty(nvim_get_runtime_file('lua/dotfiles/review.lua', v:false))
+    lua require('dotfiles.review')
+endif
+
+" ==============================================================================
 " Local Configuration
 " ==============================================================================
 

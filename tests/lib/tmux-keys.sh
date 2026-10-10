@@ -10,6 +10,7 @@
 #   tk_start                      start both servers and attach the client
 #   ti ARGS...                    run a tmux command against the inner server
 #   tk_raw BYTES                  type printf-escaped BYTES into the client
+#   tk_esc                        type a lone Esc and let tmux take it as Escape
 #   tk_stub NAME LOG [ARGS...]    pane command running the logging stub as NAME
 #   tk_ready LOG                  wait until that stub is reading raw input
 #   tk_input LOG                  what a stub received, through `cat -v`
@@ -62,6 +63,14 @@ tk_raw() {
     hex=$(printf "$1" | od -An -tx1 -v)
     # shellcheck disable=SC2086  # one argument per byte
     tmux -L "$TK_OUTER" send-keys -t outer -H $hex
+}
+
+# tmux waits up to 500 ms for more bytes after a lone Esc while it still has a
+# query out to the terminal, and the outer test server never answers all of
+# them; a key typed sooner would turn the Esc into Meta.
+tk_esc() {
+    tk_raw '\e'
+    sleep 0.6
 }
 
 tk_stub() {

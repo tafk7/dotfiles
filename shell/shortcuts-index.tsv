@@ -72,13 +72,20 @@ tmux│Ctrl+a s│Session chooser tree view│choose-tree -Zs
 tmux│Ctrl+a d│Detach (session keeps running in background)│detach-client
 tmux│Ctrl+a ) / (│Next/previous session│switch-client -n/-p
 tmux│Ctrl+a $│Rename current session│command-prompt rename-session
-# Copy mode (vi keys)
-tmux│Ctrl+a v│Toggle transcript view without changing scroll position│copy-mode / cancel
+# Review (copy mode, vi keys)
+tmux│ScrollLock key / Ctrl+a v│Review the pane: copy mode; Claude's transcript in copy mode; Codex's pager; OpenCode's editor view│Shift+F5 (firmware F17) → bin/tmux-review toggle
+tmux│e / s / d / f (and arrows)│Review: move up / left / down / right│cursor-up/-left/-down/-right
+tmux│E / S / D / F (and Shift+arrows)│Review: extend the selection, starting one if needed│begin-selection; cursor-*
+tmux│Ctrl+s / Ctrl+f (and Ctrl+←/→)│Review: word left / right│previous-word / next-word-end
+tmux│Ctrl+e / Ctrl+d (and Ctrl+↑/↓)│Review: previous / next prompt (Claude: its ❯ lines)│previous-prompt / next-prompt; search ^❯
+tmux│Home / End│Review: page up / down│page-up / page-down
+tmux│Ctrl+Home / Ctrl+End│Review: top / bottom of history│history-top / history-bottom
+tmux│/ and ? then n / N│Review: incremental search up / down, then next / previous result│search-backward-incremental / search-forward-incremental
+tmux│o│Review: open the pane's history read-only in an nvim popup at this line (q closes)│bin/tmux-review open
 tmux│v│Toggle the single tmux highlight in transcript view│begin-selection / clear-selection
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
 tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C
-tmux│ScrollLock key│Toggle transcript view (keyboard firmware sends F17)│Shift+F5 → copy-mode / cancel
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
 tmux│Click an inactive pane│Focus it only; the application sees neither the click nor a drag after it│MouseDown1Pane → select-pane
 tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M

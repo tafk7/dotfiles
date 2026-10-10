@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Review a pane: a frozen, searchable, selectable view of its conversation or
+# history (ScrollLock, prefix+v). See issues/scrollback-copy-compose.md §3.3.
+#
+#     tmux-review toggle PANE   open review, or close it if the pane is in a mode
+#     tmux-review open PANE [CLIENT]
+#                               the pane's history in a read-only nvim popup (`o`)
+#
+# Where review opens depends on the program in the pane:
+#   claude    Claude draws on the alternate screen, which tmux history never
+#             sees. Clear the history, have Claude write its transcript into it
+#             (Ctrl+O [), wait for the text to settle, then open copy-mode at
+#             the bottom. Leaving copy-mode sends Esc (the pane-mode-changed hook
+#             in tmux.conf), which returns Claude to fullscreen. Clearing first
+#             keeps exactly one copy of the conversation in history.
+#   codex     its own transcript pager (Ctrl+T), which the same key closes
+#   opencode  the session in $EDITOR (Ctrl+X x)
+#   anything else: tmux copy-mode
+#
+# @review-timeout (seconds, default 10) bounds the wait for Claude's transcript.
+
+set -uo pipefail
+
+action=${1:-}
+pane=${2:-}
+client=${3:-}
+[[ -n "$pane" ]] || { echo "usage: tmux-review toggle|open PANE [CLIENT]" >&2; exit 2; }
+
+pane_format() { tmux display-message -p -t "$pane" "$1"; }
+
+# Wait until Claude has left the alternate screen and history stops growing.
+await_transcript() {
+    local timeout last=-1 size stable=0 polls=0
+    timeout=$(tmux show -gv @review-timeout 2>/dev/null)
+    [[ "$timeout" =~ ^[0-9]+$ ]] || timeout=10
+    while (( polls < timeout * 10 )); do
+        sleep 0.1
+        ((polls++))
+        [[ "$(pane_format '#{alternate_on}')" == 0 ]] || continue
+        size=$(pane_format '#{history_size}')
+        if [[ "$size" == "$last" ]]; then
+            ((++stable >= 5)) && return 0
+        else
+            stable=0
+            last=$size
+        fi
+    done
+    return 1
+}
+
+review_claude() {
+    tmux set -p -t "$pane" @review claude
+    tmux clear-history -t "$pane"
+    tmux send-keys -t "$pane" C-o '['
+    tmux display-message -t "$pane" "loading transcript…"
+    if await_transcript; then
+        tmux copy-mode -t "$pane"
+    else
+        tmux display-message -t "$pane" "review: Claude's transcript did not load"
+        tmux set -pu -t "$pane" @review
+        tmux send-keys -t "$pane" Escape
+    fi
+}
+
+toggle() {
+    if [[ "$(pane_format '#{pane_in_mode}')" == 1 ]]; then
+        tmux send-keys -X -t "$pane" cancel
+        return
+    fi
+    case "$(pane_format '#{pane_current_command}')" in
+        claude)
+            if [[ "$(pane_format '#{alternate_on}')" == 1 ]]; then
+                review_claude
+            else
+                tmux copy-mode -t "$pane"
+            fi
+            ;;
+        codex) tmux send-keys -t "$pane" C-t ;;
+        opencode) tmux send-keys -t "$pane" C-x x ;;
+        *) tmux copy-mode -t "$pane" ;;
+    esac
+}
+
+# Open the pane's history in nvim at the line being viewed. -J joins lines that
+# only the screen width wrapped, which shifts numbering, so the estimate from
+# the copy-mode position is refined to the nearest line holding the cursor's.
+open_history() {
+    local file line cursor
+    file=$(mktemp "${TMPDIR:-/tmp}/tmux-review.XXXXXX") || exit 1
+    chmod 600 "$file"
+    tmux capture-pane -p -J -S - -E - -t "$pane" > "$file"
+    if [[ "$(pane_format '#{pane_in_mode}')" == 1 ]]; then
+        line=$(pane_format '#{e|+:#{e|-:#{history_size},#{scroll_position}},#{e|+:#{copy_cursor_y},1}}')
+        cursor=$(pane_format '#{copy_cursor_line}')
+    else
+        line=$(pane_format '#{e|+:#{history_size},#{e|+:#{cursor_y},1}}')
+        cursor=
+    fi
+    line=$(nearest_line "$file" "$line" "$cursor")
+    tmux display-popup -E -w 90% -h 90% ${client:+-c "$client"} -d "$(pane_format '#{pane_current_path}')" \
+        "NVIM_REVIEW=1 nvim -R +$line -- $(printf '%q' "$file"); rm -f -- $(printf '%q' "$file")"
+    rm -f -- "$file"
+}
+
+nearest_line() {
+    local file="$1" estimate="$2" text="$3"
+    [[ -n "${text//[[:space:]]/}" ]] || { printf '%s\n' "$estimate"; return; }
+    TEXT="$text" awk -v estimate="$estimate" '
+        index($0, ENVIRON["TEXT"]) {
+            distance = NR - estimate
+            if (distance < 0) distance = -distance
+            if (best == "" || distance < best) { best = distance; found = NR }
+        }
+        END { print (found ? found : estimate) }
+    ' "$file"
+}
+
+case "$action" in
+    toggle) toggle ;;
+    open) open_history ;;
+    *) echo "usage: tmux-review toggle|open PANE [CLIENT]" >&2; exit 2 ;;
+esac
