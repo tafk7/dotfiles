@@ -237,6 +237,8 @@ codex│Ctrl+E│Open composer in external editor│tui.keymap.global.open_exter
 codex│Ctrl+G│Next permission mode│tui.keymap.chat.next_permission_mode
 codex│Ctrl+Shift+G│Previous permission mode│tui.keymap.chat.previous_permission_mode
 codex│End│Move to end of composer line│tui.keymap.editor.move_line_end
+codex│e / d (pager)│Scroll the transcript pager up / down, like tmux review│tui.keymap.pager.scroll_up/scroll_down
+codex│Ctrl+Home / Ctrl+End (pager)│Top / bottom of the transcript pager│tui.keymap.pager.jump_top/jump_bottom
 shell│cxr│Resume Codex session (picker)│codex resume
 shell│cxc│Continue last Codex session│codex resume --last
 shell│cxp│Run one-off Codex prompt│codex exec
@@ -245,6 +247,8 @@ shell│cxhr│Resume Codex (alt dir, picker)│CODEX_HOME=~/.codex-alt codex re
 shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex resume --last
 shell│cxhp│One-off Codex prompt (alt dir)│CODEX_HOME=~/.codex-alt codex exec
 shell│oc│Launch opencode TUI (new session)│opencode
+opencode│Ctrl+Home / Ctrl+End│First / last message of the session│cli.json keybinds session.first/session.last
+opencode│Ctrl+Tab / Ctrl+Shift+Tab│Next / previous session tab (opencode default)│session.tab.next/previous
 shell│ocr│Run one-off opencode prompt│opencode run
 shell│ocrc│Run one-off opencode prompt, continuing last│opencode run --continue
 shell│pi│Start new Pi session│pi

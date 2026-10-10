@@ -16,8 +16,15 @@ sys.path.insert(0, str(ROOT / 'lib'))
 from config_files import backup, check_target, equivalent, load_json, merge, reconcile_toml, write_file
 
 
+def json_overlay(target, source):
+    original = load_json(target)
+    data = merge(original, load_json(source))
+    return target.read_text() if target.exists() and equivalent(data, original) else json.dumps(data, indent=2) + '\n'
+
+
 def desired(component, home):
     directory = home / ('.' + component)
+    extra = []
     if component == 'codex':
         directory = Path(os.environ.get('CODEX_HOME', directory)) if home == Path.home() else directory
         target = directory / 'config.toml'
@@ -52,6 +59,11 @@ def desired(component, home):
                 base.pop('autoupdate', None)
                 if base.get('$schema') == 'https://opencode.ai/config.json':
                     base.pop('$schema')
+                # V2's TUI settings (keybinds) live in cli.json, which opencode
+                # also writes itself; merge into it like opencode.json.
+                cli_target = directory / 'cli.json'
+                check_target(cli_target)
+                extra.append((cli_target, json_overlay(cli_target, ROOT / 'configs/opencode-cli.json').encode(), 0o600))
             else:
                 overlay['autoupdate'] = overlay.pop('update')
                 # Preserve any native value until V2 is available to own it.
@@ -59,7 +71,7 @@ def desired(component, home):
         else:
             data = merge(original, overlay)
         text = target.read_text() if target.exists() and equivalent(data, original) else json.dumps(data, indent=2) + '\n'
-    outputs = [(target, text.encode(), 0o600)]
+    outputs = [(target, text.encode(), 0o600), *extra]
     assets = ROOT / 'configs/ai' / component
     for source in sorted(assets.rglob('*')):
         if source.is_file() and '__pycache__' not in source.parts:

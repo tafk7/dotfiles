@@ -9,6 +9,7 @@ when invoking an installer through another path. Python 3.11+ is required.
 | `configs/codex.toml` | Declared keys in `~/.codex/config.toml` |
 | `configs/claude-settings.json` | Declared keys in `~/.claude/settings.json` |
 | `configs/opencode.json` | Declared keys in `~/.config/opencode/opencode.json` |
+| `configs/opencode-cli.json` | Declared keys in `~/.config/opencode/cli.json`, once the V2 CLI is installed |
 | `configs/ai/codex/` | Corresponding portable asset files under `~/.codex/` |
 | `configs/ai/claude/` | Corresponding portable asset files under `~/.claude/` |
 

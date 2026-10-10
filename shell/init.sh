@@ -69,6 +69,20 @@ source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
 source "$DOTFILES_DIR/shell/local.sh"
 
+# Mark each prompt for tmux (OSC 133;A) so Ctrl+E/D in review jump between
+# commands. Starship rebuilds PS1 before every Bash prompt, so Bash re-adds the
+# mark in a PROMPT_COMMAND step after Starship's; Zsh's PROMPT is set once.
+# It comes after local.sh, which may set its own prompt.
+if [[ $- == *i* ]]; then
+    if [[ "$SHELL_NAME" == zsh ]]; then
+        [[ "$PROMPT" == *'133;A'* ]] || PROMPT=$'%{\e]133;A\e\\%}'"$PROMPT"
+    else
+        _dotfiles_prompt_mark() { [[ "$PS1" == *'133;A'* ]] || PS1='\[\e]133;A\e\\\]'"$PS1"; }
+        [[ "$PROMPT_COMMAND" == *_dotfiles_prompt_mark* ]] || \
+            PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}_dotfiles_prompt_mark"
+    fi
+fi
+
 # Must run last: vendor scripts sourced from ~/.shell.local prepend
 # unconditionally, and nested shells and `reload` would accumulate them.
 command -v _dotfiles_dedupe_path >/dev/null 2>&1 && _dotfiles_dedupe_path

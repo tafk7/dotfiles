@@ -85,4 +85,16 @@ for shell in bash zsh; do
     ' || fail "$shell deferred Python tools"
 done
 
+# Interactive prompts carry an OSC 133;A mark for tmux prompt jumps, after any
+# PROMPT_COMMAND step that rebuilds PS1; agent (non-interactive) shells get none.
+mkdir -p "$TEST_ROOT/zdot"
+printf 'source "%s/entry/zsh.sh"\n' "$ROOT" > "$TEST_ROOT/zdot/.zshrc"
+bash_prompt="$(env -u SSH_CONNECTION HOME="$HOME" PATH="$PATH" bash --rcfile "$ROOT/entry/bash.sh" -i -c \
+    'PS1=plain; eval "$PROMPT_COMMAND"; eval "$PROMPT_COMMAND"; printf %s "$PS1"' 2>/dev/null)"
+[[ "$bash_prompt" == '\[\e]133;A\e\\\]plain' ]] || fail "bash prompt mark: $bash_prompt"
+zsh_prompt="$(env -u SSH_CONNECTION HOME="$HOME" PATH="$PATH" ZDOTDIR="$TEST_ROOT/zdot" zsh -i -c 'print -rn -- "$PROMPT"' 2>/dev/null)"
+[[ "$zsh_prompt" == $'%{\e]133;A\e\\%}'* ]] || fail "zsh prompt mark: $zsh_prompt"
+HOME="$HOME" PATH="$PATH" bash -c 'source "$1"; ! declare -F _dotfiles_prompt_mark && [[ "${PROMPT_COMMAND:-}" != *133* ]]' _ \
+    "$ROOT/entry/bash.sh" >/dev/null || fail "non-interactive bash got the prompt mark"
+
 printf 'shell-behavior: ok\n'
