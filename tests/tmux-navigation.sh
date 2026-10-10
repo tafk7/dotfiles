@@ -34,17 +34,32 @@ lands "$w2_left"
 tk_raw '\es'
 lands "$w1_right"
 
-# The ends stop instead of wrapping.
+# Past the first and last window they wrap around.
 at "$w1_left"
 tk_raw '\es'
-sleep 0.2
-lands "$w1_left"
-tk_contains "first window" tk_last_message || fail "no first-window message: $(tk_last_message)"
+tk_wait '#{window_index}' 2
+tk_wait '#{pane_at_right}' 1
 at "$w2_right_top"
 tk_raw '\ef'
+lands "$w1_left"
+
+# Alt+Shift+S/F go to the first and last window.
+at "$w1_right"
+tk_raw '\eF'
+tk_wait '#{window_index}' 2
+tk_raw '\eS'
+tk_wait '#{window_index}' 1
+
+# A lone window has nowhere to cross to.
+solo=$(ti new-session -d -s solo -P -F '#{pane_id}' 'exec sleep 3600')
+ti switch-client -t solo
+tk_expect solo "switch to the lone window" ti list-clients -F '#{client_session}'
+tk_raw '\ef\es'
 sleep 0.2
-lands "$w2_right_top"
-tk_contains "last window" tk_last_message || fail "no last-window message: $(tk_last_message)"
+assert_eq "$(ti list-clients -F '#{client_session}:#{pane_id}')" "solo:$solo" "a lone window moved"
+assert_eq "$(ti display-message -p -t solo '#{session_windows}')" 1 "a move created a window"
+ti switch-client -t test
+tk_expect test "switch back" ti list-clients -F '#{client_session}'
 
 # Vertical moves stop at the edge.
 at "$w2_right_top"

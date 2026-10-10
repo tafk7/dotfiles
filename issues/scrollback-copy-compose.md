@@ -127,7 +127,8 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 | Key | Action |
 |---|---|
 | Alt+E / Alt+D | Pane up / down; stops at the edge |
-| Alt+S / Alt+F Δ | Pane left / right; at the outer edge, previous / next window, landing on its facing pane (`{right}` / `{left}`). Stops at the first and last window |
+| Alt+S / Alt+F Δ | Pane left / right; at the outer edge, previous / next window, landing on its facing pane (`{right}` / `{left}`). Wraps around past the first and last window |
+| Alt+Shift+S / Alt+Shift+F ★ | First / last window |
 | Alt+arrows Δ | Same as Alt+E/S/D/F |
 | Alt+1…0 | Window 1–10 |
 | Alt+W / Alt+R | Previous / next window; retire after the transition, which frees Alt+R for Codex |
