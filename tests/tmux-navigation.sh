@@ -108,6 +108,10 @@ tk_wait '#{alternate_on}' 1
 tk_raw "${PGUP}${CTRL_HOME}x"
 tk_until grep -q x "$app_log" || fail "app stub got no input"
 assert_eq "$(tk_input "$app_log")" '^[[5~^[[1;5Hx' "PgUp and Ctrl+Home in a fullscreen app"
+
+# Alt+W/R belong to the applications again.
+tk_raw '\ew\ery'
+tk_expect '^[[5~^[[1;5Hx^[w^[ry' "Alt+W/R reach the app" tk_input "$app_log"
 tk_wait '#{pane_in_mode}' 0
 
 printf 'tmux-navigation: ok\n'
