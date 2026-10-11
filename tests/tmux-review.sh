@@ -128,6 +128,14 @@ tk_esc
 tk_wait '#{selection_present}' 0 "$claude"
 tk_wait '#{pane_in_mode}' 1 "$claude"
 
+# Home and End stay on the line.
+row=$(ti display-message -p -t "$claude" '#{copy_cursor_y}')
+tk_raw '\e[F'
+tk_wait '#{e|>:#{copy_cursor_x},5}' 1 "$claude"
+tk_raw '\e[H'
+tk_wait '#{copy_cursor_x}' 0 "$claude"
+assert_eq "$(ti display-message -p -t "$claude" '#{copy_cursor_y}')" "$row" "Home/End left the line"
+
 tk_raw q
 tk_wait '#{pane_in_mode}' 0 "$claude"
 tk_wait '#{alternate_on}' 1 "$claude"

@@ -41,7 +41,6 @@ tmux│Alt+arrows│Same as Alt+ESDF (laptop)│select-pane or previous/next-win
 tmux│PgUp│Shell pane: copy mode a page up (exits at the bottom); apps scroll themselves│copy-mode -eu / send-keys PPage
 tmux│Ctrl+Home│Shell pane: copy mode at the top of history; apps get the key│copy-mode -e; history-top / send-keys C-Home
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
-tmux│Alt+w / Alt+r│Previous / next window (no prefix)│previous-window / next-window
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 # Prefix — Panes
@@ -79,7 +78,8 @@ tmux│e / s / d / f (and arrows)│Review: move up / left / down / right│curs
 tmux│E / S / D / F (and Shift+arrows)│Review: extend the selection, starting one if needed│begin-selection; cursor-*
 tmux│Ctrl+s / Ctrl+f (and Ctrl+←/→)│Review: word left / right│previous-word / next-word-end
 tmux│Ctrl+e / Ctrl+d (and Ctrl+↑/↓)│Review: previous / next prompt (Claude: its ❯ lines)│previous-prompt / next-prompt; search ^❯
-tmux│Home / End│Review: page up / down│page-up / page-down
+tmux│Home / End│Review: start / end of the line│start-of-line / end-of-line
+tmux│PgUp / PgDn│Review: page up / down│page-up / page-down
 tmux│Ctrl+Home / Ctrl+End│Review: top / bottom of history│history-top / history-bottom
 tmux│/ and ? then n / N│Review: incremental search up / down, then next / previous result│search-backward-incremental / search-forward-incremental
 tmux│o│Review: open the pane's history read-only in an nvim popup at this line (q closes)│bin/tmux-review open

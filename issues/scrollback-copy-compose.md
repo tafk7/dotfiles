@@ -131,7 +131,7 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 | Alt+Shift+S / Alt+Shift+F ★ | First / last window |
 | Alt+arrows Δ | Same as Alt+E/S/D/F |
 | Alt+1…0 | Window 1–10 |
-| Alt+W / Alt+R | Previous / next window; retire after the transition, which frees Alt+R for Codex |
+| Alt+W / Alt+R Δ | Unbound: Alt+S/F cover them; Alt+R reaches Codex again |
 | Alt+Shift+W / Alt+Shift+T | Window picker / new window after this one |
 | **Alt+V** ★ | Open or focus the compose pane (§5) |
 
@@ -165,7 +165,7 @@ Inside tmux review:
 |---|---|---|---|
 | E / D (and ↑ / ↓) | line up / down | extend selection up / down | previous / next prompt |
 | S / F (and ← / →) | character left / right | extend selection left / right | word left / right |
-| Home / End | page up / down | — | top / bottom |
+| Home / End | start / end of line | — | top / bottom |
 
 | Key | Action |
 |---|---|
