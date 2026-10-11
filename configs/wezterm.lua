@@ -113,6 +113,13 @@ config.keys = {
     action = act.PasteFrom 'Clipboard',
   },
 
+  -- Shift + Copy: tmux copies the agent's last reply (prefix+y).
+  {
+    key = 'Insert',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[2;6~',
+  },
+
   -- Alt + the keyboard's physical Copy/Paste macros belongs to tmux.
   {
     key = 'Insert',

@@ -151,7 +151,7 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 |---|---|
 | Shell, or a fullscreen app without special handling | tmux copy-mode |
 | Claude | clear the pane's history, send `Ctrl+O [`, wait for the text to settle, open copy-mode at the bottom. Leaving copy-mode sends `Esc`, which returns Claude to fullscreen |
-| Codex | `F3`: its search over the full transcript; the live view scrolls with PgUp/PgDn and Ctrl+Home/End (§1.2.13) |
+| Codex | `F3`: its search over the full transcript; the live view scrolls with PgUp/PgDn and Ctrl+Home/End (§1.2.13). Keyboard selection is parked in [codex-review-popup](codex-review-popup.md) |
 | OpenCode | the export dialog driven to Export; the Markdown opens in the review popup (§1.2.14) |
 
 Clearing first keeps exactly one copy of the conversation in history, so search
@@ -221,7 +221,7 @@ history; OpenCode's review is already nvim.
 | Paste (Shift+Insert) | Paste the Windows clipboard (WezTerm, bracketed) |
 | Alt+Paste, `C-a p` | Paste the tmux buffer, any size |
 | `C-a e` | Export the newest tmux buffer now, regardless of the toggle |
-| `C-a y` ★ | Copy the agent's last reply. Claude: read from its session file into the tmux buffer, without touching the draft. Codex: send `Ctrl+O`. OpenCode: send `C-x y`. Codex and OpenCode copy to the Windows clipboard only |
+| `C-a y`, Shift+Copy ★ | Copy the agent's last reply. Claude: read from its session file into the tmux buffer, without touching the draft. Codex: send `Ctrl+O`. OpenCode: send `C-x y`. Codex and OpenCode copy to the Windows clipboard only |
 | Pause ★ (laptop: `C-a E`) | Toggle automatic export (`@clipboard-export`) |
 
 ---
