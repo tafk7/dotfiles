@@ -41,6 +41,11 @@ tk_expect $'first part\n\nsecond part' "Claude's last reply in the buffer" ti sh
 tk_expect $'first part\n\nsecond part' "Claude's last reply on the clipboard" tk_osc52
 assert_eq "$(tk_input "$claude_log")" "" "copying the reply typed into Claude"
 
+# Shift+Copy is the same command.
+printf 'other' | ti load-buffer -
+tk_raw '\e[2;6~'
+tk_expect $'first part\n\nsecond part' "Shift+Copy copies the last reply" ti show-buffer
+
 # Codex and OpenCode copy with their own keys.
 codex_log="$TEST_ROOT/codex.log"
 ti new-window -t test "$(tk_stub codex "$codex_log")"

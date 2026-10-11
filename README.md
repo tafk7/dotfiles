@@ -108,7 +108,7 @@ yo <command>              # print output and copy it to the clipboard
   pane: copy mode for shells and Claude's transcript, transcript search in
   Codex, the exported session in an nvim popup for OpenCode. In review,
   E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
-  in nvim. `<prefix> y` copies the agent's last reply.
+  in nvim. `<prefix> y` or Shift+Copy copies the agent's last reply.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.

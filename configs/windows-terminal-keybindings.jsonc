@@ -27,6 +27,17 @@
             "id": "User.TmuxAltPaste"
         },
 
+        // Shift + physical Copy (Ctrl+Shift+Insert) -> tmux copies the agent's
+        // last reply.
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[2;6~"
+            },
+            "id": "User.TmuxLastReply"
+        },
+
         // Shift-cut chords use F13-F16 escape sequences as a reliable,
         // otherwise-unused transport through Windows Terminal, SSH, and tmux.
         {
@@ -120,6 +131,10 @@
         {
             "id": "User.TmuxAltPaste",
             "keys": "alt+shift+insert"
+        },
+        {
+            "id": "User.TmuxLastReply",
+            "keys": "ctrl+shift+insert"
         },
 
         // Shift publishes the removed word/line range to tmux's shared buffer.
