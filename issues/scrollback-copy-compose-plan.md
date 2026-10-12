@@ -240,12 +240,14 @@ Phase 3 checks pass.
 - `eget.toml`: `["Automattic/harper"]`, tag `v2.12.0`, filters
   `["harper-ls", "musl"]`. Both architectures ship a musl build, so one asset
   remains per arch.
-- `lib/registry.sh`: core row `harper-ls`, method `eget`, capability `ai`;
-  override `eget-repo Automattic/harper`.
+- `lib/registry.sh`: core row `harper-ls`, method `eget`, tier `dev` (not
+  capability `ai` as first planned: the ai path runs vendor installers only,
+  and the compose pane's nvim and tmux are dev-tier tools); override
+  `eget-repo Automattic/harper`.
 - `python3 tests/eget-selection.py --refresh` to record the asset lists and
   regenerate `eget.lock`; confirm the locked extract path is the `harper-ls`
   binary.
-- Docs that list `--ai` contents.
+- Docs that list `--dev` contents.
 
 ### 4.2 Compose pane and prose profile
 
@@ -293,7 +295,7 @@ After each phase is fast-forwarded into the live checkout:
 | 1 | `C-a r` | tmux copy, nvim yank, shell cut, and Claude copy all reach the Windows clipboard; Pause / `C-a E` toggles and the marker shows; a >64 KB copy shows the skip message |
 | 2 | `bin/ai-config`; restart Claude sessions (`/tui` reports fullscreen) | drag-select in Claude copies to both destinations; clicking an inactive Claude pane only focuses it; wheel scrolls Claude |
 | 3 | `C-a r`; `bin/ai-config`; new shells | Alt+S/F cross windows; ScrollLock (or `C-a v`) reviews shell, Claude, Codex, OpenCode panes; `q` returns Claude to fullscreen; `o` opens the popup; Codex review opens its search; OpenCode review opens the export in the popup; OpenCode Ctrl+Home/End and Ctrl+Tab; prompt jumps in a shell pane; `C-a y` in each agent |
-| 4 | `./setup.sh --ai --dry-run`, then for real; `C-a r` | Alt+V opens compose under Claude, Codex and OpenCode; Ctrl+S submits without interrupting a running turn; spelling and grammar marks appear; Alt+V toggles focus |
+| 4 | `./setup.sh --dev --dry-run`, then for real; `C-a r` | Alt+V opens compose under Claude, Codex and OpenCode; Ctrl+S submits without interrupting a running turn; spelling and grammar marks appear; Alt+V toggles focus |
 
 Pending outside the repo: the keyboard firmware change (F17/F18), and whether
 Windows Terminal accepts the `f17`/`f18` bindings.

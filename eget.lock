@@ -8,6 +8,8 @@ aristocratos/btop	v1.4.6	aarch64	btop-aarch64-unknown-linux-musl.tbz	7902578c043
 aristocratos/btop	v1.4.6	x86_64	btop-x86_64-unknown-linux-musl.tbz	9bf7ed170423bb3709a8020767bd2ca529c5632af478f229dce7cdfd32b25691	./btop/bin/btop
 astral-sh/uv	0.10.0	aarch64	uv-aarch64-unknown-linux-gnu.tar.gz	c300afd5f2d31df039fe6a26a2d68a76b62832098c272a43e1e74ab9efd4fbd7	uv-aarch64-unknown-linux-gnu/uv
 astral-sh/uv	0.10.0	x86_64	uv-x86_64-unknown-linux-gnu.tar.gz	230e328948c92dd1ebad83949c4d56e83813dfe9c6362a4c519e6a227973f1ae	uv-x86_64-unknown-linux-gnu/uv
+Automattic/harper	v2.12.0	aarch64	harper-ls-aarch64-unknown-linux-musl.tar.gz	bf6bb2b8b863eb652c5f73517fcd2cf80f91a565979925b8f53435a3bdf41b7a	harper-ls
+Automattic/harper	v2.12.0	x86_64	harper-ls-x86_64-unknown-linux-musl.tar.gz	4e75b75b347dc09aeb1b7ebdddc617682b1897997c69e5e61ed5c31f75983343	harper-ls
 BurntSushi/ripgrep	15.2.0	aarch64	ripgrep-15.2.0-aarch64-unknown-linux-musl.tar.gz	800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915	ripgrep-15.2.0-aarch64-unknown-linux-musl/rg
 BurntSushi/ripgrep	15.2.0	x86_64	ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz	33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c	ripgrep-15.2.0-x86_64-unknown-linux-musl/rg
 charmbracelet/glow	v2.1.1	aarch64	glow_2.1.1_Linux_arm64.tar.gz	ab12a703cc6efd06caf24860344a2e8bc2518055fdd986f98eb761c47917ef3d	glow_2.1.1_Linux_arm64/glow
