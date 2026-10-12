@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Review a pane: a frozen, searchable, selectable view of its conversation or
-# history (ScrollLock, prefix+v). See issues/scrollback-copy-compose.md §3.3.
+# history (ScrollLock, prefix+f). See issues/scrollback-copy-compose.md §3.3.
 #
 #     tmux-review toggle PANE [CLIENT]
 #                               open review, or close it if the pane is in a mode
