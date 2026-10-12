@@ -47,6 +47,9 @@ local function compose_keys(buf)
     vim.keymap.set(modes, lhs, rhs, { buffer = buf, nowait = true })
   end
   map({ 'n', 'i' }, '<C-s>', function() deliver('send') end)
+  -- Stage: paste without submitting. Ctrl+Shift+S needs the terminal to report
+  -- it apart from Ctrl+S; configs/wezterm.lua sends it explicitly.
+  map({ 'n', 'i' }, '<C-S-s>', function() deliver('stage') end)
   map('n', '<leader>s', function() deliver('stage') end)
   map({ 'n', 'i' }, '<PageUp>', forward('PPage'))
   map({ 'n', 'i' }, '<PageDown>', forward('NPage'))
