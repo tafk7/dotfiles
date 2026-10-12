@@ -113,6 +113,14 @@ config.keys = {
     action = act.PasteFrom 'Clipboard',
   },
 
+  -- Ctrl+Shift+S as an extended key (xterm modifyOtherKeys), so it reaches
+  -- applications apart from Ctrl+S: the compose pane stages a prompt with it.
+  {
+    key = 's',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;83~',
+  },
+
   -- Shift + Copy: tmux copies the agent's last reply (prefix+y).
   {
     key = 'Insert',

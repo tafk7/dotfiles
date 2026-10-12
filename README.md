@@ -112,7 +112,8 @@ yo <command>              # print output and copy it to the clipboard
 - **Compose:** `Alt+V` opens Neovim in a pane under an agent (Claude, Codex,
   OpenCode) for writing a prompt, with spell checking and, once `--dev` has
   installed harper-ls, grammar marks. `Ctrl+S` pastes the prompt and submits
-  it without interrupting a running turn; `,s` pastes without submitting;
+  it without interrupting a running turn; `Ctrl+Shift+S` (or `,s`) pastes
+  without submitting;
   PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
   the last misspelling. `Alt+V` again switches focus; the draft survives
   closing the pane.

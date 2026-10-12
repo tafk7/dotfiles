@@ -38,6 +38,16 @@
             "id": "User.TmuxLastReply"
         },
 
+        // Ctrl+Shift+S as an extended key, apart from Ctrl+S (compose: stage).
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[27;6;83~"
+            },
+            "id": "User.CtrlShiftS"
+        },
+
         // Shift-cut chords use F13-F16 escape sequences as a reliable,
         // otherwise-unused transport through Windows Terminal, SSH, and tmux.
         {
@@ -135,6 +145,10 @@
         {
             "id": "User.TmuxLastReply",
             "keys": "ctrl+shift+insert"
+        },
+        {
+            "id": "User.CtrlShiftS",
+            "keys": "ctrl+shift+s"
         },
 
         // Shift publishes the removed word/line range to tmux's shared buffer.

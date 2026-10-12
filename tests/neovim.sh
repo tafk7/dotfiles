@@ -97,7 +97,8 @@ output="$(NVIM_PROSE=1 nvim_run "$TEST_ROOT/draft.md" \
     '+if !&spell || &filetype !=# "markdown" || maparg("<C-l>", "i") ==# "" | cquit 46 | endif' \
     '+if get(maparg("<C-s>", "i", 0, 1), "buffer", 0) | cquit 47 | endif')" || fail "prose profile without a target: $output"
 output="$(NVIM_PROSE=1 DOTFILES_COMPOSE_TARGET=%1 nvim_run "$TEST_ROOT/draft.md" \
-    '+if !get(maparg("<C-s>", "i", 0, 1), "buffer", 0) || !get(maparg("<C-s>", "n", 0, 1), "buffer", 0) | cquit 48 | endif')" \
+    '+if !get(maparg("<C-s>", "i", 0, 1), "buffer", 0) || !get(maparg("<C-s>", "n", 0, 1), "buffer", 0) | cquit 48 | endif' \
+    '+if !get(maparg("<C-S-s>", "i", 0, 1), "buffer", 0) | cquit 50 | endif')" \
     || fail "compose keys missing with a target: $output"
 lsp_check='+lua if vim.lsp.enable and vim.lsp.is_enabled("harper_ls") ~= (vim.env.EXPECT == "1") then vim.cmd("cquit 49") end'
 output="$(NVIM_PROSE=1 EXPECT=0 nvim_run "$lsp_check")" || fail "harper enabled without the binary: $output"

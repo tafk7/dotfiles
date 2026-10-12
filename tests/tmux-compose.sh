@@ -6,6 +6,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
 
 ALT_V='\ev'
+real_nvim=$(command -v nvim || true)
 
 tk_start
 
@@ -90,5 +91,30 @@ assert_eq "$(cat "$TEST_ROOT/kept.md")" 'keep me' "draft after a failed send"
 : > "$claude_log"
 compose forward "$claude" PPage
 tk_expect '^[[5~' "forwarded PgUp" tk_input "$claude_log"
+
+# With real nvim and the prose profile: Ctrl+Shift+S, as WezTerm sends it,
+# stages; Ctrl+S sends; each clears the draft.
+if [[ -n "$real_nvim" ]]; then
+    rm "$TEST_ROOT/bin/nvim"
+    ln -s "$real_nvim" "$TEST_ROOT/bin/nvim"
+    mkdir -p "$XDG_CONFIG_HOME/nvim"
+    ln -s "$DOTFILES_DIR/configs/init.vim" "$XDG_CONFIG_HOME/nvim/init.vim"
+    agent_log="$TEST_ROOT/agent.log"
+    agent=$(ti new-window -t test -P -F '#{pane_id}' "$(tk_stub claude "$agent_log" --paste)")
+    tk_ready "$agent_log"
+    tk_raw "$ALT_V"
+    tk_wait '#{pane_current_command}' nvim
+    editor=$(ti show -pqv -t "$agent" @compose_pane)
+    tk_until tk_contains INSERT ti capture-pane -p -t "$editor" || fail "compose nvim did not start in insert mode"
+    if [[ "$(ti display-message -p -t "$editor" '#{pane_key_mode}')" == 'Ext 2' ]]; then
+        tk_raw 'staged words\e[27;6;83~'
+        tk_expect '^[[200~staged words^[[201~' "Ctrl+Shift+S stages" tk_input "$agent_log"
+        : > "$agent_log"
+    fi
+    tk_raw 'sent words\x13'
+    tk_expect '^[[200~sent words^[[201~^X^M' "Ctrl+S sends" tk_input "$agent_log"
+    draft="$XDG_STATE_HOME/dotfiles/compose/$(ti display-message -p '#{start_time}')-${agent#%}.md"
+    tk_expect '' "draft after sending" cat "$draft"
+fi
 
 printf 'tmux-compose: ok\n'
