@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Compose prompts in Neovim beside an agent pane (Alt+V). See
+# issues/scrollback-copy-compose.md §5.
+#
+#     tmux-compose toggle PANE          open the compose pane under PANE, or move
+#                                       focus between a pane and its compose pane
+#     tmux-compose send TARGET FILE     paste FILE into TARGET and submit it
+#     tmux-compose stage TARGET FILE    paste FILE into TARGET without submitting
+#     tmux-compose forward TARGET KEY   send a scroll key (PPage, NPage, C-Home,
+#                                       C-End) to TARGET
+#
+# The compose pane runs nvim with NVIM_PROSE=1 (configs/nvim/lua/dotfiles/
+# prose.lua), DOTFILES_COMPOSE_TARGET, and DOTFILES_COMPOSE_DRAFT. The pair is
+# recorded both ways: @compose_target on the compose pane, @compose_pane on the
+# target. Drafts live under ${XDG_STATE_HOME:-~/.local/state}/dotfiles/compose,
+# one per target pane, named by the tmux server's start time and the pane ID so
+# a restarted server never reopens another pane's draft; sent prompts are
+# appended to history.md there.
+#
+# Sending pastes through a named buffer (the export hook ignores named loads, so
+# drafts never reach the clipboard), deleted by the paste, then presses the
+# target's submit key that doesn't interrupt a running turn:
+#   claude    Ctrl+X Enter (chat:queueSubmit)
+#   codex     Tab (queue; submits when idle)
+#   opencode  Ctrl+X Enter (prompt.queue)
+# Anything else, such as a shell, only gets the paste: Enter would run it.
+#
+# @compose-size sets the split's height (default 30%).
+
+set -uo pipefail
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/compose"
+
+fail() {
+    tmux display-message "compose: $1" 2>/dev/null
+    printf 'compose: %s\n' "$1" >&2
+    exit 1
+}
+
+pane_alive() { [[ -n "$1" ]] && tmux display-message -p -t "$1" '#{pane_id}' >/dev/null 2>&1; }
+
+pane_option() { tmux show -pqv -t "$1" "$2" 2>/dev/null; }
+
+toggle() {
+    local pane="$1" target compose size draft dir
+    target=$(pane_option "$pane" @compose_target)
+    if [[ -n "$target" ]]; then
+        pane_alive "$target" || fail "its agent pane is gone"
+        tmux select-pane -t "$target"
+        return
+    fi
+    compose=$(pane_option "$pane" @compose_pane)
+    if pane_alive "$compose" && [[ "$(pane_option "$compose" @compose_target)" == "$pane" ]]; then
+        tmux select-pane -t "$compose"
+        return
+    fi
+
+    mkdir -p "$state_dir" && chmod 700 "$state_dir"
+    draft="$state_dir/$(tmux display-message -p '#{start_time}')-${pane#%}.md"
+    [[ -e "$draft" ]] || (umask 077 && : > "$draft")
+    size=$(tmux show -gqv @compose-size)
+    dir=$(tmux display-message -p -t "$pane" '#{pane_current_path}')
+    compose=$(tmux split-window -v -l "${size:-30%}" -t "$pane" -c "$dir" -P -F '#{pane_id}' \
+        -e NVIM_PROSE=1 -e "DOTFILES_COMPOSE_TARGET=$pane" -e "DOTFILES_COMPOSE_DRAFT=$draft" \
+        "nvim -- $(printf '%q' "$draft")") || fail "could not split the pane"
+    tmux set -p -t "$compose" @compose_target "$pane"
+    tmux set -p -t "$pane" @compose_pane "$compose"
+}
+
+paste() {
+    local mode="$1" target="$2" file="$3" text buffer program
+    [[ -r "$file" ]] || fail "no draft at $file"
+    text=$(<"$file")
+    [[ -n "${text//[[:space:]]/}" ]] || fail "the draft is empty"
+    pane_alive "$target" || fail "the agent pane is gone; the draft is kept"
+
+    [[ "$(tmux display-message -p -t "$target" '#{pane_in_mode}')" == 1 ]] \
+        && tmux send-keys -X -t "$target" cancel
+    buffer="compose-$$"
+    printf '%s' "$text" | tmux load-buffer -b "$buffer" - || fail "could not load the draft"
+    tmux paste-buffer -p -d -b "$buffer" -t "$target" || fail "could not paste the draft"
+
+    program=$(tmux display-message -p -t "$target" '#{pane_current_command}')
+    if [[ "$mode" == send ]]; then
+        # Let the paste land before the submit key, which some agents read as a
+        # separate chord.
+        sleep 0.2
+        case "$program" in
+            claude | opencode) tmux send-keys -t "$target" C-x Enter ;;
+            codex) tmux send-keys -t "$target" Tab ;;
+            *) tmux display-message "compose: staged in $program; press Enter there to run it" ;;
+        esac
+    fi
+    (
+        umask 077
+        mkdir -p "$state_dir"
+        printf '\n## %s → %s\n\n%s\n' "$(date '+%F %T')" "$program" "$text" >> "$state_dir/history.md"
+    )
+}
+
+case "${1:-}" in
+    toggle) toggle "${2:?pane}" ;;
+    send | stage) paste "$1" "${2:?target}" "${3:?file}" ;;
+    forward) tmux send-keys -t "${2:?target}" "${3:?key}" ;;
+    *) echo "usage: tmux-compose toggle PANE | send|stage TARGET FILE | forward TARGET KEY" >&2; exit 2 ;;
+esac

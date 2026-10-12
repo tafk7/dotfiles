@@ -26,6 +26,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--log", required=True, help="append raw input bytes here")
 parser.add_argument("--alt", action="store_true", help="draw on the alternate screen")
 parser.add_argument("--mouse", action="store_true", help="enable SGR mouse reporting")
+parser.add_argument("--paste", action="store_true", help="enable bracketed paste, as the agents do")
 parser.add_argument("--extkeys", action="store_true", help="request extended keys (modifyOtherKeys 2), as Claude does")
 parser.add_argument("--claude", choices=["dump", "short", "never"], help="answer Ctrl+O [ like Claude")
 parser.add_argument("--opencode", action="store_true", help="answer the export keys like OpenCode")
@@ -54,6 +55,8 @@ if args.mouse:
     write("\x1b[?1000h\x1b[?1006h")
 if args.extkeys:
     write("\x1b[>4;2m")
+if args.paste:
+    write("\x1b[?2004h")
 
 with open(args.log, "ab", buffering=0) as log:
     open(args.log + ".ready", "w").close()
