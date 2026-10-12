@@ -8,6 +8,7 @@ trap fixture_cleanup EXIT
 fixture_init
 
 NVIM_BIN="$(command -v nvim 2>/dev/null || true)"
+REAL_HARPER="$(command -v harper-ls 2>/dev/null || true)"
 [[ -n "$NVIM_BIN" ]] || { echo 'neovim: skipped (nvim unavailable)'; exit 0; }
 cat > "$TEST_ROOT/bin/curl" <<'EOF'
 #!/bin/sh
@@ -106,5 +107,21 @@ printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/bin/harper-ls"
 chmod +x "$TEST_ROOT/bin/harper-ls"
 output="$(NVIM_PROSE=1 EXPECT=1 nvim_run "$lsp_check")" || fail "harper not enabled with the binary: $output"
 rm -f "$TEST_ROOT/bin/harper-ls"
+
+# Ctrl+L fixes the last problem before the cursor and leaves the cursor where
+# the typing was. Without harper-ls: Vim's first spelling suggestion.
+printf 'I saw teh\n' > "$TEST_ROOT/typo.md"
+output="$(NVIM_PROSE=1 nvim_run "$TEST_ROOT/typo.md" '+call feedkeys("A\<C-l>X\<Esc>", "xt")' \
+    '+if getline(1) !=# "I saw theX" | cquit 51 | endif' '+qall!')" || fail "Ctrl+L spelling fallback: $output"
+# With harper-ls (when installed here): its grammar fix, then the next one back.
+if [[ -n "$REAL_HARPER" ]] && nvim_run '+lua if not vim.lsp.enable then vim.cmd("cquit 1") end' >/dev/null; then
+    ln -s "$REAL_HARPER" "$TEST_ROOT/bin/harper-ls"
+    printf 'This is an test of teh checker\n' > "$TEST_ROOT/grammar.md"
+    output="$(NVIM_PROSE=1 nvim_run "$TEST_ROOT/grammar.md" \
+        '+lua vim.wait(10000, function() return #vim.diagnostic.get(0) >= 2 end, 100)' \
+        '+call feedkeys("A\<C-l>\<C-l>X\<Esc>", "xt")' \
+        '+if getline(1) !=# "This is a test of the checkerX" | cquit 52 | endif' '+qall!')" || fail "Ctrl+L with Harper: $output"
+    rm -f "$TEST_ROOT/bin/harper-ls"
+fi
 
 printf 'neovim: ok\n'
