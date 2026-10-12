@@ -22,7 +22,7 @@ TIERS (cumulative - each tier includes all previous tiers):
 
     --dev               Bash + development tools. Requires sudo (first APT layer).
                         Adds APT: zsh, build tools, clipboard, graphviz, etc.
-                        Adds: neovim, tmux
+                        Adds: neovim, tmux, shellcheck, harper-ls (grammar checking)
 
     --work              Dev + local development/agent execution. Requires sudo.
                         Adds: NVM, Docker, sbx, KVM host access, Rust
@@ -237,7 +237,7 @@ Tier: dev
 AI CLIs: none
 
 -- components
-bat btop delta direnv eget eza fd fzf gdu gh glow lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop delta direnv eget eza fd fzf gdu gh glow harper-ls lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
 bash dev
 -- verify
@@ -287,7 +287,7 @@ Tier: work
 AI CLIs: none
 
 -- components
-bat btop delta direnv docker eget eza fd fzf gdu gh glow lazygit neovim nvm ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop delta direnv docker eget eza fd fzf gdu gh glow harper-ls lazygit neovim nvm ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
 bash dev work
 -- verify
@@ -341,7 +341,7 @@ Tier: work
 AI CLIs: all (claude, codex, opencode, pi)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
 bash dev work cli:claude cli:codex cli:opencode cli:pi
 -- verify
@@ -1008,7 +1008,7 @@ Tailscale: yes (--tail)
 Google Cloud CLI: yes (--gcloud)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow harper-ls lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
 bash dev work cli:claude cli:codex cli:opencode cli:pi tail cloud:gcloud
 -- verify
@@ -1066,7 +1066,7 @@ AI CLIs: none
 RDP server (xrdp): yes (--rdp)
 
 -- components
-bat btop delta direnv eget eza fd fzf gdu gh glow lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent xrdp zoxide zsh 
+bat btop delta direnv eget eza fd fzf gdu gh glow harper-ls lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent xrdp zoxide zsh 
 -- install
 bash dev rdp
 -- verify
@@ -1120,7 +1120,7 @@ AI CLIs: claude codex
 Tailscale: yes (--tail)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls lazygit neovim nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
 bash dev work cli:claude cli:codex tail
 -- verify

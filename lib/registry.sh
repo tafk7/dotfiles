@@ -60,6 +60,7 @@ jq              -               eget       -     agent-badge   -              - 
 eget            -               installer  bash  -             -              -       -                  -                 -
 sd              -               eget       bash  -             -              -       -                  -                 -
 shellcheck      -               eget       dev   -             -              -       -                  -                 -
+harper-ls       -               eget       dev   -             -              -       -                  -                 -
 wsl2-ssh-agent  -               eget       bash  -             wsl            -       -                  -                 -
 neovim          nvim            installer  dev   -             -              -       -                  -                 -
 tmux            -               installer  dev   -             -              -       -                  -                 -
@@ -97,6 +98,7 @@ aws-cli         aws             installer  -     aws           -              - 
 #   removal-instructions   human-readable removal steps or retained state
 _REGISTRY_OVERRIDES="
 gh         eget-repo              cli/cli
+harper-ls  eget-repo              Automattic/harper
 uv         companions             uvx
 neovim     update-source          neovim/neovim
 neovim     relative-binary        bin/nvim

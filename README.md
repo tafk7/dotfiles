@@ -22,7 +22,7 @@ and changes nothing.
 |---|---|---|
 | `--config` | Links configs for tools that are already installed | No |
 | `--bash` | Pinned CLI tools in `~/.local/bin` through eget: starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gdu, glow, lazygit, gh, uv, sd, direnv | No |
-| `--dev` | zsh, build tools, clipboard, Neovim, tmux, shellcheck | Yes |
+| `--dev` | zsh, build tools, clipboard, Neovim, tmux, shellcheck, harper-ls | Yes |
 | `--work` | NVM, Docker, Docker Sandboxes (`sbx`) with KVM access, Rust | Yes |
 
 Each tier includes the ones before it. If you pass several tiers, the highest

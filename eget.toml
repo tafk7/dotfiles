@@ -95,6 +95,13 @@ target = "~/.local/bin/direnv"
 tag = "v0.11.0"
 asset_filters = [".linux.", ".tar.xz"]
 
+# Grammar checking in the compose pane's prose profile (Neovim LSP). The
+# release also carries harper-cli and editor packages; musl exists for both
+# arches.
+["Automattic/harper"]
+tag = "v2.12.0"
+asset_filters = ["harper-ls", "unknown-linux-musl"]
+
 # Installed on demand when a supported agent-badge CLI is selected.
 ["jqlang/jq"]
 tag = "jq-1.8.1"

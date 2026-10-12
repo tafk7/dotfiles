@@ -264,7 +264,7 @@ TIERS (cumulative - each tier includes all previous tiers):
 
     --dev               Bash + development tools. Requires sudo (first APT layer).
                         Adds APT: zsh, build tools, clipboard, graphviz, etc.
-                        Adds: neovim, tmux
+                        Adds: neovim, tmux, shellcheck, harper-ls (grammar checking)
 
     --work              Dev + local development/agent execution. Requires sudo.
                         Adds: NVM, Docker, sbx, KVM host access, Rust
