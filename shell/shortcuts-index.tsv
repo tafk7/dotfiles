@@ -43,6 +43,11 @@ tmux│Ctrl+Home│Shell pane: copy mode at the top of history; apps get the key
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
+tmux│Alt+V│Open a compose pane (Neovim) under this pane, or switch focus between them│bin/tmux-compose toggle
+tmux│Ctrl+S (compose)│Paste the draft into the agent and submit without interrupting it│Claude/OpenCode Ctrl+X Enter, Codex Tab; shells: paste only
+tmux│,s (compose)│Paste the draft into the agent without submitting│bin/tmux-compose stage
+tmux│PgUp / PgDn / Ctrl+Home / Ctrl+End (compose)│Scroll the agent's conversation from the compose pane│bin/tmux-compose forward
+tmux│Ctrl+L (compose, insert)│Fix the most recent misspelling│[s 1z=
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
 tmux│Ctrl+a Alt+ESDF│Send the original Meta key to the application│send-keys M-e/M-s/M-d/M-f

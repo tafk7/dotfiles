@@ -387,9 +387,13 @@ nnoremap <leader>ss :call StripTrailingWhitespace()<CR>
 " Single-purpose profiles
 " ==============================================================================
 
-" The tmux review popup (bin/tmux-review) sets NVIM_REVIEW.
+" The tmux review popup (bin/tmux-review) sets NVIM_REVIEW; the compose pane
+" (bin/tmux-compose) sets NVIM_PROSE.
 if !empty($NVIM_REVIEW) && !empty(nvim_get_runtime_file('lua/dotfiles/review.lua', v:false))
     lua require('dotfiles.review')
+endif
+if !empty($NVIM_PROSE) && !empty(nvim_get_runtime_file('lua/dotfiles/prose.lua', v:false))
+    lua require('dotfiles.prose')
 endif
 
 " ==============================================================================

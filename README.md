@@ -109,6 +109,13 @@ yo <command>              # print output and copy it to the clipboard
   Codex, the exported session in an nvim popup for OpenCode. In review,
   E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
   in nvim. `<prefix> y` or Shift+Copy copies the agent's last reply.
+- **Compose:** `Alt+V` opens Neovim in a pane under an agent (Claude, Codex,
+  OpenCode) for writing a prompt, with spell checking and, once `--dev` has
+  installed harper-ls, grammar marks. `Ctrl+S` pastes the prompt and submits
+  it without interrupting a running turn; `,s` pastes without submitting;
+  PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
+  the last misspelling. `Alt+V` again switches focus; the draft survives
+  closing the pane.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.

@@ -1,7 +1,8 @@
 # Spec: scrollback, copy, and compose for agent panes
 
-**Status:** proposed — not implemented. Replaces the parked Claude
-fullscreen-renderer issue and the split-pane prose-editor draft.
+**Status:** implemented through phase 4 (its hand checks pending); phase 5 and
+[Codex keyboard review](codex-review-popup.md) parked. Replaces the parked
+Claude fullscreen-renderer issue and the split-pane prose-editor draft.
 **Problem:** Claude Code, Codex, and OpenCode now draw their conversations on
 the terminal's alternate screen, where tmux copy-mode cannot see them. Each app
 scrolls, searches, selects, and copies differently; copies land in the tmux
