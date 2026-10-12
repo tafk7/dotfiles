@@ -146,7 +146,9 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 
 ### 3.3 Review (frozen)
 
-**ScrollLock** ★ toggles review (laptop: `C-a v`).
+**ScrollLock** ★ toggles review (laptop: `C-a f`). `C-a v` stays plain
+copy-mode of what the pane shows, so a Claude pane's live prompt can be
+selected.
 
 | Pane | Review opens |
 |---|---|

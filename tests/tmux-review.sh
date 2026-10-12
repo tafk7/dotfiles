@@ -1,5 +1,5 @@
 #!/bin/bash
-# Review (ScrollLock, prefix+v): per-program dispatch, Claude's transcript dump
+# Review (ScrollLock, prefix+f): per-program dispatch, Claude's transcript dump
 # into copy-mode and back, the review key table, and the nvim popup.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
@@ -73,7 +73,7 @@ tk_raw "$REVIEW"
 tk_wait '#{pane_in_mode}' 1 "$shell"
 tk_raw "$REVIEW"
 tk_wait '#{pane_in_mode}' 0 "$shell"
-tk_raw "${PREFIX}v"
+tk_raw "${PREFIX}f"
 tk_wait '#{pane_in_mode}' 1 "$shell"
 tk_raw q
 tk_wait '#{pane_in_mode}' 0 "$shell"
@@ -102,7 +102,17 @@ claude_log="$TEST_ROOT/claude.log"
 claude=$(ti new-window -t test -P -F '#{pane_id}' "$(tk_stub claude "$claude_log" --claude dump)")
 tk_ready "$claude_log"
 tk_wait '#{alternate_on}' 1 "$claude"
-tk_raw "$REVIEW"
+
+# prefix+v is plain copy-mode on the live screen: Claude is left alone.
+tk_raw "${PREFIX}v"
+tk_wait '#{pane_in_mode}' 1 "$claude"
+tk_screen_has 'stub on the alternate screen' "$claude" || fail "prefix+v left the live screen"
+tk_raw q
+tk_wait '#{pane_in_mode}' 0 "$claude"
+sleep 0.3
+assert_eq "$(tk_input "$claude_log")" "" "prefix+v sent keys to Claude"
+
+tk_raw "${PREFIX}f"
 tk_wait '#{pane_in_mode}' 1 "$claude"
 assert_eq "$(ti show -pqv -t "$claude" @review)" claude "@review during a Claude review"
 tk_wait '#{scroll_position}' 0 "$claude"
