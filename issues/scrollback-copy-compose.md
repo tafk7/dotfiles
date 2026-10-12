@@ -307,8 +307,10 @@ config; ordinary nvim, `git commit`, and other editors are unchanged.
 - `configs/nvim/lua/dotfiles/prose.lua`: `spell`, `spelllang=en_us`, soft wrap
   (`wrap`, `linebreak`, `textwidth=0`), no line numbers, `filetype=markdown`,
   ALE off for the buffer, start in insert mode, and an insert-mode `Ctrl+L`
-  that fixes the most recent misspelling
-  (`<C-g>u<Esc>[s1z=`]a<C-g>u`).
+  that fixes the latest problem before the cursor: Harper's suggested edit
+  (spelling or grammar) when it has one, else Vim's first spelling
+  suggestion. An AI cleanup key is parked in
+  [compose-ai-cleanup](compose-ai-cleanup.md).
 - Grammar: `harper-ls` through Neovim's built-in LSP client
   (`vim.lsp.config` / `vim.lsp.enable`), only when the binary is present.
   Without it the layer still provides spelling.

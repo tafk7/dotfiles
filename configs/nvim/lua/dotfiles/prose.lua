@@ -14,8 +14,110 @@ vim.opt.textwidth = 0
 vim.opt.number = false
 vim.opt.relativenumber = false
 
--- Ctrl+L fixes the most recent misspelling and returns to where you were typing.
-vim.keymap.set('i', '<C-l>', '<C-g>u<Esc>[s1z=`]a<C-g>u')
+local M = {}
+
+-- The last misspelled word before the cursor (row 0-based), within the 50
+-- lines above: {row, byte column, word}.
+local function last_misspelling(row, col)
+  for r = row, math.max(0, row - 50), -1 do
+    local line = vim.api.nvim_buf_get_lines(0, r, r + 1, false)[1]
+    if r == row then
+      line = line:sub(1, col)
+    end
+    local found, offset = nil, 0
+    while true do
+      local bad = vim.fn.spellbadword(line:sub(offset + 1))[1]
+      local start = bad ~= '' and line:find(bad, offset + 1, true)
+      if not start then
+        break
+      end
+      found, offset = { r, start - 1, bad }, start - 1 + #bad
+    end
+    if found then
+      return found
+    end
+  end
+end
+
+-- Replace the last misspelling before the cursor with Vim's first suggestion.
+local function spell_fix(row, col)
+  local found = last_misspelling(row, col)
+  local suggestion = found and vim.fn.spellsuggest(found[3], 1)[1]
+  if not suggestion then
+    return false
+  end
+  local r, c, word = found[1], found[2], found[3]
+  vim.api.nvim_buf_set_text(0, r, c, r, c + #word, { suggestion })
+  if r == row then
+    vim.api.nvim_win_set_cursor(0, { row + 1, col + #suggestion - #word })
+  end
+  return true
+end
+
+-- Harper marks that start before the cursor (row 0-based), latest first.
+local function marks_before(row, col)
+  local marks = {}
+  for _, d in ipairs(vim.diagnostic.get(0)) do
+    local before = d.lnum < row or (d.lnum == row and d.col < col)
+    if before and d.source == 'Harper' and d.user_data and d.user_data.lsp then
+      table.insert(marks, d)
+    end
+  end
+  table.sort(marks, function(a, b) return a.lnum > b.lnum or (a.lnum == b.lnum and a.col > b.col) end)
+  return marks
+end
+
+local function buffer_text()
+  return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+end
+
+-- Apply Harper's first suggested edit at MARK; true if the text changed. A
+-- mark already fixed but not yet cleared can still offer its old edit, which
+-- changes nothing, so the caller moves on to the next mark.
+local function harper_fix(mark)
+  local at = mark.user_data.lsp.range.start
+  local params = {
+    textDocument = vim.lsp.util.make_text_document_params(0),
+    range = { start = at, ['end'] = at },
+    context = { diagnostics = {} },
+  }
+  local responses = vim.lsp.buf_request_sync(0, 'textDocument/codeAction', params, 1000) or {}
+  for client_id, response in pairs(responses) do
+    local client = vim.lsp.get_client_by_id(client_id)
+    if client and client.name == 'harper_ls' then
+      for _, action in ipairs(response.result or {}) do
+        -- Replacements carry an edit; "add to dictionary" and "ignore" are commands.
+        if action.edit then
+          local text = buffer_text()
+          vim.lsp.util.apply_workspace_edit(action.edit, client.offset_encoding)
+          return buffer_text() ~= text
+        end
+      end
+    end
+  end
+  return false
+end
+
+-- Ctrl+L in insert mode: fix the latest problem before the cursor with
+-- Harper's suggestion (spelling or grammar), else Vim's first spelling
+-- suggestion, and keep typing where you were.
+function M.fix_last()
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  row = row - 1
+  local before = #vim.api.nvim_buf_get_lines(0, row, row + 1, false)[1]
+  for _, mark in ipairs(marks_before(row, col)) do
+    if harper_fix(mark) then
+      if mark.lnum == row then
+        local after = #vim.api.nvim_buf_get_lines(0, row, row + 1, false)[1]
+        vim.api.nvim_win_set_cursor(0, { row + 1, math.max(0, col + after - before) })
+      end
+      return
+    end
+  end
+  spell_fix(row, col)
+end
+
+vim.keymap.set('i', '<C-l>', '<C-g>u<Cmd>lua require("dotfiles.prose").fix_last()<CR><C-g>u')
 
 -- Grammar through the built-in LSP client (Neovim 0.11+).
 if vim.fn.executable('harper-ls') == 1 and vim.lsp.config and vim.lsp.enable then
@@ -82,3 +184,5 @@ vim.api.nvim_create_autocmd('VimEnter', {
     vim.cmd('startinsert!')
   end,
 })
+
+return M

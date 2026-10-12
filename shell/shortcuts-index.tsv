@@ -47,7 +47,7 @@ tmux│Alt+V│Open a compose pane (Neovim) under this pane, or switch focus bet
 tmux│Ctrl+S (compose)│Paste the draft into the agent and submit without interrupting it│Claude/OpenCode Ctrl+X Enter, Codex Tab; shells: paste only
 tmux│Ctrl+Shift+S / ,s (compose)│Paste the draft into the agent without submitting│bin/tmux-compose stage
 tmux│PgUp / PgDn / Ctrl+Home / Ctrl+End (compose)│Scroll the agent's conversation from the compose pane│bin/tmux-compose forward
-tmux│Ctrl+L (compose, insert)│Fix the most recent misspelling│[s 1z=
+tmux│Ctrl+L (compose, insert)│Fix the last spelling or grammar mark before the cursor│Harper's suggestion, else Vim's first spelling suggestion
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
 tmux│Ctrl+a Alt+ESDF│Send the original Meta key to the application│send-keys M-e/M-s/M-d/M-f

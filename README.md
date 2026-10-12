@@ -116,7 +116,7 @@ yo <command>              # print output and copy it to the clipboard
   it without interrupting a running turn; `Ctrl+Shift+S` (or `,s`) pastes
   without submitting;
   PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
-  the last misspelling. `Alt+V` again switches focus; the draft survives
+  the last spelling or grammar mark before the cursor. `Alt+V` again switches focus; the draft survives
   closing the pane.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
