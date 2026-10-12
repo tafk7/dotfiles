@@ -1,6 +1,6 @@
 # Spec: scrollback, copy, and compose for agent panes
 
-**Status:** implemented through phase 4 (its hand checks pending); phase 5 and
+**Status:** implemented and checked by hand through phase 4; phase 5 and
 [Codex keyboard review](codex-review-popup.md) parked. Replaces the parked
 Claude fullscreen-renderer issue and the split-pane prose-editor draft.
 **Problem:** Claude Code, Codex, and OpenCode now draw their conversations on
