@@ -198,6 +198,17 @@ nnoremap <leader>Q :qa!<CR>
 " Better escape (keep both Esc and jk)
 inoremap jk <Esc>
 
+" Line deletes match the shells and Codex: Alt+Backspace to the start of the
+" line, Alt+Delete to the end. That frees Ctrl+U (scrolling is Shift+Up here)
+" to be undo in every mode; in visual mode it leaves the selection first.
+inoremap <M-BS> <C-g>u<C-u>
+inoremap <M-Del> <C-g>u<Cmd>call setline('.', strpart(getline('.'), 0, col('.') - 1))<CR>
+cnoremap <M-BS> <C-u>
+cnoremap <M-Del> <Cmd>call setcmdline(strpart(getcmdline(), 0, getcmdpos() - 1))<CR>
+inoremap <C-u> <C-g>u<Cmd>undo<CR>
+nnoremap <C-u> u
+xnoremap <C-u> <Esc>u
+
 " Window navigation with Ctrl+ESDF
 nnoremap <C-e> <C-w>k
 nnoremap <C-s> <C-w>h
