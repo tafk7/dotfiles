@@ -127,6 +127,8 @@ vim│,hs│Stage git hunk under cursor│:GitGutterStageHunk
 vim│,hu│Undo git hunk under cursor│:GitGutterUndoHunk
 # Editing
 vim│jk│Exit insert mode│imap jk <Esc>
+vim│Alt+Backspace / Alt+Delete│Insert and command line: delete to the start / end of the line, as in the shells│<C-u> / setline
+vim│Ctrl+U│Undo in insert, normal, and visual mode (visual leaves the selection)│u
 vim│,/│Toggle comment on line/selection│:Commentary
 vim│gc│Comment out motion (e.g. gcap for paragraph)│gc{motion}
 vim│,w│Force-save file│:w!

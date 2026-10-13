@@ -88,6 +88,19 @@ output="$(nvim_run '+if maparg("e", "n") !=# "" | cquit 43 | endif')" || fail "r
 output="$(NVIM_REVIEW=1 nvim_run '+if maparg("e", "n") !=# "k" || maparg("q", "n") !~# "qall" | cquit 44 | endif')" \
     || fail "review profile did not load: $output"
 
+# Alt+Backspace / Alt+Delete delete to the line's start / end in insert mode;
+# Ctrl+U undoes in insert, normal, and visual mode.
+printf 'hello brave world\n' > "$TEST_ROOT/keys.md"
+line_after() {
+    nvim_run "$TEST_ROOT/keys.md" "+call cursor(1, $1)" "+call feedkeys(\"$2\", 'xt')" \
+        "+if getline(1) !=# '$3' | cquit 60 | endif" '+qall!' >/dev/null || fail "keys $2: expected '$3'"
+}
+line_after 7 'i\<M-BS>\<Esc>' 'brave world'
+line_after 7 'i\<M-Del>\<Esc>' 'hello '
+line_after 1 'A typed\<C-u>\<Esc>' 'hello brave world'
+line_after 1 'A one\<Esc>A two\<Esc>\<C-u>' 'hello brave world one'
+line_after 1 'A one\<Esc>v\<C-u>' 'hello brave world'
+
 # The prose profile loads only in the compose pane; its send keys only with a
 # target pane; grammar only when harper-ls is installed and nvim has
 # vim.lsp.enable (0.11+).
