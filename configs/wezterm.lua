@@ -9,6 +9,25 @@ local act = wezterm.action
 
 local config = wezterm.config_builder()
 
+-- Holding a chord makes Windows repeat it; a terminal never sees the key come
+-- back up. once_per_hold sends the key only when the previous press or repeat
+-- was at least NAV_DEBOUNCE seconds ago: a held chord sends once, however long
+-- it is held, and a fresh press works once that much time has passed. Keep it
+-- a little above the Windows keyboard repeat delay (0.5 s by default).
+local NAV_DEBOUNCE = 0.6
+
+local function once_per_hold(key, mods)
+  local last = -math.huge
+  return wezterm.action_callback(function(window, pane)
+    local now = tonumber(wezterm.time.now():format '%s%.3f')
+    local quiet = now - last >= NAV_DEBOUNCE
+    last = now
+    if quiet then
+      window:perform_action(act.SendKey { key = key, mods = mods }, pane)
+    end
+  end)
+end
+
 -- ---------------------------------------------------------------------------
 -- Rendering and terminal behavior
 -- ---------------------------------------------------------------------------
@@ -176,6 +195,11 @@ config.keys = {
     mods = 'NONE',
     action = act.SendString '\x1b[17;2~',
   },
+
+  -- tmux Alt+S/F step left/right through panes and across windows; one step
+  -- per press, so holding them never races through several windows.
+  { key = 's', mods = 'ALT', action = once_per_hold('s', 'ALT') },
+  { key = 'f', mods = 'ALT', action = once_per_hold('f', 'ALT') },
 
   -- Client utilities retained from the Windows Terminal surface.
   {

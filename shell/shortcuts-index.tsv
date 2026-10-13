@@ -35,7 +35,7 @@ git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
 # Tmux shortcuts (prefix is Ctrl+a)
 # No-prefix bindings (instant, left-hand optimized)
 tmux│Alt+E / Alt+D│Move focus up / down between panes; stops at the edge│select-pane -U/-D
-tmux│Alt+S / Alt+F│Move left / right between panes; at the edge, the previous / next window's facing pane (wraps around)│select-pane -L/-R or previous/next-window + {right}/{left}
+tmux│Alt+S / Alt+F│Move left / right between panes; at the edge, the previous / next window's facing pane (wraps around); in WezTerm, one step per press even when held│select-pane -L/-R or previous/next-window + {right}/{left}
 tmux│Alt+Shift+S / Alt+Shift+F│First / last window│select-window -t {start} / {end}
 tmux│Alt+arrows│Same as Alt+ESDF (laptop)│select-pane or previous/next-window
 tmux│PgUp│Shell pane: copy mode a page up (exits at the bottom); apps scroll themselves│copy-mode -eu / send-keys PPage
