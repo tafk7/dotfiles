@@ -110,6 +110,10 @@ yo <command>              # print output and copy it to the clipboard
   Codex, the exported session in an nvim popup for OpenCode. In review,
   E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
   in nvim. `<prefix> y` or Shift+Copy copies the agent's last reply.
+  In Claude, `Ctrl+C` sends Esc, so it can't stop every background agent;
+  `<prefix> Ctrl+C` sends the real key. Ctrl+Backspace/Delete delete a word
+  and Alt+Backspace/Delete to the line's start or end there too, as in the
+  shell, Codex and nvim.
 - **Compose:** `Alt+V` opens Neovim in a pane under an agent (Claude, Codex,
   OpenCode) for writing a prompt, with spell checking and, once `--dev` has
   installed harper-ls, grammar marks. `Ctrl+S` pastes the prompt and submits

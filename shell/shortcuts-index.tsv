@@ -93,6 +93,9 @@ tmux│v│Toggle the single tmux highlight in transcript view│begin-selection
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
 tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude, its own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C
+tmux│Ctrl+C / Ctrl+a Ctrl+C│In Claude, Esc (interrupts the turn, spares background agents) / a real Ctrl+C; elsewhere both are Ctrl+C│send-keys Escape / send-keys C-c
+tmux│Ctrl+Backspace / Ctrl+Delete (Claude)│Delete the word before / after the cursor, as in the shell│send-keys M-BSpace / M-d
+tmux│Alt+Backspace / Alt+Delete (Claude)│Delete to the start / end of the line, as in the shell│send-keys C-u / C-k
 tmux│Alt+Paste│Paste the tmux buffer with bracketed-paste markers│M-S-Insert / paste-buffer -p
 tmux│Click an inactive pane│Focus it only; the application sees neither the click nor a drag after it│MouseDown1Pane → select-pane
 tmux│Alt+click│Enter copy mode at the mouse position│copy-mode -M
