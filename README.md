@@ -120,8 +120,14 @@ yo <command>              # print output and copy it to the clipboard
   it without interrupting a running turn; `Ctrl+Shift+S` (or `,s`) pastes
   without submitting;
   PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
-  the last spelling or grammar mark before the cursor. `Alt+V` again switches focus; the draft survives
-  closing the pane.
+  the last spelling or grammar mark before the cursor. `Alt+V` again switches
+  focus; the draft survives closing the pane.
+  In Claude, `Alt+V` and Claude's own `Ctrl+G` move what is in the prompt box
+  into the compose pane, and quitting it (`:q`, `:wq`) puts the draft back in
+  the box; `:cq` keeps it in the draft instead. `Ctrl+Shift+G` opens the
+  prompt in Neovim in Claude's place, as `Ctrl+G` used to. This works for
+  Claude sessions started from a shell with these dotfiles, where `VISUAL` is
+  `bin/compose-editor`.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.

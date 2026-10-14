@@ -48,6 +48,16 @@
             "id": "User.CtrlShiftS"
         },
 
+        // Ctrl+Shift+G likewise (Claude: the prompt in nvim in Claude's place).
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[27;6;71~"
+            },
+            "id": "User.CtrlShiftG"
+        },
+
         // Shift-cut chords use F13-F16 escape sequences as a reliable,
         // otherwise-unused transport through Windows Terminal, SSH, and tmux.
         {
@@ -149,6 +159,10 @@
         {
             "id": "User.CtrlShiftS",
             "keys": "ctrl+shift+s"
+        },
+        {
+            "id": "User.CtrlShiftG",
+            "keys": "ctrl+shift+g"
         },
 
         // Shift publishes the removed word/line range to tmux's shared buffer.

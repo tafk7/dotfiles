@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# $VISUAL for interactive shells (shell/env.sh). Run by Claude Code in a tmux
+# pane (its Ctrl+G, chat:externalEditor), it joins Claude's prompt box to the
+# compose pane: `tmux-compose editor` moves the box into the compose draft,
+# puts a draft back, or opens nvim in Claude's place (Ctrl+Shift+G). Anything
+# else, such as git or another agent, gets $EDITOR.
+
+set -uo pipefail
+
+parent=$(tr '\0' '\n' < "/proc/$PPID/cmdline" 2>/dev/null | head -n 1)
+if [[ $# -gt 0 && -n "${TMUX:-}" && -n "${TMUX_PANE:-}" && "${parent##*/}" == claude ]]; then
+    exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/tmux-compose" editor "$TMUX_PANE" "${!#}"
+fi
+
+editor=${EDITOR:-vi}
+[[ "${editor##*/}" == compose-editor ]] && editor='vi'
+# shellcheck disable=SC2086  # EDITOR may carry arguments, such as `code -w`.
+exec $editor "$@"

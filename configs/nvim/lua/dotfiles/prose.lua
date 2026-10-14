@@ -128,7 +128,8 @@ end
 local group = vim.api.nvim_create_augroup('dotfiles_prose', {})
 
 -- Paste the draft into the target (send also submits it). On success the
--- draft is cleared; on failure it is kept and the reason shown.
+-- draft is cleared and the pane stays open; on failure it is kept and the
+-- reason shown.
 local function deliver(action)
   vim.cmd('silent write')
   local output = vim.fn.system({ compose, action, target, vim.api.nvim_buf_get_name(0) })
@@ -162,6 +163,30 @@ local function compose_keys(buf)
     group = group,
     buffer = buf,
     command = 'silent! update',
+  })
+  -- Claude's Ctrl+G adds its prompt box to the draft on disk and focuses this
+  -- pane; the saved buffer reloads.
+  vim.bo[buf].autoread = true
+  vim.api.nvim_create_autocmd({ 'FocusGained', 'BufEnter' }, {
+    group = group,
+    buffer = buf,
+    command = 'silent! checktime',
+  })
+end
+
+-- Quitting (:q, :wq, ZZ) puts the draft back in Claude's prompt box; :cq
+-- keeps it here for next time.
+if target and target ~= '' then
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    group = group,
+    callback = function()
+      local draft = vim.env.DOTFILES_COMPOSE_DRAFT
+      if vim.v.exiting ~= 0 or not draft or draft == '' then
+        return
+      end
+      -- Autosave has already written the draft; writing here ends nvim early.
+      vim.fn.system({ compose, 'return', target, draft })
+    end,
   })
 end
 

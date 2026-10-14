@@ -120,6 +120,13 @@ config.keys = {
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;83~',
   },
+  -- Ctrl+Shift+G likewise: in Claude, tmux opens the prompt in nvim in
+  -- Claude's place rather than the compose pane (Ctrl+G).
+  {
+    key = 'g',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;71~',
+  },
 
   -- Shift + Copy: tmux copies the agent's last reply (prefix+y).
   {

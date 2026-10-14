@@ -274,7 +274,9 @@ history; OpenCode's review is already nvim.
 | Ctrl+S | compose, insert and normal mode | Write the draft, paste it into the target with a bracketed paste, submit with the target's non-interrupting key, clear the buffer, and append the text to the compose history |
 | `,s` | compose, normal mode | Stage: paste without submitting |
 | PgUp/PgDn, Ctrl+Home/End | compose | Sent to the target, so the conversation scrolls without leaving the editor |
-| `:q`, `ZZ` | compose | Close the pane; the draft is kept |
+| `:q`, `ZZ` | compose | Close the pane; the draft is kept. On a Claude target, the draft goes back to Claude's prompt box instead; `:cq` keeps it |
+| Ctrl+G | Claude | Claude's external editor, which is `bin/compose-editor`: the prompt box moves to the end of the draft and the compose pane opens or takes focus. Alt+V in Claude does the same |
+| Ctrl+Shift+G | Claude | The prompt in nvim with the prose profile, in Claude's place (Claude's own Ctrl+G) |
 
 | Target (`pane_current_command`) | Submit |
 |---|---|
@@ -296,6 +298,11 @@ history; OpenCode's review is already nvim.
 - Long pastes may appear as a placeholder in the agent's prompt; the text is
   intact. OpenCode can show it in full with `prompt.paste: "full"`.
 - Nothing waits on the editor, so a killed compose pane cannot hang the agent.
+- Claude's box and the compose pane meet through Claude's `Ctrl+G` (plan step
+  4.3): the editor it runs returns at once, so while compose is open the
+  prompt lives there, otherwise in the box. Putting the draft back sets the box
+  exactly, with no paste placeholder; if Claude doesn't run its editor within
+  3 s, the draft is pasted instead.
 
 ### 5.2 Prose profile
 
