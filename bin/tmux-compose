@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Compose prompts in Neovim beside an agent pane (Alt+V). See
-# issues/scrollback-copy-compose.md §5.
+# issues/scrollback-copy-compose.md §5 and the plan's step 4.3.
 #
 #     tmux-compose toggle PANE          open the compose pane under PANE, or move
 #                                       focus between a pane and its compose pane
 #     tmux-compose send TARGET FILE     paste FILE into TARGET and submit it
 #     tmux-compose stage TARGET FILE    paste FILE into TARGET without submitting
+#     tmux-compose return TARGET FILE   put the draft FILE back in Claude's box
+#     tmux-compose editor PANE FILE     Claude's $VISUAL, through compose-editor
 #     tmux-compose forward TARGET KEY   send a scroll key (PPage, NPage, C-Home,
 #                                       C-End) to TARGET
 #
@@ -25,6 +27,17 @@
 #   opencode  Ctrl+X Enter (prompt.queue)
 # Anything else, such as a shell, only gets the paste: Enter would run it.
 #
+# Claude's prompt box: when Claude's $VISUAL is compose-editor, its Ctrl+G runs
+# `editor`, which acts on the pane option @compose-editor and clears it:
+#   (none), pull  move the box text to the end of the draft, empty the box, and
+#                 open or focus the compose pane; Alt+V in Claude sends Ctrl+G
+#   push:FILE     the box becomes FILE's text (deleted), followed by anything
+#                 typed into the box meanwhile; `return` sends this
+#   fullscreen    nvim with the prose profile in Claude's place (Ctrl+Shift+G)
+# Claude blanks its pane while the editor runs, so the editor never waits on
+# the compose pane: while compose is open the prompt lives there, otherwise in
+# the box.
+#
 # @compose-size sets the split's height (default 30%).
 
 set -uo pipefail
@@ -41,23 +54,45 @@ pane_alive() { [[ -n "$1" ]] && tmux display-message -p -t "$1" '#{pane_id}' >/d
 
 pane_option() { tmux show -pqv -t "$1" "$2" 2>/dev/null; }
 
-toggle() {
-    local pane="$1" target compose size draft dir
-    target=$(pane_option "$pane" @compose_target)
-    if [[ -n "$target" ]]; then
-        pane_alive "$target" || fail "its agent pane is gone"
-        tmux select-pane -t "$target"
-        return
-    fi
+blank() { [[ -z "${1//[[:space:]]/}" ]]; }
+
+cancel_mode() {
+    [[ "$(tmux display-message -p -t "$1" '#{pane_in_mode}')" == 1 ]] && tmux send-keys -X -t "$1" cancel
+    return 0
+}
+
+# PANE's draft, created empty and private if missing.
+draft_of() {
+    local draft
+    mkdir -p "$state_dir" && chmod 700 "$state_dir"
+    draft="$state_dir/$(tmux display-message -p '#{start_time}')-${1#%}.md"
+    [[ -e "$draft" ]] || (umask 077 && : > "$draft")
+    printf '%s' "$draft"
+}
+
+# Whether PANE runs a Claude whose $VISUAL is compose-editor, so that its
+# Ctrl+G reaches `editor`.
+claude_editor() {
+    local tty pid cmd
+    [[ "$(tmux display-message -p -t "$1" '#{pane_current_command}')" == claude ]] || return 1
+    tty=$(tmux display-message -p -t "$1" '#{pane_tty}')
+    while read -r pid cmd _; do
+        [[ "${cmd##*/}" == claude ]] || continue
+        tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -q '^VISUAL=.*compose-editor$' && return 0
+    done < <(ps -t "${tty#/dev/}" -o pid=,args= 2>/dev/null)
+    return 1
+}
+
+# Focus PANE's compose pane, opening it first if needed.
+open() {
+    local pane="$1" compose size draft dir
     compose=$(pane_option "$pane" @compose_pane)
     if pane_alive "$compose" && [[ "$(pane_option "$compose" @compose_target)" == "$pane" ]]; then
         tmux select-pane -t "$compose"
         return
     fi
 
-    mkdir -p "$state_dir" && chmod 700 "$state_dir"
-    draft="$state_dir/$(tmux display-message -p '#{start_time}')-${pane#%}.md"
-    [[ -e "$draft" ]] || (umask 077 && : > "$draft")
+    draft=$(draft_of "$pane")
     size=$(tmux show -gqv @compose-size)
     dir=$(tmux display-message -p -t "$pane" '#{pane_current_path}')
     compose=$(tmux split-window -v -l "${size:-30%}" -t "$pane" -c "$dir" -P -F '#{pane_id}' \
@@ -67,15 +102,106 @@ toggle() {
     tmux set -p -t "$pane" @compose_pane "$compose"
 }
 
+toggle() {
+    local pane="$1" target
+    target=$(pane_option "$pane" @compose_target)
+    if [[ -n "$target" ]]; then
+        pane_alive "$target" || fail "its agent pane is gone"
+        tmux select-pane -t "$target"
+        return
+    fi
+    if claude_editor "$pane"; then
+        # Through Claude's Ctrl+G, which brings the box along. Should Claude not
+        # run its editor (it may not while busy), open the pane anyway.
+        cancel_mode "$pane"
+        tmux set -p -t "$pane" @compose-editor pull
+        tmux send-keys -t "$pane" C-g
+        for _ in {1..15}; do
+            [[ -z "$(pane_option "$pane" @compose-editor)" ]] && return
+            sleep 0.1
+        done
+        tmux set -pu -t "$pane" @compose-editor
+    fi
+    open "$pane"
+}
+
+# Ctrl+G with no request: the box text moves to the end of the draft.
+pull() {
+    local pane="$1" file="$2" text draft current
+    text=$(<"$file")
+    if ! blank "$text"; then
+        draft=$(draft_of "$pane")
+        current=$(<"$draft")
+        if blank "$current"; then
+            printf '%s\n' "$text" > "$draft"
+        else
+            printf '%s\n\n%s\n' "$current" "$text" > "$draft"
+        fi
+    fi
+    : > "$file"
+    open "$pane"
+}
+
+# The box becomes TEXT_FILE's text, then whatever was typed into it meanwhile.
+push() {
+    local text_file="$1" file="$2" text box
+    text=$(<"$text_file")
+    rm -f "$text_file"
+    box=$(<"$file")
+    if blank "$box"; then
+        printf '%s' "$text" > "$file"
+    else
+        printf '%s\n\n%s' "$text" "$box" > "$file"
+    fi
+}
+
+editor() {
+    local pane="$1" file="$2" request
+    request=$(pane_option "$pane" @compose-editor)
+    tmux set -pu -t "$pane" @compose-editor
+    case "$request" in
+        fullscreen) NVIM_PROSE=1 exec nvim -- "$file" ;;
+        push:*) [[ -r "${request#push:}" ]] && push "${request#push:}" "$file" ;;
+        *) pull "$pane" "$file" ;;
+    esac
+}
+
+# Quitting the compose pane: the draft goes back to Claude's box through its
+# Ctrl+G, exactly as written, and the draft is emptied. If Claude doesn't run
+# its editor within 3 s, the draft is pasted instead. Other targets keep the
+# draft for next time.
+give_back() {
+    local target="$1" draft="$2" text handoff
+    text=$(<"$draft")
+    blank "$text" && return 0
+    pane_alive "$target" || fail "the agent pane is gone; the draft is kept"
+    claude_editor "$target" || return 0
+
+    handoff=$(mktemp "${TMPDIR:-/tmp}/compose-return.XXXXXX") || fail "no temporary file"
+    printf '%s' "$text" > "$handoff"
+    cancel_mode "$target"
+    tmux set -p -t "$target" @compose-editor "push:$handoff"
+    tmux send-keys -t "$target" C-g
+    for _ in {1..30}; do
+        if [[ ! -e "$handoff" ]]; then
+            : > "$draft"
+            return 0
+        fi
+        sleep 0.1
+    done
+    tmux set -pu -t "$target" @compose-editor
+    rm -f "$handoff"
+    paste stage "$target" "$draft" && : > "$draft"
+}
+
 paste() {
     local mode="$1" target="$2" file="$3" text buffer program
     [[ -r "$file" ]] || fail "no draft at $file"
     text=$(<"$file")
-    [[ -n "${text//[[:space:]]/}" ]] || fail "the draft is empty"
+    blank "$text" && fail "the draft is empty"
     pane_alive "$target" || fail "the agent pane is gone; the draft is kept"
 
-    [[ "$(tmux display-message -p -t "$target" '#{pane_in_mode}')" == 1 ]] \
-        && tmux send-keys -X -t "$target" cancel
+    cancel_mode "$target"
     buffer="compose-$$"
     printf '%s' "$text" | tmux load-buffer -b "$buffer" - || fail "could not load the draft"
     tmux paste-buffer -p -d -b "$buffer" -t "$target" || fail "could not paste the draft"
@@ -101,6 +227,11 @@ paste() {
 case "${1:-}" in
     toggle) toggle "${2:?pane}" ;;
     send | stage) paste "$1" "${2:?target}" "${3:?file}" ;;
+    return) give_back "${2:?target}" "${3:?file}" ;;
+    editor) editor "${2:?pane}" "${3:?file}" ;;
     forward) tmux send-keys -t "${2:?target}" "${3:?key}" ;;
-    *) echo "usage: tmux-compose toggle PANE | send|stage TARGET FILE | forward TARGET KEY" >&2; exit 2 ;;
+    *)
+        echo "usage: tmux-compose toggle PANE | send|stage|return TARGET FILE | editor PANE FILE | forward TARGET KEY" >&2
+        exit 2
+        ;;
 esac

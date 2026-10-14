@@ -58,7 +58,14 @@ if [[ -z "${EDITOR:-}" ]]; then
     unset _dotfiles_editor
 fi
 export EDITOR="${EDITOR:-vi}"
-export VISUAL="${VISUAL:-$EDITOR}"
+# Claude Code's Ctrl+G opens $VISUAL. compose-editor joins it to the tmux
+# compose pane and runs $EDITOR for everything else. A VISUAL of your own wins.
+if [[ -z "${VISUAL:-}" || "$VISUAL" == "$EDITOR" || "${VISUAL##*/}" == compose-editor ]] \
+    && [[ -x "${DOTFILES_DIR:-}/bin/compose-editor" ]]; then
+    export VISUAL="$DOTFILES_DIR/bin/compose-editor"
+else
+    export VISUAL="${VISUAL:-$EDITOR}"
+fi
 
 # Python
 export PYTHONDONTWRITEBYTECODE=1

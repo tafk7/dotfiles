@@ -49,6 +49,8 @@ tk_start() {
     tar -C "$TEST_REPO_ROOT" --exclude=.git --exclude=generated --exclude=.backups -cf - . \
         | tar -x -C "$TK_CHECKOUT"
     export DOTFILES_DIR="$TK_CHECKOUT" SHELL=/bin/bash PATH="$TEST_ROOT/bin:$PATH"
+    # A pane gets the compose-editor VISUAL only when a test asks (-e VISUAL=).
+    unset VISUAL
 
     ti -f "$TK_CONFIG" new-session -d -s test -x 120 -y 40 'exec sleep 3600'
     tmux -L "$TK_OUTER" -f /dev/null new-session -d -s outer -x 120 -y 41 \

@@ -286,6 +286,42 @@ Phase 3 checks pass.
 
 **Done when** the tests pass and the manual Phase 4 checks pass.
 
+### 4.3 Compose fused with Claude's prompt box
+
+Added after Phase 4. Claude's `Ctrl+G` (`chat:externalEditor`) runs `$VISUAL`
+on a temporary `.md` file holding the prompt box, with the editor as its direct
+child and `TMUX_PANE` set; on exit 0 the file replaces the box (empty clears
+it), on a non-zero exit the box is kept. While the editor runs, Claude's pane
+is blank, so the compose split can't be the editor Claude waits on: the
+editor hook only carries text across, and returns at once. While compose is
+open the prompt lives there; otherwise in the box.
+
+- `bin/compose-editor` ★: `$VISUAL` (`shell/env.sh`, unless `VISUAL` is set to
+  something other than `$EDITOR`). Run by a `claude` process in a tmux pane, it
+  hands over to `tmux-compose editor`; anything else gets `$EDITOR`.
+- `bin/tmux-compose`, keyed by the pane option `@compose-editor`:
+  - **editor PANE FILE**, no request (pull, `Ctrl+G`): the box text is added
+    to the end of the draft, the box emptied, and the compose pane opened or
+    focused; nvim reloads the draft on focus (`autoread`).
+  - `push:FILE` (return): the box becomes that text, followed by anything typed
+    into the box meanwhile.
+  - `fullscreen` (`Ctrl+Shift+G`): nvim with the prose profile in Claude's
+    place, as Claude's own `Ctrl+G` was.
+  - **return TARGET DRAFT**: the draft goes back to the box through the editor
+    hook (exact, no `[Pasted text]` folding), then the draft is emptied; if the
+    hook doesn't answer in 3 s, the draft is staged by paste instead.
+  - **toggle** in a Claude pane whose `VISUAL` is `compose-editor` sends
+    `Ctrl+G`, so Alt+V and `Ctrl+G` are one path; elsewhere, unchanged.
+- `prose.lua`: quitting a compose pane on a Claude target (`:q`, `:wq`, `ZZ`)
+  returns the draft; `:cq` keeps it parked. `Ctrl+S` still sends and stays.
+- `configs/tmux.conf`: `C-S-G` in a Claude pane sets `@compose-editor
+  fullscreen` and sends `C-g`; WezTerm and Windows Terminal send Ctrl+Shift+G
+  as `\e[27;6;71~`.
+- Tests: the stub's `--editor` runs `$VISUAL` on `Ctrl+G` as Claude does and
+  logs the box; pull into a new and an open compose pane, return with and
+  without text typed into the box meanwhile, the paste fallback, `:cq`,
+  fullscreen, and `compose-editor` falling back to `$EDITOR` elsewhere.
+
 ## Adoption and manual checks
 
 After each phase is fast-forwarded into the live checkout:
