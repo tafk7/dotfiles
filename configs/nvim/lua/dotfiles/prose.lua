@@ -164,8 +164,8 @@ local function compose_keys(buf)
     buffer = buf,
     command = 'silent! update',
   })
-  -- Claude's Ctrl+G adds its prompt box to the draft on disk and focuses this
-  -- pane; the saved buffer reloads.
+  -- Claude's Ctrl+G adds its prompt box to the draft on disk and asks this
+  -- nvim, through its --listen socket, to reread it; focus rereads it too.
   vim.bo[buf].autoread = true
   vim.api.nvim_create_autocmd({ 'FocusGained', 'BufEnter' }, {
     group = group,

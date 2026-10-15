@@ -12,7 +12,8 @@
 #                                       C-End) to TARGET
 #
 # The compose pane runs nvim with NVIM_PROSE=1 (configs/nvim/lua/dotfiles/
-# prose.lua), DOTFILES_COMPOSE_TARGET, and DOTFILES_COMPOSE_DRAFT. The pair is
+# prose.lua), DOTFILES_COMPOSE_TARGET, and DOTFILES_COMPOSE_DRAFT, listening on
+# DRAFT.sock so that a pull can make it reread the draft. The pair is
 # recorded both ways: @compose_target on the compose pane, @compose_pane on the
 # target. Drafts live under ${XDG_STATE_HOME:-~/.local/state}/dotfiles/compose,
 # one per target pane, named by the tmux server's start time and the pane ID so
@@ -93,11 +94,12 @@ open() {
     fi
 
     draft=$(draft_of "$pane")
+    rm -f "$draft.sock"
     size=$(tmux show -gqv @compose-size)
     dir=$(tmux display-message -p -t "$pane" '#{pane_current_path}')
     compose=$(tmux split-window -v -l "${size:-30%}" -t "$pane" -c "$dir" -P -F '#{pane_id}' \
         -e NVIM_PROSE=1 -e "DOTFILES_COMPOSE_TARGET=$pane" -e "DOTFILES_COMPOSE_DRAFT=$draft" \
-        "nvim -- $(printf '%q' "$draft")") || fail "could not split the pane"
+        "nvim --listen $(printf '%q' "$draft.sock") -- $(printf '%q' "$draft")") || fail "could not split the pane"
     tmux set -p -t "$compose" @compose_target "$pane"
     tmux set -p -t "$pane" @compose_pane "$compose"
 }
@@ -137,6 +139,8 @@ pull() {
         else
             printf '%s\n\n%s\n' "$current" "$text" > "$draft"
         fi
+        # An open compose nvim rereads the draft.
+        [[ -S "$draft.sock" ]] && nvim --server "$draft.sock" --remote-expr 'execute("checktime")' >/dev/null 2>&1
     fi
     : > "$file"
     open "$pane"
