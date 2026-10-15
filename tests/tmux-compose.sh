@@ -37,7 +37,7 @@ draft="$XDG_STATE_HOME/dotfiles/compose/$(ti display-message -p '#{start_time}')
 grep -qx 'prose=1' "$nvim_log" || fail "NVIM_PROSE: $(cat "$nvim_log")"
 grep -qx "target=$claude" "$nvim_log" || fail "compose target: $(cat "$nvim_log")"
 grep -qx "draft=$draft" "$nvim_log" || fail "draft path: $(cat "$nvim_log")"
-grep -qx "args=-- $draft" "$nvim_log" || fail "nvim arguments: $(cat "$nvim_log")"
+grep -qx "args=--listen $draft.sock -- $draft" "$nvim_log" || fail "nvim arguments: $(cat "$nvim_log")"
 assert_eq "$(stat -c %a "$draft")" 600 "draft mode"
 pane=$(ti show -pqv -t "$claude" @compose_pane)
 assert_eq "$(ti show -pqv -t "$pane" @compose_target)" "$claude" "@compose_target"
