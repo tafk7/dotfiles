@@ -147,7 +147,7 @@ configuration. Settings not listed in those files are left alone. See
 ```bash
 ./bin/ai-config --dry-run
 ./bin/ai-config --check --plugins
-./bin/ai-update claude            # explicit update (auto-update is disabled)
+./bin/ai-update claude            # explicit update through the official installer
 ./bin/ai-update opencode          # opencode only notifies about new releases
 ```
 
