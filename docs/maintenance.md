@@ -39,6 +39,17 @@ Ledgers written before ownership was recorded explicitly may contain ownership
 inferred from location. Check `uninstall-tool --dry-run NAME` before trusting
 an old record, and don't blanket-adopt or remove unrecorded local tools.
 
+## Setup logs
+
+Each setup run writes `~/.local/state/dotfiles/logs/setup-<UTC time>.log`
+(`-dry-run` suffix for previews; `latest.log` links the newest; the last
+`DOTFILES_LOG_KEEP`, default 30, are kept). The header names the command,
+checkout revision with its uncommitted-file count, and host. The body is the
+whole transcript without color codes. The footer gives the exit status and the
+ledger rows the run changed, timestamps aside. Standalone installer and
+`bin/ai-update` runs are not logged. `DOTFILES_SETUP_LOG=0` disables the log;
+the test harness sets it.
+
 ## Recovery
 
 Run one setup or update at a time; this is not a concurrent package manager.
