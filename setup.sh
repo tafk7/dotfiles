@@ -9,6 +9,7 @@ DOTFILES_DIR="$SCRIPT_DIR"
 export DOTFILES_DIR
 
 source "$SCRIPT_DIR/lib/install.sh"
+source "$SCRIPT_DIR/lib/setup-log.sh"
 
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 
@@ -788,7 +789,9 @@ main() {
         show_help
         exit 0
     fi
-    
+
+    setup_log_start "$@"
+
     echo "Dotfiles Installation"
     echo "===================================="
     echo "Target: Ubuntu (including WSL)"

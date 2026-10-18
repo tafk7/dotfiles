@@ -58,6 +58,11 @@ Setup options:
 
 `./setup.sh --help` lists every option.
 
+Every run, including `--dry-run`, writes a log to
+`~/.local/state/dotfiles/logs/` (`latest.log` is the newest; the last 30 are
+kept). It records the command, the checkout revision, the full output, and the
+component ledger changes the run made. Set `DOTFILES_SETUP_LOG=0` to skip it.
+
 After setup:
 
 1. Restart the shell and run `./bin/verify --installed`.

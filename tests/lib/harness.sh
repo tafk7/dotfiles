@@ -19,6 +19,7 @@ fixture_init() {
     export TMUX=""
     export DOTFILES_DIR="$TEST_REPO_ROOT"
     export DOTFILES_BACKUP_PREFIX="$TEST_ROOT/backups"
+    export DOTFILES_SETUP_LOG=0
 }
 
 fixture_cleanup() {
