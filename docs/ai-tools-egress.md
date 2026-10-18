@@ -27,11 +27,11 @@ an existing config).
   poll → `api.anthropic.com` (org-managed only), auto-updater → `downloads.claude.ai`.
 
 **What we ship:** `bin/ai-config claude` merges the explicitly owned preferences
-from `configs/claude-settings.json`, including `DISABLE_TELEMETRY=1`,
-`DISABLE_ERROR_REPORTING=1`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`.
-Unlisted keys remain local. The nonessential-traffic setting also disables
-Claude's automatic updater (confirmed by Claude Code 2.1.273's `doctor`). Use
-`bin/ai-update claude` for an explicit native update without weakening that policy.
+from `configs/claude-settings.json`, including `DISABLE_TELEMETRY=1` and
+`DISABLE_ERROR_REPORTING=1`. Unlisted keys remain local.
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is not shipped, so Claude's automatic
+updater runs. Setting it to `1` locally disables the updater as well (confirmed
+by Claude Code 2.1.273's `doctor`); `bin/ai-update claude` then updates explicitly.
 
 **Fleet enforcement (admins):** user `settings.json` is *lowest* precedence.
 To enforce policy that can't be bypassed, use system managed settings at

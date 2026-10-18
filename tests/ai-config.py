@@ -62,13 +62,13 @@ custom_binding = "ctrl-k"
         self.assertTrue(list((self.home / '.claude/backups').glob('*/settings.json')))
         self.assertFalse(list(self.home.rglob('.adapter-backups')))
 
-    def test_claude_fullscreen_turns_mouse_capture_back_on(self):
-        # The overlay merges, so dropping the key would keep a live "1"; it says "0".
+    def test_claude_fullscreen_leaves_mouse_env_local(self):
+        # Mouse capture is unmanaged: the overlay merges, so a live value stays.
         claude = self.put('.claude/settings.json', '{"tui":"default","env":{"CLAUDE_CODE_DISABLE_MOUSE":"1","LOCAL_VALUE":"keep"}}')
         self.run_config('claude')
         d = json.loads(claude.read_text())
         self.assertEqual(d['tui'], 'fullscreen')
-        self.assertEqual(d['env']['CLAUDE_CODE_DISABLE_MOUSE'], '0')
+        self.assertEqual(d['env']['CLAUDE_CODE_DISABLE_MOUSE'], '1')
         self.assertEqual(d['env']['LOCAL_VALUE'], 'keep')
         self.assertEqual((self.home / '.claude/keybindings.json').read_bytes(),
                          (ROOT / 'configs/ai/claude/keybindings.json').read_bytes())

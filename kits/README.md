@@ -46,15 +46,12 @@ Code reads the settings as managed settings, so the harness kit's own
 ## Claude Code mods
 
 The harness kit pins Claude Code 2.1.287, the first release that loads mods
-(plugins with a `modules` hooks file). Two consequences of the settings kit:
-
-- `ai-preferences` writes `/etc/claude-code/managed-settings.json`, so every
-  sandbox is a machine with managed settings. Claude Code's built-in
-  `sec-default` guard loads there ahead of user mods, `prependPlugins` and
-  `appendPlugins` in user settings are ignored, and `allowManagedModsOnly`
-  (if ever added) would stop mods delivered by `CLAUDE_CODE_PLUGIN_DIRS`.
-- The same settings carry `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, so
-  `$.http.fetch` is refused in a sandbox; mods use `$.process.run`.
+(plugins with a `modules` hooks file). `ai-preferences` writes
+`/etc/claude-code/managed-settings.json`, so every sandbox is a machine with
+managed settings. Claude Code's built-in `sec-default` guard loads there ahead
+of user mods, `prependPlugins` and `appendPlugins` in user settings are ignored,
+and `allowManagedModsOnly` (if ever added) would stop mods delivered by
+`CLAUDE_CODE_PLUGIN_DIRS`.
 
 The harness kit's startup step still links `CLAUDE.md` to `AGENTS.md`. The
 built-in `agents-md` mod (2.1.287) should make that unnecessary; it has not been
