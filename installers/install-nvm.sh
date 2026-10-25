@@ -7,6 +7,9 @@ INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
 export DOTFILES_DIR
 source "$DOTFILES_DIR/lib/install.sh"
+# Observation reports what is installed and changes nothing, so it branches
+# before any provisioning below (lib/observe.sh).
+if [[ "${1:-}" == --observe ]]; then observe_component nvm; exit; fi
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
@@ -46,13 +49,13 @@ else
     mkdir -p "$NVM_DIR"
 
     # Download to a file rather than piping the network into bash.
-    log "Downloading NVM installer (v0.40.4)..."
+    log "Downloading NVM installer (v$NVM_VERSION)..."
     nvm_installer="${DOTFILES_NVM_INSTALLER_SCRIPT:-}"
     downloaded_installer=false
     if [[ -z "$nvm_installer" ]]; then
         nvm_installer="$(mktemp)"
         downloaded_installer=true
-        download_installer_script "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh" "$nvm_installer"
+        download_installer_script "https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh" "$nvm_installer"
     elif [[ ! -s "$nvm_installer" ]]; then
         error "DOTFILES_NVM_INSTALLER_SCRIPT is missing or empty: $nvm_installer"
         exit 1

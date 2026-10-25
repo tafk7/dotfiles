@@ -13,7 +13,7 @@ from the network into a shell and are never executed with `sudo`.
 | vim-plug | commit `88e31471818e9a29a8a20a0ee61360cfd7bdc1cd` | explicit `install-editor-plugins` action; HTTPS-trusted immutable source; existing manager preserved |
 | Neovim plugins | commit-pinned in `configs/init.vim` | cloned by `install-editor-plugins`; no post-install hooks, so the fzf plugin never downloads its own binary and uses the eget-pinned `fzf` on PATH |
 | tmux | pinned release (`lib/config.sh`) | source archive SHA-256 verified against the pin; staged build and executable check before replacement |
-| NVM | pinned installer v0.40.4 | HTTPS-trusted installer file; no shell-RC modification; prior tree retained on installer failure |
+| NVM | pinned installer (`NVM_VERSION` in `lib/config.sh`) | HTTPS-trusted installer file; no shell-RC modification; prior tree retained on installer failure |
 | Rust | moving rustup installer | HTTPS-trusted installer file; in-place upstream mutation; recover with `rustup update`/`rustup self uninstall` |
 | Claude Code | moving official installer | HTTPS-trusted installer file; verified owned launcher after execution |
 | Codex | moving official installer | HTTPS-trusted installer file; official `CODEX_NON_INTERACTIVE=1` mode; release layout preserves the prior launcher on failed migration |

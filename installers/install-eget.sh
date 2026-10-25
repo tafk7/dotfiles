@@ -8,8 +8,9 @@ INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
 export DOTFILES_DIR
 source "$DOTFILES_DIR/lib/install.sh"
-
-EGET_VERSION="1.3.4"
+# Observation reports what is installed and changes nothing, so it branches
+# before any provisioning below (lib/observe.sh).
+if [[ "${1:-}" == --observe ]]; then observe_component eget; exit; fi
 
 FORCE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
