@@ -10,6 +10,7 @@ export DOTFILES_DIR
 
 source "$SCRIPT_DIR/lib/install.sh"
 source "$SCRIPT_DIR/lib/setup-log.sh"
+source "$SCRIPT_DIR/lib/operation.sh"
 
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 
@@ -819,5 +820,10 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    # A run that changes state holds the operation lock; help and previews,
+    # including a bare invocation, do not.
+    if (( $# )) && ! operation_read_only_args "$@"; then
+        operation_begin "$SCRIPT_DIR/setup.sh" "$@"
+    fi
     main "$@"
 fi

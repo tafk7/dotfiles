@@ -52,8 +52,12 @@ the test harness sets it.
 
 ## Recovery
 
-Run one setup or update at a time; this is not a concurrent package manager.
-Each artifact replacement writes a journal first. When a replacement fails,
+One state-changing command runs at a time: setup, `uninstall-tool`, and
+`ai-config` writes hold an operation lock (`operation.lock` in the state
+directory), and a second one exits 75 naming the holder. Only the top-level
+command holds it; a dotfiles command it starts, such as `ai-config` from an
+installer, joins the operation instead. Help, `--check`, and `--dry-run` runs
+take no lock. Each artifact replacement writes a journal first. When a replacement fails,
 setup makes one bounded attempt to reconcile it: if the artifact now at the
 target runs, it is recorded and the journal removed. Otherwise the journal is
 kept, and it blocks further replacements of that component only, until setup
