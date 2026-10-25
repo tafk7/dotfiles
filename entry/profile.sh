@@ -50,7 +50,9 @@ if [ -z "${_DOTFILES_BASE_ENV:-}" ]; then
 
     export TERM="${TERM:-xterm-256color}"
     export PAGER=less
-    export LESS='-F -g -i -M -R -S -w -X -z-4'
+    # No -X: less pages on the alternate screen, where tmux turns the wheel and
+    # PgUp/PgDn into its own paging. Since less 530, -F needs no -X.
+    export LESS='-F -g -i -M -R -S -w -z-4'
 
     export _DOTFILES_BASE_ENV=1
 fi

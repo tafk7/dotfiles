@@ -61,15 +61,15 @@ show_path() {
     echo "$PATH" | tr ':' '\n'
 }
 
-# Markdown viewer — TUI when interactive, rendered output when piped
+# Markdown viewer — paged through less when interactive, rendered when piped
 md() {
     if ! command -v glow >/dev/null 2>&1; then
         cat "$@"
         return
     fi
     if [[ -t 1 ]]; then
-        glow "$@"
-    else
         glow -p "$@"
+    else
+        glow "$@"
     fi
 }

@@ -183,7 +183,7 @@ shell│tree│Recursive directory tree│eza --tree --color=auto --group-direct
 # File viewing
 shell│bat│Syntax-highlighted file viewer│batcat
 shell│view│Same as bat│batcat
-shell│md│Render Markdown in terminal│glow (TUI if interactive, print if piped)
+shell│md│Render Markdown in terminal│glow (paged if interactive, print if piped)
 shell│p [path...]│Print canonical current directory or resolve supplied paths│pwd -P / realpath
 shell│yo <command>│Print command output and yank it to the clipboard│yo pwd
 # System info
