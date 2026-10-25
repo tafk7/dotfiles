@@ -54,6 +54,11 @@ HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME"
         '+if line(".") != 2 || @/ !=# "needle" | cquit 31 | endif' '+quit'
 grep -q '   $' "$TEST_ROOT/code.py" && fail "Python trailing spaces were retained"
 [[ ! -s "$DOTFILES_MUTATION_LOG" ]] || fail "Neovim startup attempted a network download"
+# Plugin install hooks run downloads outside the pins; the fzf plugin's would
+# fetch an unverified fzf whenever the eget pin differs from its version.
+if grep -E "^[[:space:]]*Plug .*'do'" "$ROOT/configs/init.vim"; then
+    fail "a Neovim plugin declares a post-install hook"
+fi
 
 # The palette colorscheme needs no plugins and never uses RGB, so tmux can map
 # its colors to the window's theme.

@@ -23,8 +23,10 @@ Plug 'tpope/vim-commentary', { 'commit': '64a654ef4a20db1727938338310209b6a63f60
 Plug 'tpope/vim-repeat', { 'commit': '65846025c15494983dafe5e3b46c8f88ab2e9635' }
 Plug 'tpope/vim-unimpaired', { 'commit': 'db65482581a28e4ccf355be297f1864a4e66985c' }
 
-" File navigation
-Plug 'junegunn/fzf', { 'commit': 'b224480a98a40c670c8ed89abd52d4216a470032', 'do': { -> fzf#install() } }
+" File navigation. No fzf#install() hook: when the fzf on PATH (the eget pin)
+" differs from the plugin's own version, it downloads an unverified binary
+" into the plugin, which fzf.vim then prefers. The plugin uses the PATH fzf.
+Plug 'junegunn/fzf', { 'commit': 'b224480a98a40c670c8ed89abd52d4216a470032' }
 Plug 'junegunn/fzf.vim', { 'commit': '8a0068127ac9ee23d71dab2944ce995726bef462' }
 
 " Git integration
