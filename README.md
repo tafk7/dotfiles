@@ -58,6 +58,19 @@ Setup options:
 
 `./setup.sh --help` lists every option.
 
+Each setup run adds its tier and selections to the machine profile
+(`~/.local/state/dotfiles/profile`), which records what dotfiles manages on
+this machine. Flags only add; a preview never writes it. `dotfiles profile`
+shows it and changes it:
+
+```bash
+dotfiles profile                  # tier, capabilities, AI CLIs, opt-outs
+dotfiles profile --add rdp        # save, show the plan, apply on confirmation
+dotfiles profile --remove pi      # stop managing pi; it stays installed
+dotfiles profile --tier dev       # lowering uninstalls nothing
+dotfiles profile --propose        # derive one from the component ledger
+```
+
 Every run, including `--dry-run`, writes a log to
 `~/.local/state/dotfiles/logs/` (`latest.log` is the newest; the last 30 are
 kept). It records the command, the checkout revision, the full output, and the

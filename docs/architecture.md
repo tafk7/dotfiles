@@ -82,6 +82,8 @@ without turning later config reconciliation into package installation.
 Durable state lives under
 `${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/`:
 
+- `profile`: the machine profile, what dotfiles manages here (tier,
+  capabilities, AI CLIs, opt-outs); setup flags only add to it;
 - `preferences.tsv`: explicit feature preferences;
 - `components.tsv`: observed component status, ownership, version, path, and
   update contract;
