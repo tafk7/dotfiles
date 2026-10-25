@@ -182,12 +182,15 @@ version_line() {
 }
 
 # The path to record for a component's command: symlinks resolved, except a
-# snap command, which resolves through /usr/bin/snap to snapd rather than to
-# the tool itself.
+# command served by a multi-call launcher that dispatches on its name: a snap
+# command resolves through /usr/bin/snap to snapd, and rustc or cargo to the
+# rustup proxy, rather than to the tool itself.
 component_path() {
     local path="$1" resolved
     resolved="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
-    case "${resolved##*/}" in snap|snapd) [[ "${path##*/}" == snap* ]] || resolved="$path" ;; esac
+    case "${resolved##*/}" in
+        snap|snapd|rustup) [[ "${path##*/}" == "${resolved##*/}" || "${path##*/}" == snap ]] || resolved="$path" ;;
+    esac
     printf '%s\n' "$resolved"
 }
 

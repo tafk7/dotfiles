@@ -52,6 +52,16 @@ assert_eq "$(field gcloud 5)" "$TEST_ROOT/snap/bin/gcloud" "gcloud snap path"
 assert_eq "$(field gcloud 4)" "Google Cloud SDK 500.0.0" "gcloud snap version"
 assert_eq "$(field gcloud 2)/$(field gcloud 3)" "external/present" "snap gcloud ownership"
 
+# rustc is the rustup proxy under another name; record rustc and its version.
+mkdir -p "$HOME/.cargo/bin"
+printf '#!/bin/sh\ncase "$(basename "$0")" in rustc) echo "rustc 1.92.0 (abc 2026-01-01)" ;; *) echo "rustup 1.29.1" ;; esac\n' \
+    > "$HOME/.cargo/bin/rustup"
+chmod +x "$HOME/.cargo/bin/rustup"
+ln -s rustup "$HOME/.cargo/bin/rustc"
+PATH="$HOME/.cargo/bin:$PATH" track_install rust ok
+assert_eq "$(field rust 5)" "$HOME/.cargo/bin/rustc" "rustc path through the rustup proxy"
+assert_eq "$(field rust 4)" "rustc 1.92.0 (abc 2026-01-01)" "rustc version through the rustup proxy"
+
 # An APT tool found already installed keeps package-manager ownership.
 printf '#!/bin/sh\necho 1.2.3\n' > "$TEST_ROOT/usr/bin/tailscale"
 chmod +x "$TEST_ROOT/usr/bin/tailscale"
