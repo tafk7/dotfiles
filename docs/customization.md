@@ -121,6 +121,8 @@ These untracked files keep machine-specific settings out of the repo:
   `~/.shell.local.d/` can export extra flags such as `--plugin-dir`.
 - `~/.gitconfig.local`: included last, so it overrides the tracked Git config.
   So does the parked Azure DevOps credential snippet ([work](work.md#cloud-clis)).
+- `~/.tmux.local.conf`: sourced at the end of the tmux config, so it
+  overrides it. `<prefix> r` reloads it.
 - `~/.ssh/config.local`: included first, so its values win. Named files in
   `~/.ssh/config.d/*.conf` follow it.
 
