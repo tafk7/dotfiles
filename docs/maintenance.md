@@ -73,9 +73,6 @@ Migration code is removed once every machine has migrated. Nothing reads a
 checkout's `generated/` directory any longer; an old checkout's copy is ignored
 and safe to delete.
 
-Whether `--work` should keep including sbx/KVM is an
-[open decision](../issues/work-tier-sandbox-boundary.md).
-
 ## Optional editor and badge setup
 
 `bin/install-editor-plugins` bootstraps the pinned vim-plug revision and

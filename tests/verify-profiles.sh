@@ -122,7 +122,8 @@ HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME"
     DOTFILES_TEST_OS_VERSION=24.04 DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_SYSTEMD_RUNNING=0 \
     "$ROOT/bin/verify" --tier work --tail > "$TEST_ROOT/work-profile.log" 2>&1 || rc=$?
 [[ $rc -ne 64 ]] || fail "composed --tier work --tail verification was rejected by the parser"
-grep -Fq 'Work local-execution readiness' "$TEST_ROOT/work-profile.log" || fail "work readiness verification did not run"
+grep -Fq 'Docker readiness' "$TEST_ROOT/work-profile.log" || fail "Docker readiness verification did not run"
+grep -Fq 'Local sandbox readiness' "$TEST_ROOT/work-profile.log" || fail "sandbox readiness verification did not run"
 grep -Fq 'Tailscale readiness' "$TEST_ROOT/work-profile.log" || fail "Tailscale verification did not run"
 
 rc=0

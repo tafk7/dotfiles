@@ -123,9 +123,12 @@ tail_state() {
     esac
 }
 
-# Callers provide check_pass/check_warn/check_fail. Required work verification
-# treats every missing local execution prerequisite as an error.
-work_verify_checks() {
+# Callers provide check_pass/check_warn/check_fail. Required verification
+# treats every missing prerequisite as an error.
+
+# Docker readiness, wherever Docker is selected: local endpoint, group
+# membership, and the service.
+docker_verify_checks() {
     local required="${1:-true}" group_state endpoint rc
     local fail_fn=check_fail
     [[ "$required" == true ]] || fail_fn=check_warn
@@ -135,6 +138,42 @@ work_verify_checks() {
     else
         "$fail_fn" "systemd unavailable (work services cannot be managed persistently)"
     fi
+
+    rc=0
+    work_docker_ready || rc=$?
+    case "$rc" in
+        0) check_pass "local Docker daemon access" ;;
+        2) "$fail_fn" "Docker package missing (run: ./setup.sh --work)" ;;
+        3) endpoint="$(work_docker_endpoint)"; "$fail_fn" "Docker context is remote ($endpoint); local daemon access is required" ;;
+        *) "$fail_fn" "local Docker daemon unavailable or permission denied" ;;
+    esac
+    if command -v docker >/dev/null 2>&1; then
+        endpoint="$(work_docker_endpoint)"
+        if [[ "$endpoint" == unix:///run/user/*/docker.sock ]]; then
+            check_pass "rootless Docker access (docker group not required)"
+        else
+            group_state="$(host_group_state docker)"
+            case "$group_state" in
+                active) check_pass "docker group membership active" ;;
+                pending) "$fail_fn" "docker group membership pending; sign out and reconnect" ;;
+                absent) "$fail_fn" "docker group membership absent; Docker socket access may be denied" ;;
+                *) "$fail_fn" "cannot resolve docker account membership" ;;
+            esac
+            if host_systemd_running; then
+                host_timeout 5 systemctl is-enabled --quiet docker 2>/dev/null \
+                    && check_pass "docker service enabled" || "$fail_fn" "docker service disabled"
+                host_timeout 5 systemctl is-active --quiet docker 2>/dev/null \
+                    && check_pass "docker service active" || "$fail_fn" "docker service stopped"
+            fi
+        fi
+    fi
+}
+
+# Local sandbox readiness (sbx and KVM), where sbx applies.
+work_verify_checks() {
+    local required="${1:-true}" group_state
+    local fail_fn=check_fail
+    [[ "$required" == true ]] || fail_fn=check_warn
 
     if command -v sbx >/dev/null 2>&1; then
         if host_timeout 10 sbx version >/dev/null 2>&1; then
@@ -166,37 +205,8 @@ work_verify_checks() {
         *) "$fail_fn" "cannot resolve kvm account membership" ;;
     esac
 
-    rc=0
-    work_docker_ready || rc=$?
-    case "$rc" in
-        0) check_pass "local Docker daemon access" ;;
-        2) "$fail_fn" "Docker package missing (run: ./setup.sh --work)" ;;
-        3) endpoint="$(work_docker_endpoint)"; "$fail_fn" "Docker context is remote ($endpoint); local daemon access is required" ;;
-        *) "$fail_fn" "local Docker daemon unavailable or permission denied" ;;
-    esac
-    if command -v docker >/dev/null 2>&1; then
-        endpoint="$(work_docker_endpoint)"
-        if [[ "$endpoint" == unix:///run/user/*/docker.sock ]]; then
-            check_pass "rootless Docker access (docker group not required)"
-        else
-            group_state="$(host_group_state docker)"
-            case "$group_state" in
-                active) check_pass "docker group membership active" ;;
-                pending) "$fail_fn" "docker group membership pending; sign out and reconnect" ;;
-                absent) "$fail_fn" "docker group membership absent; Docker socket access may be denied" ;;
-                *) "$fail_fn" "cannot resolve docker account membership" ;;
-            esac
-            if host_systemd_running; then
-                host_timeout 5 systemctl is-enabled --quiet docker 2>/dev/null \
-                    && check_pass "docker service enabled" || "$fail_fn" "docker service disabled"
-                host_timeout 5 systemctl is-active --quiet docker 2>/dev/null \
-                    && check_pass "docker service active" || "$fail_fn" "docker service stopped"
-            fi
-        fi
-    fi
-
     # Optional: Docker's containerd image store builds kits without it.
-    if [[ "$rc" -eq 0 ]]; then
+    if work_docker_ready; then
         work_sbx_kits_builder_present \
             && check_pass "sbx kit builder ${SBX_KITS_BUILDER:-sbx-kits}" \
             || check_warn "no sbx kit builder ${SBX_KITS_BUILDER:-sbx-kits} (needed for kits unless Docker uses the containerd image store; ./setup.sh --work creates it)"
@@ -211,7 +221,6 @@ work_verify_checks() {
                 || "$fail_fn" "sbx diagnostics failed (rerun 'sbx diagnose'; no upload was requested)"
         fi
     fi
-
 }
 
 tail_verify_checks() {
