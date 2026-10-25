@@ -19,8 +19,14 @@ alias ls='ls --color=auto'
 # File viewer
 command -v bat &>/dev/null && alias view='bat'
 
-# Directory navigation
-alias ..='cd ..'
+# Directory navigation. `.. N` goes up N directories (default 1).
+unalias .. 2>/dev/null
+..() {
+    local n="${1:-1}" dir=..
+    [[ "$n" =~ ^[1-9][0-9]*$ ]] || { printf 'usage: .. [N]\n' >&2; return 2; }
+    while (( --n > 0 )); do dir+=/..; done
+    cd -- "$dir" || return
+}
 alias ...='cd ../..'
 alias -- -='cd -'
 

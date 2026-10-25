@@ -42,6 +42,10 @@ run_shell_matrix() {
             claude prompt; claude stop job; codex exec prompt; opencode run prompt; opencode service status; pi prompt
             btop plain; lazygit plain
             dstopall
+            mkdir -p "$HOME/a/b/c" && cd "$HOME/a/b/c"
+            .. && [[ "$PWD" == "$HOME/a/b" ]] || exit 32
+            .. 2 && [[ "$PWD" == "$HOME" ]] || exit 33
+            ! .. x 2>/dev/null || exit 34
         ')"
     [[ "$output" == *'claude|--model|sonnet|prompt'* ]] || fail "$shell claude flag splitting"
     [[ "$output" == *'claude|stop|job'* ]] || fail "$shell claude subcommand without flags"
