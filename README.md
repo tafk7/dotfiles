@@ -115,6 +115,8 @@ yo <command>              # print output and copy it to the clipboard
   Codex, the exported session in an nvim popup for OpenCode. In review,
   E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
   in nvim. `<prefix> y` or Shift+Copy copies the agent's last reply.
+  The wheel and PgUp/PgDn page less (`glow -p`, `md`, bat, Git) and Claude's
+  transcript; in Claude, Shift+Up/Down scroll it a line at a time.
   In Claude, `Ctrl+C` sends Esc, so it can't stop every background agent;
   `<prefix> Ctrl+C` sends the real key. Ctrl+Backspace/Delete delete a word
   and Alt+Backspace/Delete to the line's start or end there too, as in the
