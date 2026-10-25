@@ -55,4 +55,45 @@ IFS=$'\t' read -r _ _ owner status _ path _ _ <<< "$(ledger_line claude)"
 assert_eq "$owner/$status" dotfiles/installed "self-updated claude lost ownership"
 assert_eq "$path" "$HOME/.local/share/claude/versions/2" "self-updated claude path not refreshed"
 
+# Phases run as `phase || failed=true`, which disables errexit inside them, so
+# every fallible step needs its own status check.
+(
+    sources="$TEST_ROOT/apt-sources"; keys="$TEST_ROOT/apt-keys"
+    mkdir -p "$sources" "$keys"
+    printf 'VERSION_CODENAME=noble\n' > "$TEST_ROOT/os-release"
+    export DOTFILES_APT_SOURCES_DIR="$sources" DOTFILES_APT_KEYRINGS_DIR="$keys" DOTFILES_OS_RELEASE="$TEST_ROOT/os-release"
+    safe_apt_get() { return 0; }
+    update_packages() { return 0; }
+    download_https() { printf 'key\n' > "$2"; }
+    gpg() {
+        case "$*" in
+            *--show-keys*) printf 'fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:\n' ;;
+            *--dearmor*) printf 'keyring\n' > "${@: -2:1}" ;;
+        esac
+    }
+    dpkg() { printf 'amd64\n'; }
+    failing=""
+    safe_sudo() {
+        if [[ "$1" == "$failing" ]]; then cat >/dev/null; return 1; fi
+        [[ "$1" != tee ]] || cat >/dev/null
+    }
+    failing="chmod"
+    if ensure_docker_repo >/dev/null 2>&1; then fail "Docker keyring permission failure was ignored"; fi
+    : > "$keys/docker.gpg"
+    failing="tee"
+    if ensure_docker_repo >/dev/null 2>&1; then fail "Docker source list write failure was ignored"; fi
+)
+(
+    is_wsl() { return 0; }
+    mkdir -p "$HOME/.ssh" && : > "$HOME/.ssh/use-windows-agent"
+    printf '#!/bin/sh\n' > "$TEST_ROOT/bin/wsl2-ssh-agent"; chmod +x "$TEST_ROOT/bin/wsl2-ssh-agent"
+    PATH="$TEST_ROOT/bin:$PATH"
+    systemctl() { [[ "$*" != "--user daemon-reload" ]]; }
+    if setup_wsl_ssh_agent >/dev/null 2>&1; then fail "systemd user reload failure was ignored"; fi
+)
+(
+    record_install_path() { return 1; }
+    if write_dotfiles_env >/dev/null 2>&1; then fail "install path write failure was ignored"; fi
+)
+
 printf 'install-failures: ok\n'

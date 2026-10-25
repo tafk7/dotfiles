@@ -347,7 +347,7 @@ setup_wsl_clipboard() {
     wsl_log "Setting up WSL clipboard integration..."
 
     local bin_dir="$HOME/.local/bin"
-    mkdir -p "$bin_dir"
+    mkdir -p "$bin_dir" || return 1
 
     # Render outside HOME so a no-op rerun preserves both file and directory
     # mtimes. Replace only changed wrappers, matching config reconciliation.
@@ -414,10 +414,10 @@ setup_wsl_ssh_agent() {
     local unit_src="$DOTFILES_DIR/configs/wsl2-ssh-agent.service"
     local unit_dir="$HOME/.config/systemd/user"
 
-    mkdir -p "$unit_dir"
-    ln -sfn "$unit_src" "$unit_dir/wsl2-ssh-agent.service"
+    mkdir -p "$unit_dir" || return 1
+    ln -sfn "$unit_src" "$unit_dir/wsl2-ssh-agent.service" || return 1
 
-    systemctl --user daemon-reload
+    systemctl --user daemon-reload || { warn "ssh-agent bridge: systemd user daemon-reload failed"; return 1; }
     if systemctl --user enable --now wsl2-ssh-agent.service >/dev/null 2>&1; then
         success "WSL ssh-agent bridge service installed + started (wsl2-ssh-agent.service)"
     else
@@ -439,10 +439,10 @@ write_dotfiles_env() {
         return 0
     fi
 
-    record_install_path "$DOTFILES_DIR"
+    record_install_path "$DOTFILES_DIR" || return 1
     if is_wsl; then
-        preference_set platform.wsl enabled
-        preference_set machine.win_user "$(get_windows_username)"
+        preference_set platform.wsl enabled || return 1
+        preference_set machine.win_user "$(get_windows_username)" || return 1
     fi
     success "Recorded install path in $path_file"
 }
@@ -591,7 +591,7 @@ cleanup_old_backups() {
 
     local i
     for (( i = 0; i < total - keep_count; i++ )); do
-        rm -rf "${backups[i]}"
+        rm -rf "${backups[i]}" || warn "Could not remove old backup: ${backups[i]}"
     done
 }
 
@@ -747,8 +747,8 @@ ensure_docker_repo() {
     safe_sudo install -m 0755 -d "$keyrings_dir" || return 1
     if [[ ! -f "$keyrings_dir/docker.gpg" ]]; then
         local docker_key docker_keyring fingerprint docker_tmp
-        docker_tmp="$(mktemp -d)"
-        mkdir -m 0700 "$docker_tmp/gnupg"
+        docker_tmp="$(mktemp -d)" || return 1
+        mkdir -m 0700 "$docker_tmp/gnupg" || { rm -rf "$docker_tmp"; return 1; }
         docker_key="$docker_tmp/docker.asc"; docker_keyring="$docker_tmp/docker.gpg"
         download_https https://download.docker.com/linux/ubuntu/gpg "$docker_key" \
             || { rm -rf "$docker_tmp"; return 1; }
@@ -763,12 +763,12 @@ ensure_docker_repo() {
         safe_sudo install -m 0644 "$docker_keyring" "$keyrings_dir/docker.gpg" \
             || { rm -rf "$docker_tmp"; return 1; }
         rm -rf "$docker_tmp"
-        safe_sudo chmod a+r "$keyrings_dir/docker.gpg"
+        safe_sudo chmod a+r "$keyrings_dir/docker.gpg" || return 1
     fi
 
     printf 'deb [arch=%s signed-by=%s/docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' \
         "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | \
-        safe_sudo tee "$sources_dir/docker.list" > /dev/null
+        safe_sudo tee "$sources_dir/docker.list" > /dev/null || return 1
 
     update_packages || return 1
     success "Docker apt repository configured"
@@ -795,10 +795,10 @@ install_azure_cli() {
 
     if [[ ! -f "$keyrings_dir/microsoft.gpg" ]]; then
         local microsoft_key microsoft_keyring fingerprint
-        microsoft_key="$(mktemp)"; microsoft_keyring="$(mktemp)"
+        microsoft_key="$(mktemp)" && microsoft_keyring="$(mktemp)" || return 1
         download_https https://packages.microsoft.com/keys/microsoft.asc "$microsoft_key" || return 1
         local microsoft_gnupg
-        microsoft_gnupg="$(mktemp -d)"; chmod 700 "$microsoft_gnupg"
+        microsoft_gnupg="$(mktemp -d)" && chmod 700 "$microsoft_gnupg" || return 1
         fingerprint="$(GNUPGHOME="$microsoft_gnupg" gpg --batch --show-keys --with-colons "$microsoft_key" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
         if [[ "$fingerprint" != BC528686B50D79E339D3721CEB3E94ADBE1229CF ]]; then
             rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"
@@ -809,14 +809,15 @@ install_azure_cli() {
             || { rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"; return 1; }
         safe_sudo install -m 0644 "$microsoft_keyring" "$keyrings_dir/microsoft.gpg" || return 1
         rm -f "$microsoft_key" "$microsoft_keyring"; rm -rf "$microsoft_gnupg"
-        safe_sudo chmod a+r "$keyrings_dir/microsoft.gpg"
+        safe_sudo chmod a+r "$keyrings_dir/microsoft.gpg" || return 1
     fi
 
     local codename
     codename="$(awk -F= '$1 == "VERSION_CODENAME" { gsub(/^"|"$/, "", $2); print $2; exit }' "${DOTFILES_OS_RELEASE:-/etc/os-release}")"
     [[ -n "$codename" ]] || { error "Cannot determine Ubuntu codename for Azure CLI repository"; return 1; }
     printf 'deb [arch=%s signed-by=%s/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ %s main\n' \
-        "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | safe_sudo tee "$sources_dir/azure-cli.list" > /dev/null
+        "$(dpkg --print-architecture)" "$keyrings_dir" "$codename" | safe_sudo tee "$sources_dir/azure-cli.list" > /dev/null \
+        || return 1
 
     update_packages || return 1
     if [[ "${FORCE_REINSTALL:-false}" == true ]] && dpkg-query -W azure-cli >/dev/null 2>&1; then
@@ -1048,10 +1049,15 @@ install_eget_tools() {
         fi
 
         local stage_home stage_config staged staged_hash companion companions_ok
-        stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")"
+        stage_home="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-eget-${name}.XXXXXX")" || return 1
         stage_config="$stage_home/eget.toml"
-        mkdir -p "$stage_home/.local/bin"
-        : > "$stage_config"   # no [global] defaults: the lock says what to fetch
+        # no [global] defaults: the lock says what to fetch
+        if ! mkdir -p "$stage_home/.local/bin" || ! : > "$stage_config"; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
         local -a extract_args=()
         if [[ -n "${TOOL_COMPANIONS[$name]:-}" ]]; then
             extract_args+=(--all --to "$stage_home/.local/bin")
@@ -1440,8 +1446,9 @@ install_work_packages() {
 
     install_docker_engine || failed=true
     run_installer "sbx" || failed=true
-    configure_work_host
-    ensure_sbx_kits_builder
+    # Host readiness is reported, not a package failure: both only warn.
+    configure_work_host || true
+    ensure_sbx_kits_builder || true
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" || failed=true
