@@ -11,6 +11,7 @@ export DOTFILES_DIR
 source "$SCRIPT_DIR/lib/install.sh"
 source "$SCRIPT_DIR/lib/setup-log.sh"
 source "$SCRIPT_DIR/lib/operation.sh"
+source "$SCRIPT_DIR/lib/profile.sh"
 
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 
@@ -229,6 +230,30 @@ component_selected() {
         capability_selected "$capability" && tool_has_capability "$name" "$capability" && return 0
     done
     return 1
+}
+
+# Validate, save, then apply: once the system check accepts this run's flags,
+# they join the machine profile before anything is installed. Flags only add
+# (lib/profile.sh); a preview never writes the profile. An unreadable profile
+# is reported and left alone, without stopping setup.
+setup_save_profile() {
+    [[ "$DRY_RUN" == true ]] && return 0
+    if ! profile_load; then
+        warn "Machine profile not updated; repair or remove $DOTFILES_PROFILE_FILE"
+        return 0
+    fi
+    local capability capabilities="" opt_outs="" ai_tools=""
+    for capability in "${CAPABILITY_NAMES[@]}"; do
+        if [[ "$capability" != ai ]] && capability_selected "$capability"; then
+            capabilities+="${capabilities:+,}$capability"
+        fi
+    done
+    [[ "$NO_GIT" != true ]] || opt_outs+="no-git,"
+    [[ "$NO_HOOKS" != true ]] || opt_outs+="no-hooks,"
+    (( ${#SELECTED_AI_TOOLS[@]} == 0 )) || ai_tools="$(IFS=,; printf '%s' "${SELECTED_AI_TOOLS[*]}")"
+    profile_merge "$INSTALL_TIER" "$capabilities" "${SELECTED_CAPABILITIES[ai]:-}" "$ai_tools" "${opt_outs%,}"
+    profile_save || return 1
+    (( ${#PROFILE_CHANGES[@]} == 0 )) || log "Machine profile: ${PROFILE_CHANGES[*]}"
 }
 
 install_ai_selection() {
@@ -641,6 +666,9 @@ run_installation() {
     phase_verify_system || INSTALLATION_FAILED=true
     if [[ "$INSTALLATION_FAILED" != "true" ]]; then
         apply_feature_requests || INSTALLATION_FAILED=true
+    fi
+    if [[ "$INSTALLATION_FAILED" != "true" ]]; then
+        setup_save_profile || INSTALLATION_FAILED=true
     fi
     if [[ "$INSTALLATION_FAILED" != "true" ]]; then
         phase_install_packages || INSTALLATION_FAILED=true

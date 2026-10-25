@@ -106,6 +106,7 @@ snapshot_case() {
         journal_pending() { return 1; }
         phase_verify_system() { :; }
         apply_feature_requests() { :; }
+        setup_save_profile() { :; }  # tests/profile.sh covers the profile
         phase_install_packages() { :; }
         phase_setup_configs() { :; }
         print_install_summary() { :; }

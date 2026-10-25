@@ -1,0 +1,226 @@
+#!/bin/bash
+# The dotfiles front door: show or change this machine's profile.
+#
+# Usage: dotfiles profile [--add X | --remove X | --tier T | --propose]
+#                         [--yes] [--no-apply]
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Always this checkout: the front door runs the code it ships with.
+DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
+export DOTFILES_DIR
+
+source "$DOTFILES_DIR/lib/runtime.sh"
+source "$DOTFILES_DIR/lib/config.sh"
+source "$DOTFILES_DIR/lib/state.sh"
+source "$DOTFILES_DIR/lib/operation.sh"
+source "$DOTFILES_DIR/lib/profile.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: dotfiles <command> [options]
+
+Commands:
+  profile               Show this machine's profile: what dotfiles manages here.
+  profile --add X       Manage X: a capability (rdp, tail, azure, gcloud, aws),
+                        ai (every AI CLI) or one AI CLI, an opt-out (no-git,
+                        no-hooks), or editor-plugins. Saved, then applied.
+  profile --remove X    Stop managing X. Nothing is uninstalled; the commands
+                        that would remove it are printed.
+  profile --tier T      Set the tier (config, bash, dev, work). Raising it
+                        applies the new tier; lowering it uninstalls nothing.
+  profile --propose     Derive a profile from the component ledger and offer
+                        to save it.
+
+Options:
+  --yes                 Apply (or save a proposal) without asking.
+  --no-apply            Save the change only.
+
+Values may be comma-separated, as in --add tail,gcloud.
+EOF
+}
+
+is_capability() { [[ ",$(profile_known_capabilities | paste -sd, -)," == *",$1,"* ]]; }
+is_ai_tool() { [[ ",$(profile_ai_tool_names | paste -sd, -)," == *",$1,"* ]]; }
+is_opt_out() { [[ " ${PROFILE_OPT_OUTS[*]} " == *" $1 "* ]]; }
+
+# Unsupported explicit requests are rejected before anything is saved.
+validate_addition() {
+    local item="$1" component
+    if is_capability "$item"; then
+        while IFS= read -r component; do
+            tool_applicable "$component" \
+                || { error "$item is not supported on this platform ($component is not applicable)"; return 1; }
+        done < <(tools_for_capability "$item")
+    elif is_ai_tool "$item"; then
+        tool_applicable "$item" || { error "$item is not supported on this platform"; return 1; }
+    elif [[ "$item" != ai && "$item" != editor-plugins ]] && ! is_opt_out "$item"; then
+        error "Unknown selection: $item"
+        return 64
+    fi
+}
+
+add_item() {
+    local item="$1"
+    if is_capability "$item"; then
+        PROFILE[capabilities]="$(_profile_list_add "${PROFILE[capabilities]}" "$item")"
+    elif [[ "$item" == ai ]]; then
+        PROFILE[ai]=all PROFILE[ai.exclude]=""
+    elif is_ai_tool "$item"; then
+        if [[ "${PROFILE[ai]}" == all ]]; then
+            PROFILE[ai.exclude]="$(_profile_list_remove "${PROFILE[ai.exclude]}" "$item")"
+        else
+            PROFILE[ai]="$(_profile_list_add "${PROFILE[ai]}" "$item")"
+        fi
+    elif is_opt_out "$item"; then
+        PROFILE[opt-outs]="$(_profile_list_add "${PROFILE[opt-outs]}" "$item")"
+    else
+        PROFILE[editor-plugins]=yes
+    fi
+}
+
+# Components that stop being managed are appended to UNMANAGED, for the
+# uninstall hint.
+UNMANAGED=()
+remove_item() {
+    local item="$1"
+    if is_capability "$item"; then
+        PROFILE[capabilities]="$(_profile_list_remove "${PROFILE[capabilities]}" "$item")"
+        readarray -t -O "${#UNMANAGED[@]}" UNMANAGED < <(tools_for_capability "$item")
+    elif [[ "$item" == ai ]]; then
+        readarray -t -O "${#UNMANAGED[@]}" UNMANAGED < <(profile_ai_tools)
+        PROFILE[ai]="" PROFILE[ai.exclude]=""
+    elif is_ai_tool "$item"; then
+        if [[ "${PROFILE[ai]}" == all ]]; then
+            PROFILE[ai.exclude]="$(_profile_list_add "${PROFILE[ai.exclude]}" "$item")"
+        else
+            PROFILE[ai]="$(_profile_list_remove "${PROFILE[ai]}" "$item")"
+        fi
+        UNMANAGED+=("$item")
+    elif is_opt_out "$item"; then
+        PROFILE[opt-outs]="$(_profile_list_remove "${PROFILE[opt-outs]}" "$item")"
+    elif [[ "$item" == editor-plugins ]]; then
+        PROFILE[editor-plugins]=no
+    else
+        error "Unknown selection: $item"
+        return 64
+    fi
+}
+
+print_unmanaged() {
+    local component
+    (( $# )) || return 0
+    printf 'No longer managed (still installed). To remove one:\n'
+    for component in "$@"; do printf '  %s/bin/uninstall-tool %s\n' "$DOTFILES_DIR" "$component"; done
+}
+
+confirm() {
+    local answer
+    [[ -t 0 && -t 1 ]] || return 1
+    read -rp "$1 [Y/n] " answer
+    [[ -z "$answer" || "$answer" =~ ^[Yy] ]]
+}
+
+# Plan, then apply the whole profile through setup. A failed apply keeps the
+# saved intent; verify reports what is missing until an apply succeeds.
+apply_profile() {
+    local assume_yes="$1" no_apply="$2"
+    local -a args
+    readarray -t args < <(profile_setup_args)
+    printf 'plan:    %s/setup.sh %s\n' "$DOTFILES_DIR" "${args[*]}"
+    if [[ "$no_apply" == true ]]; then
+        printf 'Saved; not applied (--no-apply).\n'
+        return 0
+    fi
+    if [[ "$assume_yes" != true ]] && ! confirm "apply now?"; then
+        printf 'Saved; not applied. Apply it with the command above.\n'
+        return 0
+    fi
+    "$DOTFILES_DIR/setup.sh" "${args[@]}" || { error "Apply failed; the profile keeps the new intent"; return 1; }
+}
+
+cmd_profile() {
+    local action="" value="" assume_yes=false no_apply=false item
+    while (( $# )); do
+        case "$1" in
+            --add|--remove|--tier)
+                [[ -z "$action" ]] || { error "Give one of --add, --remove, --tier, --propose"; return 64; }
+                [[ -n "${2:-}" && "$2" != --* ]] || { error "$1 requires a value"; return 64; }
+                action="${1#--}" value="$2"; shift
+                ;;
+            --propose)
+                [[ -z "$action" ]] || { error "Give one of --add, --remove, --tier, --propose"; return 64; }
+                action=propose
+                ;;
+            --yes|-y) assume_yes=true ;;
+            --no-apply) no_apply=true ;;
+            --help|-h) usage; return 0 ;;
+            *) error "Unknown option: $1"; usage >&2; return 64 ;;
+        esac
+        shift
+    done
+
+    if [[ -z "$action" ]]; then
+        if ! profile_exists; then
+            printf 'No machine profile yet. Derive one from the ledger with: dotfiles profile --propose\n'
+            return 0
+        fi
+        profile_load || return 3
+        profile_describe
+        return 0
+    fi
+
+    operation_begin "$SCRIPT_DIR/dotfiles" profile "${ORIGINAL_ARGS[@]}"
+    profile_load || return 3
+    local before_tier="${PROFILE[tier]}"
+    case "$action" in
+        add)
+            for item in ${value//,/ }; do validate_addition "$item" || return; done
+            for item in ${value//,/ }; do add_item "$item"; done
+            profile_save || return 1
+            printf 'profile: + %s\n' "${value//,/, }"
+            apply_profile "$assume_yes" "$no_apply"
+            ;;
+        remove)
+            for item in ${value//,/ }; do remove_item "$item" || return; done
+            profile_save || return 1
+            printf 'profile: - %s\n' "${value//,/, }"
+            print_unmanaged "${UNMANAGED[@]+"${UNMANAGED[@]}"}"
+            ;;
+        tier)
+            _profile_tier_rank "$value" >/dev/null || { error "Unknown tier: $value"; return 64; }
+            PROFILE[tier]="$value"
+            profile_save || return 1
+            printf 'profile: tier %s -> %s\n' "$before_tier" "$value"
+            if (( $(_profile_tier_rank "$value") > $(_profile_tier_rank "$before_tier") )); then
+                apply_profile "$assume_yes" "$no_apply"
+            else
+                local name
+                while IFS= read -r name; do
+                    tool_in_cumulative_tier "$name" "$before_tier" && ! tool_in_cumulative_tier "$name" "$value" \
+                        && ledger_line "$name" >/dev/null 2>&1 && UNMANAGED+=("$name")
+                done < <(printf '%s\n' "${!TOOL_TIER[@]}" | LC_ALL=C sort)
+                print_unmanaged "${UNMANAGED[@]+"${UNMANAGED[@]}"}"
+            fi
+            ;;
+        propose)
+            profile_exists && warn "A profile already exists; saving the proposal replaces it."
+            profile_propose
+            printf 'Proposed from the component ledger (only what dotfiles or the package manager installed):\n'
+            profile_describe | sed 's/^/  /'
+            if [[ "$assume_yes" == true ]] || confirm "save this profile?"; then
+                profile_save || return 1
+                printf 'Saved.\n'
+            else
+                printf 'Not saved. Rerun with --yes to save it.\n'
+            fi
+            ;;
+    esac
+}
+
+ORIGINAL_ARGS=("$@")
+case "${1:-}" in
+    profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
+    --help|-h|help|"") usage ;;
+    *) error "Unknown command: $1"; usage >&2; exit 64 ;;
+esac
