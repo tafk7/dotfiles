@@ -1,6 +1,12 @@
 #!/bin/bash
 # Static exports and PATH composition: the single source of truth for PATH.
-# Sourced after shell/env-runtime.sh by entry/profile.sh and shell/init.sh.
+# Sourced before shell/env-runtime.sh by entry/profile.sh and shell/init.sh.
+#
+# Owned variables (EDITOR, PROJECTS_DIRS, RIPGREP_CONFIG_PATH here; PAGER and
+# LESS in entry/profile.sh) resolve in layers, each overriding the one before:
+# the repo defaults below, assigned regardless of inherited values; then
+# ~/.shell.env, sourced at the end of this file; then direnv, which
+# shell/env-runtime.sh applies afterwards.
 #
 # The guard is exported so child shells inherit the composed environment
 # instead of re-prepending the same directories at every nesting level.
@@ -48,16 +54,15 @@ fi
 # ==============================================================================
 
 # Editor
-if [[ -z "${EDITOR:-}" ]]; then
-    for _dotfiles_editor in nvim vim nano vi; do
-        if command -v "$_dotfiles_editor" >/dev/null 2>&1; then
-            EDITOR="$_dotfiles_editor"
-            break
-        fi
-    done
-    unset _dotfiles_editor
-fi
-export EDITOR="${EDITOR:-vi}"
+EDITOR="vi"
+for _dotfiles_editor in nvim vim nano; do
+    if command -v "$_dotfiles_editor" >/dev/null 2>&1; then
+        EDITOR="$_dotfiles_editor"
+        break
+    fi
+done
+unset _dotfiles_editor
+export EDITOR
 # Claude Code's Ctrl+G opens $VISUAL. compose-editor joins it to the tmux
 # compose pane and runs $EDITOR for everything else. A VISUAL of your own wins.
 if [[ -z "${VISUAL:-}" || "$VISUAL" == "$EDITOR" || "${VISUAL##*/}" == compose-editor ]] \
@@ -70,7 +75,7 @@ fi
 # Python
 export PYTHONDONTWRITEBYTECODE=1
 export PIP_REQUIRE_VIRTUALENV=false
-export RIPGREP_CONFIG_PATH="${RIPGREP_CONFIG_PATH:-$HOME/.ripgreprc}"
+export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
 
 # Node.js
 # NODE_OPTIONS is deliberately not set: every node process would inherit it,
@@ -84,7 +89,7 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 # startup adds them only when the optional theme feature is enabled.
 
 # Project search roots for proj, fzf-project, and cproj (colon-separated).
-export PROJECTS_DIRS="${PROJECTS_DIRS:-$HOME/projects:$HOME/work:$HOME/dev:$HOME/code:$HOME/src}"
+export PROJECTS_DIRS="$HOME/projects:$HOME/work:$HOME/dev:$HOME/code:$HOME/src"
 
 # ==============================================================================
 # WSL-Specific Environment
@@ -134,4 +139,15 @@ if [[ "${DOTFILES_WSL:-0}" == "1" ]] || command -v wslpath >/dev/null 2>&1; then
         export WIN_DOCUMENTS="$WIN_HOME/Documents"
         export WIN_SSH="$WIN_HOME/.ssh"
     fi
+fi
+
+# ==============================================================================
+# Machine settings
+# ==============================================================================
+
+# ~/.shell.env overrides the defaults above for every shell that reads Layer 0,
+# agents' non-interactive shells included. Environment only; aliases, functions,
+# and prompt settings belong in ~/.shell.local.
+if [[ -r "$HOME/.shell.env" ]]; then
+    source "$HOME/.shell.env"
 fi

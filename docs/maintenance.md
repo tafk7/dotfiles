@@ -13,11 +13,11 @@ code and reconciling config/state (`./setup.sh --config` or a tier) are separate
 steps; preview the setup command with `--dry-run` first.
 
 The repository is public. Keep employer names and internal hosts in untracked
-files (`~/.shell.local`, `~/.gitconfig.local`). To have the pre-commit hook
-enforce that, point `DOTFILES_DENYLIST` at an untracked file listing those words,
-one per line. Without the variable the hook (and the Claude invariant guard
-rules in `.agents/invariants.json`) read `~/.config/dotfiles/denylist` when it
-exists. Check the whole tree with
+files (`~/.shell.env`, `~/.shell.local`, `~/.gitconfig.local`). To have the
+pre-commit hook enforce that, point `DOTFILES_DENYLIST` at an untracked file
+listing those words, one per line. Without the variable the hook (and the
+Claude invariant guard rules in `.agents/invariants.json`) read
+`~/.config/dotfiles/denylist` when it exists. Check the whole tree with
 `git grep -n -i -w -F -f <(grep -vE '^[[:space:]]*(#|$)' "$DOTFILES_DENYLIST")`.
 
 ## Updates and ownership

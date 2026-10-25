@@ -112,6 +112,11 @@ that line, and most scripts print their header comment as `--help`. Source
 
 These untracked files keep machine-specific settings out of the repo:
 
+- `~/.shell.env`: environment only, read by every shell that reads Layer 0,
+  including agents' non-interactive shells. It overrides the repo defaults
+  for `EDITOR`, `PROJECTS_DIRS`, `RIPGREP_CONFIG_PATH`, `PAGER`, and `LESS`;
+  an allowed `.envrc` overrides it in turn. Keep it to plain `export`
+  lines: it runs in startup-critical, non-interactive shells.
 - `~/.shell.local`: sourced near the end of interactive startup in both shells.
   Gate shell-specific syntax on `$ZSH_VERSION` or `$BASH_VERSION`.
 - `~/.shell.local.d/*.sh`: sourced in filename order after `~/.shell.local`.
@@ -127,13 +132,18 @@ These untracked files keep machine-specific settings out of the repo:
   `~/.ssh/config.d/*.conf` follow it.
 
 ```bash
-# ~/.shell.local
+# ~/.shell.env
 export PROJECTS_DIRS="$HOME/work/acme:$HOME/projects"
+
+# ~/.shell.local
 export CODEX_DEFAULT_PROFILE=work     # an explicit -p/--profile still wins
 ```
 
-These are interactive hooks. Services, desktop applications, and plain
-non-interactive shells do not read them.
+The rule: what a program or agent needs goes in `~/.shell.env`; what only a
+prompt needs goes in `~/.shell.local`. Secrets stay in `~/.shell.local` unless
+agents should have them. `~/.shell.local` and its fragments are interactive
+hooks; services, desktop applications, and plain non-interactive shells do not
+read them. Plain `bash -c` reads neither file.
 
 Employer- or account-specific helpers, such as a clone function pinned to a
 second GitHub account, belong in `~/.shell.local` until

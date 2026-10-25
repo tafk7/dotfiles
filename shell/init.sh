@@ -7,11 +7,11 @@ if [[ -z "${DOTFILES_DIR:-}" ]]; then
     return 0
 fi
 
-# Always-fresh Layer 0 exports; intentionally unguarded so `reload` refreshes
-# project activation.
-source "$DOTFILES_DIR/shell/env-runtime.sh"
-
 source "$DOTFILES_DIR/shell/env.sh"
+
+# Always-fresh Layer 0 exports; intentionally unguarded so `reload` refreshes
+# project activation. After env.sh, so an allowed .envrc wins.
+source "$DOTFILES_DIR/shell/env-runtime.sh"
 
 # The previous theme system exported per-shell theme variables, and a tmux
 # server started from such a shell hands them to every new pane. Drop them, or
