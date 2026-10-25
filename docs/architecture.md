@@ -85,7 +85,7 @@ Durable state lives under
   update contract;
 - `theme.tsv`: global theme selection;
 - `install-path`: fallback checkout discovery for flattened deployments;
-- `transaction.tsv`: an interrupted artifact replacement journal;
+- `transactions/`: one journal per interrupted artifact replacement;
 - `backups/`: displaced user configuration.
 
 These files have a version header, contain data only, are validated before use,

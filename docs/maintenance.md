@@ -53,10 +53,14 @@ the test harness sets it.
 ## Recovery
 
 Run one setup or update at a time; this is not a concurrent package manager.
-An interrupted artifact journal blocks further replacements until setup
-reconciles it, and `bin/verify` reports it as a failure. Recovery checks the
+Each artifact replacement writes a journal first. When a replacement fails,
+setup makes one bounded attempt to reconcile it: if the artifact now at the
+target runs, it is recorded and the journal removed. Otherwise the journal is
+kept, and it blocks further replacements of that component only, until setup
+reconciles it; the rest of the run proceeds and the run reports failure.
+`bin/verify` reports a pending journal as a failure. Recovery checks the
 recorded artifact itself, not whatever binary is on PATH. If that artifact
-cannot run, the journal is kept; diagnose the paths before retrying.
+cannot run, diagnose the paths before retrying.
 
 A replacement can commit before its ledger write fails, so the new artifact may
 already be active while the journal remains. Multi-binary components are

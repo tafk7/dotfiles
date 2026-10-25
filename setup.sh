@@ -624,12 +624,18 @@ process_symlink() {
 
 run_installation() {
     INSTALLATION_FAILED=false
+    local journal_blocked=false
     if journal_pending; then
         if [[ "$DRY_RUN" == true ]]; then
             warn "Incomplete component transaction detected; dry-run will not reconcile it."
         else
             warn "Recovering an interrupted component transaction before setup."
-            journal_reconcile || INSTALLATION_FAILED=true
+            # An unresolved journal blocks only its own component's replacement;
+            # the rest of setup proceeds, and the run still reports failure.
+            if ! journal_reconcile; then
+                journal_blocked=true
+                warn "Replacements stay blocked for: $(journal_pending_components | paste -sd ' ')"
+            fi
         fi
     fi
     phase_verify_system || INSTALLATION_FAILED=true
@@ -643,7 +649,7 @@ run_installation() {
 
     print_install_summary
 
-    if [[ "$INSTALLATION_FAILED" == "true" || ${#INSTALL_FAIL[@]} -gt 0 ]]; then
+    if [[ "$INSTALLATION_FAILED" == "true" || "$journal_blocked" == true || ${#INSTALL_FAIL[@]} -gt 0 ]]; then
         echo
         error "Dotfiles installation incomplete; see the summary above."
         return 1

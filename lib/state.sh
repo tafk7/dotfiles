@@ -10,6 +10,7 @@ DOTFILES_STATE_DIR="${DOTFILES_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/
 DOTFILES_PREFERENCES_FILE="$DOTFILES_STATE_DIR/preferences.tsv"
 DOTFILES_LEDGER_FILE="$DOTFILES_STATE_DIR/components.tsv"
 DOTFILES_JOURNAL_FILE="$DOTFILES_STATE_DIR/transaction.tsv"
+DOTFILES_JOURNAL_DIR="$DOTFILES_STATE_DIR/transactions"
 DOTFILES_THEME_STATE_FILE="$DOTFILES_STATE_DIR/theme.tsv"
 DOTFILES_STATE_LOCK="$DOTFILES_STATE_DIR/.lock"
 
@@ -43,10 +44,13 @@ _state_validate_file() {
 }
 
 state_validate() {
+    local journal
     _state_validate_file "$DOTFILES_PREFERENCES_FILE" preferences 2 &&
         _state_validate_file "$DOTFILES_LEDGER_FILE" ledger 8 &&
-        _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 &&
-        _state_validate_file "$DOTFILES_JOURNAL_FILE" journal 2
+        _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 || return 1
+    while IFS= read -r journal; do
+        _state_validate_file "$journal" journal 2 || return 1
+    done < <(_journal_files)
 }
 
 _state_lock_acquire() {
@@ -239,6 +243,37 @@ ledger_line() {
     awk -F '\t' -v key="$component" 'NR > 1 && $1 == key { print; found=1 } END { exit found ? 0 : 1 }' "$DOTFILES_LEDGER_FILE"
 }
 
+# Artifact journals: one file per component under transactions/, written
+# before a replacement and removed once its result is validated and recorded.
+# A pending journal blocks further replacements of its own component (or of
+# the paths it names) until it is reconciled; other components proceed. A
+# legacy single transaction.tsv is still honored.
+_journal_files() {
+    local file
+    [[ ! -s "$DOTFILES_JOURNAL_FILE" ]] || printf '%s\n' "$DOTFILES_JOURNAL_FILE"
+    [[ -d "$DOTFILES_JOURNAL_DIR" ]] || return 0
+    for file in "$DOTFILES_JOURNAL_DIR"/*.tsv; do
+        [[ ! -s "$file" ]] || printf '%s\n' "$file"
+    done
+}
+
+_journal_file_field() {
+    local file="$1" key="$2"
+    [[ -f "$file" ]] || return 1
+    awk -F '\t' -v key="$key" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$file"
+}
+
+# The pending journal file for COMPONENT, if any.
+_journal_file_for() {
+    local component="$1" file
+    while IFS= read -r file; do
+        [[ "$(_journal_file_field "$file" component 2>/dev/null)" == "$component" ]] || continue
+        printf '%s\n' "$file"
+        return 0
+    done < <(_journal_files)
+    return 1
+}
+
 journal_begin() {
     local component="$1" old_path="$2" staged_path="$3" new_path="$4"
     _state_valid_atom "$component" || return 1
@@ -255,44 +290,83 @@ journal_begin() {
     (
         _state_lock_acquire || exit 1
         trap _state_lock_release EXIT INT TERM
-        if journal_pending; then
-            _state_error "An artifact transaction is pending; reconcile it before another replacement"
-            exit 1
-        fi
+        local file pending_component pending_path
+        while IFS= read -r file; do
+            pending_component="$(_journal_file_field "$file" component 2>/dev/null || true)"
+            pending_path="$(_journal_file_field "$file" new_path 2>/dev/null || true)"
+            if [[ "$pending_component" == "$component" || "$pending_path" == "$new_path" ]]; then
+                _state_error "An artifact transaction for $pending_component is pending; reconcile it before replacing $component"
+                exit 1
+            fi
+        done < <(_journal_files)
+        mkdir -p "$DOTFILES_JOURNAL_DIR" || exit 1
         local staged
-        staged="$(mktemp "$DOTFILES_STATE_DIR/transaction.tsv.tmp.XXXXXX")" || exit 1
+        staged="$(mktemp "$DOTFILES_JOURNAL_DIR/.$component.tsv.tmp.XXXXXX")" || exit 1
         printf 'schema\t%s\ncomponent\t%s\nold_path\t%s\nstaged_path\t%s\nnew_path\t%s\n' \
             "$DOTFILES_STATE_SCHEMA" "$component" "$(_state_clean_field "$old_path")" \
             "$(_state_clean_field "$staged_path")" "$(_state_clean_field "$new_path")" > "$staged" || exit 1
-        _state_commit_file "$staged" "$DOTFILES_JOURNAL_FILE"
+        _state_commit_file "$staged" "$DOTFILES_JOURNAL_DIR/$component.tsv"
     )
 }
 
+# Remove COMPONENT's journal, or every journal with no argument.
 journal_clear() {
+    local component="${1:-}"
     (
         _state_lock_acquire || exit 1
         trap _state_lock_release EXIT INT TERM
-        rm -f "$DOTFILES_JOURNAL_FILE"
+        local file
+        while IFS= read -r file; do
+            [[ -z "$component" || "$(_journal_file_field "$file" component 2>/dev/null)" == "$component" ]] || continue
+            rm -f "$file" || exit 1
+        done < <(_journal_files)
     )
 }
 
+# Whether any journal is pending, or COMPONENT's when given.
 journal_pending() {
-    [[ -s "$DOTFILES_JOURNAL_FILE" ]]
+    if [[ -n "${1:-}" ]]; then
+        _journal_file_for "$1" >/dev/null
+    else
+        [[ -n "$(_journal_files)" ]]
+    fi
 }
 
+journal_pending_components() {
+    local file
+    while IFS= read -r file; do
+        _journal_file_field "$file" component 2>/dev/null || printf '%s\n' "${file##*/}"
+    done < <(_journal_files)
+}
+
+# Field KEY of COMPONENT's journal, or of the first pending journal.
 journal_field() {
-    local key="$1"
-    [[ -f "$DOTFILES_JOURNAL_FILE" ]] || return 1
-    awk -F '\t' -v key="$key" '$1 == key { print $2; found=1 } END { exit found ? 0 : 1 }' "$DOTFILES_JOURNAL_FILE"
+    local key="$1" component="${2:-}" file
+    if [[ -n "$component" ]]; then
+        file="$(_journal_file_for "$component")" || return 1
+    else
+        file="$(_journal_files | head -n1)"
+    fi
+    _journal_file_field "$file" "$key"
 }
 
+# Reconcile COMPONENT's journal, or every pending journal with no argument:
+# validate the artifact the journal names, record it, and only then remove the
+# journal. An artifact that cannot be validated keeps its journal.
 journal_reconcile() {
-    journal_pending || return 0
-    _state_validate_file "$DOTFILES_JOURNAL_FILE" journal 2 || return 1
-    local component old_path new_path observed version=""
-    component="$(journal_field component)" || return 1
-    old_path="$(journal_field old_path)" || return 1
-    new_path="$(journal_field new_path)" || return 1
+    local component="${1:-}" failed=0 file
+    if [[ -z "$component" ]]; then
+        while IFS= read -r component; do
+            journal_reconcile "$component" || failed=1
+        done < <(journal_pending_components)
+        return "$failed"
+    fi
+    file="$(_journal_file_for "$component")" || return 0
+    _state_validate_file "$file" journal 2 || return 1
+    local old_path new_path staged_path observed version=""
+    old_path="$(_journal_file_field "$file" old_path)" || return 1
+    new_path="$(_journal_file_field "$file" new_path)" || return 1
+    staged_path="$(_journal_file_field "$file" staged_path)" || return 1
     _state_valid_atom "$component" || return 1
 
     if ! declare -F tool_owned_path >/dev/null 2>&1 \
@@ -326,7 +400,9 @@ journal_reconcile() {
         _state_error "Interrupted $component artifact is not runnable: $new_path (journal retained)"
         return 1
     fi
-    journal_clear
+    # A staged file a failed rename left beside the target is not the artifact.
+    [[ "$staged_path" != "$new_path".dotfiles-new.* || ! -f "$staged_path" ]] || rm -f "$staged_path"
+    journal_clear "$component"
 }
 
 record_install_path() {
