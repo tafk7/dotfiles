@@ -49,7 +49,7 @@ record_component_outcome() {
     else
         path="$(command -v "$binary" 2>/dev/null || true)"
     fi
-    [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+    [[ -n "$path" ]] && path="$(component_path "$path")"
     if [[ -z "$path" && "$result" != fail ]]; then
         local candidate
         while IFS= read -r candidate; do
@@ -74,15 +74,17 @@ record_component_outcome() {
                 ownership=dotfiles
             fi
         fi
-        version="$("$path" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null | head -n1 || true)"
+        version="$(observed_component_version "$name" "$path")"
     fi
-    if [[ "${TOOL_METHOD[$name]:-}" == apt && "$result" == ok ]] \
-       && dpkg-query -W "${TOOL_APT_PACKAGE[$name]:-$name}" >/dev/null 2>&1; then
+    # A package the package manager installed stays its responsibility whether
+    # this run installed it or found it already present.
+    if [[ "${TOOL_METHOD[$name]:-}" == apt && ( "$result" == ok || "$result" == skip ) ]] \
+       && apt_package_installed "${TOOL_APT_PACKAGE[$name]:-$name}"; then
         ownership="package-manager"
     fi
     case "$result" in
         ok) if [[ "$ownership" == external ]]; then status=present; else status=installed; fi ;;
-        skip) if [[ "$ownership" == dotfiles ]]; then status=installed; else status=present; fi ;;
+        skip) if [[ "$ownership" == dotfiles || "$ownership" == package-manager ]]; then status=installed; else status=present; fi ;;
         not-applicable) status=not-applicable; applicable=no ;;
         fail)
             if [[ -n "$path" && -x "$path" ]]; then status=update-failed; else status=failed; fi
@@ -107,12 +109,12 @@ observed_component_version() {
     # for registered APT components, which is both faster and side-effect-free.
     package="${TOOL_APT_PACKAGE[$name]:-}"
     if [[ "${TOOL_METHOD[$name]:-}" == "apt" && -n "$package" ]] \
-       && command -v dpkg-query >/dev/null 2>&1; then
+       && command -v dpkg-query >/dev/null 2>&1 && apt_package_installed "$package"; then
         version="$(dpkg-query -W -f='${Version}\n' "$package" 2>/dev/null || true)"
     fi
 
     if [[ -z "$version" && -n "$path" && -x "$path" ]]; then
-        version="$("$path" --version 2>/dev/null | head -n1 || true)"
+        version="$("$path" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null | version_line || true)"
     fi
     printf '%s\n' "$version"
 }
@@ -128,7 +130,7 @@ reconcile_observed_components() {
         }
         tool_is_present "$name" || continue
         path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
-        [[ -n "$path" ]] && path="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+        [[ -n "$path" ]] && path="$(component_path "$path")"
         version="$(observed_component_version "$name" "$path")"
         ownership=unknown
         [[ -n "$path" ]] && ! tool_owned_path "$name" "$path" && ownership=external
@@ -247,7 +249,7 @@ atomic_replace_binary() {
     mv "$staged" "$pending" || return 1
     mv -f "$pending" "$target" || return 1
     local version
-    version="$("$target" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | head -n1 || true)"
+    version="$("$target" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | version_line || true)"
     local note="${TOOL_UPDATE_CONTRACT[$component]:-staged}"
     [[ -z "$metadata" ]] || note+=" $metadata"
     ledger_record "$component" yes dotfiles installed "$version" "$target" "$note" || return 1
@@ -287,7 +289,7 @@ atomic_replace_tree() {
         fi
         return 1
     fi
-    version="$("${link_path:-$target/$verify_relative}" --version 2>/dev/null | head -n1 || true)"
+    version="$("${link_path:-$target/$verify_relative}" --version 2>/dev/null | version_line || true)"
     ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}" || return 1
     rm -rf "$rollback" || return 1
     rmdir "$rollback_root" 2>/dev/null || true
@@ -1143,13 +1145,17 @@ install_dev_packages() {
     # shellcheck disable=SC2206
     is_wsl && packages+=(${PACKAGES[wsl]})
 
+    # zsh is the dev tier's registry component among these packages; it is
+    # reported installed only when this run installed it.
+    local zsh_result=ok
+    [[ "${DRY_RUN:-false}" == "true" ]] || ! apt_package_installed zsh || zsh_result=skip
     if ! install_apt "dev" "${packages[@]}"; then
         [[ "${DRY_RUN:-false}" == "true" ]] || track_install zsh fail
         return 1
     fi
     configure_locale
     if [[ "${DRY_RUN:-false}" != "true" ]]; then
-        if command -v zsh >/dev/null 2>&1; then track_install zsh ok; else track_install zsh fail; return 1; fi
+        if command -v zsh >/dev/null 2>&1; then track_install zsh "$zsh_result"; else track_install zsh fail; return 1; fi
     fi
 
     log "Installing dev tier tools via scripts..."
