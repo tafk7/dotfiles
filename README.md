@@ -191,6 +191,7 @@ Machine-specific settings go in these files. None of them are tracked.
 - `~/.shell.local` and `~/.shell.local.d/*.sh`: aliases, exports, secrets, and
   `PROJECTS_DIRS`.
 - `~/.gitconfig.local`: Git identity and commit signing.
+- `~/.tmux.local.conf`: tmux options for this machine.
 - `~/.ssh/config.local` and `~/.ssh/config.d/*.conf`: SSH host overrides.
 
 See [docs/customization.md](docs/customization.md) for these files and for
