@@ -11,6 +11,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/runtime.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/work-host.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/observe.sh"
 
 # Backups are machine state, not repository content.
 DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"

@@ -21,6 +21,10 @@ declare -A NVIM_SHA256=(
     [arm64]="1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725"
 )
 TMUX_VERSION="3.7c"
+# Bootstraps, pinned by version: eget (installers/install-eget.sh) and the nvm
+# installer (installers/install-nvm.sh).
+EGET_VERSION="1.3.4"
+NVM_VERSION="0.40.4"
 TMUX_SHA256="7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf"
 # The docker-container BuildKit builder sbx kit builds use when Docker's image
 # store has no OCI exporter (BUILDX_BUILDER=sbx-kits). Optional, untracked

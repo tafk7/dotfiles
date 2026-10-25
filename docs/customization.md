@@ -48,7 +48,10 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
 ## Adding a tool with a custom installer
 
 1. Create `installers/install-mytool.sh` with `set -euo pipefail`. Exit `0` when
-   installed or updated, `2` when already current, and `1` on failure.
+   installed or updated, `2` when already current, and `1` on failure. Right
+   after sourcing `lib/install.sh`, branch on `--observe` to
+   `observe_component mytool` and exit, before any provisioning: observation
+   reports what is installed and must change nothing.
 
    **Never let a vendor installer edit shell rc files.** `~/.bashrc` and
    `~/.zshrc` are symlinks into this checkout, so an appended PATH block writes

@@ -5,6 +5,9 @@ set -euo pipefail
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"; export DOTFILES_DIR
 source "$DOTFILES_DIR/lib/install.sh"
+# Observation reports what is installed and changes nothing, so it branches
+# before any provisioning below (lib/observe.sh).
+if [[ "${1:-}" == --observe ]]; then observe_component aws-cli; exit; fi
 
 FORCE=false
 while (( $# )); do

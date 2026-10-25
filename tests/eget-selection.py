@@ -22,7 +22,7 @@ runners share addresses). --refresh downloads only assets the lock lacks; it
 uses GITHUB_TOKEN, GH_TOKEN or `gh auth token` when available.
 
 The detector logic mirrors eget v1.3.4 (detect.go). The test asserts that
-installers/install-eget.sh still pins that version.
+lib/config.sh (EGET_VERSION) still pins that version.
 """
 from __future__ import annotations
 
@@ -238,7 +238,7 @@ def cli_filters(args: list[str]) -> list[str]:
 
 
 def installer_eget_version() -> str:
-    text = (ROOT / "installers" / "install-eget.sh").read_text()
+    text = (ROOT / "lib" / "config.sh").read_text()
     m = re.search(r'^EGET_VERSION="([^"]+)"', text, re.M)
     return m.group(1) if m else ""
 
@@ -434,7 +434,7 @@ def check(manifest: dict[str, dict]) -> int:
     failures: list[str] = []
     version = installer_eget_version()
     if version != SIMULATED_EGET_VERSION:
-        failures.append(f"installers/install-eget.sh pins eget {version or '?'}, but this test "
+        failures.append(f"lib/config.sh pins eget {version or '?'}, but this test "
                         f"simulates {SIMULATED_EGET_VERSION}; re-verify detect.go and update it")
 
     lock = read_lock()
