@@ -212,7 +212,7 @@ shell│hgrep│Search command history│history | grep
 shell│ducks│Show largest items in current directory│du -cks * | sort -rn | head
 shell│fixmouse│Reset stale terminal mouse-reporting modes│disable DEC/Xterm mouse modes
 # Configuration
-shell│reload│Reload shell configuration│source ~/.bashrc
+shell│reload [--soft]│Restart the shell in place with fresh config (--soft re-sources instead)│exec $SHELL -l
 shell│themes│List available themes│theme --list
 shell│theme│Set the global theme / interactive picker│theme [name]
 shell│theme-window│Theme only this tmux window / picker│theme -w [name]

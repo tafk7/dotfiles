@@ -130,15 +130,46 @@ _tafk_tmux_buffer_set() {
     printf '%s' "$1" | tmux load-buffer -
 }
 
-# Reload shell config, unsetting the guards so env.sh and profile.sh re-run.
-# Removed aliases/functions persist; use `exec $SHELL -l` for a clean slate.
+# Replace this shell with a fresh login shell of the same kind, in the same
+# directory, so removed aliases, functions, and options are gone too. Unexported
+# variables and anything defined by hand are lost; refuses while jobs exist.
+# `reload --soft` re-sources the startup files in place instead: it adds and
+# changes definitions but cannot remove them.
 reload() {
-    unset _DOTFILES_ENV_LOADED _PROFILE_LOADED
-    if [[ -n "$ZSH_VERSION" ]]; then
-        source ~/.zshrc
+    local shell_path
+    case "${1:-}" in
+        --soft)
+            unset _DOTFILES_ENV_LOADED _DOTFILES_BASE_ENV _PROFILE_LOADED
+            if [[ -n "${ZSH_VERSION:-}" ]]; then
+                source ~/.zshenv
+                source ~/.zshrc
+            else
+                source ~/.bashrc
+            fi
+            return
+            ;;
+        '') ;;
+        *) printf 'usage: reload [--soft]\n' >&2; return 2 ;;
+    esac
+    if [[ -n "${ZSH_VERSION:-}" ]]; then
+        zmodload zsh/parameter 2>/dev/null
+        # shellcheck disable=SC2154  # zsh/parameter's job table
+        if (( ${#jobstates} )); then
+            printf 'reload: background jobs exist; finish them or use reload --soft\n' >&2
+            return 1
+        fi
+        fc -AI 2>/dev/null
+        shell_path="$(command -v zsh)"
     else
-        source ~/.bashrc
+        if [[ -n "$(jobs -p)" ]]; then
+            printf 'reload: background jobs exist; finish them or use reload --soft\n' >&2
+            return 1
+        fi
+        history -a
+        shell_path="$BASH"
     fi
+    unset _DOTFILES_ENV_LOADED _DOTFILES_BASE_ENV _PROFILE_LOADED
+    exec "$shell_path" -l
 }
 
 if [[ -n "$ZSH_VERSION" ]]; then
