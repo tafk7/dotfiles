@@ -62,14 +62,41 @@ run_shell_matrix() {
 run_shell_matrix bash
 run_shell_matrix zsh
 
+# reload --soft re-sources the startup files in place, with every guard cleared.
 printf 'DOTFILES_RELOAD_MARKER=$(( ${DOTFILES_RELOAD_MARKER:-0} + 1 ))\n' > "$HOME/.bashrc"
-HOME="$HOME" DOTFILES_DIR="$ROOT" bash --noprofile --norc -c \
-    'source "$DOTFILES_DIR/shell/tools/general.sh"; reload; [[ "$DOTFILES_RELOAD_MARKER" == 1 ]]' \
-    || fail "bash reload"
+HOME="$HOME" DOTFILES_DIR="$ROOT" _DOTFILES_BASE_ENV=1 _DOTFILES_ENV_LOADED=1 bash --noprofile --norc -c \
+    'source "$DOTFILES_DIR/shell/tools/general.sh"; reload --soft
+     [[ "$DOTFILES_RELOAD_MARKER" == 1 && -z "${_DOTFILES_BASE_ENV:-}${_DOTFILES_ENV_LOADED:-}" ]]' \
+    || fail "bash soft reload"
+printf 'DOTFILES_RELOAD_ENV=$(( ${DOTFILES_RELOAD_ENV:-0} + 1 ))\n' > "$HOME/.zshenv"
 printf 'DOTFILES_RELOAD_MARKER=$(( ${DOTFILES_RELOAD_MARKER:-0} + 1 ))\n' > "$HOME/.zshrc"
-HOME="$HOME" DOTFILES_DIR="$ROOT" zsh -dfc \
-    'source "$DOTFILES_DIR/shell/tools/general.sh"; reload; [[ "$DOTFILES_RELOAD_MARKER" == 1 ]]' \
-    || fail "zsh reload"
+HOME="$HOME" DOTFILES_DIR="$ROOT" _DOTFILES_BASE_ENV=1 _DOTFILES_ENV_LOADED=1 zsh -dfc \
+    'source "$DOTFILES_DIR/shell/tools/general.sh"; reload --soft
+     [[ "$DOTFILES_RELOAD_ENV" == 1 && "$DOTFILES_RELOAD_MARKER" == 1 && -z "${_DOTFILES_BASE_ENV:-}${_DOTFILES_ENV_LOADED:-}" ]]' \
+    || fail "zsh soft reload"
+rm "$HOME/.bashrc" "$HOME/.zshenv" "$HOME/.zshrc"
+
+# reload replaces the shell with a fresh login shell: the directory stays,
+# Layer 0 recomputes over stale inherited values, and unexported state is gone.
+# The replacement shell reads its commands from the same stdin.
+reload_home="$TEST_ROOT/reload-home"
+mkdir -p "$reload_home" "$TEST_ROOT/reload dir"
+for mapping in profile.sh:.profile bash.sh:.bashrc bash_profile:.bash_profile zshenv:.zshenv zprofile:.zprofile; do
+    ln -s "$ROOT/entry/${mapping%%:*}" "$reload_home/${mapping#*:}"
+done
+for shell in bash zsh; do
+    if [[ "$shell" == bash ]]; then args=(--noprofile --norc -c); else args=(-dfc); fi
+    reloaded="$(cd "$TEST_ROOT/reload dir" && printf '%s\n' 'printf "%s|%s|%s\n" "$PWD" "${UNEXPORTED:-}" "$PROJECTS_DIRS"' \
+        | env HOME="$reload_home" ZDOTDIR="$reload_home" PATH="$PATH" DOTFILES_DIR="$ROOT" PROJECTS_DIRS=stale \
+            _DOTFILES_BASE_ENV=1 _DOTFILES_ENV_LOADED=1 "$shell" "${args[@]}" \
+            'source "$DOTFILES_DIR/shell/tools/general.sh"; UNEXPORTED=1; reload; echo not-replaced')"
+    assert_eq "$reloaded" "$TEST_ROOT/reload dir||$reload_home/projects:$reload_home/work:$reload_home/dev:$reload_home/code:$reload_home/src" "$shell reload"
+    status=0
+    HOME="$reload_home" DOTFILES_DIR="$ROOT" "$shell" "${args[@]}" \
+        'source "$DOTFILES_DIR/shell/tools/general.sh"; sleep 5 & reload 2>/dev/null; s=$?; kill $! 2>/dev/null; exit $s' \
+        || status=$?
+    assert_eq "$status" 1 "$shell reload with a background job"
+done
 
 export TEST_ROOT
 # Optional Python tools are discovered at invocation, including after a PATH
