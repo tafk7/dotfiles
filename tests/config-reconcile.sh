@@ -20,7 +20,9 @@ printf '%s\n' \
     > "$TEST_ROOT/bin/az"
 printf '%s\n' \
     '#!/bin/bash' \
-    'if [[ "${*: -1}" == azure-cli ]]; then' \
+    'if [[ "${*: -1}" == azure-cli && "$*" == *Status* ]]; then' \
+    '    printf installed' \
+    'elif [[ "${*: -1}" == azure-cli ]]; then' \
     '    printf "99.0\n"' \
     'else' \
     '    exec /usr/bin/dpkg-query "$@"' \
