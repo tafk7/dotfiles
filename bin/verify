@@ -338,7 +338,7 @@ else
     check_fail "machine-state schema invalid"
 fi
 if journal_pending; then
-    check_fail "incomplete component transaction requires reconciliation: $DOTFILES_JOURNAL_FILE"
+    check_fail "incomplete component transaction requires reconciliation (setup.sh reconciles it): $(journal_pending_components | paste -sd ' ')"
 else
     check_pass "no incomplete component transaction"
 fi

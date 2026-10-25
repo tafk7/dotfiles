@@ -240,20 +240,33 @@ validate_tar_archive() {
     ' || { error "Archive contains an unsafe path: $archive"; return 1; }
 }
 
+# A replacement that fails after its journal was written gets one bounded
+# reconciliation: if the artifact now at the target validates, it is recorded
+# and the journal removed; otherwise the journal stays and blocks only this
+# component's later replacements. The replacement still reports failure.
+settle_failed_replacement() {
+    local component="$1"
+    journal_reconcile "$component" \
+        || warn "Replacement of $component left an unresolved journal; its later replacements stay blocked until setup reconciles it"
+}
+
 atomic_replace_binary() {
     local component="$1" staged="$2" target="$3" metadata="${4:-}"
     [[ -x "$staged" ]] || { error "Staged $component binary is not executable: $staged"; return 1; }
     mkdir -p "$(dirname "$target")" || return 1
-    local pending="${target}.dotfiles-new.$$"
+    local pending="${target}.dotfiles-new.$$" version note
     journal_begin "$component" "$target" "$pending" "$target" || return 1
-    mv "$staged" "$pending" || return 1
-    mv -f "$pending" "$target" || return 1
-    local version
-    version="$("$target" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | version_line || true)"
-    local note="${TOOL_UPDATE_CONTRACT[$component]:-staged}"
+    note="${TOOL_UPDATE_CONTRACT[$component]:-staged}"
     [[ -z "$metadata" ]] || note+=" $metadata"
-    ledger_record "$component" yes dotfiles installed "$version" "$target" "$note" || return 1
-    journal_clear
+    if mv "$staged" "$pending" && mv -f "$pending" "$target"; then
+        version="$("$target" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | version_line || true)"
+        if ledger_record "$component" yes dotfiles installed "$version" "$target" "$note" \
+           && journal_clear "$component"; then
+            return 0
+        fi
+    fi
+    settle_failed_replacement "$component"
+    return 1
 }
 
 atomic_replace_tree() {
@@ -263,11 +276,22 @@ atomic_replace_tree() {
     "$staged/$verify_relative" --version >/dev/null 2>&1 \
         || { error "Staged $component tree failed verification"; return 1; }
     mkdir -p "$(dirname "$target")" || return 1
-    local rollback_root rollback version
+    local rollback_root rollback
     rollback_root="$(dirname "$target")/.dotfiles-${component}-rollback"
     rollback="$rollback_root/${BASHPID:-$$}"
     mkdir -p "$rollback_root" || return 1
     journal_begin "$component" "$rollback" "$staged" "$target" || return 1
+    if ! _atomic_replace_tree_journaled "$component" "$staged" "$target" "$verify_relative" "$link_path" \
+            "$rollback_root" "$rollback"; then
+        settle_failed_replacement "$component"
+        return 1
+    fi
+}
+
+# The steps of atomic_replace_tree that run under its journal.
+_atomic_replace_tree_journaled() {
+    local component="$1" staged="$2" target="$3" verify_relative="$4" link_path="$5"
+    local rollback_root="$6" rollback="$7" version
     if [[ -e "$target" ]]; then mv "$target" "$rollback" || return 1; fi
     if ! mv "$staged" "$target"; then
         [[ ! -e "$rollback" ]] || mv "$rollback" "$target"
@@ -293,7 +317,7 @@ atomic_replace_tree() {
     ledger_record "$component" yes dotfiles installed "$version" "${link_path:-$target}" "${TOOL_UPDATE_CONTRACT[$component]:-staged}" || return 1
     rm -rf "$rollback" || return 1
     rmdir "$rollback_root" 2>/dev/null || true
-    journal_clear
+    journal_clear "$component"
 }
 
 get_windows_username() {
@@ -1341,7 +1365,8 @@ configure_docker_host_access() {
         warn "Membership in the docker group grants root-equivalent access to this host."
     fi
     if host_systemd_running && [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
-        if systemctl is-enabled --quiet docker 2>/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
+        if [[ "${DRY_RUN:-false}" != true ]] \
+           && systemctl is-enabled --quiet docker 2>/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
             log "docker service already enabled and running"
         else
             safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
