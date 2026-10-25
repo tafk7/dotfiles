@@ -11,6 +11,7 @@ from the network into a shell and are never executed with `sudo`.
 | eget-managed CLI tools | pinned in `eget.toml`; asset locked in `eget.lock` | exact asset by download URL (no GitHub API call), SHA-256 verified against the lock; staged executable check and atomic replacement |
 | Neovim | pinned release (`lib/config.sh`) | release asset SHA-256 verified against the pin; archive-layout and executable checks; staged tree replacement |
 | vim-plug | commit `88e31471818e9a29a8a20a0ee61360cfd7bdc1cd` | explicit `install-editor-plugins` action; HTTPS-trusted immutable source; existing manager preserved |
+| Neovim plugins | commit-pinned in `configs/init.vim` | cloned by `install-editor-plugins`; no post-install hooks, so the fzf plugin never downloads its own binary and uses the eget-pinned `fzf` on PATH |
 | tmux | pinned release (`lib/config.sh`) | source archive SHA-256 verified against the pin; staged build and executable check before replacement |
 | NVM | pinned installer v0.40.4 | HTTPS-trusted installer file; no shell-RC modification; prior tree retained on installer failure |
 | Rust | moving rustup installer | HTTPS-trusted installer file; in-place upstream mutation; recover with `rustup update`/`rustup self uninstall` |
