@@ -169,6 +169,30 @@ apply_feature_requests() {
     fi
 }
 
+# The version line of a version probe's output on stdin: color codes and
+# carriage returns removed, and the first line that carries a digit, so a
+# banner line (eza) or escape codes (btop) are never recorded as the version.
+version_line() {
+    sed -e $'s/\x1b\\[[0-9;?]*[[:alpha:]]//g' -e 's/\r//g' \
+        | awk '/[0-9]/ { sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); print; exit }'
+}
+
+# The path to record for a component's command: symlinks resolved, except a
+# snap command, which resolves through /usr/bin/snap to snapd rather than to
+# the tool itself.
+component_path() {
+    local path="$1" resolved
+    resolved="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+    case "${resolved##*/}" in snap|snapd) [[ "${path##*/}" == snap* ]] || resolved="$path" ;; esac
+    printf '%s\n' "$resolved"
+}
+
+# Whether a dpkg package is installed, not merely known (a removed package
+# keeps a "config-files" entry that dpkg-query -W still lists).
+apt_package_installed() {
+    [[ "$(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null)" == installed ]]
+}
+
 ledger_record() {
     local component="$1" applicable="$2" ownership="$3" status="$4"
     local version="${5:-}" path="${6:-}" note="${7:-}" now
@@ -295,7 +319,7 @@ journal_reconcile() {
         observed="$new_path/${TOOL_RELATIVE_BINARY[$component]}"
     fi
     if [[ -n "$observed" ]] && "$observed" "${TOOL_VERSION_FLAG[$component]:---version}" >/dev/null 2>&1; then
-        version="$("$observed" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | head -n1 || true)"
+        version="$("$observed" "${TOOL_VERSION_FLAG[$component]:---version}" 2>/dev/null | version_line || true)"
         ledger_record "$component" yes dotfiles installed "$version" "$observed" "recovered interrupted transaction" || return 1
     else
         ledger_record "$component" yes unknown failed "" "$new_path" "interrupted transaction artifact missing" || return 1
