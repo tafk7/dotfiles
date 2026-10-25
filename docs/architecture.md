@@ -24,7 +24,10 @@ non-interactive Bash stops after Layer 0; plain `bash -c` and Bash shebangs do
 not read these files.
 
 Zsh always reads `.zshenv`, which loads Layer 0, and reads `.zshrc` only for
-interactive sessions. Layer 0 does not resolve themes, query tmux, define public
+interactive sessions. Layer 0's load guards (`_DOTFILES_BASE_ENV`, `_DOTFILES_ENV_LOADED`)
+are exported so nested shells reuse the composed environment; `tmux.conf`
+drops them from the server's global environment, so every new pane computes
+its own. Layer 0 does not resolve themes, query tmux, define public
 interactive commands, or remove externally owned functions.
 
 Startup locates the checkout (`DOTFILES_DIR`) in this order; a checkout is
