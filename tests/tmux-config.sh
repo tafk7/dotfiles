@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_ROOT="$(mktemp -d)"
 SERVER="dotfiles-config-$RANDOM-$$"
 OUTER="$SERVER-outer"
-trap 'tmux -L "$OUTER" kill-server 2>/dev/null || true; tmux -L "$SERVER" kill-server 2>/dev/null || true; rm -rf "$TEST_ROOT"' EXIT
+trap 'tmux -L "$OUTER" kill-server 2>/dev/null || true; tmux -L "$SERVER" kill-server 2>/dev/null || true; tmux -L "$SERVER-guards" kill-server 2>/dev/null || true; rm -rf "$TEST_ROOT"' EXIT
 mkdir -p "$TEST_ROOT/home/dev" "$TEST_ROOT/tmux" "$TEST_ROOT/state" "$TEST_ROOT/cache"
 # Every tmux call below, including setup.sh's theme unwiring, must stay off the
 # caller's real tmux server.
@@ -62,5 +62,23 @@ if tmux -L "$SERVER" show-hooks -g | grep -Fq 'theme-switcher'; then
     echo "FAIL: themes must not need tmux hooks" >&2
     exit 1
 fi
+
+# A server started from a dotfiles shell inherits its exported load guards.
+# tmux.conf drops them, so a new pane recomputes the environment from the
+# checkout instead of keeping the values the server started with.
+HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state-themed" XDG_CACHE_HOME="$TEST_ROOT/cache" \
+    DOTFILES_DIR="$SPACED" _DOTFILES_BASE_ENV=1 _DOTFILES_ENV_LOADED=1 LESS=stale \
+    tmux -L "$SERVER-guards" -f "$SPACED/configs/tmux.conf" new-session -d -s test
+for guard in _DOTFILES_BASE_ENV _DOTFILES_ENV_LOADED; do
+    if tmux -L "$SERVER-guards" show-environment -g "$guard" >/dev/null 2>&1; then
+        echo "FAIL: tmux kept $guard in its global environment" >&2
+        exit 1
+    fi
+done
+tmux -L "$SERVER-guards" new-window -d "bash -lc 'printf %s \"\$LESS\" > \"$TEST_ROOT/pane-less\"'"
+for _ in {1..50}; do [[ -s "$TEST_ROOT/pane-less" ]] && break; sleep 0.1; done
+expected_less="$(sed -n "s/^ *export LESS='\\(.*\\)'$/\\1/p" "$ROOT/entry/profile.sh")"
+[[ -n "$expected_less" && "$(cat "$TEST_ROOT/pane-less" 2>/dev/null)" == "$expected_less" ]] \
+    || { echo "FAIL: a new pane did not recompute LESS: $(cat "$TEST_ROOT/pane-less" 2>/dev/null)" >&2; exit 1; }
 
 printf 'tmux-config: ok\n'
