@@ -268,9 +268,9 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Adds: neovim, tmux, shellcheck, harper-ls (grammar checking)
 
     --work              Dev + local development/agent execution. Requires sudo.
-                        Adds: NVM, Docker, sbx, KVM host access, Rust
-                        Requires native Ubuntu 24.04/26.04 with KVM available
-                        for local sandbox readiness.
+                        Adds: NVM, Docker, Rust, and on native Ubuntu
+                        24.04/26.04 sbx with KVM host access. Elsewhere (WSL,
+                        22.04) sbx and KVM are skipped and the rest installs.
                         AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave
                         AI off where an organization manages those CLIs.
 
@@ -356,7 +356,7 @@ TIER SUMMARY:
     │          │   gdu, glow, lazygit, gh, uv, sd, bat, fd,      │           │
     │          │   ripgrep, direnv  (all to ~/.local/bin)        │           │
     │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
-    │ work     │ + NVM, Docker, sbx, KVM access, Rust            │ Yes       │
+    │ work     │ + NVM, Docker, Rust; sbx + KVM where supported  │ Yes       │
     ├──────────┼─────────────────────────────────────────────────┼───────────┤
     │ --ai     │ + Claude Code, Codex, opencode, Pi (orthogonal) │ No        │
     │          │   (or --claude/--codex/--opencode/--pi singly)  │           │
@@ -429,8 +429,7 @@ phase_verify_system() {
 
     local capability component
     if tier_includes work && ! tool_applicable sbx; then
-        error "--work requires native Ubuntu 24.04/26.04 with supported KVM architecture"
-        return 1
+        warn "Local sandboxes (sbx, KVM access) need native Ubuntu 24.04/26.04; --work installs the other work tools here"
     fi
 
     for capability in "${CAPABILITY_NAMES[@]}"; do
@@ -677,7 +676,7 @@ run_installation() {
         fi
     fi
 
-    if tier_includes "work" && [[ "$(host_group_state kvm)" == pending ]]; then
+    if tier_includes "work" && tool_applicable sbx && [[ "$(host_group_state kvm)" == pending ]]; then
         echo "* KVM group membership requires a new login"
         needs_restart=true
     fi
@@ -718,7 +717,7 @@ run_installation() {
     echo
     ((step++))
 
-    if tier_includes "work"; then
+    if tier_includes "work" && tool_applicable sbx; then
         echo "$step. Authenticate and smoke-test local sandboxes manually:"
         echo "   sbx login"
         echo "   ./bin/verify --tier work --smoke"

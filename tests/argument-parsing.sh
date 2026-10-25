@@ -50,7 +50,7 @@ printf 'ID=ubuntu\nVERSION_ID="22.04"\nVERSION_CODENAME=jammy\n' > "$TEST_ROOT/o
 rc=0
 DOTFILES_OS_RELEASE="$TEST_ROOT/os-release" DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_ARCH=x86_64 \
     "$ROOT/setup.sh" --work --dry-run --no-hooks --no-git >/dev/null 2>&1 || rc=$?
-[[ $rc -ne 0 ]] || fail "Ubuntu 22.04 work tier was accepted despite sbx requiring 24.04+"
+[[ $rc -eq 0 ]] || fail "Ubuntu 22.04 work tier was refused instead of skipping sbx"
 
 reset_args
 DOTFILES_TEST_WSL_VERSION=1 WSL_DISTRO_NAME=Ubuntu INSTALL_TIER=bash DRY_RUN=true \

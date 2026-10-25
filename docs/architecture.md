@@ -56,7 +56,9 @@ environment, while `bash -lc` refreshes through the login chain.
 ## Installation dimensions
 
 The cumulative package tiers are `config -> bash -> dev -> work`; work includes
-Docker, local sbx/KVM readiness, NVM, and Rust. AI tools, RDP, Tailscale, and
+Docker, NVM, Rust, and, on native Ubuntu 24.04/26.04, local sbx/KVM readiness.
+A bundle installs what the platform supports and skips the rest; an explicit
+selection such as `--azure` fails where it does not apply. AI tools, RDP, Tailscale, and
 cloud CLIs are orthogonal selections. The theme feature is enabled by default but can
 be persistently disabled. Agent-badge is enabled by default when a supported AI
 CLI is installed and can be independently disabled.

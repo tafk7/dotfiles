@@ -274,17 +274,30 @@ fi
 # 4. Work-tier local execution and optional Tailscale readiness
 # ==============================================================================
 
-verify_work_host=false
+# Docker readiness wherever Docker is selected; sandbox (sbx, KVM) readiness
+# only where sbx applies.
+verify_docker=false
+verify_sandbox=false
 if [[ "$VERIFY_MODE" == tier && "$VERIFY_TIER" == work ]]; then
-    verify_work_host=true
-elif [[ "$VERIFY_MODE" == installed ]] && component_expected sbx; then
-    verify_work_host=true
-elif [[ "$RUN_SMOKE" == true ]]; then
-    verify_work_host=true
+    tool_applicable docker && verify_docker=true
+    tool_applicable sbx && verify_sandbox=true
+elif [[ "$VERIFY_MODE" == installed ]]; then
+    component_expected docker && verify_docker=true
+    component_expected sbx && verify_sandbox=true
 fi
-if [[ "$verify_work_host" == true ]]; then
+if [[ "$RUN_SMOKE" == true ]]; then
+    verify_docker=true
+    verify_sandbox=true
+fi
+if [[ "$verify_docker" == true ]]; then
     echo
-    echo "Work local-execution readiness"
+    echo "Docker readiness"
+    echo "─────────────────────────────────────"
+    docker_verify_checks true
+fi
+if [[ "$verify_sandbox" == true ]]; then
+    echo
+    echo "Local sandbox readiness"
     echo "─────────────────────────────────────"
     work_verify_checks true
 fi

@@ -23,11 +23,11 @@ and changes nothing.
 | `--config` | Links configs for tools that are already installed | No |
 | `--bash` | Pinned CLI tools in `~/.local/bin` through eget: starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gdu, glow, lazygit, gh, uv, sd, direnv | No |
 | `--dev` | zsh, build tools, clipboard, Neovim, tmux, shellcheck, harper-ls | Yes |
-| `--work` | NVM, Docker, Docker Sandboxes (`sbx`) with KVM access, Rust | Yes |
+| `--work` | NVM, Docker, Rust, and Docker Sandboxes (`sbx`) with KVM access where supported | Yes |
 
 Each tier includes the ones before it. If you pass several tiers, the highest
-one wins. `--work` requires native Ubuntu 24.04/26.04 with KVM. The other tiers
-also run on 22.04 and WSL2.
+one wins. Every tier runs on each supported platform; `sbx` and its KVM access
+need native Ubuntu 24.04/26.04, so `--work` skips them on 22.04 and WSL2.
 
 The following selections combine with any tier:
 

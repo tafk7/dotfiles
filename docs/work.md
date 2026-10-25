@@ -11,7 +11,8 @@ development and local Docker Sandboxes:
 ```
 
 `work` includes the lower config, bash, and dev tiers, then adds NVM, Docker
-Engine, `docker-sbx`, KVM/Docker host access, and Rust. Tailscale is independent:
+Engine and Docker host access, Rust, and, where sbx applies, `docker-sbx` with
+KVM host access and its kit builder. Tailscale is independent:
 `--tail` installs its package and service without selecting work or AI.
 `--full` remains exactly `--work --ai`, so add `--tail` explicitly when wanted.
 
@@ -21,9 +22,11 @@ group membership grants root-equivalent access to the host.
 
 ## Supported host and virtualization
 
-Because local `sbx` is a work-tier requirement, work targets native Ubuntu
-24.04 and 26.04 on amd64 or arm64. Config, bash, and dev retain Ubuntu 22.04
-and WSL support. Tailscale independently supports repository-supported Ubuntu
+Local `sbx` needs native Ubuntu 24.04 or 26.04 on amd64 or arm64. Elsewhere
+(WSL, Ubuntu 22.04) `--work` installs the other work tools, records sbx as not
+applicable, and skips KVM access and the kit builder; verification still checks
+Docker there and skips the sandbox checks. Config, bash, and dev support every
+listed platform. Tailscale independently supports repository-supported Ubuntu
 22.04/24.04/26.04.
 
 See the current vendor pages for [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/),
@@ -40,7 +43,7 @@ support may be built in, so verification does not rely only on `lsmod`.
 Package installation and host readiness are separate results. Missing KVM or a
 group change awaiting a new login does not turn a successful package install
 into a package failure, but explicit work verification fails until local
-sandbox execution is ready.
+sandbox execution is ready on a host where sbx applies.
 
 ## Installation boundaries
 

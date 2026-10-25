@@ -1370,7 +1370,9 @@ configure_docker_host_access() {
         ensure_account_group docker
         warn "Membership in the docker group grants root-equivalent access to this host."
     fi
-    if host_systemd_running && [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
+    if ! host_systemd_running; then
+        warn "systemd is not managing this host; Docker service readiness must be handled manually"
+    elif [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
         if [[ "${DRY_RUN:-false}" != true ]] \
            && systemctl is-enabled --quiet docker 2>/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
             log "docker service already enabled and running"
@@ -1380,9 +1382,9 @@ configure_docker_host_access() {
     fi
 }
 
+# KVM access for local sandboxes, where sbx applies.
 configure_work_host() {
-    log "Configuring work-tier Docker and KVM access..."
-    configure_docker_host_access
+    log "Configuring KVM access for local sandboxes..."
     if work_kvm_device_present || work_kernel_has_kvm; then
         ensure_account_group kvm
     else
@@ -1393,8 +1395,7 @@ configure_work_host() {
     elif ! work_kvm_accessible; then
         warn "/dev/kvm permission denied; reconnect after kvm group membership is applied"
     fi
-    host_systemd_running || warn "systemd is not managing this host; Docker service readiness must be handled manually"
-    success "Work host configuration checked (package success and host readiness are reported separately)"
+    success "Sandbox host configuration checked (package success and host readiness are reported separately)"
 }
 
 install_tail_packages() {
@@ -1445,10 +1446,19 @@ install_work_packages() {
     install_apt "work" python3-dev python3-venv || failed=true
 
     install_docker_engine || failed=true
-    run_installer "sbx" || failed=true
-    # Host readiness is reported, not a package failure: both only warn.
-    configure_work_host || true
-    ensure_sbx_kits_builder || true
+    # Host readiness is reported, not a package failure: these only warn.
+    configure_docker_host_access || true
+    # The tier installs the work tools the platform supports. sbx needs native
+    # Ubuntu 24.04/26.04 on a supported architecture; elsewhere it, KVM access,
+    # and the kit builder are skipped and sbx is recorded as not applicable.
+    if tool_applicable sbx; then
+        run_installer "sbx" || failed=true
+        configure_work_host || true
+        ensure_sbx_kits_builder || true
+    else
+        log "Skipping sbx, KVM access, and the sbx kit builder: sbx is not applicable on this platform"
+        [[ "${DRY_RUN:-false}" == true ]] || track_install sbx not-applicable
+    fi
 
     # Version managers (Python is handled by uv, installed in the shell tier)
     run_installer "nvm" || failed=true
