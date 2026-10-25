@@ -169,7 +169,7 @@ shell│Alt+Shift+Backspace│Cut from cursor to line start into tmux buffer│T
 shell│Alt+Shift+Delete│Cut from cursor to line end into tmux buffer│TAFK F16 widget
 shell│Shift+Tab│Spell-correct the word at the cursor (zsh)│spell-word
 # Navigation
-shell│..│Go up one directory│cd ..
+shell│.. [N]│Go up N directories (default 1)│cd .. N times
 shell│...│Go up two directories│cd ../..
 shell│-│Return to previous directory│cd -
 shell│cdl│cd and list directory contents│cdl <dir>
