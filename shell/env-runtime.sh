@@ -5,8 +5,9 @@
 # subprocess, and shell/env.sh is skipped by child shells through its exported
 # guard, so they can't live there. Static exports belong in shell/env.sh.
 #
-# Sourced immediately before env.sh by entry/profile.sh (login and
-# non-interactive bash/zsh) and shell/init.sh (interactive shells).
+# Sourced immediately after env.sh by entry/profile.sh (login and
+# non-interactive bash/zsh) and shell/init.sh (interactive shells), so an
+# allowed .envrc overrides the repo defaults and ~/.shell.env.
 
 # ==============================================================================
 # PATH hygiene

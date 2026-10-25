@@ -2,7 +2,8 @@
 # ~/.profile: login baseline. Must stay POSIX: dash/sh read it too.
 #
 # Part 1 (all shells):    locale, XDG, TERM, PAGER.
-# Part 2 (bash/zsh only): shell/env-runtime.sh and shell/env.sh.
+# Part 2 (bash/zsh only): shell/env.sh (with ~/.shell.env), then
+#                         shell/env-runtime.sh (direnv).
 #
 # Never sources bashrc/zshrc; ~/.bash_profile and zsh's own startup do that.
 
@@ -73,8 +74,9 @@ if [ -n "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
         unset _dotfiles_path_file
     fi
     export DOTFILES_DIR
-    [ -f "$DOTFILES_DIR/shell/env-runtime.sh" ] && . "$DOTFILES_DIR/shell/env-runtime.sh"
+    # Defaults and machine settings first, so project activation wins.
     [ -f "$DOTFILES_DIR/shell/env.sh" ] && . "$DOTFILES_DIR/shell/env.sh"
+    [ -f "$DOTFILES_DIR/shell/env-runtime.sh" ] && . "$DOTFILES_DIR/shell/env-runtime.sh"
 
     # The only dedup non-interactive agent shells get; /etc/profile.d scripts
     # can append on every login shell.

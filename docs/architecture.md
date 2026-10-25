@@ -7,8 +7,8 @@ platform, and architecture are separate decisions.
 ## Runtime layers
 
 ```text
-Layer 0: entry/profile.sh -> shell/env-runtime.sh -> shell/env.sh
-  locale, XDG paths, PATH, editor, project environment, direnv
+Layer 0: entry/profile.sh -> shell/env.sh -> ~/.shell.env -> shell/env-runtime.sh
+  locale, XDG paths, PATH, editor, machine settings, project environment
   safe for startup-reading non-interactive Bash and Zsh
 
 Layer 1: shell/init.sh
@@ -42,6 +42,12 @@ Step 1 lives in `entry/bash.sh` and `entry/zshenv`; steps 2–4 live once, in
 `entry/profile.sh`. An inherited value never overrides a resolvable symlink, so
 a test HOME linked to a worktree, or a new tmux pane after a checkout switch,
 uses the linked checkout.
+
+Variables dotfiles owns (`EDITOR`, `PROJECTS_DIRS`, `RIPGREP_CONFIG_PATH`,
+`PAGER`, `LESS`) resolve in three layers, each overriding the one before: the
+repo default, `~/.shell.env`, then an allowed `.envrc`. An inherited value
+never wins over them, so a changed default reaches the next shell that
+computes Layer 0.
 
 Project activation follows shell startup semantics: `zsh -c` refreshes direnv
 through `.zshenv`; plain `bash -c` reads no dotfiles and inherits its parent's

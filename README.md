@@ -190,8 +190,10 @@ Wave/Dragon, Catppuccin Mocha/Latte, Everforest, Vesper, and GitHub Light.
 
 Machine-specific settings go in these files. None of them are tracked.
 
-- `~/.shell.local` and `~/.shell.local.d/*.sh`: aliases, exports, secrets, and
-  `PROJECTS_DIRS`.
+- `~/.shell.env`: environment for every shell, agents' included, such as
+  `PROJECTS_DIRS` or `EDITOR`.
+- `~/.shell.local` and `~/.shell.local.d/*.sh`: aliases, functions, prompt,
+  and secrets, for interactive shells only.
 - `~/.gitconfig.local`: Git identity and commit signing.
 - `~/.tmux.local.conf`: tmux options for this machine.
 - `~/.ssh/config.local` and `~/.ssh/config.d/*.conf`: SSH host overrides.
