@@ -11,6 +11,7 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/registry.sh"
 source "$DOTFILES_DIR/lib/state.sh"
+source "$DOTFILES_DIR/lib/operation.sh"
 
 DRY_RUN=false
 ASSUME_YES=false
@@ -199,5 +200,8 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if (( $# )) && ! operation_read_only_args "$@"; then
+        operation_begin "$SCRIPT_DIR/uninstall-tool" "$@"
+    fi
     main "$@"
 fi

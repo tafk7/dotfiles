@@ -3,4 +3,8 @@
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Writes hold the operation lock (joined when setup runs this); checks and
+# previews do not.
+source "$ROOT/lib/operation.sh"
+operation_read_only_args "$@" || operation_begin "$ROOT/bin/ai-config" "$@"
 exec python3 "$ROOT/lib/ai_preferences.py" "$@"

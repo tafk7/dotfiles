@@ -26,9 +26,11 @@ fixture_cleanup() {
     [[ -n "${TEST_ROOT:-}" && "$TEST_ROOT" == /tmp/* ]] && /bin/rm -rf -- "$TEST_ROOT"
 }
 
+# The operation lock (lib/operation.sh) records each run's id: bookkeeping that
+# changes on every run, not managed state, so manifests leave it out.
 fixture_manifest() {
     local root="$1"
-    find "$root" -path "$root/.git" -prune -o -printf '%P\t%y\t%m\t%s\t%T@' \
+    find "$root" -path "$root/.git" -prune -o -path '*/dotfiles/operation.lock' -prune -o -printf '%P\t%y\t%m\t%s\t%T@' \
         -exec sh -c 'for f do if [ -f "$f" ]; then sha256sum "$f" | cut -d" " -f1; else printf "%s\n" -; fi; done' sh {} + \
         | LC_ALL=C sort
 }

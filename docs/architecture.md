@@ -88,6 +88,7 @@ Durable state lives under
 - `theme.tsv`: global theme selection;
 - `install-path`: fallback checkout discovery for flattened deployments;
 - `transactions/`: one journal per interrupted artifact replacement;
+- `operation.lock`: the lock a state-changing command holds, with its run id;
 - `backups/`: displaced user configuration.
 
 These files have a version header, contain data only, are validated before use,
