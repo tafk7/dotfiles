@@ -146,21 +146,12 @@ end
 config.disable_default_key_bindings = true
 
 config.keys = {
-  -- Top-level tabs: usually one per SSH machine.
+  -- Top-level tabs: usually one per SSH machine, rarely more than a few, so
+  -- one key cycles them (with two, it toggles). Alt is tmux's.
   {
     key = 'a',
-    mods = 'ALT',
+    mods = 'CTRL|SHIFT',
     action = act.ActivateTabRelative(1),
-  },
-  {
-    key = '1',
-    mods = 'CTRL',
-    action = act.ActivateTab(0),
-  },
-  {
-    key = '2',
-    mods = 'CTRL',
-    action = act.ActivateTab(1),
   },
   {
     key = 'PageUp',

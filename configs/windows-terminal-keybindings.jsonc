@@ -116,20 +116,11 @@
 
     "keybindings":
     [
-        // With two tabs, Alt+A toggles between the two SSH machines.
+        // Ctrl+Shift+A cycles tabs, one per SSH machine (with two, it toggles).
+        // Alt is tmux's.
         {
             "id": "Terminal.NextTab",
-            "keys": "alt+a"
-        },
-
-        // Direct access to the first two tabs.
-        {
-            "id": "Terminal.SwitchToTab0",
-            "keys": "ctrl+1"
-        },
-        {
-            "id": "Terminal.SwitchToTab1",
-            "keys": "ctrl+2"
+            "keys": "ctrl+shift+a"
         },
 
         // Reorder Windows Terminal tabs. These replace client scrollback paging;
