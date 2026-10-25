@@ -101,4 +101,21 @@ DRY_RUN=false ensure_sbx_kits_builder >/dev/null 2>&1
 ! grep -q 'buildx create' "$docker_log" || fail "an existing builder was recreated"
 unset -f docker
 
+# Docker's service is enabled and started only when it is not already both,
+# so a ready host needs no sudo on rerun.
+docker() { :; }
+work_docker_endpoint() { printf 'unix:///var/run/docker.sock\n'; }
+ensure_account_group() { :; }
+docker_ready=yes
+systemctl() {
+    case "$1" in is-enabled|is-active) [[ "$docker_ready" == yes ]] ;; *) return 0 ;; esac
+}
+sudo_calls=""
+DOTFILES_TEST_SYSTEMD_RUNNING=1 configure_docker_host_access >/dev/null 2>&1
+[[ -z "$sudo_calls" ]] || fail "ready Docker service was enabled again:$sudo_calls"
+docker_ready=no
+DOTFILES_TEST_SYSTEMD_RUNNING=1 configure_docker_host_access >/dev/null 2>&1
+[[ "$sudo_calls" == " systemctl enable --now docker" ]] || fail "stopped Docker service not started:$sudo_calls"
+unset -f docker systemctl
+
 printf 'work-installers: ok\n'

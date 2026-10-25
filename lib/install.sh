@@ -1341,7 +1341,11 @@ configure_docker_host_access() {
         warn "Membership in the docker group grants root-equivalent access to this host."
     fi
     if host_systemd_running && [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
-        safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
+        if systemctl is-enabled --quiet docker 2>/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
+            log "docker service already enabled and running"
+        else
+            safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
+        fi
     fi
 }
 
