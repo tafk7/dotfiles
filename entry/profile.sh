@@ -12,7 +12,8 @@
 [ -n "$_PROFILE_LOADED" ] && return 0
 _PROFILE_LOADED=1
 
-# Part 1: POSIX baseline. Guarded by an exported flag because these values are
+# Part 1: POSIX baseline. lib/env-producer.sh reads it from this heading to
+# Part 2's, so keep both headings. Guarded by an exported flag because these values are
 # inherited, and agents start a login shell per tool call; the `locale -a` fork
 # would otherwise run in every one. Set _DOTFILES_BASE_ENV= to force a recompute.
 if [ -z "${_DOTFILES_BASE_ENV:-}" ]; then
