@@ -109,6 +109,20 @@ verify_components() {
     while IFS= read -r name; do
         verify_component "$name"
     done < <(verify_expected_components)
+    # sbx is the one pinned APT package: setup holds it, and moves only the
+    # holds it placed or was told to adopt.
+    local package="${TOOL_APT_PACKAGE[sbx]}"
+    if verify_expected_components | grep -Fxq sbx && tool_applicable sbx && apt_package_installed "$package"; then
+        if ! apt_package_held "$package"; then
+            outcome convergence Components "sbx hold" "$package is not held; setup holds it at the pin"
+        elif hold_owned "$package"; then
+            outcome ok Components "sbx hold" "held by dotfiles"
+        elif [[ "$(hold_status "$package")" == declined ]]; then
+            outcome health Components "sbx hold" "$package is held by someone other than dotfiles, who moves it"
+        else
+            outcome health Components "sbx hold" "$package is held by someone other than dotfiles; run setup in a terminal to decide whether dotfiles adopts the hold"
+        fi
+    fi
     if feature_enabled agent-badge && verify_expected_components | grep -Eqx 'claude|codex'; then
         if command -v jq >/dev/null 2>&1; then
             outcome ok Components jq "agent-badge JSON dependency"

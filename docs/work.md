@@ -87,9 +87,12 @@ allowlist (see [the kits](../kits/README.md)); credentials never do.
 
 `docker-sbx` is pinned (the `sbx` row of `versions.lock`) and held in APT, since
 sbx changes weekly and tools built on it, such as kits and controllers that
-require an exact version, break on an unplanned upgrade. Another installed
-version is reported by setup and `bin/verify`, never replaced silently; bump the
-pin deliberately and rerun `./setup.sh --work --force`.
+require an exact version, break on an unplanned upgrade. Setup installs the pin,
+holds it, and records a receipt in `holds.tsv`; when the pin moves, it moves the
+package and its hold. It moves only holds it has a receipt for: a hold someone
+else placed (or one from before receipts) is a health finding in
+`dotfiles verify`, and setup run in a terminal asks once whether to adopt it,
+remembering a refusal.
 
 The work tier also creates `sbx-kits`, a `docker-container` BuildKit builder
 for building kits from source when Docker's image store has no OCI exporter
