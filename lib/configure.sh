@@ -43,7 +43,12 @@ configure_ai_settings() {
             || log "[DRY RUN] Would reconcile $1's portable settings (bin/ai-config $1 --dry-run shows how)"
         return 0
     fi
-    "$DOTFILES_DIR/bin/ai-config" "$1"
+    # Running sessions keep the settings they started with.
+    if "$DOTFILES_DIR/bin/ai-config" "$1" --check >/dev/null 2>&1; then
+        "$DOTFILES_DIR/bin/ai-config" "$1"
+    else
+        "$DOTFILES_DIR/bin/ai-config" "$1" && change_record "$1" "$1 settings changed"
+    fi
 }
 
 # The badge plugin's state for NAME: unregistered (not enabled), current, or

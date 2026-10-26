@@ -1,8 +1,9 @@
 #!/bin/bash
 # Checks behind `dotfiles verify`. Each prints outcome records
 # (lib/outcomes.sh) and changes nothing; the command renders them and exits on
-# their classes. Sections: checkout, state, profile, components, configs, AI,
-# Docker, local sandboxes, Tailscale, environment, and upstream (--latest).
+# their classes. Sections: checkout, state, profile, components, configs,
+# editor plugins, AI, Docker, local sandboxes, Tailscale, environment, running
+# (lib/staleness.sh), and upstream (--latest).
 
 [[ -n "${_DOTFILES_VERIFY_LOADED:-}" ]] && return 0
 _DOTFILES_VERIFY_LOADED=1
