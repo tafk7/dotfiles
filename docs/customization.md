@@ -2,22 +2,24 @@
 
 Most extensions are table entries in `lib/config.sh` or `lib/registry.sh`;
 `setup.sh`, `bin/verify`, `bin/uninstall-tool`, and `bin/cheatsheet` read those
-tables, so they pick up a new entry without code changes. See
+tables, so they pick up a new entry without code changes. Setup installs the
+selected entries of the registry's install order (`_REGISTRY_ORDER`), so a new
+component also needs a place there, after everything its `needs` names; the
+help text's tool lists come from the same tables. See
 [architecture](architecture.md) for how the pieces fit together.
 
 ## Adding an APT package
 
 Add it to the appropriate `PACKAGES` group in `lib/config.sh`. The bash tier is
-sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
-`lib/install.sh`:
+sudo-free, so tier-owned APT packages start at dev. A tier's groups install as
+its package set (`install_package_set` in `lib/install.sh`; the `packages:dev`
+and `packages:work` entries of the install order):
 
-- `install_dev_packages`: core, development, languages, terminal, diagramming
-  (plus wsl on WSL), then the tmux and Neovim installers
-- `install_work_packages`: Docker, sbx/KVM host access, NVM then the pinned
-  Node, Rust
-- `install_ai_packages`: the named AI CLI installers
-- `install_rdp_packages`: rdp, then the xrdp configuration installer
-- `install_tail_packages`: Tailscale package/service without enrollment
+- `dev`: core, development, languages, terminal, diagramming (plus wsl on WSL),
+  before the components that need them (zsh, tmux)
+- `work`: the Python headers and venv module
+- the rdp group installs with xrdp (`install_rdp_packages`), which preseeds
+  the display-manager answer first
 
 ## Adding a binary tool (eget)
 
@@ -34,7 +36,8 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
    SHA-256 per architecture. Setup downloads exactly that without asking the
    GitHub API, and treats the tool as current only while its binary's SHA-256
    matches. Commit all three.
-2. Add one row to the core table in `lib/registry.sh`:
+2. Add one row to the core table in `lib/registry.sh`, and the name to the
+   install order among the other eget tools:
    ```text
    # name   binary  method  tier  capabilities  platform  arches  ubuntu  apt  verify
    mytool   -       eget    bash  -             -         -       -       -    -
@@ -67,14 +70,17 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
 2. Add a core-table row in `lib/registry.sh` with method `installer`, and
    override lines for its `ownership-roots`, `update-contract`, and any `paths`
    that uninstall may remove. Use verify `runs` when a present launcher can
-   still be broken.
-3. Call it from the appropriate `install_*_packages` function:
-   ```bash
-   run_installer "mytool" || failed=true
-   ```
-   Functions called through `if`, `!`, or `||` run without `set -e`, so check
-   each required mutation explicitly. The runner records outcomes; never record
-   ownership merely because a skipped tool is already present locally.
+   still be broken. Name what must come first with `needs` (another component
+   or a package set), and set `policy` when versions are not the pin's
+   (`vendor` for a self-updating CLI).
+3. Add it to the install order after everything it needs. Setup then runs the
+   installer whenever the component is selected, skips it where it does not
+   apply, and does not attempt it after one of its needs failed in the same
+   run. Host configuration that belongs with it (groups, services) goes in
+   `configure` override functions, which run after the install step whatever it
+   did. Functions called through `if`, `!`, or `||` run without `set -e`, so
+   check each required mutation explicitly. The runner records outcomes; never
+   record ownership merely because a skipped tool is already present locally.
 
 Host mutations (groups, services) belong in `lib/install.sh`. Read-only
 KVM/service/group probes belong in `lib/work-host.sh`, which verification also
@@ -83,11 +89,10 @@ uses. Neither is loaded during shell startup.
 ## Adding an orthogonal capability
 
 Capabilities such as `--tail` or `--aws` compose with any tier. Add a row to
-`CAPABILITIES` in `setup.sh` (name, requirements, installer, label) and give the
-registry components the capability in the core table. The `--NAME` flag,
-preflight checks, install dispatch, banner, and summary all come from the row;
-the installer function receives the capability name. Document the flag in
-`show_help`.
+the capability table in `lib/registry.sh` (name, requirements, label, help) and
+give the registry components the capability in the core table. The `--NAME`
+flag, preflight checks, install selection, help, banner, and summary all come
+from the row.
 
 ## Adding a config file
 

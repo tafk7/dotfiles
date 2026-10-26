@@ -15,35 +15,6 @@ source "$SCRIPT_DIR/lib/profile.sh"
 
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 
-# Orthogonal capabilities, one row each, in banner, install, and summary order:
-#   name|requirements|installer|label
-# Requirements: ubuntu (a supported Ubuntu release), curl, apt (apt-get), sudo,
-# systemd (systemctl), and applicable (every registry component of the
-# capability must apply to this platform). The installer receives the
-# capability name. A flag --NAME selects the capability; ai also has per-tool
-# flags. agent-badge is a registry capability too (jq), but it is a feature
-# preference (--agent-badge / --no-agent-badge) that install_ai_packages acts
-# on, not a selection.
-CAPABILITIES=(
-    "ai|curl|install_ai_selection|AI CLIs"
-    "rdp|ubuntu apt sudo systemd|install_rdp_packages|RDP server (xrdp)"
-    "tail|ubuntu curl apt sudo applicable|install_tail_packages|Tailscale"
-    "azure|ubuntu curl apt sudo applicable|install_cloud_capability|Azure CLI"
-    "gcloud|ubuntu curl apt sudo applicable|install_cloud_capability|Google Cloud CLI"
-    "aws|ubuntu curl apt sudo applicable|install_cloud_capability|AWS CLI v2"
-)
-declare -a CAPABILITY_NAMES=()
-declare -A CAPABILITY_REQUIRES=() CAPABILITY_INSTALLER=() CAPABILITY_LABEL=()
-for _capability_row in "${CAPABILITIES[@]}"; do
-    IFS='|' read -r _capability_name _capability_requires _capability_installer _capability_label \
-        <<< "$_capability_row"
-    CAPABILITY_NAMES+=("$_capability_name")
-    CAPABILITY_REQUIRES[$_capability_name]="$_capability_requires"
-    CAPABILITY_INSTALLER[$_capability_name]="$_capability_installer"
-    CAPABILITY_LABEL[$_capability_name]="$_capability_label"
-done
-unset _capability_row _capability_name _capability_requires _capability_installer _capability_label
-
 # Selected capabilities. ai is "all" for --ai / --full (every registry tool
 # with the ai capability), else "some" for the per-tool flags recorded in
 # SELECTED_AI_TOOLS. rdp opens a network listener and is never implied by --full.
@@ -177,7 +148,7 @@ parse_arguments() {
                 ;;
             *)
                 # Any other capability is selected by its own --NAME flag.
-                if [[ "$1" == --?* && -n "${CAPABILITY_INSTALLER[${1#--}]:-}" ]]; then
+                if [[ "$1" == --?* && -n "${CAPABILITY_LABEL[${1#--}]:-}" ]]; then
                     SELECTED_CAPABILITIES[${1#--}]=yes
                 else
                     error "Unknown option: $1"
@@ -223,13 +194,32 @@ selected_capabilities_need() {
     return 1
 }
 
+# Whether this run selects component $1: its tier, a selected capability, or
+# for AI CLIs --ai or its own flag. jq comes with the AI CLIs agent-badge
+# decorates.
 component_selected() {
     local name="$1" capability
     tool_in_cumulative_tier "$name" "$INSTALL_TIER" && return 0
+    if tool_has_capability "$name" ai; then
+        case "${SELECTED_CAPABILITIES[ai]:-}" in
+            all) return 0 ;;
+            some) [[ " ${SELECTED_AI_TOOLS[*]} " == *" $name "* ]] && return 0 ;;
+        esac
+        return 1
+    fi
+    if tool_has_capability "$name" agent-badge; then
+        feature_enabled agent-badge && { component_selected claude || component_selected codex; }
+        return
+    fi
     for capability in "${CAPABILITY_NAMES[@]}"; do
+        [[ "$capability" != ai ]] || continue
         capability_selected "$capability" && tool_has_capability "$name" "$capability" && return 0
     done
     return 1
+}
+
+package_set_selected() {
+    tier_includes "${PACKAGE_SET_TIER[$1]}"
 }
 
 # Validate, save, then apply: once the system check accepts this run's flags,
@@ -256,17 +246,32 @@ setup_save_profile() {
     (( ${#PROFILE_CHANGES[@]} == 0 )) || log "Machine profile: ${PROFILE_CHANGES[*]}"
 }
 
-install_ai_selection() {
-    local -a tools=()
-    if [[ "${SELECTED_CAPABILITIES[ai]:-}" == all ]]; then
-        readarray -t tools < <(tools_for_capability ai)
-    else
-        tools=("${SELECTED_AI_TOOLS[@]}")
-    fi
-    install_ai_packages "${tools[@]}"
+# help_entry FLAG TEXT: one option, its text wrapped beside it.
+help_entry() {
+    printf '%s\n' "$2" | fold -s -w 56 | sed 's/ *$//' \
+        | awk -v flag="$1" 'NR == 1 { printf "    %-20s%s\n", flag, $0; next } { printf "%24s%s\n", "", $0 }'
+}
+
+# help_components TIER: the tier's components in install order, with platform
+# limits noted. eget (the bootstrap) and package-set members are left out.
+help_components() {
+    local name entry out=""
+    for name in "${REGISTRY_ORDER[@]}"; do
+        [[ "$name" != packages:* && "${TOOL_TIER[$name]:-}" == "$1" ]] || continue
+        [[ "${TOOL_INSTALL[$name]}" != bootstrap && "${TOOL_INSTALL[$name]}" != packages:* ]] || continue
+        entry="$name"
+        case "${TOOL_PLATFORM[$name]}" in
+            wsl) entry+=" (WSL)" ;;
+            native-ubuntu) entry+=" (native Ubuntu ${TOOL_UBUNTU_VERSIONS[$name]//,//})" ;;
+        esac
+        out+="${out:+, }$entry"
+    done
+    printf '%s' "$out"
 }
 
 show_help() {
+    local ai_tools name capability text
+    ai_tools="$(tools_for_capability ai | paste -sd, - | sed 's/,/, /g')"
     cat << 'EOF'
 Dotfiles Installation Script - Tiered Installation System
 
@@ -282,59 +287,30 @@ USAGE:
                         it syncs your symlinks to what's actually on the system.
 
 TIERS (cumulative - each tier includes all previous tiers):
-    --bash              Config + modern CLI tools. NO SUDO — every tool installs
-                        to ~/.local/bin via eget: starship, eza, fzf, zoxide,
-                        delta, btop, gdu, glow, lazygit, gh, uv, sd, bat, fd,
-                        ripgrep, direnv. The non-sudo base for managed systems.
-                        (git is assumed present; a tool already installed
-                        system-wide is left alone unless --force.)
-
-    --dev               Bash + development tools. Requires sudo (first APT layer).
-                        Adds APT: zsh, build tools, clipboard, graphviz, etc.
-                        Adds: neovim, tmux, shellcheck, harper-ls (grammar checking)
-
-    --work              Dev + local development/agent execution. Requires sudo.
-                        Adds: NVM, Docker, Rust, and on native Ubuntu
-                        24.04/26.04 sbx with KVM host access. Elsewhere (WSL,
-                        22.04) sbx and KVM are skipped and the rest installs.
-                        AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave
-                        AI off where an organization manages those CLIs.
-
-    --full              Work tier plus all AI CLIs. Requires sudo.
-                        Equivalent to: --work --ai
-
-AI TOOLING (orthogonal - combines with any tier):
-    --ai                Install ALL AI CLIs (Claude Code, Codex, opencode, Pi) into
-                        ~/.local/bin. Leave this off when your org manages the
-                        install; the shell aliases/shortcuts load either way and
-                        resolve whatever binary is on PATH.
-    --claude            Install only Claude Code.
-    --codex             Install only Codex.
-    --opencode          Install only opencode.
-    --pi                Install only Pi. Unlike the others Pi is an npm package,
-                        so it needs Node >=22.19 (the work tier's NVM provides
-                        it); the requested install fails with instructions if
-                        Node is missing rather than pulling in a toolchain.
-                        (Per-tool flags combine: --claude --opencode installs
-                        just those two. --ai / --full install all of them.)
-
-RDP SERVER (orthogonal - combines with any tier):
-    --rdp               Install + configure the xrdp RDP server with an XFCE
-                        session. Requires sudo. NOT implied by --full (opens a
-                        WSL: listens on localhost:3390 for the Windows host
-                        (connect with mstsc). Native: port 3389 — keep it
-                        behind a VPN/firewall. See
-                        docs/history/xrdp-remote-desktop.md.
-
-TAILSCALE AND CLOUD (orthogonal - combine with any tier):
-    --tail              Install Tailscale and enable tailscaled under systemd.
-                        Does not enroll, configure routes/SSH, or change firewall
-                        policy. Requires sudo on Ubuntu 22.04/24.04/26.04.
-    --azure             Azure CLI. The Azure DevOps Git credential helper is
-                        parked; see bin/git-credential-azdo.
-    --gcloud            Google Cloud CLI from Google's signed APT repository.
-    --aws               AWS CLI v2 from AWS's signature-verified distribution.
-                        These selections require sudo independently of the tier.
+EOF
+    help_entry --bash "Config + modern CLI tools. NO SUDO: every tool installs to ~/.local/bin via eget: $(help_components bash). The non-sudo base for managed systems. (git is assumed present; a tool already installed system-wide is left alone unless --force.)"
+    echo
+    help_entry --dev "Bash + development tools. Requires sudo (the first APT layer): zsh, build tools, clipboard, graphviz, and more, then $(help_components dev)."
+    echo
+    help_entry --work "Dev + local development and agent execution. Requires sudo. Adds $(help_components work), at the versions versions.lock pins; sbx brings KVM host access. Where sbx does not apply (WSL, 22.04) it is skipped and the rest installs. AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave AI off where an organization manages those CLIs."
+    echo
+    help_entry --full "Work tier plus all AI CLIs. Requires sudo. Equivalent to: --work --ai"
+    echo
+    echo "AI TOOLING (orthogonal - combines with any tier):"
+    help_entry --ai "${CAPABILITY_HELP[ai]} ($ai_tools)"
+    for name in $(tools_for_capability ai); do
+        help_entry "--$name" "Only $name."
+    done
+    help_entry "" "Per-tool flags combine: --claude --opencode installs just those two; --ai and --full install all of them. Pi is an npm package, so it needs Node >=22.19 (the work tier's pinned Node); without it, the request fails with instructions rather than pulling in a toolchain."
+    echo
+    echo "CAPABILITIES (orthogonal - combine with any tier):"
+    for capability in "${CAPABILITY_NAMES[@]}"; do
+        [[ "$capability" != ai ]] || continue
+        text="${CAPABILITY_HELP[$capability]}"
+        capability_requires "$capability" sudo && text+=" Requires sudo."
+        help_entry "--$capability" "$text"
+    done
+    cat << 'EOF'
 
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
@@ -374,23 +350,11 @@ EXAMPLES:
     ./setup.sh --bash --dry-run      # Preview bash tier installation
 
 TIER SUMMARY:
-    ┌──────────┬─────────────────────────────────────────────────┬───────────┐
-    │ Tier     │ What It Installs                                │ Sudo?     │
-    ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ config   │ Symlinks only (reconcile to installed tools)    │ No        │
-    │ bash     │ + eget: starship, eza, fzf, zoxide, delta, btop,│ No        │
-    │          │   gdu, glow, lazygit, gh, uv, sd, bat, fd,      │           │
-    │          │   ripgrep, direnv  (all to ~/.local/bin)        │           │
-    │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
-    │ work     │ + NVM, Docker, Rust; sbx + KVM where supported  │ Yes       │
-    ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ --ai     │ + Claude Code, Codex, opencode, Pi (orthogonal) │ No        │
-    │          │   (or --claude/--codex/--opencode/--pi singly)  │           │
-    │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
-    │ --tail   │ + Tailscale package/service (no enrollment)     │ Yes       │
-    │ cloud    │ --azure / --gcloud / --aws                      │ Yes       │
-    │ --full   │ = work + ai (no Tailscale, RDP, or cloud CLIs)  │ Yes       │
-    └──────────┴─────────────────────────────────────────────────┴───────────┘
+    config   symlinks only (reconcile to installed tools)      no sudo
+    bash     + eget CLI tools in ~/.local/bin                   no sudo
+    dev      + APT packages and development tools              sudo
+    work     + local development and agent execution           sudo
+    --full   = work + ai (no Tailscale, RDP, or cloud CLIs)    sudo
     The tier sudo boundary is at dev. Tailscale, RDP, and APT-backed cloud
     selections require sudo independently of the selected tier.
 
@@ -493,23 +457,7 @@ phase_install_packages() {
         return 0
     fi
 
-    if tier_includes "bash"; then
-        install_bash_packages || INSTALLATION_FAILED=true
-    fi
-
-    if tier_includes "dev"; then
-        install_dev_packages || INSTALLATION_FAILED=true
-    fi
-
-    if tier_includes "work"; then
-        install_work_packages || INSTALLATION_FAILED=true
-    fi
-
-    local capability
-    for capability in "${CAPABILITY_NAMES[@]}"; do
-        capability_selected "$capability" || continue
-        "${CAPABILITY_INSTALLER[$capability]}" "$capability" || INSTALLATION_FAILED=true
-    done
+    install_selection || INSTALLATION_FAILED=true
 
     if [[ "$INSTALLATION_FAILED" == "true" ]]; then
         error "One or more requested package operations failed"
@@ -843,7 +791,7 @@ main() {
     echo "Target: Ubuntu (including WSL)"
     echo "Tier: $INSTALL_TIER"
     case "${SELECTED_CAPABILITIES[ai]:-}" in
-        all) echo "${CAPABILITY_LABEL[ai]}: all (claude, codex, opencode, pi)" ;;
+        all) echo "${CAPABILITY_LABEL[ai]}: all ($(tools_for_capability ai | paste -sd, - | sed 's/,/, /g'))" ;;
         some) echo "${CAPABILITY_LABEL[ai]}: ${SELECTED_AI_TOOLS[*]}" ;;
         *) echo "${CAPABILITY_LABEL[ai]}: none" ;;
     esac

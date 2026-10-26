@@ -13,59 +13,58 @@ USAGE:
                         it syncs your symlinks to what's actually on the system.
 
 TIERS (cumulative - each tier includes all previous tiers):
-    --bash              Config + modern CLI tools. NO SUDO — every tool installs
+    --bash              Config + modern CLI tools. NO SUDO: every tool installs
                         to ~/.local/bin via eget: starship, eza, fzf, zoxide,
-                        delta, btop, gdu, glow, lazygit, gh, uv, sd, bat, fd,
-                        ripgrep, direnv. The non-sudo base for managed systems.
-                        (git is assumed present; a tool already installed
-                        system-wide is left alone unless --force.)
+                        delta, btop, gdu, glow, lazygit, gh, uv, bat, fd,
+                        ripgrep, direnv, sd, wsl2-ssh-agent (WSL). The non-sudo
+                        base for managed systems. (git is assumed present; a
+                        tool already installed system-wide is left alone unless
+                        --force.)
 
-    --dev               Bash + development tools. Requires sudo (first APT layer).
-                        Adds APT: zsh, build tools, clipboard, graphviz, etc.
-                        Adds: neovim, tmux, shellcheck, harper-ls (grammar checking)
+    --dev               Bash + development tools. Requires sudo (the first APT
+                        layer): zsh, build tools, clipboard, graphviz, and
+                        more, then shellcheck, harper-ls, tmux, neovim.
 
-    --work              Dev + local development/agent execution. Requires sudo.
-                        Adds: NVM, Docker, Rust, and on native Ubuntu
-                        24.04/26.04 sbx with KVM host access. Elsewhere (WSL,
-                        22.04) sbx and KVM are skipped and the rest installs.
-                        AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave
+    --work              Dev + local development and agent execution. Requires
+                        sudo. Adds docker, sbx (native Ubuntu 24.04/26.04),
+                        nvm, node, rust, at the versions versions.lock pins;
+                        sbx brings KVM host access. Where sbx does not apply
+                        (WSL, 22.04) it is skipped and the rest installs. AI,
+                        Tailscale, RDP, and cloud CLIs stay orthogonal; leave
                         AI off where an organization manages those CLIs.
 
-    --full              Work tier plus all AI CLIs. Requires sudo.
-                        Equivalent to: --work --ai
+    --full              Work tier plus all AI CLIs. Requires sudo. Equivalent
+                        to: --work --ai
 
 AI TOOLING (orthogonal - combines with any tier):
-    --ai                Install ALL AI CLIs (Claude Code, Codex, opencode, Pi) into
-                        ~/.local/bin. Leave this off when your org manages the
-                        install; the shell aliases/shortcuts load either way and
-                        resolve whatever binary is on PATH.
-    --claude            Install only Claude Code.
-    --codex             Install only Codex.
-    --opencode          Install only opencode.
-    --pi                Install only Pi. Unlike the others Pi is an npm package,
-                        so it needs Node >=22.19 (the work tier's NVM provides
-                        it); the requested install fails with instructions if
-                        Node is missing rather than pulling in a toolchain.
-                        (Per-tool flags combine: --claude --opencode installs
-                        just those two. --ai / --full install all of them.)
+    --ai                Every AI CLI, into ~/.local/bin. Leave it off where an
+                        organization manages them; the shell shortcuts load
+                        either way. (claude, codex, opencode, pi)
+    --claude            Only claude.
+    --codex             Only codex.
+    --opencode          Only opencode.
+    --pi                Only pi.
+                        Per-tool flags combine: --claude --opencode installs
+                        just those two; --ai and --full install all of them. Pi
+                        is an npm package, so it needs Node >=22.19 (the work
+                        tier's pinned Node); without it, the request fails with
+                        instructions rather than pulling in a toolchain.
 
-RDP SERVER (orthogonal - combines with any tier):
-    --rdp               Install + configure the xrdp RDP server with an XFCE
-                        session. Requires sudo. NOT implied by --full (opens a
-                        WSL: listens on localhost:3390 for the Windows host
-                        (connect with mstsc). Native: port 3389 — keep it
-                        behind a VPN/firewall. See
-                        docs/history/xrdp-remote-desktop.md.
-
-TAILSCALE AND CLOUD (orthogonal - combine with any tier):
-    --tail              Install Tailscale and enable tailscaled under systemd.
-                        Does not enroll, configure routes/SSH, or change firewall
-                        policy. Requires sudo on Ubuntu 22.04/24.04/26.04.
-    --azure             Azure CLI. The Azure DevOps Git credential helper is
-                        parked; see bin/git-credential-azdo.
+CAPABILITIES (orthogonal - combine with any tier):
+    --rdp               The xrdp RDP server with an XFCE session. Never implied
+                        by --full, since it opens a listener: localhost:3390 on
+                        WSL, port 3389 elsewhere (keep it behind a VPN or
+                        firewall). See docs/history/xrdp-remote-desktop.md.
+                        Requires sudo.
+    --tail              Tailscale and its systemd service. No enrollment,
+                        routes, SSH, or firewall changes. Requires sudo.
+    --azure             Azure CLI from Microsoft's signed APT repository. The
+                        Azure DevOps Git credential helper is parked; see
+                        bin/git-credential-azdo. Requires sudo.
     --gcloud            Google Cloud CLI from Google's signed APT repository.
-    --aws               AWS CLI v2 from AWS's signature-verified distribution.
-                        These selections require sudo independently of the tier.
+                        Requires sudo.
+    --aws               AWS CLI v2, the release versions.lock pins,
+                        signature-verified. Requires sudo.
 
 OPTIONS:
     --force             Force overwrite configs and reinstall tools
@@ -105,23 +104,11 @@ EXAMPLES:
     ./setup.sh --bash --dry-run      # Preview bash tier installation
 
 TIER SUMMARY:
-    ┌──────────┬─────────────────────────────────────────────────┬───────────┐
-    │ Tier     │ What It Installs                                │ Sudo?     │
-    ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ config   │ Symlinks only (reconcile to installed tools)    │ No        │
-    │ bash     │ + eget: starship, eza, fzf, zoxide, delta, btop,│ No        │
-    │          │   gdu, glow, lazygit, gh, uv, sd, bat, fd,      │           │
-    │          │   ripgrep, direnv  (all to ~/.local/bin)        │           │
-    │ dev      │ + zsh, build tools, clipboard, neovim, tmux     │ Yes       │
-    │ work     │ + NVM, Docker, Rust; sbx + KVM where supported  │ Yes       │
-    ├──────────┼─────────────────────────────────────────────────┼───────────┤
-    │ --ai     │ + Claude Code, Codex, opencode, Pi (orthogonal) │ No        │
-    │          │   (or --claude/--codex/--opencode/--pi singly)  │           │
-    │ --rdp    │ + xrdp server + XFCE desktop (orthogonal flag)  │ Yes       │
-    │ --tail   │ + Tailscale package/service (no enrollment)     │ Yes       │
-    │ cloud    │ --azure / --gcloud / --aws                      │ Yes       │
-    │ --full   │ = work + ai (no Tailscale, RDP, or cloud CLIs)  │ Yes       │
-    └──────────┴─────────────────────────────────────────────────┴───────────┘
+    config   symlinks only (reconcile to installed tools)      no sudo
+    bash     + eget CLI tools in ~/.local/bin                   no sudo
+    dev      + APT packages and development tools              sudo
+    work     + local development and agent execution           sudo
+    --full   = work + ai (no Tailscale, RDP, or cloud CLIs)    sudo
     The tier sudo boundary is at dev. Tailscale, RDP, and APT-backed cloud
     selections require sudo independently of the selected tier.
 
@@ -189,7 +176,7 @@ AI CLIs: none
 -- components
 bat btop delta direnv eget eza fd fzf gdu gh glow lazygit ripgrep sd starship uv wsl2-ssh-agent zoxide 
 -- install
-bash
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd wsl2-ssh-agent]
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -239,7 +226,7 @@ AI CLIs: none
 -- components
 bat btop delta direnv eget eza fd fzf gdu gh glow harper-ls lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-bash dev
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent] packages:dev tmux neovim
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -289,7 +276,7 @@ AI CLIs: none
 -- components
 bat btop delta direnv docker eget eza fd fzf gdu gh glow harper-ls lazygit neovim node nvm ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-bash dev work
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[sbx] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -341,9 +328,9 @@ Tier: work
 AI CLIs: all (claude, codex, opencode, pi)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls jq lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-bash dev work cli:claude cli:codex cli:opencode cli:pi
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude codex opencode pi
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[sbx] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -395,9 +382,9 @@ Tier: config
 AI CLIs: all (claude, codex, opencode, pi)
 
 -- components
-claude codex opencode pi 
+claude codex jq opencode pi 
 -- install
-cli:claude cli:codex cli:opencode cli:pi
+eget[jq] claude codex opencode pi
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -441,9 +428,9 @@ Tier: config
 AI CLIs: claude
 
 -- components
-claude codex opencode pi 
+claude jq 
 -- install
-cli:claude
+eget[jq] claude
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -487,9 +474,9 @@ Tier: config
 AI CLIs: claude codex
 
 -- components
-claude codex opencode pi 
+claude codex jq 
 -- install
-cli:claude cli:codex
+eget[jq] claude codex
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -533,9 +520,9 @@ Tier: config
 AI CLIs: all (claude, codex, opencode, pi)
 
 -- components
-claude codex opencode pi 
+claude codex jq opencode pi 
 -- install
-cli:claude cli:codex cli:opencode cli:pi
+eget[jq] claude codex opencode pi
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -579,9 +566,9 @@ Tier: config
 AI CLIs: all (claude, codex, opencode, pi)
 
 -- components
-claude codex opencode pi 
+claude codex jq opencode pi 
 -- install
-cli:claude cli:codex cli:opencode cli:pi
+eget[jq] claude codex opencode pi
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -625,9 +612,9 @@ Tier: config
 AI CLIs: claude claude
 
 -- components
-claude codex opencode pi 
+claude jq 
 -- install
-cli:claude
+eget[jq] claude
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -671,9 +658,9 @@ Tier: config
 AI CLIs: pi opencode
 
 -- components
-claude codex opencode pi 
+opencode pi 
 -- install
-cli:pi cli:opencode
+opencode pi
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -770,7 +757,7 @@ Tailscale: yes (--tail)
 -- components
 tailscale 
 -- install
-tail
+tailscale
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[tailscale] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -820,7 +807,7 @@ Azure CLI: yes (--azure)
 -- components
 azure-cli 
 -- install
-cloud:azure
+azure-cli
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -867,7 +854,7 @@ Google Cloud CLI: yes (--gcloud)
 -- components
 gcloud 
 -- install
-cloud:gcloud
+gcloud
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[gcloud] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -914,7 +901,7 @@ AWS CLI v2: yes (--aws)
 -- components
 aws-cli 
 -- install
-cloud:aws
+aws-cli
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[aws-cli] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -962,7 +949,7 @@ AWS CLI v2: yes (--aws)
 -- components
 aws-cli azure-cli 
 -- install
-cloud:azure cloud:aws
+azure-cli aws-cli
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[azure-cli aws-cli] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1008,9 +995,9 @@ Tailscale: yes (--tail)
 Google Cloud CLI: yes (--gcloud)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow harper-ls lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow harper-ls jq lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-bash dev work cli:claude cli:codex cli:opencode cli:pi tail cloud:gcloud
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude codex opencode pi tailscale gcloud
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale gcloud] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1068,7 +1055,7 @@ RDP server (xrdp): yes (--rdp)
 -- components
 bat btop delta direnv eget eza fd fzf gdu gh glow harper-ls lazygit neovim ripgrep sd shellcheck starship tmux uv wsl2-ssh-agent xrdp zoxide zsh 
 -- install
-bash dev rdp
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent] packages:dev tmux neovim rdp
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo systemctl] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1120,9 +1107,9 @@ AI CLIs: claude codex
 Tailscale: yes (--tail)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls jq lazygit neovim node nvm ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-bash dev work cli:claude cli:codex tail
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude codex tailscale
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1182,9 +1169,9 @@ Google Cloud CLI: yes (--gcloud)
 AWS CLI v2: yes (--aws)
 
 -- components
-aws-cli azure-cli bat btop claude codex delta direnv eget eza fd fzf gcloud gdu gh glow lazygit opencode pi ripgrep sd starship tailscale uv wsl2-ssh-agent xrdp zoxide 
+aws-cli azure-cli bat btop delta direnv eget eza fd fzf gcloud gdu gh glow lazygit pi ripgrep sd starship tailscale uv wsl2-ssh-agent xrdp zoxide 
 -- install
-bash cli:pi rdp tail cloud:azure cloud:gcloud cloud:aws
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd wsl2-ssh-agent] pi rdp tailscale azure-cli gcloud aws-cli
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo systemctl] applicable=[tailscale azure-cli gcloud aws-cli] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl

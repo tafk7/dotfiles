@@ -8,32 +8,47 @@ reset_selection() {
     INSTALL_TIER=config; SELECTED_CAPABILITIES=(); SELECTED_AI_TOOLS=()
     INSTALLATION_FAILED=false; INSTALL_OK=(); INSTALL_SKIP=(); INSTALL_FAIL=(); INSTALL_NA=()
 }
+# Record each install step by its component, package set, or configure step.
 calls=""
-install_bash_packages() { calls+=" bash"; }
-install_dev_packages() { calls+=" dev"; }
-install_work_packages() { calls+=" work"; }
-install_ai_selection() { calls+=" ai"; }
+install_eget_tools() { calls+=" eget"; }
+install_package_set() { calls+=" packages:$1"; }
+install_docker_engine() { calls+=" docker"; }
 install_rdp_packages() { calls+=" rdp"; }
-install_tail_packages() { calls+=" tail"; }
-install_cloud_capability() { calls+=" cloud:$1"; }
+configure_docker_host_access() { calls+=" docker-access"; }
+configure_work_host() { calls+=" kvm"; }
+ensure_sbx_kits_builder() { calls+=" builder"; }
+use_default_node() { :; }
+run_installer() { calls+=" $1"; }
+feature_enabled() { return 1; }
 
 reset_selection; INSTALL_TIER=work; SELECTED_CAPABILITIES=([ai]=all [tail]=yes [gcloud]=yes)
 # setup.sh is sourced above; ShellCheck 0.9 otherwise binds these calls to the
 # failure-injection override near the end of this test instead of the sourced
 # production function.
 # shellcheck disable=SC2218
-phase_install_packages >/dev/null
-assert_eq "$calls" " bash dev work ai tail cloud:gcloud" "composed work/tail/cloud install order"
+DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_OS_VERSION=24.04 phase_install_packages >/dev/null
+assert_eq "$calls" " eget packages:dev tmux neovim packages:work docker docker-access sbx kvm builder nvm node rust claude codex opencode pi tailscale gcloud" \
+    "composed work/tail/cloud install order"
 
 calls=""; reset_selection; INSTALL_TIER=work
 # shellcheck disable=SC2218
-phase_install_packages >/dev/null
-assert_eq "$calls" " bash dev work" "work unexpectedly selected Tailscale/cloud"
+DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_OS_VERSION=24.04 phase_install_packages >/dev/null
+[[ "$calls" != *tailscale* && "$calls" != *gcloud* && "$calls" != *claude* ]] || fail "work unexpectedly selected Tailscale/cloud/AI: $calls"
 
 calls=""; reset_selection; SELECTED_CAPABILITIES=([tail]=yes)
 # shellcheck disable=SC2218
 phase_install_packages >/dev/null
-assert_eq "$calls" " tail" "--tail did not retain config baseline independence"
+assert_eq "$calls" " tailscale" "--tail did not retain config baseline independence"
+
+# A component whose need failed in this run is not attempted.
+calls=""; reset_selection; INSTALL_TIER=work
+run_installer() { calls+=" $1"; [[ "$1" != nvm ]]; }
+# shellcheck disable=SC2218
+if DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_OS_VERSION=24.04 phase_install_packages >/dev/null 2>&1; then
+    fail "a failed nvm install reported success"
+fi
+[[ "$calls" == *" nvm rust"* && " ${INSTALL_FAIL[*]} " == *" node "* ]] || fail "node was attempted after nvm failed: $calls"
+run_installer() { calls+=" $1"; }
 
 output="$(DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_OS_VERSION=24.04 \
     HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
@@ -52,23 +67,14 @@ for platform in wsl:24.04 ubuntu:22.04; do
     [[ $rc -eq 0 ]] || fail "--work on $platform was refused: $output"
     [[ "$output" == *"Would ensure Docker apt repo"* && "$output" == *"installer: nvm"* \
        && "$output" != *"installer: sbx"* && "$output" != *"Would ensure the sbx kit builder"* \
-       && "$output" == *"sbx is not applicable"* ]] || fail "--work on $platform did not skip only sbx: $output"
+       && "$output" == *"Skipping sbx: it is not applicable"* ]] || fail "--work on $platform did not skip only sbx: $output"
 done
 (
-    # This test replaced install_work_packages above; load the real one.
-    unset _DOTFILES_INSTALL_LOADED
-    source "$ROOT/lib/install.sh"
-    calls=""
-    install_apt() { :; }
-    install_docker_engine() { calls+=" docker"; }
-    configure_docker_host_access() { calls+=" docker-access"; }
-    configure_work_host() { calls+=" kvm"; }
-    ensure_sbx_kits_builder() { calls+=" builder"; }
-    run_installer() { calls+=" $1"; }
+    calls=""; reset_selection; INSTALL_TIER=work
     tool_applicable() { [[ "$1" != sbx ]]; }
-    INSTALL_NA=()
-    DRY_RUN=false install_work_packages >/dev/null
-    assert_eq "$calls" " docker docker-access nvm node rust" "work tools where sbx does not apply"
+    # shellcheck disable=SC2218
+    DRY_RUN=false phase_install_packages >/dev/null
+    assert_eq "$calls" " eget packages:dev tmux neovim packages:work docker docker-access nvm node rust" "work tools where sbx does not apply"
     [[ " ${INSTALL_NA[*]} " == *" sbx "* ]] || fail "sbx not recorded as not applicable"
 )
 

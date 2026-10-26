@@ -77,10 +77,10 @@ run_installer() { :; }
 printf '#!/bin/sh\necho "zsh 5.9"\n' > "$TEST_ROOT/usr/bin/zsh"
 chmod +x "$TEST_ROOT/usr/bin/zsh"
 INSTALL_OK=() INSTALL_SKIP=()
-install_dev_packages >/dev/null
+install_package_set dev >/dev/null
 [[ " ${INSTALL_OK[*]} " == *" zsh "* ]] || fail "newly installed zsh not reported installed"
 INSTALL_OK=() INSTALL_SKIP=()
-install_dev_packages >/dev/null
+install_package_set dev >/dev/null
 [[ " ${INSTALL_SKIP[*]} " == *" zsh "* && " ${INSTALL_OK[*]} " != *" zsh "* ]] \
     || fail "present zsh reported as installed by this run"
 

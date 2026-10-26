@@ -888,23 +888,25 @@ run_installer() {
     esac
 }
 
-# Install the eget-method tools, as the assets versions.lock pins
+# install_eget_tools [NAME...]: install the named eget-method tools, or
+# without names every one in the selected tiers (all of them outside setup.sh),
+# as the assets versions.lock pins.
 install_eget_tools() {
-    local requested="${1:-}" arch
+    local -a names=("$@") candidates=()
+    local arch
     if [[ ! -r "$DOTFILES_VERSIONS_LOCK" ]]; then
         error "versions.lock not found at $DOTFILES_VERSIONS_LOCK"
         return 1
     fi
 
-    # Gate each tool on its own tier so a dev-tier eget tool (shellcheck) is
-    # skipped by --bash. Without setup.sh's tier_includes, install all of them.
+    # Without names, gate each tool on its own tier so a dev-tier eget tool
+    # (shellcheck) is skipped by --bash.
     local -a eget_tools=()
     local name
-    for name in "${!TOOL_METHOD[@]}"; do
-        [[ "${TOOL_METHOD[$name]}" == "eget" ]] || continue
-        if [[ -n "$requested" ]]; then
-            [[ "$name" == "$requested" ]] || continue
-        elif declare -F tier_includes >/dev/null 2>&1; then
+    if (( ${#names[@]} )); then candidates=("${names[@]}"); else candidates=("${!TOOL_METHOD[@]}"); fi
+    for name in "${candidates[@]}"; do
+        [[ "${TOOL_METHOD[$name]:-}" == "eget" ]] || continue
+        if (( ${#names[@]} == 0 )) && declare -F tier_includes >/dev/null 2>&1; then
             [[ -n "${TOOL_TIER[$name]:-}" ]] || continue
             tier_includes "${TOOL_TIER[$name]}" || continue
         fi
@@ -1106,17 +1108,6 @@ install_eget_tools() {
 
 # bash tier: eget binaries in ~/.local/bin, no apt and no root. Git is only
 # checked, because installing it would need sudo.
-install_bash_packages() {
-    log "Installing bash tier packages..."
-
-    command -v git >/dev/null 2>&1 || \
-        warn "git not found — install it (sudo apt install git) for full functionality"
-
-    install_eget_tools || return 1
-
-    success "Bash tier installation complete"
-}
-
 configure_locale() {
     locale -a 2>/dev/null | grep -qi '^en_US\.utf8$' && return 0
     if [[ "${DRY_RUN:-false}" == true ]]; then
@@ -1135,66 +1126,34 @@ configure_locale() {
     fi
 }
 
-# dev tier: first apt layer (sudo). Everything that needs root lives here or
-# above — zsh, build toolchain, clipboard, and the tmux build deps that
-# install-tmux.sh compiles against.
-install_dev_packages() {
-    log "Installing dev tier packages..."
-
-    # PACKAGES values are space-separated lists; word splitting is intended.
-    # shellcheck disable=SC2206
-    local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[languages]} ${PACKAGES[terminal]} ${PACKAGES[diagramming]})
-    # shellcheck disable=SC2206
-    is_wsl && packages+=(${PACKAGES[wsl]})
-
-    # zsh is the dev tier's registry component among these packages; it is
-    # reported installed only when this run installed it.
-    local zsh_result=ok
-    [[ "${DRY_RUN:-false}" == "true" ]] || ! apt_package_installed zsh || zsh_result=skip
-    if ! install_apt "dev" "${packages[@]}"; then
-        [[ "${DRY_RUN:-false}" == "true" ]] || track_install zsh fail
-        return 1
-    fi
-    configure_locale
-    if [[ "${DRY_RUN:-false}" != "true" ]]; then
-        if command -v zsh >/dev/null 2>&1; then track_install zsh "$zsh_result"; else track_install zsh fail; return 1; fi
-    fi
-
-    log "Installing dev tier tools via scripts..."
-    local failed=false
-    run_installer "tmux" || failed=true
-    run_installer "neovim" || failed=true
-    [[ "$failed" == "false" ]] || return 1
-
-    success "Dev tier installation complete"
-}
-
-# Install the named AI CLIs, de-duplicated in order (setup.sh resolves --ai to
-# every registry tool with the ai capability). Each installer refuses to shadow
-# an external binary already on PATH, so org-managed installs are left alone.
-install_ai_packages() {
-    local -a tools=()
-    local failed=false t
-    for t in "$@"; do
-        [[ " ${tools[*]-} " == *" $t "* ]] || tools+=("$t")
-    done
-
-    [[ ${#tools[@]} -eq 0 ]] && return 0
-
-    if feature_enabled agent-badge && [[ " ${tools[*]} " == *' claude '* || " ${tools[*]} " == *' codex '* ]] \
-       && ! command -v jq >/dev/null 2>&1; then
-        install_eget_tools jq || failed=true
-    fi
-
-    log "Installing AI CLIs: ${tools[*]}"
-    local t
-    for t in "${tools[@]}"; do
-        run_installer "$t" || failed=true
-    done
-
-    [[ "$failed" == "false" ]] || return 1
-
-    success "AI CLIs installation complete"
+# install_package_set SET: the apt packages a tier installs beyond its
+# components (lib/registry.sh's package sets).
+install_package_set() {
+    case "$1" in
+        dev)
+            # The first apt layer (sudo): zsh, build toolchain, clipboard, and
+            # the tmux build deps that install-tmux.sh compiles against.
+            # PACKAGES values are space-separated lists; word splitting is intended.
+            # shellcheck disable=SC2206
+            local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[languages]} ${PACKAGES[terminal]} ${PACKAGES[diagramming]})
+            # shellcheck disable=SC2206
+            is_wsl && packages+=(${PACKAGES[wsl]})
+            # zsh is the registry component among these packages; it is
+            # reported installed only when this run installed it.
+            local zsh_result=ok
+            [[ "${DRY_RUN:-false}" == "true" ]] || ! apt_package_installed zsh || zsh_result=skip
+            if ! install_apt "dev" "${packages[@]}"; then
+                [[ "${DRY_RUN:-false}" == "true" ]] || track_install zsh fail
+                return 1
+            fi
+            configure_locale
+            if [[ "${DRY_RUN:-false}" != "true" ]]; then
+                if command -v zsh >/dev/null 2>&1; then track_install zsh "$zsh_result"; else track_install zsh fail; return 1; fi
+            fi
+            ;;
+        work) install_apt "work" python3-dev python3-venv ;;
+        *) error "Unknown package set: $1"; return 1 ;;
+    esac
 }
 
 # xfce4 pulls in a display manager (e.g. lightdm). On a machine that already
@@ -1370,19 +1329,6 @@ configure_work_host() {
     success "Sandbox host configuration checked (package success and host readiness are reported separately)"
 }
 
-install_tail_packages() {
-    log "Installing the optional Tailscale capability..."
-    run_installer tailscale || return 1
-    success "Tailscale capability installation complete"
-}
-
-install_cloud_capability() {
-    local capability="$1" tool
-    tool="$(tools_for_capability "$capability" | head -n1)"
-    [[ -n "$tool" ]] || { error "No component registered for --$capability"; return 1; }
-    run_installer "$tool"
-}
-
 # The docker-container BuildKit builder sbx needs to build kits when Docker's
 # image store has no OCI exporter (no containerd image store). Created once,
 # never replaced; buildkitd settings (for example a site's DNS servers) come
@@ -1411,43 +1357,70 @@ ensure_sbx_kits_builder() {
     fi
 }
 
-install_work_packages() {
-    log "Installing work tier packages..."
-    local failed=false
-
-    install_apt "work" python3-dev python3-venv || failed=true
-
-    install_docker_engine || failed=true
-    # Host readiness is reported, not a package failure: these only warn.
-    configure_docker_host_access || true
-    # The tier installs the work tools the platform supports. sbx needs native
-    # Ubuntu 24.04/26.04 on a supported architecture; elsewhere it, KVM access,
-    # and the kit builder are skipped and sbx is recorded as not applicable.
-    if tool_applicable sbx; then
-        run_installer "sbx" || failed=true
-        configure_work_host || true
-        ensure_sbx_kits_builder || true
-    else
-        log "Skipping sbx, KVM access, and the sbx kit builder: sbx is not applicable on this platform"
-        [[ "${DRY_RUN:-false}" == true ]] || track_install sbx not-applicable
-    fi
-
-    # Version managers and the runtimes versions.lock pins through them
-    # (Python is handled by uv, installed in the shell tier).
-    if run_installer "nvm"; then
-        run_installer "node" || failed=true
-    else
-        failed=true
-    fi
+# Put NVM's default Node on this process's PATH, so later steps (Pi) find it
+# on a machine whose shell has not loaded it yet.
+use_default_node() {
     if [[ -d "$HOME/.nvm/default/bin" && ":$PATH:" != *":$HOME/.nvm/default/bin:"* ]]; then
         PATH="$HOME/.nvm/default/bin:$PATH"
         export PATH
     fi
-    # Rust toolchain (userspace, no sudo). Non-critical: unlike node (which
-    # underpins the AI CLIs), nothing else in setup depends on it.
-    run_installer "rust" || failed=true
+}
 
-    [[ "$failed" == "false" ]] || return 1
-
-    success "Work tier installation complete"
+# install_selection: install every selected entry of the registry's install
+# order. Selection is the caller's: component_selected NAME and
+# package_set_selected SET (setup.sh). eget tools install in one batch at the
+# first one's place; a component whose need failed in this run is not
+# attempted; one that does not apply here is recorded as not applicable; each
+# applicable component's configure steps run after its install step,
+# whatever it did, and only warn.
+install_selection() {
+    local entry kind need needs step failed=false eget_done=false
+    local -a eget_tools=() failed_here=()
+    for entry in "${REGISTRY_ORDER[@]}"; do
+        [[ "$entry" != packages:* && "${TOOL_INSTALL[$entry]}" == eget ]] || continue
+        component_selected "$entry" && eget_tools+=("$entry")
+    done
+    for entry in "${REGISTRY_ORDER[@]}"; do
+        if [[ "$entry" == packages:* ]]; then
+            package_set_selected "${entry#packages:}" || continue
+            log "Installing the ${entry#packages:} tier's packages..."
+            install_package_set "${entry#packages:}" || { failed=true; failed_here+=("$entry"); }
+            continue
+        fi
+        component_selected "$entry" || continue
+        kind="${TOOL_INSTALL[$entry]}"
+        if [[ "$kind" != eget ]]; then
+            needs="${TOOL_NEEDS[$entry]:-}"
+            for need in ${needs//,/ }; do
+                [[ " ${failed_here[*]-} " != *" $need "* ]] && continue
+                warn "Skipping $entry: it needs $need, which failed"
+                [[ "${DRY_RUN:-false}" == true ]] || track_install "$entry" fail
+                failed=true; failed_here+=("$entry")
+                continue 2
+            done
+            if ! tool_applicable "$entry"; then
+                log "Skipping $entry: it is not applicable on this platform"
+                [[ "${DRY_RUN:-false}" == true ]] || track_install "$entry" not-applicable
+                continue
+            fi
+        fi
+        case "$kind" in
+            eget)
+                [[ "$eget_done" == false ]] || continue
+                eget_done=true
+                install_eget_tools "${eget_tools[@]}" || failed=true
+                ;;
+            bootstrap)
+                # The eget batch bootstraps eget; alone, it installs here.
+                (( ${#eget_tools[@]} )) || run_installer "$entry" || { failed=true; failed_here+=("$entry"); }
+                ;;
+            installer) run_installer "$entry" || { failed=true; failed_here+=("$entry"); } ;;
+            packages:*) ;;
+            function:*) "${kind#function:}" || { failed=true; failed_here+=("$entry"); } ;;
+        esac
+        for step in ${TOOL_CONFIGURE[$entry]:-}; do
+            "$step" || true
+        done
+    done
+    [[ "$failed" == false ]]
 }
