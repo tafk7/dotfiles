@@ -1,9 +1,9 @@
 #!/bin/bash
 # The dotfiles front door: update, apply, verify, and the machine profile.
 #
-# Usage: dotfiles update [--dry-run]
+# Usage: dotfiles update [--dry-run] [--upgrade]
 #        dotfiles apply [--dry-run] [--only X,Y] [--reinstall[=X,Y]]
-#                       [--overwrite-configs] [--force] [--no-refresh]
+#                       [--overwrite-configs] [--force] [--upgrade] [--no-refresh]
 #        dotfiles refresh [-v]
 #        dotfiles verify [-v] [--latest] [--smoke]
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
@@ -39,8 +39,7 @@ Commands:
                         upstream, without uncommitted changes; a branch that has
                         diverged from its upstream stops it.
     --dry-run           Fetch and show; preview the apply without pulling.
-                        Not yet: retiring configs removed upstream, stale-process
-                        tracking, editor plugins, and --upgrade.
+    --upgrade           Also upgrade what is not pinned (see apply --upgrade).
   apply                 Bring this machine to the checkout and its profile:
                         install, move, or repair what the profile selects, run
                         their configure steps, then deploy configs. No pull.
@@ -50,6 +49,9 @@ Commands:
     --reinstall[=X,Y]   Reinstall everything selected, or the named components.
     --overwrite-configs Replace configs that differ, keeping backups.
     --force             Both of the above.
+    --upgrade           Also upgrade what is not pinned: the selection's APT
+                        packages (apt's simulated transaction first; held ones
+                        skipped), the AI CLIs and Pi, and rustup itself.
     --no-refresh        Skip the refresh that ends every apply.
   refresh               Bring running processes up to date with the disk: the
                         tmux server's environment, config, badge, and theme.
@@ -215,7 +217,7 @@ cmd_apply() {
             --dry-run) dry_run=true; extra+=("$1") ;;
             --no-refresh) refresh=false ;;
             --only) [[ -n "${2:-}" ]] || { error "--only requires component names"; return 64; }; extra+=("$1" "$2"); shift ;;
-            --only=*|--reinstall|--reinstall=*|--overwrite-configs|--force) extra+=("$1") ;;
+            --only=*|--reinstall|--reinstall=*|--overwrite-configs|--force|--upgrade) extra+=("$1") ;;
             --help|-h) usage; return 0 ;;
             *) error "Unknown option: $1"; usage >&2; return 64 ;;
         esac
@@ -393,8 +395,9 @@ update_preconditions() {
 # Everything after the pull, run by the new code: setup with the profile, then
 # verify, then the report.
 update_continue() {
-    local before="$1" dry_run="$2" setup_rc=0 verify_rc=0 after
-    local -a args
+    local before="$1" dry_run="$2" upgrade="${3:-}" setup_rc=0 verify_rc=0 after
+    local -a args apply_args=()
+    [[ -z "$upgrade" ]] || apply_args+=(--upgrade)
     if ! profile_exists; then
         error "No machine profile yet; create one with: dotfiles profile --propose"
         return 3
@@ -403,7 +406,7 @@ update_continue() {
     readarray -t args < <(profile_setup_args)
     log "Applying the profile: setup.sh ${args[*]}"
     if [[ "$dry_run" == true ]]; then
-        cmd_apply --dry-run || setup_rc=$?
+        cmd_apply --dry-run "${apply_args[@]}" || setup_rc=$?
         return "$(( setup_rc == 0 ? 0 : 1 ))"
     fi
     # Shells read the pulled startup files only when they next load them.
@@ -412,7 +415,7 @@ update_continue() {
        && git -C "$DOTFILES_DIR" diff --name-only "$before" "$after" -- shell entry | grep -q .; then
         change_record shell "pulled $before..$after"
     fi
-    cmd_apply || setup_rc=$?
+    cmd_apply "${apply_args[@]}" || setup_rc=$?
     echo
     "$SCRIPT_DIR/dotfiles" verify || verify_rc=$?
     after="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD)"
@@ -434,10 +437,11 @@ update_continue() {
 }
 
 cmd_update() {
-    local dry_run=false before="" ahead behind
+    local dry_run=false upgrade="" before="" ahead behind
     while (( $# )); do
         case "$1" in
             --dry-run) dry_run=true ;;
+            --upgrade) upgrade=--upgrade ;;
             --continue) [[ -n "${2:-}" ]] || { error "--continue requires a revision"; return 64; }; before="$2"; shift ;;
             --help|-h) usage; return 0 ;;
             *) error "Unknown option: $1"; usage >&2; return 64 ;;
@@ -447,7 +451,7 @@ cmd_update() {
     # After the pull this process re-execs the new code with --continue; the
     # lock spans the re-exec, which keeps the pid.
     if [[ -n "$before" ]]; then
-        update_continue "$before" "$dry_run"
+        update_continue "$before" "$dry_run" "$upgrade"
         return
     fi
     [[ "$dry_run" == true ]] || operation_begin "$SCRIPT_DIR/dotfiles" update "${ORIGINAL_ARGS[@]}"
@@ -466,18 +470,18 @@ cmd_update() {
         else
             log "The checkout is up to date with its upstream"
         fi
-        update_continue "$before" "$dry_run"
+        update_continue "$before" "$dry_run" "$upgrade"
         return
     fi
     log "Upstream changes ($behind):"
     git -C "$DOTFILES_DIR" log --oneline --no-decorate 'HEAD..@{upstream}'
     if [[ "$dry_run" == true ]]; then
         log "[DRY RUN] Would pull; previewing setup with the current checkout"
-        update_continue "$before" true
+        update_continue "$before" true "$upgrade"
         return
     fi
     git -C "$DOTFILES_DIR" pull --ff-only --quiet || { error "git pull --ff-only failed"; return 3; }
-    exec "$BASH" "$SCRIPT_DIR/dotfiles" update --continue "$before"
+    exec "$BASH" "$SCRIPT_DIR/dotfiles" update --continue "$before" ${upgrade:+"$upgrade"}
 }
 
 ORIGINAL_ARGS=("$@")

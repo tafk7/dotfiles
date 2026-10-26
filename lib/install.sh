@@ -906,9 +906,11 @@ tool_reinstall() {
     [[ "${FORCE_REINSTALL:-false}" == true || ",${REINSTALL_COMPONENTS:-}," == *",$1,"* ]]
 }
 
-# Installer exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
+# run_installer NAME [update]: run NAME's installer, or with update its
+# update operation (setup --upgrade). Exit codes: 0 = installed/updated,
+# 2 = already up to date, 1 = failed.
 run_installer() {
-    local name="$1"
+    local name="$1" operation="${2:-}"
     local script="$DOTFILES_DIR/installers/install-$name.sh"
 
     if [[ ! -f "$script" ]]; then
@@ -919,12 +921,16 @@ run_installer() {
 
     # Installers download and write to disk, so a dry run must not execute them.
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log "[DRY RUN] Would run installer: $name"
+        if [[ "$operation" == update ]]; then log "[DRY RUN] Would run $name's updater"; else log "[DRY RUN] Would run installer: $name"; fi
         return 0
     fi
 
     local args=()
-    tool_reinstall "$name" && args+=(--force)
+    if [[ "$operation" == update ]]; then
+        args+=(--update)
+    elif tool_reinstall "$name"; then
+        args+=(--force)
+    fi
 
     local rc=0
     "$script" "${args[@]+"${args[@]}"}" || rc=$?
@@ -1501,6 +1507,95 @@ _unmet_need() {
         fi
     done
     return 0
+}
+
+# The APT packages of this run's selection that are installed and not pinned:
+# the selected tiers' package sets, Docker's and RDP's groups when Docker or
+# xrdp is selected, and each selected APT component's package except sbx.
+# Selection enrolls a package for upgrades whoever installed it.
+upgrade_apt_packages() {
+    local entry pkg
+    local -a packages=()
+    for entry in "${REGISTRY_ORDER[@]}"; do
+        if [[ "$entry" == packages:* ]]; then
+            package_set_selected "${entry#packages:}" || continue
+            readarray -t -O "${#packages[@]}" packages < <(package_set_packages "${entry#packages:}")
+            continue
+        fi
+        [[ "${TOOL_METHOD[$entry]}" == apt && "${TOOL_POLICY[$entry]}" == present ]] || continue
+        component_selected "$entry" && tool_applicable "$entry" || continue
+        case "$entry" in
+            docker) read -ra pkg <<< "${PACKAGES[docker]}"; packages+=("${pkg[@]}") ;;
+            xrdp) read -ra pkg <<< "${PACKAGES[rdp]}"; packages+=("${pkg[@]}") ;;
+            *) packages+=("${TOOL_APT_PACKAGE[$entry]}") ;;
+        esac
+    done
+    for pkg in "${packages[@]}"; do
+        apt_package_installed "$pkg" && printf '%s\n' "$pkg"
+    done | awk '!seen[$0]++'
+}
+
+# apt_upgrade PACKAGE...: upgrade only these, never removing anything. Held
+# packages are skipped and reported. The plan is apt's simulated transaction,
+# every package it would install or upgrade, dependencies outside the named
+# ones included.
+apt_upgrade() {
+    local pkg plan
+    local -a held=() named=()
+    for pkg in "$@"; do
+        if apt_package_held "$pkg"; then held+=("$pkg"); else named+=("$pkg"); fi
+    done
+    (( ${#held[@]} == 0 )) || log "Held, so not upgraded: ${held[*]}"
+    (( ${#named[@]} )) || return 0
+    [[ "${DRY_RUN:-false}" == true ]] || update_packages || return 1
+    plan="$(apt-get -s -o Debug::NoLocking=1 install --only-upgrade --no-remove "${named[@]}" 2>/dev/null \
+        | awk -v named=" ${named[*]} " '
+            $1 == "Inst" {
+                old = ($3 ~ /^\[/) ? substr($3, 2, length($3) - 2) : "new"
+                new = ($3 ~ /^\[/) ? $4 : $3; sub(/^\(/, "", new)
+                printf "%s %s -> %s%s\n", $2, old, new, (index(named, " " $2 " ") ? "" : " (dependency)")
+            }')"
+    if [[ -z "$plan" ]]; then
+        log "APT packages already up to date"
+        return 0
+    fi
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        while IFS= read -r pkg; do log "[DRY RUN] Would upgrade $pkg"; done <<< "$plan"
+        return 0
+    fi
+    log "Upgrading APT packages:"
+    while IFS= read -r pkg; do log "  $pkg"; done <<< "$plan"
+    safe_apt_get install --only-upgrade --no-remove -y "${named[@]}"
+}
+
+# upgrade_selection: --upgrade, between the component and config phases.
+# Only what is not pinned moves: the selection's APT packages, and the
+# self-updating components (policy vendor: the AI CLIs and Pi) plus rustup
+# itself, through their installers' update operation. Pinned components move
+# only with versions.lock. APT components' new versions reach the ledger.
+upgrade_selection() {
+    local name failed=false
+    local -a packages=()
+    if [[ -z "${ONLY_COMPONENTS:-}" ]]; then
+        readarray -t packages < <(upgrade_apt_packages)
+        (( ${#packages[@]} == 0 )) || apt_upgrade "${packages[@]}" || failed=true
+    fi
+    for name in "${REGISTRY_ORDER[@]}"; do
+        [[ "$name" != packages:* ]] || continue
+        _install_wanted "$name" && tool_applicable "$name" || continue
+        if [[ "${TOOL_POLICY[$name]}" == vendor || "$name" == rust ]]; then
+            # An updated CLI gets its configure steps again (settings, badge).
+            if run_installer "$name" update; then
+                configure_component "$name" || failed=true
+            else
+                failed=true
+            fi
+        elif [[ "${TOOL_METHOD[$name]}" == apt && "${TOOL_POLICY[$name]}" == present && "${DRY_RUN:-false}" != true ]] \
+             && apt_package_installed "${TOOL_APT_PACKAGE[$name]}"; then
+            track_install "$name" skip || failed=true
+        fi
+    done
+    [[ "$failed" == false ]]
 }
 
 # install_selection: install every selected entry of the registry's install

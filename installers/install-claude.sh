@@ -16,7 +16,8 @@ source "$DOTFILES_DIR/lib/install.sh"
 if [[ "${1:-}" == --observe ]]; then observe_component claude; exit; fi
 
 FORCE=false
-[[ "${1:-}" == "--force" ]] && FORCE=true
+# --update (setup --upgrade) runs the official installer as --force does.
+[[ "${1:-}" == "--force" || "${1:-}" == "--update" ]] && FORCE=true
 
 # The native installer writes the binary here. Verify by absolute path, since
 # ~/.local/bin may not be on PATH yet on a fresh machine.

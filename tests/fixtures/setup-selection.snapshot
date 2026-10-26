@@ -79,6 +79,11 @@ OPTIONS:
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
+    --upgrade           Also upgrade what is not pinned: the selection's APT
+                        packages (only-upgrade, never removing; apt's simulated
+                        transaction is shown first; held packages are skipped),
+                        the AI CLIs and Pi through their updaters, and rustup
+                        itself. Pinned tools move only with versions.lock.
     --editor-plugins    Install vim-plug and the Neovim plugins configs/init.vim
                         pins, and move them to their pinned commits (with Neovim).
     --theme             Enable tmux themes (default).

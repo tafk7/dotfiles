@@ -31,6 +31,7 @@ DRY_RUN=false
 NO_HOOKS=false
 NO_GIT=false          # --no-git: skip ~/.gitconfig entirely (no prompt, no write).
 EDITOR_PLUGINS=false  # --editor-plugins: vim-plug and the Neovim plugins at their pins.
+UPGRADE=false         # --upgrade: what is not pinned moves to its newest version.
 PARSE_ERROR=false
 
 tier_rank() {
@@ -172,6 +173,10 @@ parse_arguments() {
                 ;;
             --editor-plugins)
                 EDITOR_PLUGINS=true
+                shift
+                ;;
+            --upgrade)
+                UPGRADE=true
                 shift
                 ;;
             --git-name)
@@ -377,6 +382,11 @@ OPTIONS:
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
+    --upgrade           Also upgrade what is not pinned: the selection's APT
+                        packages (only-upgrade, never removing; apt's simulated
+                        transaction is shown first; held packages are skipped),
+                        the AI CLIs and Pi through their updaters, and rustup
+                        itself. Pinned tools move only with versions.lock.
     --editor-plugins    Install vim-plug and the Neovim plugins configs/init.vim
                         pins, and move them to their pinned commits (with Neovim).
     --theme             Enable tmux themes (default).
@@ -519,6 +529,10 @@ phase_install_packages() {
     fi
 
     install_selection || INSTALLATION_FAILED=true
+    if [[ "$UPGRADE" == true ]]; then
+        log "Upgrade: APT packages and self-updating tools (pinned tools move only with versions.lock)"
+        upgrade_selection || INSTALLATION_FAILED=true
+    fi
 
     if [[ "$INSTALLATION_FAILED" == "true" ]]; then
         error "One or more requested package operations failed"

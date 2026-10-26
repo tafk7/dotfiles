@@ -27,8 +27,17 @@ the operation lock, checks that this checkout is the install path, on a branch
 with an upstream and without uncommitted changes, fetches and shows the
 incoming commits, fast-forwards, re-executes the pulled code, applies the
 machine profile (`dotfiles apply`), and verifies. An ahead-only branch skips the pull;
-a diverged one stops it. It does not yet move unpinned packages (`--upgrade`)
-or retire configs removed upstream.
+a diverged one stops it. Configs removed upstream are retired by the apply
+(see [customization](customization.md#adding-a-config-file)).
+
+`--upgrade` (on `update`, `apply`, or `setup.sh`) also moves what is not
+pinned, between the component and config phases: the selection's installed
+APT packages through `apt-get install --only-upgrade --no-remove`, after
+showing apt's simulated transaction (dependencies outside the selected names
+included) and skipping held packages; the AI CLIs and Pi through their
+updaters; and rustup itself. Pinned components, Node, and the Rust toolchain
+move only with `versions.lock`. Upgraded components reach the ledger, and the
+run is in the setup log.
 
 `dotfiles refresh` changes running processes only. It targets one tmux
 server (`$TMUX`'s, else the one `DOTFILES_TMUX_SERVER` names, else the
@@ -75,8 +84,8 @@ Each setup run writes `~/.local/state/dotfiles/logs/setup-<UTC time>.log`
 `DOTFILES_LOG_KEEP`, default 30, are kept). The header names the command,
 checkout revision with its uncommitted-file count, and host. The body is the
 whole transcript without color codes. The footer gives the exit status and the
-ledger rows the run changed, timestamps aside. Standalone installer and
-`bin/ai-update` runs are not logged. `DOTFILES_SETUP_LOG=0` disables the log;
+ledger rows the run changed, timestamps aside. Standalone installer runs are
+not logged; `bin/ai-update` runs setup, so it is. `DOTFILES_SETUP_LOG=0` disables the log;
 the test harness sets it.
 
 ## Recovery
