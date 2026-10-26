@@ -72,8 +72,9 @@ user's decision, 2026-10-26).
 
 ## Adoption on this machine (after the plan is complete)
 
-1. Move `PROJECTS_DIRS` (and any `EDITOR`) from `~/.shell.local` to
-   `~/.shell.env`.
+1. Nothing moves to `~/.shell.env` here: `~/.shell.local` sets only
+   `CLAUDE_FLAGS`, which the interactive `claude` wrapper reads, and
+   `PROJECTS_DIRS` and `EDITOR` are the repo defaults.
 2. Fast-forward `main` with git (main has no `dotfiles update`).
 3. `dotfiles profile --propose`, then confirm. It reads only ledger rows
    dotfiles or the package manager installed, so here it proposes tier work and
