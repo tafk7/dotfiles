@@ -1,6 +1,7 @@
 # Per-machine AI tool settings
 
-Status: on hold while research runs (2026-10-26); the research brief is below.
+Status: research back (2026-10-26); revised proposal below, waiting on the
+open questions.
 
 ## Problem
 
@@ -47,33 +48,69 @@ leave Alt to tmux); others are only starting points a machine should own.
 | Release the key entirely | Yes | Yes | None |
 | Launch flags | Shell-started sessions only | Yes | Flags |
 
-## Proposal (pending the research)
+## Research (2026-10-26)
 
-Two kinds of portable key. Enforced keys behave as today. Initial keys are
-written once per machine, recorded, and from then on the machine's: changed or
-deleted, they stay that way, and verify ignores them. Moving a key from
-enforced to initial hands it over without changing its value. The sandbox kit
-would enforce only enforced keys. Defer the per-machine override file until an
-enforced key must differ on one machine.
+A research agent's report. The layer paths are confirmed present in the
+installed binaries (Claude Code 2.1.311, Codex 0.164.0, OpenCode 2.0.28,
+Pi 0.85.1); precedence is as documented, not tested here.
 
-| | Enforced | Initial |
+- Claude Code reads managed settings from `/etc/claude-code/managed-settings.json`
+  and `managed-settings.d/*.json`, above the user file and never written by
+  the tool. Managed keys are locked, except `model`, documented as a starting
+  default. An organization's managed source (server or MDM) wins over the
+  file under the default `"first-wins"`.
+- Codex reads `/etc/codex/config.toml` below `~/.codex/config.toml`: a
+  defaults layer the user's choices override. `/etc/codex/requirements.toml`
+  constrains security keys (approval, sandbox, network); the legacy
+  `/etc/codex/managed_config.toml` overrides user config and `-c` at start.
+  The app-server rewrites the whole user TOML; `-c` sessions bypass the
+  shared daemon.
+- OpenCode reads `/etc/opencode`: lowest precedence on 2.0.28, highest
+  (enforced) from 2.0.29, per its changelog. `OPENCODE_CLI_CONFIG_CONTENT`
+  overlays `cli.json` and is never written.
+- Pi has no system layer; `PI_TELEMETRY=0` in the environment overrides
+  `enableInstallTelemetry`.
+- Organizations enforce security, telemetry, and compliance keys and leave
+  model, effort, and UI as defaults. Dotfiles managers that merge into
+  app-written files (chezmoi `modify_`, home-manager's proposed merger) meet
+  the same needs: a last-applied record for removals, byte-preserving output.
+
+## Revised proposal
+
+Enforced keys go to a layer the tool reads and never writes. Defaults go to a
+lower layer where one exists; otherwise into the user file, tracked by the
+value dotfiles last wrote: updated while the machine still holds it, the
+machine's once changed. Keys leaving the user file are retired by the existing
+three-way record, so a machine's own changes (Codex's `xhigh`) stay and win.
+
+| | Enforced | Defaults |
 |---|---|---|
-| Claude | attribution off; telemetry and error reporting off; the status line (runs dotfiles' script) | model, theme, `tui`, tool search, the two warning skips |
-| Codex | `otel` off; key bindings | reasoning efforts, approval policy and reviewer, sandbox mode, history, status line |
-| OpenCode | `share` disabled; `update` notify (its updater edits `~/.bashrc`) | key bindings |
-| Pi | | install telemetry off (seeded once per key, not only when the file is absent) |
+| Claude | `managed-settings.d/50-dotfiles.json`: attribution off, telemetry and error reporting off, the status line; `model` (a managed default) | user file, tracked: theme, `tui`, tool search, the warning skips |
+| Codex | `requirements.toml` for approval and sandbox, if enforced | `/etc/codex/config.toml`: reasoning efforts, history, status line, key bindings, `otel` |
+| OpenCode | `/etc/opencode` on 2.0.29 or later: `share`, `update` | `cli.json`, tracked: key bindings |
+| Pi | `PI_TELEMETRY=0` in `shell/env.sh` | user file, tracked: `enableInstallTelemetry` |
+
+The system files need sudo and affect every user of the host; without sudo,
+or below a version gate, enforced keys stay in the user file as today.
+dotfiles stops writing `~/.codex/config.toml` at all, which ends the fights
+with Codex's daemon.
 
 ## Open questions
 
-- Codex's approval policy and sandbox mode: may a machine loosen them
-  silently (initial), or are they enforced?
-- Does the rest of the split hold?
-- Would a native layer do better than editing the user file: a defaults tier
-  in Claude Code's settings hierarchy, Codex's administrator configuration,
-  OpenCode's remote or custom config?
+- Sudo-written system files for AI settings on dev and work machines, with
+  today's behavior as the fallback: acceptable?
+- Codex's approval policy and sandbox mode: defaults, or enforced through
+  `requirements.toml`? Codex's `otel`: a default, or enforced through the
+  legacy `managed_config.toml`?
+- The research recommends a per-machine overlay now. With defaults owned by
+  each machine once changed, it would only declare a machine's values from
+  dotfiles; deferred unless an enforced key must differ on one machine.
+- An organization's managed settings would silently replace the Claude file
+  layer. The `ai` capability is meant to stay off on organization-managed
+  machines, and verify cannot see the effective settings.
 - This machine, meanwhile: Codex's `xhigh` is kept by hand, so verify reports
-  `codex settings` until this is decided. Pi's telemetry can be turned off
-  by hand (`"enableInstallTelemetry": false` in `~/.pi/agent/settings.json`).
+  `codex settings` until this lands. Pi's telemetry can be turned off by hand
+  (`"enableInstallTelemetry": false` in `~/.pi/agent/settings.json`).
 
 ## Research brief
 
