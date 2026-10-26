@@ -39,15 +39,24 @@ def load_record(component, home):
     return files
 
 
+def released(component, target):
+    """Keys dotfiles stopped managing in TARGET and left to the machine
+    (configs/ai/released.json): forgotten rather than retired, so they keep
+    their values."""
+    listed = load_json(ROOT / 'configs/ai/released.json').get(component, {}).get(target.name, [])
+    return {tuple(path) for path in listed}
+
+
 class Settings:
     """One settings document: its new text, and what retirement found."""
-    def __init__(self, target, base, overlay, previous, fmt, original=None):
+    def __init__(self, target, base, overlay, previous, fmt, original=None, released=()):
         """base is the document to merge into; original, what the target holds
-        now (default: base), keeps the bytes when nothing changes."""
+        now (default: base), keeps the bytes when nothing changes; released
+        paths are dropped from the record instead of retired."""
         original = base if original is None else original
-        recorded = {tuple(k): v for k, v in previous.get('applied', [])}
+        recorded = {tuple(k): v for k, v in previous.get('applied', []) if tuple(k) not in released}
         self.target, self.overlay = target, overlay
-        self.conflicts_before = {tuple(k) for k in previous.get('conflicts', [])}
+        self.conflicts_before = {tuple(k) for k in previous.get('conflicts', [])} - set(released)
         retired, self.removed, self.conflicts = retire_leaves(base, recorded, overlay)
         data = merge(retired, overlay)
         if target.exists() and equivalent(data, original):
@@ -64,8 +73,8 @@ class Settings:
                 'conflicts': [list(path) for path in conflicts]}
 
 
-def json_settings(target, source, previous):
-    return Settings(target, load_json(target), load_json(source), previous, 'json')
+def json_settings(target, source, previous, released=()):
+    return Settings(target, load_json(target), load_json(source), previous, 'json', released=released)
 
 
 def desired(component, home, record=None):
@@ -81,7 +90,8 @@ def desired(component, home, record=None):
         check_target(target)
         original = tomllib.loads(target.read_text()) if target.exists() else {}
         overlay = tomllib.loads((ROOT / 'configs/codex.toml').read_text())
-        settings.append(Settings(target, original, overlay, record.get(str(target), {}), 'toml'))
+        settings.append(Settings(target, original, overlay, record.get(str(target), {}), 'toml',
+                                 released=released(component, target)))
     else:
         if component == 'opencode':
             config_home = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) if home == Path.home() else home / '.config'
@@ -113,15 +123,18 @@ def desired(component, home, record=None):
                 # also writes itself; merge into it like opencode.json.
                 cli_target = directory / 'cli.json'
                 check_target(cli_target)
-                cli = json_settings(cli_target, ROOT / 'configs/opencode-cli.json', record.get(str(cli_target), {}))
+                cli = json_settings(cli_target, ROOT / 'configs/opencode-cli.json', record.get(str(cli_target), {}),
+                                    released(component, cli_target))
                 extra.append((cli_target, cli.text.encode(), 0o600))
                 settings.append(cli)
             else:
                 overlay['autoupdate'] = overlay.pop('update')
                 # Preserve any native value until V2 is available to own it.
-            document = Settings(target, base, overlay, record.get(str(target), {}), 'json', original)
+            document = Settings(target, base, overlay, record.get(str(target), {}), 'json', original,
+                                released(component, target))
         else:
-            document = Settings(target, original, overlay, record.get(str(target), {}), 'json')
+            document = Settings(target, original, overlay, record.get(str(target), {}), 'json',
+                                released=released(component, target))
         settings.insert(0, document)
     outputs = [(settings[0].target, settings[0].text.encode(), 0o600), *extra]
     assets = ROOT / 'configs/ai' / component

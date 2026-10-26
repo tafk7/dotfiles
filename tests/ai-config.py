@@ -233,6 +233,37 @@ command = "second"
         conflicts = json.loads(record_path.read_text())['files'][str(claude)]['conflicts']
         self.assertEqual(conflicts, [['edited']])
 
+    def test_released_keys_keep_their_values(self):
+        released = json.loads((ROOT / 'configs/ai/released.json').read_text())['claude']['settings.json']
+        self.assertIn(['effortLevel'], released)
+        overlay = json.loads((ROOT / 'configs/claude-settings.json').read_text())
+        self.assertNotIn('effortLevel', overlay, 'a released key is still managed')
+        self.run_config('claude')
+        record_path = self.home / '.local/state/dotfiles/ai/claude.json'
+        record = json.loads(record_path.read_text())
+        claude = self.home / '.claude/settings.json'
+        # A previous checkout applied it; the machine still holds that value.
+        record['files'][str(claude)]['applied'].append([['effortLevel'], 'medium'])
+        record['files'][str(claude)]['conflicts'].append(['effortLevel'])
+        record_path.write_text(json.dumps(record))
+        data = json.loads(claude.read_text())
+        data['effortLevel'] = 'medium'
+        claude.write_text(json.dumps(data))
+
+        self.run_config('claude', '--check')
+        result = self.run_config('claude')
+        self.assertNotIn('effortLevel', result.stdout)
+        self.assertEqual(json.loads(claude.read_text())['effortLevel'], 'medium')
+        entry = json.loads(record_path.read_text())['files'][str(claude)]
+        self.assertNotIn(['effortLevel'], [path for path, _ in entry['applied']])
+        self.assertNotIn(['effortLevel'], entry['conflicts'])
+        # The machine's own value from then on is neither reverted nor reported.
+        data['effortLevel'] = 'high'
+        claude.write_text(json.dumps(data))
+        self.run_config('claude', '--check')
+        self.run_config('claude')
+        self.assertEqual(json.loads(claude.read_text())['effortLevel'], 'high')
+
     def test_retired_toml_keys_are_removed(self):
         self.run_config('codex')
         record_path = self.home / '.local/state/dotfiles/ai/codex.json'
