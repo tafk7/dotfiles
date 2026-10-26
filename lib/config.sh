@@ -7,25 +7,22 @@ source "$(dirname "${BASH_SOURCE[0]}")/registry.sh"
 CONFIGS_DIR="$DOTFILES_DIR/configs"
 ENTRY_DIR="$DOTFILES_DIR/entry"
 
-# Docker Sandboxes, pinned like every other tool and held in APT: sbx changes
-# weekly, and kits and controllers built on it (Cardinal requires an exact
-# version) break on an unplanned upgrade. Bump deliberately.
-SBX_VERSION="0.49.2"
-# Neovim and tmux, pinned with their release assets' SHA-256 so installing
-# needs no GitHub API lookup (anonymous calls are rate-limited per address).
-# bin/check-updates shows newer releases; bump version and checksums together
-# (`gh api repos/OWNER/REPO/releases/tags/TAG --jq '.assets[] | .name+" "+.digest'`).
-NVIM_VERSION="0.12.5"
+# Pins come from versions.lock (lib/versions.sh), the one version authority.
+# sbx is held in APT at its pin: it changes weekly, and kits and controllers
+# built on it need an exact version. Neovim and tmux carry their release
+# assets' SHA-256, so installing needs no GitHub API lookup.
+source "$(dirname "${BASH_SOURCE[0]}")/versions.sh"
+SBX_VERSION="$(versions_field sbx want any)"
+NVIM_VERSION="$(versions_field neovim want x86_64)"; NVIM_VERSION="${NVIM_VERSION#v}"
 declare -A NVIM_SHA256=(
-    [x86_64]="bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875"
-    [arm64]="1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725"
+    [x86_64]="$(versions_field neovim sha256 x86_64)"
+    [arm64]="$(versions_field neovim sha256 aarch64)"
 )
-TMUX_VERSION="3.7c"
-# Bootstraps, pinned by version: eget (installers/install-eget.sh) and the nvm
-# installer (installers/install-nvm.sh).
-EGET_VERSION="1.3.4"
-NVM_VERSION="0.40.4"
-TMUX_SHA256="7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf"
+TMUX_VERSION="$(versions_field tmux want any)"
+TMUX_SHA256="$(versions_field tmux sha256 any)"
+EGET_VERSION="$(versions_field eget want x86_64)"; EGET_VERSION="${EGET_VERSION#v}"
+NVM_VERSION="$(versions_field nvm want any)"; NVM_VERSION="${NVM_VERSION#v}"
+
 # The docker-container BuildKit builder sbx kit builds use when Docker's image
 # store has no OCI exporter (BUILDX_BUILDER=sbx-kits). Optional, untracked
 # buildkitd settings such as a site's DNS servers: SBX_KITS_BUILDKITD_CONFIG.

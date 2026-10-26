@@ -8,7 +8,6 @@ mkdir -p "$HOME/.local/bin" "$TEST_ROOT/repo"
 export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
 source "$ROOT/lib/install.sh"
 DOTFILES_DIR="$TEST_ROOT/repo"
-cp "$ROOT/eget.toml" "$ROOT/eget.lock" "$DOTFILES_DIR/"
 run_installer() { return 0; }
 TOOL_METHOD=(['uv']=eget)
 tier_includes() { return 0; }
@@ -22,6 +21,10 @@ for name in uv uvx; do
 done
 EOF
 chmod +x "$HOME/.local/bin/eget"
+# The lock's identity is the fake release's uv.
+uv_digest="$(printf '#!/bin/sh\necho "uv 0.10.0"\n' | sha256sum | awk '{print $1}')"
+DOTFILES_VERSIONS_LOCK="$DOTFILES_DIR/versions.lock"
+awk -F '\t' -v OFS='\t' -v d="sha256:$uv_digest" '$1 == "uv" { $8 = d; print }' "$ROOT/versions.lock" > "$DOTFILES_VERSIONS_LOCK"
 install_eget_tools >/dev/null
 "$HOME/.local/bin/uvx" --version >/dev/null || fail "companion missing after install"
 tool_is_present uv || fail "complete component verification"

@@ -173,7 +173,8 @@ shell/env*.sh                  Layer 0 implementation
 shell/init.sh                  Layer 1 loader
 shell/tools/, shell/platform/  interactive aliases/functions and platform adapters
 lib/runtime.sh                 side-effect-free command helpers
-lib/config.sh                  CONFIG_MAP and APT package groups
+lib/config.sh                  CONFIG_MAP, APT package groups, pins read from versions.lock
+lib/versions.sh                versions.lock parser and validation
 lib/registry.sh                component inventory and ownership
 lib/state.sh                   persistent state, lock, journal
 lib/profile.sh                 the machine profile and its merge rules

@@ -4,7 +4,7 @@ Docker Sandboxes (sbx) v3 kits that belong to no project: coding-agent
 harnesses, model-gateway access, the portable part of this repository's AI
 configuration. Content kits (skills, prompts) come from their owners and
 layer the same way. Layer them onto any workload, such as FINN's (`finn.yaml` in a FINN checkout). Validated with the sbx version
-`lib/config.sh` pins (`SBX_VERSION`).
+`versions.lock` pins (the `sbx` row).
 
 | Kit | Kind | Adds |
 |---|---|---|

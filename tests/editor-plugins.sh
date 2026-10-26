@@ -26,6 +26,12 @@ done
 cp "$TEST_ROOT/plug.vim" "$dest"
 EOF
 chmod +x "$TEST_ROOT/bin/curl"
+# A download that is not the locked plug.vim is refused.
+if "$ROOT/bin/install-editor-plugins" >/dev/null 2>&1; then fail "an unlocked plug.vim was installed"; fi
+[[ ! -e "$XDG_CONFIG_HOME/nvim/autoload/plug.vim" ]] || fail "an unlocked plug.vim was left in place"
+awk -F '\t' -v OFS='\t' -v d="$(sha256sum "$TEST_ROOT/plug.vim" | awk '{print $1}')" '$1 == "vim-plug" { $6 = d } 1' \
+    "$ROOT/versions.lock" > "$TEST_ROOT/versions.lock"
+export DOTFILES_VERSIONS_LOCK="$TEST_ROOT/versions.lock"
 "$ROOT/bin/install-editor-plugins" >/dev/null
 [[ -f "$XDG_CONFIG_HOME/nvim/autoload/plug.vim" && -f "$TEST_ROOT/plugins-ran" ]] || fail "explicit editor bootstrap incomplete"
 [[ ! -e "$HOME/.config/nvim" ]] || fail "editor bootstrap ignored XDG"

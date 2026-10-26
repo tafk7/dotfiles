@@ -81,7 +81,7 @@ allowlist (see [the kits](../kits/README.md)); credentials never do.
 
 ## sbx version and kits
 
-`docker-sbx` is pinned (`SBX_VERSION` in `lib/config.sh`) and held in APT, since
+`docker-sbx` is pinned (the `sbx` row of `versions.lock`) and held in APT, since
 sbx changes weekly and tools built on it, such as kits and controllers that
 require an exact version, break on an unplanned upgrade. Another installed
 version is reported by setup and `bin/verify`, never replaced silently; bump the

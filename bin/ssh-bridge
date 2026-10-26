@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ssh-bridge status     Report bridge prerequisites and live state (default)
-#   ssh-bridge enable     Install the bridge, set the marker, verify (personal only)
+#   ssh-bridge enable     Set the marker and verify the bridge (personal only)
 #   ssh-bridge disable    Remove the marker (revert to local on-disk keys)
 #   ssh-bridge restart    Restart the relay (systemd service, else inline)
 #
@@ -76,18 +76,10 @@ cmd_status() {
 cmd_enable() {
     is_wsl || { error "ssh-bridge enable only applies under WSL"; exit 1; }
 
+    # setup.sh installs the release versions.lock pins (bash tier, WSL only).
     if ! command -v wsl2-ssh-agent >/dev/null 2>&1; then
-        if command -v eget >/dev/null 2>&1; then
-            log "Installing wsl2-ssh-agent via eget..."
-            # shellcheck source=../lib/registry.sh
-            source "$DOTFILES_DIR/lib/registry.sh"
-            local -a asset_args
-            mapfile -t asset_args < <(tool_eget_asset_args wsl2-ssh-agent)
-            EGET_CONFIG="$DOTFILES_DIR/eget.toml" eget "${asset_args[@]}" mame/wsl2-ssh-agent
-        else
-            error "eget not found — run ./setup.sh --bash first, then retry"
-            exit 1
-        fi
+        error "wsl2-ssh-agent not installed — run ./setup.sh --bash first, then retry"
+        exit 1
     fi
 
     mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
