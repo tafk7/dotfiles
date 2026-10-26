@@ -130,6 +130,7 @@ docker     configure              configure_docker_host_access
 sbx        needs                  docker
 sbx        policy                 converge
 sbx        configure              configure_work_host ensure_sbx_kits_builder
+neovim     configure              configure_editor_plugins
 node       needs                  nvm
 node       configure              use_default_node
 claude     policy                 vendor

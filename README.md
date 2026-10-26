@@ -84,7 +84,9 @@ component ledger changes the run made. Set `DOTFILES_SETUP_LOG=0` to skip it.
 After setup:
 
 1. Restart the shell and run `dotfiles verify`.
-2. After `--dev`, run `./bin/install-editor-plugins` to install Neovim plugins.
+2. For Neovim plugins, enroll them once (`dotfiles profile --add editor-plugins`,
+   or `--editor-plugins` with `--dev`); setup then keeps vim-plug and every
+   plugin at its pinned commit.
 3. Run `gh auth login` on each machine that needs GitHub access.
 
 For `--work` host setup (KVM, `sbx login`, Tailscale enrollment, the pinned

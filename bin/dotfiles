@@ -303,6 +303,7 @@ cmd_verify() {
         verify_state
         verify_components
         verify_configs
+        verify_editor_plugins
         verify_ai
         verify_host
         verify_environment

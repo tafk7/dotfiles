@@ -155,6 +155,7 @@ profile_setup_args() {
         while IFS= read -r item; do printf -- '--%s\n' "$item"; done < <(profile_ai_tools)
     fi
     for item in ${PROFILE[opt-outs]//,/ }; do printf -- '--%s\n' "$item"; done
+    [[ "${PROFILE[editor-plugins]}" != yes ]] || printf -- '--editor-plugins\n'
 }
 
 profile_describe() {
@@ -167,15 +168,19 @@ profile_describe() {
     printf 'editor-plugins  %s\n' "${PROFILE[editor-plugins]}"
 }
 
-# profile_merge TIER CAPABILITIES AI_MODE AI_TOOLS OPT_OUTS: fold one setup
-# run's flags into PROFILE. Flags only add: a higher tier raises it,
-# capabilities and AI tools join (and leave ai.exclude), opt-outs set. Nothing
-# is lowered or removed. AI_MODE is all, some, or empty. Each addition is
-# appended to PROFILE_CHANGES as "+ X".
+# profile_merge TIER CAPABILITIES AI_MODE AI_TOOLS OPT_OUTS [EDITOR_PLUGINS]:
+# fold one setup run's flags into PROFILE. Flags only add: a higher tier
+# raises it, capabilities and AI tools join (and leave ai.exclude), opt-outs
+# and editor plugins (yes) set. Nothing is lowered or removed. AI_MODE is all,
+# some, or empty. Each addition is appended to PROFILE_CHANGES as "+ X".
 PROFILE_CHANGES=()
 profile_merge() {
-    local tier="$1" capabilities="$2" ai_mode="$3" ai_tools="$4" opt_outs="$5" item
+    local tier="$1" capabilities="$2" ai_mode="$3" ai_tools="$4" opt_outs="$5" editor_plugins="${6:-}" item
     PROFILE_CHANGES=()
+    if [[ "$editor_plugins" == yes && "${PROFILE[editor-plugins]}" != yes ]]; then
+        PROFILE_CHANGES+=("+ editor-plugins")
+        PROFILE[editor-plugins]=yes
+    fi
     if (( $(_profile_tier_rank "$tier") > $(_profile_tier_rank "${PROFILE[tier]}") )); then
         PROFILE_CHANGES+=("+ tier $tier")
         PROFILE[tier]="$tier"

@@ -89,6 +89,12 @@ profile_exists && fail "a proposal was saved without confirmation"
 dotfiles profile --propose --yes >/dev/null
 assert_eq "$(profile_value tier)/$(profile_value capabilities)/$(profile_value ai)" "work/tail/claude" "saved proposal"
 
+# Editor plugins: setup's flag enrolls them, and the profile passes it back.
+profile_load
+profile_merge "$(profile_value tier)" "" "" "" "" yes
+assert_eq "${PROFILE[editor-plugins]}/${PROFILE_CHANGES[*]}" "yes/+ editor-plugins" "enrolling editor plugins"
+[[ "$(profile_setup_args)" == *"--editor-plugins"* ]] || fail "the profile does not pass --editor-plugins: $(profile_setup_args)"
+
 # A damaged profile is reported, not silently replaced.
 printf 'schema\t1\ntier\tgalaxy\n' > "$DOTFILES_PROFILE_FILE"
 rc=0

@@ -30,6 +30,7 @@ SHOW_HELP=false
 DRY_RUN=false
 NO_HOOKS=false
 NO_GIT=false          # --no-git: skip ~/.gitconfig entirely (no prompt, no write).
+EDITOR_PLUGINS=false  # --editor-plugins: vim-plug and the Neovim plugins at their pins.
 PARSE_ERROR=false
 
 tier_rank() {
@@ -169,6 +170,10 @@ parse_arguments() {
                 NO_GIT=true
                 shift
                 ;;
+            --editor-plugins)
+                EDITOR_PLUGINS=true
+                shift
+                ;;
             --git-name)
                 require_option_value "$1" "${2:-}" || { shift; continue; }
                 DOTFILES_GIT_NAME="$2"
@@ -287,7 +292,8 @@ setup_save_profile() {
     [[ "$NO_GIT" != true ]] || opt_outs+="no-git,"
     [[ "$NO_HOOKS" != true ]] || opt_outs+="no-hooks,"
     (( ${#SELECTED_AI_TOOLS[@]} == 0 )) || ai_tools="$(IFS=,; printf '%s' "${SELECTED_AI_TOOLS[*]}")"
-    profile_merge "$INSTALL_TIER" "$capabilities" "${SELECTED_CAPABILITIES[ai]:-}" "$ai_tools" "${opt_outs%,}"
+    profile_merge "$INSTALL_TIER" "$capabilities" "${SELECTED_CAPABILITIES[ai]:-}" "$ai_tools" "${opt_outs%,}" \
+        "$([[ "$EDITOR_PLUGINS" == true ]] && echo yes)"
     profile_save || return 1
     (( ${#PROFILE_CHANGES[@]} == 0 )) || log "Machine profile: ${PROFILE_CHANGES[*]}"
 }
@@ -371,6 +377,8 @@ OPTIONS:
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
+    --editor-plugins    Install vim-plug and the Neovim plugins configs/init.vim
+                        pins, and move them to their pinned commits (with Neovim).
     --theme             Enable tmux themes (default).
     --no-theme          Persistently disable tmux themes.
     --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
