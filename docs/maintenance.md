@@ -30,6 +30,21 @@ machine profile (`dotfiles apply`), and verifies. An ahead-only branch skips the
 a diverged one stops it. It does not yet move unpinned packages (`--upgrade`)
 or retire configs removed upstream.
 
+`dotfiles refresh` changes running processes only. It targets one tmux
+server (`$TMUX`'s, else the one `DOTFILES_TMUX_SERVER` names, else the
+default): the global environment gets the managed variables from the
+environment producer (`lib/env-producer.sh`, which reads the repo defaults and
+`~/.shell.env` but never direnv or user startup files) and loses the load
+guards and last time's PATH segments; a session that overrides a managed
+variable is reported, not changed; then `~/.tmux.conf` is sourced, the badge
+rewired, and the theme applied. A server older than the installed tmux is a
+health finding. It then reports staleness from persistent state: shells that
+loaded before the last change to shell startup (a soft reload stays stale),
+shells possibly stale after a hand edit of `~/.shell.local` or `~/.shell.env`,
+and programs started before their binary or settings changed. Apply ends with
+one refresh (`--no-refresh` skips it), and setup leaves tmux and the theme to
+it.
+
 `dotfiles apply` runs setup with the profile's flags. Its dry run is a plan
 built from observations: it names only components to install, move to their
 pin, or repair, configure steps with work to do, and configs that differ, and

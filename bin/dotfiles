@@ -3,7 +3,8 @@
 #
 # Usage: dotfiles update [--dry-run]
 #        dotfiles apply [--dry-run] [--only X,Y] [--reinstall[=X,Y]]
-#                       [--overwrite-configs] [--force]
+#                       [--overwrite-configs] [--force] [--no-refresh]
+#        dotfiles refresh [-v]
 #        dotfiles verify [-v] [--latest] [--smoke]
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
@@ -24,6 +25,8 @@ source "$DOTFILES_DIR/lib/operation.sh"
 source "$DOTFILES_DIR/lib/profile.sh"
 source "$DOTFILES_DIR/lib/verify.sh"
 source "$DOTFILES_DIR/lib/staleness.sh"
+source "$DOTFILES_DIR/lib/environment.sh"
+source "$DOTFILES_DIR/lib/refresh.sh"
 
 usage() {
     cat <<'EOF'
@@ -47,6 +50,13 @@ Commands:
     --reinstall[=X,Y]   Reinstall everything selected, or the named components.
     --overwrite-configs Replace configs that differ, keeping backups.
     --force             Both of the above.
+    --no-refresh        Skip the refresh that ends every apply.
+  refresh               Bring running processes up to date with the disk: the
+                        tmux server's environment, config, badge, and theme.
+                        Lists shells and programs that predate a change and
+                        need a restart (reload a shell). Exit 3 when a step
+                        could not be made.
+    -v                  List every step, passing ones included.
   verify                Check this machine against the checkout and its profile.
                         Changes nothing. Exit 1: setup has work to do; 3: a check
                         could not be made; 2: something needs you; 0: healthy.
@@ -174,14 +184,36 @@ apply_profile() {
     cmd_apply || { error "Apply failed; the profile keeps the new intent"; return 1; }
 }
 
-# apply: the whole profile through setup, from what is installed now. Exit 1
-# when setup failed or blocked something, 3 without a readable profile.
+# refresh: running processes only (lib/refresh.sh), then which shells and
+# programs still predate a change. Exit 3 when a step could not be made.
+cmd_refresh() {
+    local verbose=false records rc
+    while (( $# )); do
+        case "$1" in
+            -v|--verbose) verbose=true ;;
+            --help|-h) usage; return 0 ;;
+            *) error "Unknown option: $1"; usage >&2; return 64 ;;
+        esac
+        shift
+    done
+    operation_begin "$SCRIPT_DIR/dotfiles" refresh "${ORIGINAL_ARGS[@]}"
+    log "Refreshing running processes..."
+    records="$(refresh_tmux; staleness_report --sweep)"
+    if [[ "$verbose" == true ]]; then outcome_render -v <<< "$records"; else outcome_render <<< "$records"; fi
+    rc="$(outcome_exit refresh <<< "$records")"
+    return "$rc"
+}
+
+# apply: the whole profile through setup, from what is installed now, then
+# one refresh (unless --no-refresh). Exit 1 when setup failed or blocked
+# something, 3 without a readable profile.
 cmd_apply() {
-    local dry_run=false rc=0
+    local dry_run=false refresh=true rc=0 refresh_rc=0
     local -a extra=() args=()
     while (( $# )); do
         case "$1" in
             --dry-run) dry_run=true; extra+=("$1") ;;
+            --no-refresh) refresh=false ;;
             --only) [[ -n "${2:-}" ]] || { error "--only requires component names"; return 64; }; extra+=("$1" "$2"); shift ;;
             --only=*|--reinstall|--reinstall=*|--overwrite-configs|--force) extra+=("$1") ;;
             --help|-h) usage; return 0 ;;
@@ -196,8 +228,16 @@ cmd_apply() {
     profile_load || return 3
     [[ "$dry_run" == true ]] || operation_begin "$SCRIPT_DIR/dotfiles" apply "${ORIGINAL_ARGS[@]}"
     readarray -t args < <(profile_setup_args)
-    "$DOTFILES_DIR/setup.sh" "${args[@]}" "${extra[@]}" || rc=$?
-    case "$rc" in 0|64) return "$rc" ;; *) return 1 ;; esac
+    # Setup leaves running processes to the refresh below.
+    DOTFILES_REFRESH_FOLLOWS="$([[ "$refresh" == true && "$dry_run" != true ]] && echo 1)" \
+        "$DOTFILES_DIR/setup.sh" "${args[@]}" "${extra[@]}" || rc=$?
+    (( rc != 64 )) || return 64
+    if [[ "$refresh" == true && "$dry_run" != true ]]; then
+        echo
+        cmd_refresh || refresh_rc=$?
+    fi
+    (( rc == 0 )) || return 1
+    return "$refresh_rc"
 }
 
 cmd_profile() {
@@ -444,6 +484,7 @@ ORIGINAL_ARGS=("$@")
 case "${1:-}" in
     update) shift; ORIGINAL_ARGS=("$@"); cmd_update "$@" ;;
     apply) shift; ORIGINAL_ARGS=("$@"); cmd_apply "$@" ;;
+    refresh) shift; ORIGINAL_ARGS=("$@"); cmd_refresh "$@" ;;
     verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;
     profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
     --help|-h|help|"") usage ;;
