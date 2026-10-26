@@ -44,6 +44,14 @@ brings an installed plugin to this checkout's version when its cache is stale
 (`bin/ai-config claude --check-plugin`). OpenCode's settings are written only
 for V2, so an external V1 keeps its own.
 
+A portable key that leaves `configs/` is retired from each settings file by a
+three-way comparison: `bin/ai-config` records the leaves it applied (in
+`~/.local/state/dotfiles/ai/`), and removes one the overlay no longer has only
+while the file still holds the value it wrote; a table emptied by the removal
+goes too. A key edited since is kept and reported once, and the record
+remembers it. Keys still in the overlay keep winning, lists count as single
+values, and Pi's seed-once settings stay the user's.
+
 Before changes, files are copied into private, uniquely named subdirectories of
 `~/.claude/backups`, `~/.codex/backups` or `~/.config/opencode/backups`. Alternate configuration homes use their
 own `backups` subdirectory. A semantic no-op retains original bytes and creates no
