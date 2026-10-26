@@ -30,9 +30,9 @@ and `packages:work` entries of the install order):
    asset_filters = [".tar.gz", "gnu"]
    ```
    Filters must leave exactly one asset for each supported architecture. Then
-   run `python3 tests/eget-selection.py --refresh` (after any tag bump too): it
-   records the release's asset lists and writes the tool's `versions.lock`
-   rows: the exact asset, its SHA-256, the file to extract, and that file's
+   run `dotfiles bump --refresh`: it records the release's asset lists and
+   writes the tool's `versions.lock` rows (later tag moves use
+   `dotfiles bump mytool [TAG]`): the exact asset, its SHA-256, the file to extract, and that file's
    SHA-256 per architecture. Setup downloads exactly that without asking the
    GitHub API, and treats the tool as current only while its binary's SHA-256
    matches. Commit all three.

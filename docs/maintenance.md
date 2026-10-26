@@ -61,7 +61,16 @@ marks what it could not check as Unknown. `--only X,Y` narrows the run to
 those components and blocks one whose needs are not installed;
 `--reinstall=X,Y` reinstalls only those.
 
-To move a pin, use `bin/check-updates`, bump the pin, and run `dotfiles apply`. Direct `eget --download-all` bypasses platform/tier selection, ownership
+To move a pin, find it with `bin/check-updates`, then run
+`dotfiles bump TOOL [VERSION]` and `dotfiles apply`. Bump has one handler per
+kind of pin, each using its source's own trust: GitHub releases and their
+published digests (eget tools, neovim, tmux, eget, nvm), nodejs.org's index
+and `SHASUMS256.txt` with the bundled npm, Rust's channel manifest, the AWS
+CLI's signed archives, resolved commits (vim-plug and Neovim plugins), and the
+APT version Docker publishes for sbx. It checks both architectures before
+writing, refuses a release younger than 14 days unless `--security` (for a fix
+to an advisory affecting the pin), edits files, and never commits. An sbx bump
+needs the kits rebuilt. Direct `eget --download-all` bypasses platform/tier selection, ownership
 recording, companion handling, and staged replacement. `check-updates` exits 1
 for failed lookups, 2 for updates found with `--outdated`, and 0 otherwise.
 

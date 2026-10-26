@@ -103,6 +103,7 @@ jobs:
           python3 tests/theme-contrast.py
           python3 tests/documentation.py
           python3 tests/eget-selection.py
+          python3 tests/bump.py
           python3 tests/viz.py
 
       - name: Cheatsheet TSV is well-formed

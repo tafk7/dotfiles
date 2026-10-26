@@ -5,12 +5,12 @@
 # setup.sh does not read this file: versions.lock records, per tool and
 # architecture, the asset these filters select, its SHA-256, the file to
 # extract and that file's digest, and setup.sh downloads exactly that (no
-# GitHub API call, so no rate limit on a fresh machine). After bumping a `tag`,
-# regenerate the lock's rows:
+# GitHub API call, so no rate limit on a fresh machine). Move a tag with
 #
-#     python3 tests/eget-selection.py --refresh
+#     dotfiles bump TOOL [TAG]      (or dotfiles bump --refresh after editing a tag)
 #
-# then rerun setup to upgrade; `./setup.sh --bash --force` re-downloads (repair
+# which rewrites the tag and the lock's rows together;
+# then run `dotfiles apply`; `dotfiles apply --reinstall=TOOL` re-downloads (repair
 # or downgrade). `eget -D` with this file still works for manual use.
 #
 # Architecture: filters must leave exactly one asset per supported arch
