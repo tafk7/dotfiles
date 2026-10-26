@@ -9,11 +9,9 @@
     "command": "bash ~/.claude/statusline.sh",
     "padding": 0
   },
-  "effortLevel": "medium",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
-  "autoCompactEnabled": true,
   "tui": "fullscreen",
   "env": {
     "ENABLE_TOOL_SEARCH": "true",

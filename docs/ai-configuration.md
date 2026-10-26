@@ -24,7 +24,9 @@ compaction threshold depend on where requests are served, so they are left to
 whatever configures the provider; named profiles can override any default.
 Provider-specific Claude environment, such as gateway compatibility flags,
 belongs to the provider configuration too, as do opencode's providers, models
-and provider allowlist. Claude keeps medium effort. Nonessential traffic is
+and provider allowlist. Claude's effort level and auto-compaction are left to
+each machine (set them in Claude Code; dotfiles neither sets nor checks
+them). Nonessential traffic is
 left to the machine: setting `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` in
 `~/.claude/settings.json` or a provider configuration also disables Claude's
 automatic updater and makes `$.http.fetch` fail in Claude Code mods (use
@@ -50,7 +52,10 @@ three-way comparison: `bin/ai-config` records the leaves it applied (in
 while the file still holds the value it wrote; a table emptied by the removal
 goes too. A key edited since is kept and reported once, and the record
 remembers it. Keys still in the overlay keep winning, lists count as single
-values, and Pi's seed-once settings stay the user's.
+values, and Pi's seed-once settings stay the user's. A key listed in
+`configs/ai/released.json` is handed to the machine instead: dropped from the
+record without touching its value, so a setting dotfiles stops managing keeps
+whatever each machine has.
 
 Before changes, files are copied into private, uniquely named subdirectories of
 `~/.claude/backups`, `~/.codex/backups` or `~/.config/opencode/backups`. Alternate configuration homes use their

@@ -29,8 +29,6 @@ ROOT = Path(__file__).resolve().parent.parent
 KIT = ROOT / "kits" / "ai-preferences"
 SETTINGS_KEYS = (
     "attribution",
-    "autoCompactEnabled",
-    "effortLevel",
     "env",
     "skipWorkflowUsageWarning",
     "theme",

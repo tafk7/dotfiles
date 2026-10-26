@@ -3,8 +3,6 @@
     "commit": "",
     "pr": ""
   },
-  "autoCompactEnabled": true,
-  "effortLevel": "medium",
   "env": {
     "DISABLE_ERROR_REPORTING": "1",
     "DISABLE_TELEMETRY": "1",

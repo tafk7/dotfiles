@@ -1,0 +1,12 @@
+{
+  "claude": {
+    "settings.json": [
+      [
+        "autoCompactEnabled"
+      ],
+      [
+        "effortLevel"
+      ]
+    ]
+  }
+}
