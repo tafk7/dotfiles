@@ -86,7 +86,9 @@ user's decision, 2026-10-26).
 5. Adopt rustup if wanted: `dotfiles apply --only rust --reinstall=rust`.
 6. Replace every shell started before the pull: they have no load records,
    and a git pull records no change event, so nothing lists them. In those
-   shells `reload` is still the old soft one; use `exec "$SHELL" -l`.
+   shells `reload` is still the old soft one: run it twice (the first defines
+   the new one). A plain `exec "$SHELL" -l` is not enough: the new shell
+   inherits the exported load guards and keeps the old environment.
 7. `dotfiles verify -v`.
 
 Other machines main set up: main's sbx installer held docker-sbx at 0.46.0
