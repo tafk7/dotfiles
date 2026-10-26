@@ -9,29 +9,79 @@ import shutil
 import subprocess
 from pathlib import Path
 import sys
+import tempfile
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'lib'))
-from config_files import backup, check_target, equivalent, load_json, merge, reconcile_toml, write_file
+from config_files import backup, check_target, dump_toml, equivalent, leaves, load_json, merge, retire_leaves, write_file
+
+TOML_HEADER = '# Portable keys are managed by dotfiles/bin/ai-config; other values are retained.\n'
 
 
-def json_overlay(target, source):
-    original = load_json(target)
-    data = merge(original, load_json(source))
-    return target.read_text() if target.exists() and equivalent(data, original) else json.dumps(data, indent=2) + '\n'
+def record_path(component, home):
+    """Where the leaves last applied to each settings document are recorded."""
+    if home != Path.home():
+        base = home / '.local/state/dotfiles'
+    elif os.environ.get('DOTFILES_STATE_DIR'):
+        base = Path(os.environ['DOTFILES_STATE_DIR'])
+    else:
+        base = Path(os.environ.get('XDG_STATE_HOME', home / '.local/state')) / 'dotfiles'
+    return base / 'ai' / f'{component}.json'
 
 
-def desired(component, home):
+def load_record(component, home):
+    path = record_path(component, home)
+    record = load_json(path) if path.exists() else {}
+    files = record.get('files', {})
+    if not isinstance(files, dict):
+        raise ValueError(f'Invalid AI settings record: {path}')
+    return files
+
+
+class Settings:
+    """One settings document: its new text, and what retirement found."""
+    def __init__(self, target, base, overlay, previous, fmt, original=None):
+        """base is the document to merge into; original, what the target holds
+        now (default: base), keeps the bytes when nothing changes."""
+        original = base if original is None else original
+        recorded = {tuple(k): v for k, v in previous.get('applied', [])}
+        self.target, self.overlay = target, overlay
+        self.conflicts_before = {tuple(k) for k in previous.get('conflicts', [])}
+        retired, self.removed, self.conflicts = retire_leaves(base, recorded, overlay)
+        data = merge(retired, overlay)
+        if target.exists() and equivalent(data, original):
+            self.text = target.read_text()
+        elif fmt == 'toml':
+            self.text = TOML_HEADER + dump_toml(data)
+        else:
+            self.text = json.dumps(data, indent=2) + '\n'
+
+    def record(self):
+        applied = leaves(self.overlay)
+        conflicts = sorted(path for path in self.conflicts_before | set(self.conflicts) if path not in applied)
+        return {'applied': [[list(path), value] for path, value in sorted(applied.items())],
+                'conflicts': [list(path) for path in conflicts]}
+
+
+def json_settings(target, source, previous):
+    return Settings(target, load_json(target), load_json(source), previous, 'json')
+
+
+def desired(component, home, record=None):
+    """The component's directory, its outputs (path, bytes, mode), and its
+    settings documents. Leaves a previous run applied and the overlay no
+    longer ships are retired (see retire_leaves)."""
+    record = record or {}
     directory = home / ('.' + component)
-    extra = []
+    extra, settings = [], []
     if component == 'codex':
         directory = Path(os.environ.get('CODEX_HOME', directory)) if home == Path.home() else directory
         target = directory / 'config.toml'
         check_target(target)
-        original = target.read_text() if target.exists() else ''
+        original = tomllib.loads(target.read_text()) if target.exists() else {}
         overlay = tomllib.loads((ROOT / 'configs/codex.toml').read_text())
-        text = reconcile_toml(original, overlay, header='# Portable keys are managed by dotfiles/bin/ai-config; other values are retained.\n')
+        settings.append(Settings(target, original, overlay, record.get(str(target), {}), 'toml'))
     else:
         if component == 'opencode':
             config_home = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) if home == Path.home() else home / '.config'
@@ -63,22 +113,24 @@ def desired(component, home):
                 # also writes itself; merge into it like opencode.json.
                 cli_target = directory / 'cli.json'
                 check_target(cli_target)
-                extra.append((cli_target, json_overlay(cli_target, ROOT / 'configs/opencode-cli.json').encode(), 0o600))
+                cli = json_settings(cli_target, ROOT / 'configs/opencode-cli.json', record.get(str(cli_target), {}))
+                extra.append((cli_target, cli.text.encode(), 0o600))
+                settings.append(cli)
             else:
                 overlay['autoupdate'] = overlay.pop('update')
                 # Preserve any native value until V2 is available to own it.
-            data = merge(base, overlay)
+            document = Settings(target, base, overlay, record.get(str(target), {}), 'json', original)
         else:
-            data = merge(original, overlay)
-        text = target.read_text() if target.exists() and equivalent(data, original) else json.dumps(data, indent=2) + '\n'
-    outputs = [(target, text.encode(), 0o600), *extra]
+            document = Settings(target, original, overlay, record.get(str(target), {}), 'json')
+        settings.insert(0, document)
+    outputs = [(settings[0].target, settings[0].text.encode(), 0o600), *extra]
     assets = ROOT / 'configs/ai' / component
     for source in sorted(assets.rglob('*')):
         if source.is_file() and '__pycache__' not in source.parts:
             dest = directory / source.relative_to(assets)
             check_target(dest)
             outputs.append((dest, source.read_bytes(), 0o600))
-    return directory, outputs
+    return directory, outputs, settings
 
 
 MODS_FLOOR = (2, 1, 287)
@@ -168,9 +220,22 @@ def main():
             parser.error('--check-plugin needs claude or codex')
         return 0 if check_plugin(args.component, desired(args.component, args.home)[0]) else 1
     # Validate every document and target before writing any of them.
-    plans = [(c, *desired(c, args.home)) for c in (['codex', 'claude', 'opencode'] if args.component == 'all' else [args.component])]
+    plans = []
+    for c in (['codex', 'claude', 'opencode'] if args.component == 'all' else [args.component]):
+        record = load_record(c, args.home)
+        plans.append((c, record, *desired(c, args.home, record)))
     ok = True
-    for component, directory, outputs in plans:
+    for component, record, directory, outputs, settings in plans:
+        for document in settings:
+            for path in document.removed:
+                key = '.'.join(path)
+                if args.check:
+                    print(f'CHECK: {key} left the portable settings but is still set in {document.target}')
+                else:
+                    print(f'{"would remove" if args.dry_run else "removed"} retired key {key} from {document.target}')
+            if not args.check:
+                for path in sorted(set(document.conflicts) - document.conflicts_before):
+                    print(f'kept (edited since dotfiles wrote it): {".".join(path)} in {document.target}')
         for path, data, mode in outputs:
             if args.check:
                 matches = path.is_file() and path.read_bytes() == data
@@ -186,6 +251,17 @@ def main():
                     ok = (not stale) and ok
             else:
                 retire(path, digest, directory / 'backups', args.dry_run)
+        if not args.check and not args.dry_run:
+            updated = dict(record)
+            updated.update({str(d.target): d.record() for d in settings})
+            if updated != record:
+                text = json.dumps({'schema': 1, 'files': updated}, indent=2, sort_keys=True, default=str) + '\n'
+                path = record_path(component, args.home)
+                path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+                fd, staged = tempfile.mkstemp(dir=path.parent, prefix=path.name + '.')
+                with os.fdopen(fd, 'w') as handle:
+                    handle.write(text)
+                os.replace(staged, path)
         if args.check and args.plugins and component != 'opencode':
             ok = check_plugin(component, directory) and ok
         if component == 'claude':

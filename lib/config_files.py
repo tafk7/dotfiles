@@ -91,6 +91,48 @@ def equivalent(a, b):
     return type(a) is type(b) and a == b
 
 
+def leaves(node, path=()):
+    """A document's leaves, {path tuple: value}; lists and empty tables are leaves."""
+    out = {}
+    for key, value in node.items():
+        if isinstance(value, dict) and value:
+            out.update(leaves(value, (*path, key)))
+        else:
+            out[(*path, key)] = value
+    return out
+
+
+def retire_leaves(data, applied, overlay):
+    """Remove from data each leaf dotfiles applied before (applied: {path:
+    value}) that overlay no longer has, when data still holds that value.
+    Tables the removal leaves empty go too. Returns (data, removed, kept): the
+    paths removed, and those kept because data holds another value."""
+    data, current = deepcopy(data), leaves(overlay)
+    removed, kept = [], []
+    for path, value in applied.items():
+        if path in current or any(path[:i] in current for i in range(1, len(path))):
+            continue
+        parents, node = [], data
+        for key in path[:-1]:
+            if not isinstance(node, dict) or not isinstance(node.get(key), dict):
+                node = None
+                break
+            parents.append((node, key))
+            node = node[key]
+        if not isinstance(node, dict) or path[-1] not in node:
+            continue
+        if not equivalent(node[path[-1]], value):
+            kept.append(path)
+            continue
+        del node[path[-1]]
+        removed.append(path)
+        for parent, key in reversed(parents):
+            if parent[key]:
+                break
+            del parent[key]
+    return data, removed, kept
+
+
 def reconcile_toml(text, overlay, remove=(), header=''):
     original = tomllib.loads(text)
     data = deepcopy(original)

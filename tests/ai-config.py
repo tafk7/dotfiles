@@ -190,6 +190,55 @@ command = "second"
         data['emoji 🔧'] = 'control \x7f and 🔧'
         self.assertTrue(equivalent(data, tomllib.loads(dump_toml(data))))
 
+    def test_retired_keys_are_removed_only_when_unedited(self):
+        self.run_config()
+        record_path = self.home / '.local/state/dotfiles/ai/claude.json'
+        record = json.loads(record_path.read_text())
+        claude = self.home / '.claude/settings.json'
+        entry = record['files'][str(claude)]
+        # Keys a previous checkout applied and this one no longer ships.
+        entry['applied'] += [[['env', 'OLD_DOTFILES'], '1'], [['oldTable', 'nested'], 'v'], [['edited'], 'a']]
+        record_path.write_text(json.dumps(record))
+        data = json.loads(claude.read_text())
+        data['env']['OLD_DOTFILES'] = '1'
+        data['oldTable'] = {'nested': 'v'}
+        data['edited'] = 'b'
+        data['unrelated'] = {'keep': True}
+        claude.write_text(json.dumps(data))
+
+        result = self.run_config('claude', '--check', ok=False)
+        self.assertIn('CHECK: env.OLD_DOTFILES left the portable settings', result.stdout)
+        before = claude.read_bytes()
+        result = self.run_config('claude', '--dry-run')
+        self.assertIn('would remove retired key oldTable.nested', result.stdout)
+        self.assertEqual(claude.read_bytes(), before)
+
+        result = self.run_config('claude')
+        data = json.loads(claude.read_text())
+        self.assertNotIn('OLD_DOTFILES', data['env'])
+        self.assertNotIn('oldTable', data, 'a table left empty by the removal was kept')
+        self.assertEqual(data['edited'], 'b')
+        self.assertEqual(data['unrelated'], {'keep': True})
+        self.assertIn('kept (edited since dotfiles wrote it): edited', result.stdout)
+        # The edited key is reported once, and the result is converged.
+        result = self.run_config('claude')
+        self.assertNotIn('kept (edited', result.stdout)
+        self.run_config('claude', '--check')
+        conflicts = json.loads(record_path.read_text())['files'][str(claude)]['conflicts']
+        self.assertEqual(conflicts, [['edited']])
+
+    def test_retired_toml_keys_are_removed(self):
+        self.run_config('codex')
+        record_path = self.home / '.local/state/dotfiles/ai/codex.json'
+        record = json.loads(record_path.read_text())
+        codex = self.home / '.codex/config.toml'
+        record['files'][str(codex)]['applied'].append([['old_codex_key'], 'x'])
+        record_path.write_text(json.dumps(record))
+        codex.write_text('old_codex_key = "x"\n' + codex.read_text())
+        self.assertEqual(tomllib.loads(codex.read_text())['old_codex_key'], 'x')
+        self.run_config('codex')
+        self.assertNotIn('old_codex_key', tomllib.loads(codex.read_text()))
+
     def test_retired_files_are_removed_only_when_unmodified(self):
         retired = json.loads((ROOT / 'configs/ai/retired.json').read_text())['claude']
         clean = self.put('.claude/skills/viz/SKILL.md', 'x')
