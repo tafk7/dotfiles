@@ -45,6 +45,8 @@ grep -Fxq "plugin marketplace add $ROOT" "$TEST_ROOT/plugin.log" && grep -Fxq "p
     || fail "the badge was not registered with the external Claude: $(<"$TEST_ROOT/plugin.log")"
 grep -Fxq "plugin update agent-badge@tafk7" "$TEST_ROOT/plugin.log" \
     || fail "the stale badge plugin was not updated: $(<"$TEST_ROOT/plugin.log")"
+# Running sessions keep the plugin they loaded: the update is a change event.
+[[ "$(change_line claude | cut -f3)" == "agent-badge plugin updated" ]] || fail "no change event for the badge: $(change_line claude)"
 
 # A failed install step gets no configuration.
 rm -f "$TEST_ROOT/plugin.log" "$HOME/.claude/settings.json"

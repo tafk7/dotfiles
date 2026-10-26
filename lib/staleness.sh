@@ -78,7 +78,8 @@ staleness_report() {
         [[ -n "$event" ]] || continue
         found=()
         for proc in /proc/[0-9]*; do
-            IFS= read -r name < "$proc/comm" 2>/dev/null || continue
+            # A process can exit between the glob and the read.
+            { IFS= read -r name < "$proc/comm"; } 2>/dev/null || continue
             [[ "$name" == "$comm" || ( "$comm" == *: && "$name" == "$comm"* ) ]] || continue
             start="$(proc_start_epoch "${proc#/proc/}" 2>/dev/null)" || continue
             (( start < event )) && found+=("${proc#/proc/}")
