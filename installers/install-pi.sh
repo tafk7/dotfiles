@@ -20,7 +20,9 @@ source "$DOTFILES_DIR/lib/install.sh"
 if [[ "${1:-}" == --observe ]]; then observe_component pi; exit; fi
 
 FORCE=false
+UPDATE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
+[[ "${1:-}" == "--update" ]] && UPDATE=true
 
 PI_PACKAGE="@earendil-works/pi-coding-agent"
 PI_NODE_MIN="22.19.0"                       # package.json engines.node
@@ -55,6 +57,16 @@ require_node() {
         exit 1
     fi
 }
+
+# --update (setup --upgrade): Pi's own updater, for the Pi installed here.
+if [[ "$UPDATE" == true && -x "$PI_REAL" ]] && "$PI_REAL" --version >/dev/null 2>&1; then
+    before="$("$PI_REAL" --version 2>/dev/null | head -n1)"
+    "$PI_REAL" update || { error "pi update failed"; exit 1; }
+    after="$("$PI_REAL" --version 2>/dev/null | head -n1)"
+    [[ "$after" != "$before" ]] || { success "Pi is current ($after)"; exit 2; }
+    success "Pi updated: $before -> $after"
+    exit 0
+fi
 
 # Verify by absolute path: on a fresh machine ~/.local/bin is not guaranteed to
 # be on the installer process's PATH.

@@ -11,7 +11,8 @@ source "$DOTFILES_DIR/lib/install.sh"
 # before any provisioning below (lib/observe.sh).
 if [[ "${1:-}" == --observe ]]; then observe_component opencode; exit; fi
 FORCE=false
-[[ "${1:-}" == --force ]] && FORCE=true
+# --update (setup --upgrade) runs the official installer as --force does.
+[[ "${1:-}" == --force || "${1:-}" == --update ]] && FORCE=true
 OPENCODE_REAL="$HOME/.opencode/bin/opencode"
 OPENCODE_LINK="$HOME/.local/bin/opencode"
 

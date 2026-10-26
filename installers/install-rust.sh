@@ -19,7 +19,9 @@ source "$DOTFILES_DIR/lib/install.sh"
 if [[ "${1:-}" == --observe ]]; then observe_component rust; exit; fi
 
 FORCE=false
+UPDATE=false
 [[ "${1:-}" == "--force" ]] && FORCE=true
+[[ "${1:-}" == "--update" ]] && UPDATE=true
 
 export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
@@ -42,6 +44,11 @@ if [[ -x "$RUSTUP_BIN" ]] && rustup_neutral --version >/dev/null 2>&1; then
     if [[ "$FORCE" != true && "$owner" != dotfiles ]]; then
         log "Preserving the toolchains of a rustup dotfiles does not own; --force adopts it"
         exit 2
+    fi
+    # --update (setup --upgrade): rustup itself is vendor-updated; the
+    # toolchain moves only with the pin.
+    if [[ "$UPDATE" == true && "$owner" == dotfiles ]]; then
+        rustup_neutral self update || { error "rustup self update failed"; exit 1; }
     fi
     current="$(default_toolchain)"
     if [[ "$current" == "$TOOLCHAIN" ]]; then

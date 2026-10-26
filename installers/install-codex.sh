@@ -14,7 +14,8 @@ source "$DOTFILES_DIR/lib/install.sh"
 if [[ "${1:-}" == --observe ]]; then observe_component codex; exit; fi
 
 FORCE=false
-[[ "${1:-}" == "--force" ]] && FORCE=true
+# --update (setup --upgrade) runs the official installer as --force does.
+[[ "${1:-}" == "--force" || "${1:-}" == "--update" ]] && FORCE=true
 
 # The official standalone installer owns this launcher and the release tree
 # under ~/.codex/packages/standalone. Dotfiles owns configuration, plugins and

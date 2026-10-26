@@ -32,8 +32,8 @@ automatic updater and makes `$.http.fetch` fail in Claude Code mods (use
 new releases and never shares sessions: its own updater reruns the upstream
 installer without `--no-modify-path`, which would append to the repo-owned
 `~/.bashrc`. Use `bin/ai-update claude`, `codex` or `opencode` to update
-explicitly through the official installer's `--force` path, followed by the
-CLI's configure steps.
+explicitly: it runs `setup.sh --CLI --only CLI --upgrade`, the official
+installer's update path followed by the CLI's configure steps.
 
 Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
 not part of the installers: setup runs them after each selected AI CLI's
