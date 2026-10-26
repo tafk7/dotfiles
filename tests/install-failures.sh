@@ -74,8 +74,9 @@ assert_eq "$path" "$HOME/.local/share/claude/versions/2" "self-updated claude pa
     dpkg() { printf 'amd64\n'; }
     failing=""
     safe_sudo() {
-        if [[ "$1" == "$failing" ]]; then cat >/dev/null; return 1; fi
+        # Only tee reads stdin; draining it for any other command would block.
         [[ "$1" != tee ]] || cat >/dev/null
+        [[ "$1" != "$failing" ]]
     }
     failing="chmod"
     if ensure_docker_repo >/dev/null 2>&1; then fail "Docker keyring permission failure was ignored"; fi

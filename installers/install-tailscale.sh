@@ -27,8 +27,7 @@ if [[ "${DRY_RUN:-false}" == true ]]; then
 fi
 
 if [[ "$FORCE" != true ]] && command -v tailscale >/dev/null 2>&1 \
-   && dpkg-query -W tailscale >/dev/null 2>&1 \
-   && { ! host_systemd_running || systemctl is-active --quiet tailscaled 2>/dev/null; }; then
+   && dpkg-query -W tailscale >/dev/null 2>&1; then
     success "Tailscale already installed"
     exit 2
 fi
@@ -73,11 +72,7 @@ else
 fi
 command -v tailscale >/dev/null 2>&1 && command -v tailscaled >/dev/null 2>&1 \
     || { error "tailscale package installed but its client/daemon executables are unavailable"; exit 1; }
-if host_systemd_running; then
-    safe_sudo systemctl enable --now tailscaled \
-        || { error "Tailscale installed but tailscaled could not be enabled/started"; exit 1; }
-else
-    warn "Tailscale installed; systemd is unavailable, so tailscaled was not enabled"
-fi
+# tailscaled is enabled by a configure step (lib/configure.sh), which leaves a
+# masked unit alone.
 success "Tailscale installed; enroll manually with 'sudo tailscale up'"
 exit 0

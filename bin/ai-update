@@ -1,9 +1,20 @@
 #!/bin/bash
-# Explicit native CLI update/repair; does not change the traffic policy.
+# Explicit native CLI update/repair; does not change the traffic policy. The
+# CLI's configure steps (settings, agent-badge) run after it, as in setup.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
     -h|--help) echo "Usage: ai-update claude|codex|opencode"; exit 0 ;;
-    claude|codex|opencode) exec "$ROOT/installers/install-$1.sh" --force ;;
+    claude|codex|opencode) ;;
     *) echo 'Usage: ai-update claude|codex|opencode' >&2; exit 64 ;;
 esac
+# shellcheck source=../lib/operation.sh
+source "$ROOT/lib/operation.sh"
+operation_begin "$ROOT/bin/ai-update" "$@"
+rc=0
+"$ROOT/installers/install-$1.sh" --force || rc=$?
+(( rc == 0 || rc == 2 )) || exit "$rc"
+DOTFILES_DIR="$ROOT"
+# shellcheck source=../lib/install.sh
+source "$ROOT/lib/install.sh"
+configure_component "$1"

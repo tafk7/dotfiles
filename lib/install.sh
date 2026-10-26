@@ -12,6 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/work-host.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/observe.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/configure.sh"
 
 # Backups are machine state, not repository content.
 DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
@@ -1311,6 +1312,7 @@ configure_docker_host_access() {
             safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
         fi
     fi
+    return 0
 }
 
 # KVM access for local sandboxes, where sbx applies.
@@ -1364,6 +1366,7 @@ use_default_node() {
         PATH="$HOME/.nvm/default/bin:$PATH"
         export PATH
     fi
+    return 0
 }
 
 # install_selection: install every selected entry of the registry's install
@@ -1371,10 +1374,10 @@ use_default_node() {
 # package_set_selected SET (setup.sh). eget tools install in one batch at the
 # first one's place; a component whose need failed in this run is not
 # attempted; one that does not apply here is recorded as not applicable; each
-# applicable component's configure steps run after its install step,
-# whatever it did, and only warn.
+# applicable component's configure steps run after its install step installed
+# it or found it present, its own or external (lib/configure.sh).
 install_selection() {
-    local entry kind need needs step failed=false eget_done=false
+    local entry kind need needs failed=false eget_done=false
     local -a eget_tools=() failed_here=()
     for entry in "${REGISTRY_ORDER[@]}"; do
         [[ "$entry" != packages:* && "${TOOL_INSTALL[$entry]}" == eget ]] || continue
@@ -1418,9 +1421,7 @@ install_selection() {
             packages:*) ;;
             function:*) "${kind#function:}" || { failed=true; failed_here+=("$entry"); } ;;
         esac
-        for step in ${TOOL_CONFIGURE[$entry]:-}; do
-            "$step" || true
-        done
+        [[ " ${failed_here[*]-} " == *" $entry "* ]] || configure_component "$entry" || failed=true
     done
     [[ "$failed" == false ]]
 }

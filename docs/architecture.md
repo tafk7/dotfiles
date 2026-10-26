@@ -196,6 +196,7 @@ lib/operation.sh               the operation lock
 lib/outcomes.sh                outcome records and exit precedence
 lib/observe.sh                 side-effect-free component observation
 lib/install.sh                 host mutation used by setup and installers
+lib/configure.sh               configure steps: settings, plugins, services
 lib/work-host.sh               read-only work-host probes
 installers/                    component-specific installation
 configs/                       tracked configuration sources
