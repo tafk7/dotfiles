@@ -63,58 +63,60 @@ user's decision, 2026-10-26).
 
 ## Waiting on the user
 
+- **Push and merge.** The branch is unpushed; this machine's `main` runs it
+  locally, ahead of `origin/main`.
 - **The schedule (4.3).** A scheduled Claude job runs against the GitHub
-  repository, so it needs this branch on `main` there first, which means
-  pushing. Then the schedule (monthly review, weekly security check) is
-  created and one manual run on a branch is checked for a reviewable pull
-  request. Each of these steps waits for the user's go-ahead.
-- **Adoption** on this machine, below.
+  repository, so it needs this branch on `main` there first. Then the
+  schedule (monthly review, weekly security check) is created and one manual
+  run on a branch is checked for a reviewable pull request. Each step waits
+  for the user's go-ahead.
+- **AI settings per machine:** [ai-settings-per-machine.md](ai-settings-per-machine.md),
+  on hold while research runs.
 
-## Adoption on this machine (after the plan is complete)
+## Follow-ups
 
-1. Nothing moves to `~/.shell.env` here: `~/.shell.local` sets only
-   `CLAUDE_FLAGS`, which the interactive `claude` wrapper reads, and
-   `PROJECTS_DIRS` and `EDITOR` are the repo defaults.
-2. Fast-forward `main` with git (main has no `dotfiles update`).
+- `tests/tmux-compose-claude.sh` can leave `nvim --embed` servers behind when
+  its cleanup races, and they ignore SIGTERM; three were left on this host
+  (killed with SIGKILL on 2026-10-26).
+- `dotfiles profile --propose` reads ownership from the ledger an older
+  checkout wrote: Docker and Tailscale were recorded external though both
+  are APT packages from their vendors' repositories, so `tail` was not
+  proposed. Proposing from observations would fix it.
+
+## Adopting a machine
+
+This machine was adopted on 2026-10-26 (profile: tier work, all AI CLIs; the
+dev tier's Neovim plugins; rustup left external; tailscaled left masked).
+Left on it: pick up the commits since with a fast-forward and `dotfiles
+apply`, settle Codex's settings (above), and start the agents.
+
+The steps, for the next machine:
+
+1. Move environment that agents and tmux need (anything set in
+   `~/.shell.local` that is not interactive-only) to `~/.shell.env`.
+2. Fast-forward `main` with git (an older checkout has no `dotfiles update`).
 3. `dotfiles profile --propose`, then confirm. It reads only ledger rows
-   dotfiles or the package manager installed, so here it proposes tier work and
-   all AI tools, without `tail` or `gcloud` (recorded external); add what is
-   wanted (`--add tail`, opt-outs) with `--no-apply`.
+   dotfiles or the package manager installed; add what is wanted (`--add
+   tail`, opt-outs) with `--no-apply`.
 4. `dotfiles apply --dry-run`, review, then `dotfiles apply` in a terminal (the
-   sbx hold question needs one on machines main set up; it ends with a refresh
-   of the tmux server, which clears the guards from its global environment).
+   sbx hold question needs one on machines an older checkout set up; it ends
+   with a refresh of the tmux server, which clears the guards from its global
+   environment).
 5. Adopt rustup if wanted: `dotfiles apply --only rust --reinstall=rust`.
-6. Replace every shell started before the pull: they have no load records,
-   and a git pull records no change event, so nothing lists them. In those
-   shells `reload` is still the old soft one: run it twice (the first defines
-   the new one). A plain `exec "$SHELL" -l` is not enough: the new shell
-   inherits the exported load guards and keeps the old environment.
+6. Replace every shell and agent started before the pull: shells have no load
+   records, and a git pull records no change event, so nothing lists them.
+   Restarting the tmux server is simplest. In a shell kept, `reload` is still
+   the old soft one: run it twice (the first defines the new one). A plain
+   `exec "$SHELL" -l` is not enough: the new shell inherits the exported load
+   guards and keeps the old environment. Codex's app-server daemon outlives
+   tmux: `codex app-server daemon restart`.
 7. `dotfiles verify -v`.
 
-Other machines main set up: main's sbx installer held docker-sbx at 0.46.0
-without a receipt, so the first apply asks once whether to adopt the hold.
-Components recorded `unknown` (present before the ledger) are preserved and
-not pinned until adopted with `--reinstall=NAME`. Global npm packages stay
-with the previous Node release; the installer names them.
-
-What the first apply will change here, from read-only checks:
-
-- `gdu` and `starship` are their pinned versions but other builds than the
-  locked assets (installed before the lock existed); they are replaced. The
-  lock's digests were confirmed against fresh downloads.
-- Node becomes 24.22.1 as NVM's default (24.21.0 stays installed), and npm
-  moves from 12.0.2 back to the bundled 11.19.1.
-- rustup is recorded as `unknown` ownership, so the toolchain stays on
-  `stable` until it is adopted: `dotfiles apply --only rust --reinstall=rust`.
-- docker-sbx 0.49.2 is installed and not held; apply holds it (no existing
-  hold to adopt).
-- tailscaled is masked deliberately until a vulnerability is patched; apply
-  leaves it masked, and `dotfiles verify` reports it as a health finding.
-- The Claude agent-badge plugin is behind this checkout; apply updates it.
-  `ai-config --check` also reports drift in `~/.codex/config.toml`.
-- The `sbx-kits` buildx builder exists (inactive). With Docker's containerd
-  image store, sbx 0.49.2 builds kits with the host's Docker; whether it still
-  needs `sbx-kits` elsewhere is unchecked.
+An older checkout held docker-sbx at 0.46.0 without a receipt, so the first
+apply asks once whether to adopt the hold. Components recorded `unknown`
+(present before the ledger) are preserved and not pinned until adopted with
+`--reinstall=NAME`. Global npm packages stay with the previous Node release;
+the installer names them.
 
 ## Deviations from the plan
 
