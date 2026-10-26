@@ -1,6 +1,7 @@
 # Setup redesign: implementation status
 
-Phases 0 to 2 are done; Phase 3 is next. The [plan](setup-update-plan.md)
+Every step is implemented except the end of 4.3: creating the schedule and
+its trial run wait on the user. The [plan](setup-update-plan.md)
 and [design](setup-update-redesign.md) are unchanged except as noted under
 Deviations. Adoption on this machine waits until the whole plan is done (the
 user's decision, 2026-10-26).
@@ -50,13 +51,24 @@ user's decision, 2026-10-26).
 | 2.7 | `deployed.tsv`; retirement of configs whose source left the manifest; gitconfig content check; honest `diff-config` |
 | 2.8 | Three-way retirement of AI settings keys, with conflicts remembered |
 | 2.9 | Editor plugins under the profile; vim-plug and plugins at their pins |
+| 3.1 | Environment producer (`lib/env-producer.sh`, `lib/environment.sh`): owned and respected variables, PATH segments |
+| 3.2 | tmux refresh: one server's environment, guards, PATH segments, session overrides reported, config, badge, theme, version check |
+| 3.3 | Staleness: change events (`changes.tsv`), shell load records under `$XDG_RUNTIME_DIR`, process scan; verify's Running section |
+| 3.4 | `dotfiles refresh`; one refresh at the end of every apply (`--no-refresh`) |
+| 3.5 | `--upgrade`: APT only-upgrade with apt's simulated plan, held packages skipped; vendor updaters and `rustup self update`; `ai-update` wraps setup |
+| 3.6 | Full update proven end to end (pin bump and environment change against a local remote) |
+| 4.1 | `dotfiles bump` with a handler per kind of pin, both architectures, 14-day cool-down; the lock generator moved to `lib/lockgen.py` |
+| 4.2 | `check-updates` covers every pin, with advisories, JSON, records, exit codes |
+| 4.3 | The review prompt (`maintenance/dependency-review.md`); the schedule waits on the user |
 
-## Next
+## Waiting on the user
 
-Phase 3 (environment producer, tmux refresh, staleness, `dotfiles refresh`,
-`--upgrade`, full update), then Phase 4 (bump, check-updates coverage, the
-scheduled review, which needs the user's confirmation before the schedule is
-created).
+- **The schedule (4.3).** A scheduled Claude job runs against the GitHub
+  repository, so it needs this branch on `main` there first, which means
+  pushing. Then the schedule (monthly review, weekly security check) is
+  created and one manual run on a branch is checked for a reviewable pull
+  request. Each of these steps waits for the user's go-ahead.
+- **Adoption** on this machine, below.
 
 ## Adoption on this machine (after the plan is complete)
 
@@ -64,8 +76,11 @@ created).
 2. Move `PROJECTS_DIRS` (and any `EDITOR`) from `~/.shell.local` to
    `~/.shell.env`.
 3. `dotfiles profile --propose`, then confirm (add `editor-plugins` if wanted).
-4. `dotfiles apply --dry-run`, review, then `dotfiles apply`.
-5. Restart the tmux server once.
+4. `dotfiles apply --dry-run`, review, then `dotfiles apply` (it ends with a
+   refresh of the tmux server).
+5. Restart the tmux server once, so its own process drops the inherited
+   guards; then `reload` (or reopen) shells that `dotfiles verify` lists as
+   stale.
 6. `dotfiles verify -v`.
 
 What the first apply will change here, from read-only checks:
