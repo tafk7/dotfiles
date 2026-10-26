@@ -73,6 +73,10 @@ to an advisory affecting the pin), edits files, and never commits. An sbx bump
 needs the kits rebuilt. Direct `eget --download-all` bypasses platform/tier
 selection, ownership recording, companion handling, and staged replacement.
 
+A scheduled Claude job keeps the pins current: a monthly review and a weekly
+security check, both opening a pull request for the owner to merge. Its prompt
+is [maintenance/dependency-review.md](../maintenance/dependency-review.md).
+
 `check-updates` covers every row of `versions.lock` and every Neovim plugin
 pin, with the advisories published since each pinned release (GitHub
 repository advisories, Node security releases). It exits 1 for failed lookups,
