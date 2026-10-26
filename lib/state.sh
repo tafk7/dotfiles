@@ -12,6 +12,7 @@ DOTFILES_LEDGER_FILE="$DOTFILES_STATE_DIR/components.tsv"
 DOTFILES_JOURNAL_FILE="$DOTFILES_STATE_DIR/transaction.tsv"
 DOTFILES_JOURNAL_DIR="$DOTFILES_STATE_DIR/transactions"
 DOTFILES_THEME_STATE_FILE="$DOTFILES_STATE_DIR/theme.tsv"
+DOTFILES_HOLDS_FILE="$DOTFILES_STATE_DIR/holds.tsv"
 DOTFILES_STATE_LOCK="$DOTFILES_STATE_DIR/.lock"
 
 _state_error() { printf 'Error: %s\n' "$*" >&2; }
@@ -47,7 +48,8 @@ state_validate() {
     local journal
     _state_validate_file "$DOTFILES_PREFERENCES_FILE" preferences 2 &&
         _state_validate_file "$DOTFILES_LEDGER_FILE" ledger 8 &&
-        _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 || return 1
+        _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 &&
+        _state_validate_file "$DOTFILES_HOLDS_FILE" holds 4 || return 1
     while IFS= read -r journal; do
         _state_validate_file "$journal" journal 2 || return 1
     done < <(_journal_files)
@@ -406,6 +408,55 @@ journal_reconcile() {
     # A staged file a failed rename left beside the target is not the artifact.
     [[ "$staged_path" != "$new_path".dotfiles-new.* || ! -f "$staged_path" ]] || rm -f "$staged_path"
     journal_clear "$component"
+}
+
+# APT hold receipts: setup moves only the holds it placed, or was told to
+# adopt; a refusal to adopt is remembered so it is asked once. Columns:
+# package, version, status (placed | adopted | declined), time.
+hold_record() {
+    local package="$1" version="$2" status="$3" now
+    _state_valid_atom "$package" || { _state_error "Invalid package name: $package"; return 1; }
+    case "$status" in placed|adopted|declined) ;; *) _state_error "Invalid hold status: $status"; return 1 ;; esac
+    version="$(_state_clean_field "$version")"
+    [[ "$(hold_line "$package" 2>/dev/null | cut -f1-3)" != "$package"$'\t'"$version"$'\t'"$status" ]] || return 0
+    now="$(date +%s)"
+    (
+        _state_lock_acquire || exit 1
+        trap _state_lock_release EXIT INT TERM
+        _state_validate_file "$DOTFILES_HOLDS_FILE" holds 4 || exit 1
+        local staged
+        staged="$(mktemp "$DOTFILES_STATE_DIR/holds.tsv.tmp.XXXXXX")" || exit 1
+        {
+            printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA"
+            if [[ -f "$DOTFILES_HOLDS_FILE" ]]; then
+                awk -F '\t' -v key="$package" 'NR > 1 && $1 != key { print }' "$DOTFILES_HOLDS_FILE"
+            fi
+            printf '%s\t%s\t%s\t%s\n' "$package" "$version" "$status" "$now"
+        } > "$staged" || exit 1
+        _state_commit_file "$staged" "$DOTFILES_HOLDS_FILE"
+    )
+}
+
+hold_line() {
+    local package="$1"
+    _state_validate_file "$DOTFILES_HOLDS_FILE" holds 4 || return 1
+    [[ -f "$DOTFILES_HOLDS_FILE" ]] || return 1
+    awk -F '\t' -v key="$package" 'NR > 1 && $1 == key { print; found=1 } END { exit found ? 0 : 1 }' "$DOTFILES_HOLDS_FILE"
+}
+
+# The receipt's status for PACKAGE (placed, adopted, declined), or nothing.
+hold_status() {
+    hold_line "$1" 2>/dev/null | cut -f3
+}
+
+# Whether dotfiles may move PACKAGE's hold: it placed or adopted it.
+hold_owned() {
+    case "$(hold_status "$1")" in placed|adopted) return 0 ;; *) return 1 ;; esac
+}
+
+# Whether dpkg holds PACKAGE (read-only; no root needed).
+apt_package_held() {
+    [[ "$(dpkg-query -W -f='${db:Status-Want}' "$1" 2>/dev/null)" == hold ]]
 }
 
 record_install_path() {

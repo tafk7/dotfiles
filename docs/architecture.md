@@ -89,6 +89,8 @@ Durable state lives under
 - `components.tsv`: observed component status, ownership, version, path, and
   update contract;
 - `theme.tsv`: global theme selection;
+- `holds.tsv`: receipts for the APT holds setup placed or adopted (sbx), and a
+  remembered refusal to adopt someone else's;
 - `install-path`: fallback checkout discovery for flattened deployments;
 - `transactions/`: one journal per interrupted artifact replacement;
 - `operation.lock`: the lock a state-changing command holds, with its run id;

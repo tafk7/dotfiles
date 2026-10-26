@@ -14,15 +14,18 @@ export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
 source "$ROOT/lib/install.sh"
 mkdir -p "$TEST_ROOT/bin"
 
-# --- NVM: installed once, never damaged by a failed update, and only from the
-# locked install.sh.
+# --- NVM: installed at the pin, moved with it when dotfiles owns it, never
+# damaged by a failed update, and only from the locked install.sh.
 nvm_installer="$TEST_ROOT/nvm-install.sh"
 cat > "$nvm_installer" <<'EOF'
 #!/bin/sh
 set -eu
 mkdir -p "$NVM_DIR"
 cp "$NVM_FIXTURE" "$NVM_DIR/nvm.sh"
+printf '{\n  "version": "%s"\n}\n' "$FAKE_NVM_VERSION" > "$NVM_DIR/package.json"
+echo ran >> "$NVM_DIR/installer-runs"
 EOF
+export FAKE_NVM_VERSION="$NVM_VERSION"
 chmod +x "$nvm_installer"
 # The fake nvm installs the fixture Node release with its bundled npm, whose
 # npm can be upgraded independently, and records what it was asked.
@@ -52,10 +55,26 @@ EOF
 printf '#!/bin/sh\necho v24.22.1\n' > "$NODE_FIXTURE"
 chmod +x "$NODE_FIXTURE" "$NPM_FIXTURE"
 
-DOTFILES_NVM_INSTALLER_SCRIPT="$nvm_installer" "$ROOT/installers/install-nvm.sh" >/dev/null
+nvm_install() { local rc=0; DOTFILES_NVM_INSTALLER_SCRIPT="$nvm_installer" "$ROOT/installers/install-nvm.sh" >/dev/null || rc=$?; NVM_RC=$rc; }
+nvm_install
+assert_eq "$NVM_RC" 0 "NVM install"
 [[ -s "$HOME/.nvm/nvm.sh" && ! -e "$HOME/.nvm/versions" ]] || fail "NVM install (without Node)"
-rc=0; DOTFILES_NVM_INSTALLER_SCRIPT="$nvm_installer" "$ROOT/installers/install-nvm.sh" >/dev/null || rc=$?
-assert_eq "$rc" 2 "an installed NVM"
+# An NVM dotfiles does not own stays as it is, even off the pin.
+printf '{\n  "version": "0.39.0"\n}\n' > "$HOME/.nvm/package.json"
+nvm_install
+assert_eq "$NVM_RC/$(wc -l < "$HOME/.nvm/installer-runs")" "2/1" "an unowned NVM"
+# An owned NVM off the pin is moved to it; at the pin, nothing runs.
+ledger_record nvm yes dotfiles installed - "$HOME/.nvm" test
+nvm_install
+assert_eq "$NVM_RC/$(wc -l < "$HOME/.nvm/installer-runs")" "0/2" "an owned NVM off the pin"
+grep -q "\"$NVM_VERSION\"" "$HOME/.nvm/package.json" || fail "NVM was not moved to the pin"
+nvm_install
+assert_eq "$NVM_RC/$(wc -l < "$HOME/.nvm/installer-runs")" "2/2" "an NVM at the pin"
+# An installer that leaves another version is a failure.
+printf '{\n  "version": "0.39.0"\n}\n' > "$HOME/.nvm/package.json"
+FAKE_NVM_VERSION=0.39.1 nvm_install
+assert_eq "$NVM_RC" 1 "an NVM installer that missed the pin"
+nvm_install
 
 cp "$HOME/.nvm/nvm.sh" "$TEST_ROOT/nvm.sh.good"
 printf '# working nvm\n' >> "$HOME/.nvm/nvm.sh"
@@ -85,6 +104,7 @@ node_dir="$HOME/.nvm/versions/node/v24.22.1"
 node_installer() { local rc=0; "$ROOT/installers/install-node.sh" > "$TEST_ROOT/node-out" 2>&1 || rc=$?; NODE_RC=$rc; }
 
 # Under an NVM dotfiles does not own, Node is left alone.
+ledger_record nvm yes unknown present - "$HOME/.nvm" test
 node_installer
 assert_eq "$NODE_RC" 2 "Node under an unowned NVM: $(<"$TEST_ROOT/node-out")"
 [[ ! -e "$NVM_LOG" ]] || fail "Node was installed under an unowned NVM"

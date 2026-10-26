@@ -181,7 +181,7 @@ work_verify_checks() {
             local sbx_version
             sbx_version="$(work_sbx_version)"
             if [[ -n "${SBX_VERSION:-}" && -n "$sbx_version" && "$sbx_version" != "$SBX_VERSION" ]]; then
-                check_warn "sbx $sbx_version differs from the pinned $SBX_VERSION (./setup.sh --work --force)"
+                check_warn "sbx $sbx_version differs from the pinned $SBX_VERSION (./setup.sh --work moves a hold dotfiles owns)"
             fi
         else "$fail_fn" "sbx package present but executable health failed"; fi
     else
