@@ -125,8 +125,19 @@ ownership roots, update contract, uninstall paths where automated removal is
 safe, and removal notes. Defaults follow from the method, so a typical eget tool
 needs no overrides. The tables are parsed once into `TOOL_*` arrays.
 The tier records only cumulative membership. Composable, comma-separated
-capabilities record AI, RDP, Tailscale, and cloud membership. Docker and sbx are
-ordinary work-tier components.
+capabilities record AI, RDP, Tailscale, and cloud membership; the capability
+table defines each one's flag, preflight requirements, label, and help. Docker
+and sbx are ordinary work-tier components.
+
+Overrides also give each component its `needs` (components or package sets
+that must come first), its `policy` (`converge` to the pin, `present` for
+package-manager versions, `vendor` for self-updating CLIs), how it installs,
+and its `configure` steps. Setup walks one explicit install order of
+components and package sets (a tier's APT packages), installing what the run
+selects: eget tools in one batch, a component not applicable here recorded as
+such, nothing attempted after one of its needs failed, and each component's
+configure steps after its install step. The parser rejects an order that
+misses a component or puts one before what it needs.
 
 Presence is checked by `tool_is_present` from a typed verify column (`command`,
 `runs`, `service-active`, `file-nonempty`, or a named predicate), never by

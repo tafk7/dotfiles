@@ -48,18 +48,19 @@ XDG_CONFIG_HOME="$custom/config" XDG_STATE_HOME="$custom/state" RUN_PATH="$TEST_
 
 source "$ROOT/setup.sh"
 
-# --- Per-tool AI selection installs exactly the named tools.
+# --- Per-tool AI selection selects and installs exactly the named tools.
 (
     parse_arguments --claude --opencode
     installed=""
     run_installer() { installed+=" $1"; }
     feature_enabled() { return 1; }
-    install_ai_selection >/dev/null
+    install_selection >/dev/null
     assert_eq "$installed" " claude opencode" "per-tool AI selection"
+    if component_selected codex || component_selected pi; then fail "a per-tool flag selected other AI CLIs"; fi
     SELECTED_CAPABILITIES=() SELECTED_AI_TOOLS=()
     parse_arguments --claude --ai
     installed=""
-    install_ai_selection >/dev/null
+    install_selection >/dev/null
     assert_eq "$installed" " claude codex opencode pi" "--ai with a per-tool flag"
 )
 

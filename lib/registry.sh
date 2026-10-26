@@ -16,6 +16,11 @@ declare -A TOOL_EGET_REPO=() TOOL_UPDATE_SOURCE=() TOOL_RELATIVE_BINARY=()
 declare -A TOOL_VERSION_FLAG=() TOOL_TIMEOUT=() TOOL_COMPANIONS=()
 declare -A TOOL_OWNERSHIP_ROOTS=() TOOL_UPDATE_CONTRACT=() TOOL_PATHS=()
 declare -A TOOL_REMOVAL_MODE=() TOOL_REMOVAL_REQUIRES_SUDO=() TOOL_REMOVAL_INSTRUCTIONS=()
+declare -A TOOL_NEEDS=() TOOL_POLICY=() TOOL_INSTALL=() TOOL_CONFIGURE=()
+# The install order (components and package sets), package sets' tiers, and
+# the orthogonal capabilities.
+declare -a REGISTRY_ORDER=() CAPABILITY_NAMES=()
+declare -A PACKAGE_SET_TIER=() CAPABILITY_REQUIRES=() CAPABILITY_LABEL=() CAPABILITY_HELP=()
 # Problems found while parsing; tests/registry.sh requires this to stay empty.
 declare -a REGISTRY_ERRORS=()
 
@@ -24,7 +29,8 @@ declare -a REGISTRY_ERRORS=()
 #   method        eget | apt | installer | external
 #   tier          minimum cumulative tier: bash | dev | work. Bash-tier tools
 #                 must install without root. Capability-only tools have none.
-#   capabilities  comma-separated orthogonal selections (see setup.sh)
+#   capabilities  comma-separated orthogonal selections (the capability
+#                 table below)
 #   platform      ubuntu (default; native Ubuntu and WSL) | native-ubuntu | wsl
 #   arches        comma-separated (default: x86_64,aarch64). Explicit so
 #                 selection-only CI can validate ARM without executing it.
@@ -97,7 +103,40 @@ aws-cli         aws             installer  -     aws           -              - 
 #   removal-mode           manual: show instructions instead of apt removal
 #   removal-requires-sudo  yes: uninstall elevates for the paths
 #   removal-instructions   human-readable removal steps or retained state
+#   needs                  comma-separated components or package sets
+#                          (packages:SET) that must come first in the install
+#                          order (default: eget for eget tools)
+#   policy                 converge: an owned install moves to its pin
+#                          (default for eget and installer tools); present:
+#                          installed, versions are the package manager's
+#                          (default for apt); vendor: installed, the vendor's
+#                          updater owns versions
+#   install                how setup installs it: eget (default for eget
+#                          tools, all in one batch), installer
+#                          (installers/install-NAME.sh; default otherwise),
+#                          packages:SET (by that package set; recorded only),
+#                          bootstrap (by the eget batch), or function:NAME
+#   configure              space-separated functions setup runs after the
+#                          install step when the component applies, whether
+#                          or not the install changed anything
 _REGISTRY_OVERRIDES="
+eget       install                bootstrap
+zsh        install                packages:dev
+zsh        needs                  packages:dev
+tmux       needs                  packages:dev
+docker     install                function:install_docker_engine
+docker     configure              configure_docker_host_access
+sbx        needs                  docker
+sbx        policy                 converge
+sbx        configure              configure_work_host ensure_sbx_kits_builder
+node       needs                  nvm
+node       configure              use_default_node
+claude     policy                 vendor
+codex      policy                 vendor
+opencode   policy                 vendor
+pi         policy                 vendor
+pi         needs                  node
+xrdp       install                function:install_rdp_packages
 gh         eget-repo              cli/cli
 harper-ls  eget-repo              Automattic/harper
 uv         companions             uvx
@@ -167,6 +206,44 @@ aws-cli    removal-requires-sudo  yes
 aws-cli    removal-instructions   $HOME/.aws credentials and configuration are preserved
 "
 
+# The install order. Setup installs the selected entries in this order: the
+# eget tools in one batch at the first one's place, package sets (apt packages
+# for a tier, before the components that need them), then components.
+_REGISTRY_ORDER="
+eget
+starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd
+shellcheck harper-ls wsl2-ssh-agent
+packages:dev zsh tmux neovim
+packages:work docker sbx nvm node rust
+jq claude codex opencode pi
+xrdp tailscale azure-cli gcloud aws-cli
+"
+
+# Package sets: apt packages a tier installs beyond its components
+# (install_package_set in lib/install.sh).
+#   set   tier
+_REGISTRY_PACKAGE_SETS="
+dev   dev
+work  work
+"
+
+# Orthogonal capabilities, in banner, install, and summary order:
+#   name|requirements|label|help
+# Requirements: ubuntu (a supported Ubuntu release), curl, apt (apt-get), sudo,
+# systemd (systemctl), and applicable (every registry component of the
+# capability must apply to this platform). A flag --NAME selects the
+# capability; ai also has per-tool flags. agent-badge is a capability of jq
+# only: a feature preference (--agent-badge / --no-agent-badge), not a
+# selection.
+_REGISTRY_CAPABILITIES="
+ai|curl|AI CLIs|Every AI CLI, into ~/.local/bin. Leave it off where an organization manages them; the shell shortcuts load either way.
+rdp|ubuntu apt sudo systemd|RDP server (xrdp)|The xrdp RDP server with an XFCE session. Never implied by --full, since it opens a listener: localhost:3390 on WSL, port 3389 elsewhere (keep it behind a VPN or firewall). See docs/history/xrdp-remote-desktop.md.
+tail|ubuntu curl apt sudo applicable|Tailscale|Tailscale and its systemd service. No enrollment, routes, SSH, or firewall changes.
+azure|ubuntu curl apt sudo applicable|Azure CLI|Azure CLI from Microsoft's signed APT repository. The Azure DevOps Git credential helper is parked; see bin/git-credential-azdo.
+gcloud|ubuntu curl apt sudo applicable|Google Cloud CLI|Google Cloud CLI from Google's signed APT repository.
+aws|ubuntu curl apt sudo applicable|AWS CLI v2|AWS CLI v2, the release versions.lock pins, signature-verified.
+"
+
 # Parsed in memory: `read` from a here-string or heredoc costs a syscall per
 # byte, which tripled the registry's load time. Splitting is deliberate, with
 # globbing off.
@@ -201,8 +278,13 @@ _registry_load() {
             eget)
                 TOOL_OWNERSHIP_ROOTS[$name]="$HOME/.local/bin"
                 TOOL_UPDATE_CONTRACT[$name]="staged-release"
+                TOOL_NEEDS[$name]=eget TOOL_POLICY[$name]=converge TOOL_INSTALL[$name]=eget
                 ;;
-            apt) TOOL_UPDATE_CONTRACT[$name]="apt-in-place" ;;
+            apt)
+                TOOL_UPDATE_CONTRACT[$name]="apt-in-place"
+                TOOL_POLICY[$name]=present TOOL_INSTALL[$name]=installer
+                ;;
+            *) TOOL_POLICY[$name]=converge TOOL_INSTALL[$name]=installer ;;
         esac
     done
 
@@ -228,13 +310,67 @@ _registry_load() {
             removal-mode) TOOL_REMOVAL_MODE[$name]="$value" ;;
             removal-requires-sudo) TOOL_REMOVAL_REQUIRES_SUDO[$name]="$value" ;;
             removal-instructions) TOOL_REMOVAL_INSTRUCTIONS[$name]="$value" ;;
+            needs) TOOL_NEEDS[$name]="$value" ;;
+            policy) TOOL_POLICY[$name]="$value" ;;
+            install) TOOL_INSTALL[$name]="$value" ;;
+            configure) TOOL_CONFIGURE[$name]="$value" ;;
             *) REGISTRY_ERRORS+=("$name: unknown field $field") ;;
+        esac
+    done
+
+    IFS=$'\n'; lines=($_REGISTRY_PACKAGE_SETS); IFS=$' \t\n'
+    for line in "${lines[@]}"; do
+        [[ "$line" == \#* ]] && continue
+        set -- $line
+        (( $# == 2 )) || { REGISTRY_ERRORS+=("incomplete package set: $line"); continue; }
+        PACKAGE_SET_TIER[$1]="$2"
+    done
+
+    IFS=$'\n'; lines=($_REGISTRY_CAPABILITIES); IFS=$' \t\n'
+    local capability requires label help
+    for line in "${lines[@]}"; do
+        [[ "$line" == \#* ]] && continue
+        IFS='|' read -r capability requires label help <<< "$line"
+        [[ -n "$label" ]] || { REGISTRY_ERRORS+=("incomplete capability: $line"); continue; }
+        CAPABILITY_NAMES+=("$capability")
+        CAPABILITY_REQUIRES[$capability]="$requires"
+        CAPABILITY_LABEL[$capability]="$label"
+        CAPABILITY_HELP[$capability]="$help"
+    done
+
+    # The order names every component and package set once, each after what it
+    # needs.
+    local -A position=()
+    local entry need index=0
+    for entry in $_REGISTRY_ORDER; do
+        [[ -z "${position[$entry]:-}" ]] || REGISTRY_ERRORS+=("$entry: listed twice in the install order")
+        if [[ "$entry" == packages:* ]]; then
+            [[ -n "${PACKAGE_SET_TIER[${entry#packages:}]:-}" ]] || REGISTRY_ERRORS+=("$entry: unknown package set")
+        else
+            [[ -n "${TOOL_BINARY[$entry]:-}" ]] || REGISTRY_ERRORS+=("$entry: unknown component in the install order")
+        fi
+        REGISTRY_ORDER+=("$entry")
+        position[$entry]=$(( ++index ))
+    done
+    for name in "${!TOOL_BINARY[@]}"; do
+        [[ -n "${position[$name]:-}" ]] || { REGISTRY_ERRORS+=("$name: missing from the install order"); continue; }
+        local needs="${TOOL_NEEDS[$name]:-}"
+        for need in ${needs//,/ }; do
+            [[ -n "${position[$need]:-}" ]] || { REGISTRY_ERRORS+=("$name: needs unknown $need"); continue; }
+            (( position[$need] < position[$name] )) || REGISTRY_ERRORS+=("$name: needs $need, which comes later")
+        done
+        case "${TOOL_POLICY[$name]}" in converge|present|vendor) ;; *) REGISTRY_ERRORS+=("$name: unknown policy ${TOOL_POLICY[$name]}") ;; esac
+        case "${TOOL_INSTALL[$name]}" in
+            eget|installer|bootstrap|function:?*) ;;
+            packages:?*) [[ -n "${PACKAGE_SET_TIER[${TOOL_INSTALL[$name]#packages:}]:-}" ]] \
+                || REGISTRY_ERRORS+=("$name: installed by unknown ${TOOL_INSTALL[$name]}") ;;
+            *) REGISTRY_ERRORS+=("$name: unknown install ${TOOL_INSTALL[$name]}") ;;
         esac
     done
 }
 _registry_load
 unset -f _registry_load
-unset _REGISTRY_TOOLS _REGISTRY_OVERRIDES
+unset _REGISTRY_TOOLS _REGISTRY_OVERRIDES _REGISTRY_ORDER _REGISTRY_PACKAGE_SETS _REGISTRY_CAPABILITIES
 
 # ==============================================================================
 # Helper Functions
@@ -258,11 +394,14 @@ tool_has_capability() {
     esac
 }
 
+# The components with a capability, in install order.
 tools_for_capability() {
     local capability="$1" name
-    for name in "${!TOOL_BINARY[@]}"; do
+    for name in "${REGISTRY_ORDER[@]}"; do
+        [[ "$name" != packages:* ]] || continue
         tool_has_capability "$name" "$capability" && printf '%s\n' "$name"
-    done | sort
+    done
+    return 0
 }
 
 tool_in_cumulative_tier() {

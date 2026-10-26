@@ -38,8 +38,28 @@ for name in "${!TOOL_BINARY[@]}"; do
     fi
 done
 
+# Each install step names something that exists: an installer script, a
+# function, or a package set; configure steps are functions.
+(
+    source "$ROOT/lib/install.sh"
+    for name in "${!TOOL_BINARY[@]}"; do
+        case "${TOOL_INSTALL[$name]}" in
+            installer) [[ -f "$ROOT/installers/install-$name.sh" ]] || fail "$name installs by a missing installer script" ;;
+            function:*) declare -F "${TOOL_INSTALL[$name]#function:}" >/dev/null || fail "$name installs by an undefined function" ;;
+        esac
+        for step in ${TOOL_CONFIGURE[$name]:-}; do
+            declare -F "$step" >/dev/null || fail "$name: configure step $step is undefined"
+        done
+    done
+)
+assert_policy() { [[ "${TOOL_POLICY[$1]}" == "$2" ]] || fail "$1 has policy ${TOOL_POLICY[$1]}, expected $2"; }
+assert_policy fzf converge; assert_policy neovim converge; assert_policy node converge; assert_policy sbx converge
+assert_policy docker present; assert_policy tailscale present
+assert_policy claude vendor; assert_policy pi vendor
+[[ "${CAPABILITY_NAMES[*]}" == "ai rdp tail azure gcloud aws" ]] || fail "capabilities: ${CAPABILITY_NAMES[*]}"
 for capability in ai rdp tail azure gcloud aws; do
     [[ -n "$(tools_for_capability "$capability")" ]] || fail "$capability capability is empty"
+    [[ -n "${CAPABILITY_LABEL[$capability]}" && -n "${CAPABILITY_HELP[$capability]}" ]] || fail "$capability has no label or help"
 done
 [[ "${TOOL_TIER[docker]}" == work ]] || fail "docker lost work-tier compatibility"
 [[ "${TOOL_TIER[sbx]}" == work ]] || fail "sbx is not part of the work tier"

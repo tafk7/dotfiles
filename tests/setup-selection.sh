@@ -68,14 +68,17 @@ snapshot_case() {
     (
         source "$ROOT/setup.sh"; stub_host; parse_arguments "${flags[@]}"
         CALLS=""
-        install_bash_packages() { CALLS+=" bash"; }
-        install_dev_packages() { CALLS+=" dev"; }
-        install_work_packages() { CALLS+=" work"; }
+        install_eget_tools() { CALLS+=" eget[$*]"; }
+        install_package_set() { CALLS+=" packages:$1"; }
+        install_docker_engine() { CALLS+=" docker"; }
         install_rdp_packages() { CALLS+=" rdp"; }
-        install_tail_packages() { CALLS+=" tail"; }
-        install_cloud_capability() { CALLS+=" cloud:$1"; }
-        install_eget_tools() { CALLS+=" eget:$*"; }
-        run_installer() { CALLS+=" cli:$1"; }
+        configure_docker_host_access() { CALLS+=" +docker-access"; }
+        configure_work_host() { CALLS+=" +kvm"; }
+        ensure_sbx_kits_builder() { CALLS+=" +kits-builder"; }
+        use_default_node() { CALLS+=" +node-path"; }
+        tool_applicable() { return 0; }
+        track_install() { CALLS+=" $2:$1"; }
+        run_installer() { CALLS+=" $1"; }
         INSTALLATION_FAILED=false
         phase_install_packages >/dev/null 2>&1 || CALLS+=" (failed)"
         printf '%s\n' "${CALLS# }"
