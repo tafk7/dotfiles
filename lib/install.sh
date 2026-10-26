@@ -1476,10 +1476,24 @@ plan_component() {
             fi
             ;;
         package-manager)
-            identity_matches "$want" "$identity" || log "[DRY RUN] Would move $name from ${identity#apt:} to ${want#apt:}"
+            if ! identity_matches "$want" "$identity"; then
+                log "[DRY RUN] Would move $name from ${identity#apt:} to ${want#apt:}"
+            elif [[ "$name" == sbx ]]; then
+                _plan_hold "${TOOL_APT_PACKAGE[$name]}" "${want#apt:}"
+            fi
             ;;
     esac
     return 0
+}
+
+# _plan_hold PACKAGE VERSION: what the sbx installer would do about the hold
+# on a package already at its pin (installers/install-sbx.sh).
+_plan_hold() {
+    if ! apt_package_held "$1"; then
+        log "[DRY RUN] Would hold $1 at $2"
+    elif ! hold_owned "$1" && [[ "$(hold_status "$1")" != declined ]]; then
+        log "[DRY RUN] $1 is held by someone other than dotfiles; setup would ask once whether to adopt the hold"
+    fi
 }
 
 # Whether the run installs entry NAME: selected, and named by --only when it

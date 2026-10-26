@@ -104,6 +104,22 @@ assert_eq "$RC/$(sudo_log)" "0/" "dry run"
 [[ "$(<"$TEST_ROOT/out")" == *"install docker-sbx $pin (replacing 0.40.0)"* ]] || fail "dry run plan: $(<"$TEST_ROOT/out")"
 assert_eq "$(fixture_managed_snapshot)" "$before" "dry run changed state"
 
+# apply's dry run plans the hold on a package already at its pin.
+plan() { # the plan for sbx observed at the pin
+    (
+        observe_component() { printf 'path=/usr/bin/sbx\nowner=package-manager\nidentity=apt:%s-1~ubuntu.24.04~noble\nwant=apt:%s\nrunnable=yes\ncompanions=ok\n' "$pin" "$pin"; }
+        DRY_RUN=true plan_component sbx 2>&1
+    )
+}
+state "$pin" unheld
+[[ "$(plan)" == *"Would hold docker-sbx at $pin"* ]] || fail "an unheld pin's plan: $(plan)"
+state "$pin" held
+hold_record docker-sbx "$pin" placed
+assert_eq "$(plan)" "" "an owned hold's plan"
+rm -f "$DOTFILES_HOLDS_FILE"
+[[ "$(plan)" == *"would ask once whether to adopt"* ]] || fail "a foreign hold's plan: $(plan)"
+assert_eq "$(sudo_log)" "" "planning changed nothing"
+
 # Verify reports each hold state.
 source "$ROOT/lib/outcomes.sh"
 source "$ROOT/lib/profile.sh"
