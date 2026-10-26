@@ -422,7 +422,7 @@ update_continue() {
     # Shells read the pulled startup files only when they next load them.
     after="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD)"
     if [[ "$before" != "$after" ]] \
-       && git -C "$DOTFILES_DIR" diff --name-only "$before" "$after" -- shell entry | grep -q .; then
+       && ! git -C "$DOTFILES_DIR" diff --quiet "$before" "$after" -- shell entry; then
         change_record shell "pulled $before..$after"
     fi
     cmd_apply "${apply_args[@]}" || setup_rc=$?
