@@ -1047,7 +1047,7 @@ install_eget_tools() {
         # limited per address, which fresh machines and CI runners share).
         local lock_row want source asset asset_sha256 member identity digest target companion_ready companion
         if ! lock_row="$(versions_row "$name" "$arch")"; then
-            warn "versions.lock has no $name row for $arch (run: python3 tests/eget-selection.py --refresh)"
+            warn "versions.lock has no $name row for $arch (run: dotfiles bump --refresh)"
             track_install "$name" fail
             any_missing=true
             continue

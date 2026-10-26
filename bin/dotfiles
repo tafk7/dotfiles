@@ -5,6 +5,7 @@
 #        dotfiles apply [--dry-run] [--only X,Y] [--reinstall[=X,Y]]
 #                       [--overwrite-configs] [--force] [--upgrade] [--no-refresh]
 #        dotfiles refresh [-v]
+#        dotfiles bump TOOL [VERSION] [--security] | --refresh
 #        dotfiles verify [-v] [--latest] [--smoke]
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
@@ -61,6 +62,13 @@ Commands:
                         need a restart (reload a shell). Exit 3 when a step
                         could not be made.
     -v                  List every step, passing ones included.
+  bump TOOL [VERSION]   Move a pin in versions.lock (and eget.toml or
+                        configs/init.vim) to a release, checked through its
+                        source's own data for both architectures. Without
+                        VERSION, the newest release outside the 14-day
+                        cool-down. Edits files; never commits.
+    --security          Allow a newer release that fixes an advisory.
+    --refresh           Rewrite the eget rows for eget.toml's tags.
   verify                Check this machine against the checkout and its profile.
                         Changes nothing. Exit 1: setup has work to do; 3: a check
                         could not be made; 2: something needs you; 0: healthy.
@@ -495,6 +503,7 @@ case "${1:-}" in
     update) shift; ORIGINAL_ARGS=("$@"); cmd_update "$@" ;;
     apply) shift; ORIGINAL_ARGS=("$@"); cmd_apply "$@" ;;
     refresh) shift; ORIGINAL_ARGS=("$@"); cmd_refresh "$@" ;;
+    bump) shift; exec python3 "$DOTFILES_DIR/lib/bump.py" "$@" ;;
     verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;
     profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
     --help|-h|help|"") usage ;;

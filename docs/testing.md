@@ -54,7 +54,8 @@ or first-prompt rendering. Don't run them concurrently with other tests.
   `tests/fixtures/eget-assets/` (refresh with `--refresh` after bumping a tag),
   and checks that `versions.lock` records exactly those assets and that its
   tags agree with `eget.toml`. `tests/versions-lock.sh` covers the lock's
-  parser and validation.
+  parser and validation, and `tests/bump.py` runs `dotfiles bump` offline
+  against recorded releases (`DOTFILES_FETCH_FIXTURES`).
   `.github/workflows/arm64.yml` runs the real `--bash` installer on
   `ubuntu-24.04-arm` weekly and on installer changes. Dev/work tiers and APT
   repositories are not exercised on ARM.
