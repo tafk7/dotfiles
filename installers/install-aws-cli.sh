@@ -1,5 +1,6 @@
 #!/bin/bash
-# Install AWS CLI v2 from AWS's signed Linux distribution.
+# Install the AWS CLI v2 release versions.lock pins, from AWS's signed Linux
+# distribution.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,8 +18,11 @@ while (( $# )); do
     shift
 done
 
+AWS_VERSION="$(versions_field aws-cli want)" || { error "versions.lock has no aws-cli row for $(get_arch)"; exit 1; }
+IFS=$'\t' read -r _ _ _ _ AWS_ASSET AWS_SHA256 _ _ < <(versions_row aws-cli)
+
 if [[ "${DRY_RUN:-false}" == true ]]; then
-    log "[DRY RUN] Would download, verify, and install AWS CLI v2 under /usr/local/aws-cli"
+    log "[DRY RUN] Would download, verify, and install AWS CLI $AWS_VERSION under /usr/local/aws-cli"
     exit 0
 fi
 
@@ -28,19 +32,20 @@ if command -v aws >/dev/null 2>&1; then
         warn "Keeping externally managed AWS CLI: $aws_path"
         exit 2
     fi
-    if [[ "$FORCE" != true ]] && aws --version 2>&1 | grep -q '^aws-cli/2\.'; then
-        success "AWS CLI v2 already installed"
+    current="$(aws --version 2>&1 | version_line | version_token || true)"
+    if [[ "$FORCE" != true && "$current" == "$AWS_VERSION" ]]; then
+        success "AWS CLI $AWS_VERSION already installed"
         exit 2
     fi
+    log "AWS CLI ${current:-unknown} installed, moving to $AWS_VERSION..."
 fi
 safe_apt_get install -y ca-certificates curl gnupg unzip || exit 1
-case "$(get_arch)" in x86_64) aws_arch=x86_64 ;; aarch64) aws_arch=aarch64 ;;
-    *) error "Unsupported AWS CLI architecture"; exit 1 ;; esac
 tmpdir="$(mktemp -d)"; trap 'rm -rf "$tmpdir"' EXIT INT TERM
 mkdir -m 0700 "$tmpdir/gnupg"
 archive="$tmpdir/awscliv2.zip"
-download_https "https://awscli.amazonaws.com/awscli-exe-linux-${aws_arch}.zip" "$archive"
-download_https "https://awscli.amazonaws.com/awscli-exe-linux-${aws_arch}.zip.sig" "$archive.sig"
+download_https "https://awscli.amazonaws.com/$AWS_ASSET" "$archive"
+download_https "https://awscli.amazonaws.com/$AWS_ASSET.sig" "$archive.sig"
+verify_sha256 "$archive" "$AWS_SHA256" || exit 1
 
 expected=FB5DB77FD5C118B80511ADA8A6310ACC4672475C
 actual="$(GNUPGHOME="$tmpdir/gnupg" gpg --batch --show-keys --with-colons "$INSTALLER_DIR/aws-cli-signing-key.asc" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')"
@@ -56,6 +61,7 @@ unzip -q "$archive" -d "$tmpdir/unpacked"
 args=(--bin-dir /usr/local/bin --install-dir /usr/local/aws-cli)
 [[ -d /usr/local/aws-cli ]] && args+=(--update)
 safe_sudo "$tmpdir/unpacked/aws/install" "${args[@]}" || exit 1
-/usr/local/bin/aws --version 2>&1 | grep -q '^aws-cli/2\.' \
-    || { error "AWS CLI v2 verification failed"; exit 1; }
-success "AWS CLI v2 installed; ~/.aws credentials and configuration remain user-owned"
+installed="$(/usr/local/bin/aws --version 2>&1 | version_line | version_token || true)"
+[[ "$installed" == "$AWS_VERSION" ]] \
+    || { error "AWS CLI verification failed: /usr/local/bin/aws reports ${installed:-nothing}, expected $AWS_VERSION"; exit 1; }
+success "AWS CLI $AWS_VERSION installed; ~/.aws credentials and configuration remain user-owned"

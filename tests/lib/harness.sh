@@ -20,6 +20,8 @@ fixture_init() {
     export DOTFILES_DIR="$TEST_REPO_ROOT"
     export DOTFILES_BACKUP_PREFIX="$TEST_ROOT/backups"
     export DOTFILES_SETUP_LOG=0
+    # Toolchain homes and selections from the caller would point outside HOME.
+    unset NVM_DIR NVM_BIN NVM_INC CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN
 }
 
 fixture_cleanup() {

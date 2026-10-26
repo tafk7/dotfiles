@@ -74,6 +74,53 @@ rc=0
 obs="$(DOTFILES_OBSERVE_TIMEOUT=1 observe_component gdu)" || rc=$?
 assert_eq "$rc/$(field runnable "$obs")" "3/unknown" "a hung version probe"
 
+# --- Node is NVM's default release, never a node on PATH; its identity
+# carries the npm it has, so an independently upgraded npm is off the pin.
+printf '#!/bin/sh\necho v18.0.0\n' > "$TEST_ROOT/usr/bin/node"
+chmod +x "$TEST_ROOT/usr/bin/node"
+node_dir="$HOME/.nvm/versions/node/v24.22.1"
+mkdir -p "$node_dir/bin" "$node_dir/lib/node_modules/npm" "$HOME/.nvm/alias"
+printf '#!/bin/sh\necho v24.22.1\n' > "$node_dir/bin/node"
+chmod +x "$node_dir/bin/node"
+printf '{\n  "version": "11.19.1"\n}\n' > "$node_dir/lib/node_modules/npm/package.json"
+printf '24.22.1\n' > "$HOME/.nvm/alias/default"
+awk -F '\t' -v OFS='\t' -v d="sha256:$(sha256sum "$node_dir/bin/node" | awk '{print $1}')" \
+    '$1 == "node" && $2 == "x86_64" { $8 = d } 1' "$DOTFILES_VERSIONS_LOCK" > "$TEST_ROOT/versions.lock.node"
+DOTFILES_VERSIONS_LOCK="$TEST_ROOT/versions.lock.node"
+obs="$(observe_component node)"
+assert_eq "$(field path "$obs")" "$node_dir/bin/node" "Node path"
+assert_eq "$(field identity "$obs")" "$(field want "$obs")" "the locked Node and npm"
+assert_eq "$(field want "$obs")" "version:24.22.1 (npm 11.19.1)" "Node want"
+printf '{\n  "version": "12.0.2"\n}\n' > "$node_dir/lib/node_modules/npm/package.json"
+assert_eq "$(field identity "$(observe_component node)")" "version:24.22.1 (npm 12.0.2)" "an upgraded npm"
+printf '#!/bin/sh\necho other build\n' > "$node_dir/bin/node"
+[[ "$(field identity "$(observe_component node)")" == sha256:* ]] || fail "another Node build kept the locked identity"
+mkdir -p "$HOME/.nvm/versions/node/v22.0.0/lib/node_modules/npm"
+cp -r "$node_dir/bin" "$HOME/.nvm/versions/node/v22.0.0/"
+printf '{\n  "version": "10.0.0"\n}\n' > "$HOME/.nvm/versions/node/v22.0.0/lib/node_modules/npm/package.json"
+printf 'v22.0.0\n' > "$HOME/.nvm/alias/default"
+assert_eq "$(field identity "$(observe_component node)")" "version:22.0.0 (npm 10.0.0)" "another Node release"
+
+# --- Rust is rustup's default toolchain, asked from / without overrides, so a
+# project toolchain or RUSTUP_TOOLCHAIN cannot answer and nothing installs.
+mkdir -p "$HOME/.cargo/bin" "$TEST_ROOT/project"
+printf '[toolchain]\nchannel = "nightly"\n' > "$TEST_ROOT/project/rust-toolchain.toml"
+cat > "$HOME/.cargo/bin/rustup" <<'EOF'
+#!/bin/sh
+echo "$PWD|${RUSTUP_TOOLCHAIN-unset}|${RUSTUP_AUTO_INSTALL-unset}|$*" >> "$HOME/rustup.log"
+[ -f rust-toolchain.toml ] && { echo "nightly-x86_64-unknown-linux-gnu (overridden)"; exit 0; }
+echo "${FAKE_DEFAULT:-1.98.1}-x86_64-unknown-linux-gnu (default)"
+EOF
+printf '#!/bin/sh\necho "rustc 1.98.1"\n' > "$HOME/.cargo/bin/rustc"
+chmod +x "$HOME/.cargo/bin/rustup" "$HOME/.cargo/bin/rustc"
+obs="$(cd "$TEST_ROOT/project" && RUSTUP_TOOLCHAIN=nightly PATH="$HOME/.cargo/bin:$PATH" observe_component rust)"
+assert_eq "$(field identity "$obs")/$(field want "$obs")" "version:1.98.1/version:$(versions_field rust want any)" "Rust from a project directory"
+grep -Fxq "/|unset|0|default" "$HOME/rustup.log" || fail "rustup was not asked from / without overrides: $(<"$HOME/rustup.log")"
+obs="$(FAKE_DEFAULT=stable PATH="$HOME/.cargo/bin:$PATH" observe_component rust)"
+assert_eq "$(field identity "$obs")" toolchain:stable "a channel default"
+rm "$HOME/rustup.log"
+assert_eq "$(field want "$(observe_component aws-cli)")" "version:$(versions_field aws-cli want)" "AWS CLI want"
+
 # --- Unreadable state makes the observation incomplete.
 printf 'schema\t1\nbroken row\n' > "$DOTFILES_LEDGER_FILE"
 rc=0

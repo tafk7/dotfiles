@@ -41,7 +41,7 @@ if versions_field demo nonsense >/dev/null 2>&1; then fail "an unknown field was
 # no registry tools and the bootstrap components excused.
 problems_for() {
     printf '%s\n' "$@" > "$lock"
-    versions_problems | grep -Ev '^(neovim|tmux|eget|nvm|vim-plug|sbx) has no row$' || true
+    versions_problems | grep -Ev '^(neovim|tmux|eget|nvm|vim-plug|sbx|node|npm|rust|aws-cli) has no row for ' || true
 }
 declare -A saved_method=()
 for name in "${!TOOL_METHOD[@]}"; do saved_method[$name]="${TOOL_METHOD[$name]}"; done

@@ -1,10 +1,13 @@
 #!/bin/bash
-# Install the Rust toolchain via rustup (https://rustup.rs).
+# Install rustup (https://rustup.rs) with the Rust toolchain versions.lock pins
+# as its default.
 #
-# rustup self-updates (`rustup update`), so this only ensures the toolchain is
-# present; --force reinstalls. No sudo: everything lands in ~/.cargo and
-# ~/.rustup. --no-modify-path stops rustup-init editing the shell rc files
-# (symlinks into this repo); shell/env.sh already puts ~/.cargo/bin on PATH.
+# rustup itself self-updates; the default toolchain moves only with the pin.
+# Other toolchains, and a project's own (rust-toolchain.toml), are kept. A
+# rustup dotfiles did not install keeps its default unless --force adopts it.
+# No sudo: everything lands in ~/.cargo and ~/.rustup. --no-modify-path stops
+# rustup-init editing the shell rc files (symlinks into this repo);
+# shell/env.sh already puts ~/.cargo/bin on PATH.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,12 +24,37 @@ FORCE=false
 export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
 RUSTUP_BIN="$CARGO_HOME/bin/rustup"
+TOOLCHAIN="$(versions_field rust want any)" || { error "versions.lock has no rust row"; exit 1; }
+
+# rustup runs from / with RUSTUP_TOOLCHAIN unset and auto-install off, so no
+# project override answers and only an explicit install installs.
+rustup_neutral() { (cd / && env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 "$RUSTUP_BIN" "$@"); }
+default_toolchain() {
+    rustup_neutral default 2>/dev/null | awk 'NR == 1 { print $1 }' \
+        | sed -E 's/-(x86_64|aarch64)-unknown-linux-(gnu|musl)$//'
+}
 
 # Verify by absolute path: on a fresh machine ~/.cargo/bin is not guaranteed to
 # be on the installer process's PATH yet.
-if [[ "$FORCE" != true && -x "$RUSTUP_BIN" ]] && "$RUSTUP_BIN" --version >/dev/null 2>&1; then
-    success "Rust already installed ($("$RUSTUP_BIN" --version 2>/dev/null | head -n1)); it self-updates via 'rustup update'."
-    exit 2
+if [[ -x "$RUSTUP_BIN" ]] && rustup_neutral --version >/dev/null 2>&1; then
+    owner=""
+    IFS=$'\t' read -r _ _ owner _ < <(ledger_line rust 2>/dev/null || true) || true
+    if [[ "$FORCE" != true && "$owner" != dotfiles ]]; then
+        log "Preserving the toolchains of a rustup dotfiles does not own; --force adopts it"
+        exit 2
+    fi
+    current="$(default_toolchain)"
+    if [[ "$current" == "$TOOLCHAIN" ]]; then
+        success "Rust $TOOLCHAIN is rustup's default"
+        exit 2
+    fi
+    log "Moving rustup's default toolchain from ${current:-none} to $TOOLCHAIN..."
+    rustup_neutral toolchain install "$TOOLCHAIN" --no-self-update \
+        || { error "rustup toolchain install $TOOLCHAIN failed"; exit 1; }
+    rustup_neutral default "$TOOLCHAIN" || { error "rustup default $TOOLCHAIN failed"; exit 1; }
+    [[ "$(default_toolchain)" == "$TOOLCHAIN" ]] || { error "rustup's default is not $TOOLCHAIN after switching"; exit 1; }
+    success "Rust $TOOLCHAIN is rustup's default; other toolchains are kept"
+    exit 0
 fi
 
 log "Installing Rust toolchain via rustup..."
@@ -47,7 +75,7 @@ fi
 
 log "Running rustup installer from $rustup_installer"
 rc_before="$(rc_snapshot)"
-if ! sh "$rustup_installer" -y --no-modify-path; then
+if ! sh "$rustup_installer" -y --no-modify-path --default-toolchain "$TOOLCHAIN"; then
     error "rustup installation failed"
     [[ "$downloaded_installer" == true ]] && rm -f "$rustup_installer"
     exit 1
@@ -61,10 +89,10 @@ warn_if_rc_changed "$rc_before"
 # Make cargo/rustc resolvable in this script's own shell for the verify below.
 PATH="$CARGO_HOME/bin:$PATH"
 
-if command -v rustc >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1; then
-    success "Rust installed: $(rustc --version 2>/dev/null), $(cargo --version 2>/dev/null)"
+if command -v rustc >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1 && [[ "$(default_toolchain)" == "$TOOLCHAIN" ]]; then
+    success "Rust $TOOLCHAIN installed: $(cd / && rustc --version 2>/dev/null), $(cd / && cargo --version 2>/dev/null)"
     exit 0
 fi
 
-error "rustup ran but rustc/cargo are not runnable from $CARGO_HOME/bin"
+error "rustup ran but rustc/cargo are not runnable from $CARGO_HOME/bin, or its default is not $TOOLCHAIN"
 exit 1

@@ -13,7 +13,9 @@
 #
 # Probe rules: an APT component is never executed; its identity is the
 # package version (running `az --version` or `gcloud --version` writes state).
-# Other components run their version flag under a timeout. Nothing here launches
+# Other components run their version flag under a timeout, from / with
+# RUSTUP_TOOLCHAIN unset and rustup auto-install off, so a project's toolchain
+# or Node version cannot answer and nothing is installed. Nothing here launches
 # a login shell, writes files, or changes services.
 
 [[ -n "${_DOTFILES_OBSERVE_LOADED:-}" ]] && return 0
@@ -36,6 +38,9 @@ component_want() {
         tmux) printf 'version:%s\n' "$TMUX_VERSION" ;;
         eget) printf 'version:%s\n' "$EGET_VERSION" ;;
         nvm) printf 'version:%s\n' "$NVM_VERSION" ;;
+        node) printf 'version:%s (npm %s)\n' "$(versions_field node want | sed 's/^v//')" "$(versions_field npm want any)" ;;
+        rust) printf 'version:%s\n' "$(versions_field rust want any)" ;;
+        aws-cli) printf 'version:%s\n' "$(versions_field aws-cli want)" ;;
         sbx) printf 'apt:%s\n' "$SBX_VERSION" ;;
         *) printf -- '-\n' ;;
     esac
@@ -70,10 +75,13 @@ observe_component() {
         fi
     fi
 
-    # Where the component is: the managed copy first for eget tools, then PATH,
-    # then a registered path for components with no command (nvm).
+    # Where the component is: the managed copy first for eget tools, nvm's
+    # default release for Node, then PATH, then a registered path for
+    # components with no command (nvm).
     if [[ "$method" == eget && -x "$HOME/.local/bin/$binary" ]]; then
         path="$HOME/.local/bin/$binary"
+    elif [[ "$name" == node ]]; then
+        path="$(node_default_dir 2>/dev/null)/bin/node" || path=""
     else
         path="$(command -v "$binary" 2>/dev/null || true)"
     fi
@@ -114,7 +122,7 @@ observe_component() {
         else
             local output rc=0 probe="$path"
             [[ ! -d "$path" || -z "${TOOL_RELATIVE_BINARY[$name]:-}" ]] || probe="$path/${TOOL_RELATIVE_BINARY[$name]}"
-            output="$(timeout "$probe_timeout" "$probe" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null </dev/null)" || rc=$?
+            output="$(_observe_probe "$probe_timeout" "$probe" "${TOOL_VERSION_FLAG[$name]:---version}")" || rc=$?
             if (( rc == 124 )); then
                 runnable=unknown; complete=3
             elif (( rc == 0 )); then
@@ -123,6 +131,34 @@ observe_component() {
             local version
             version="$(printf '%s\n' "$output" | version_line | version_token || true)"
             [[ -z "$version" ]] || identity="version:$version"
+        fi
+        # Node is its locked release when its binary's digest is the lock's,
+        # and carries the npm version it has now (the bundled one, or drift).
+        if [[ "$name" == node ]]; then
+            local npm_version
+            npm_version="$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' \
+                "${path%/bin/node}/lib/node_modules/npm/package.json" 2>/dev/null | head -n1)"
+            # Another release is its version; the pinned version in another
+            # build is its digest.
+            local release="${path%/bin/node}" node_want
+            release="${release##*/v}"
+            node_want="$(versions_field node want | sed 's/^v//')"
+            identity="sha256:$(sha256sum "$path" | awk '{print $1}')"
+            if [[ "$(versions_field node identity 2>/dev/null)" == "$identity" ]]; then
+                identity="version:$node_want (npm ${npm_version:-missing})"
+            elif [[ "$release" != "$node_want" ]]; then
+                identity="version:$release (npm ${npm_version:-missing})"
+            fi
+        fi
+        # The Rust toolchain is rustup's default, never a directory override.
+        if [[ "$name" == rust && -x "$(dirname "$path")/rustup" ]]; then
+            local toolchain
+            toolchain="$(_observe_probe "$probe_timeout" "$(dirname "$path")/rustup" default | awk 'NR == 1 { print $1 }')"
+            toolchain="$(sed -E 's/-(x86_64|aarch64)-unknown-linux-(gnu|musl)$//' <<< "$toolchain")"
+            if [[ "$toolchain" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then identity="version:$toolchain"
+            elif [[ -n "$toolchain" && "$toolchain" != no ]]; then identity="toolchain:$toolchain"
+            else identity="-"
+            fi
         fi
         # An eget tool is its locked release when its digest is the lock's.
         if [[ "$method" == eget && -f "$path" ]]; then
@@ -161,6 +197,13 @@ observe_component() {
     printf 'applicable=%s\nreason=%s\npath=%s\nowner=%s\nidentity=%s\nwant=%s\nrunnable=%s\ncompanions=%s\nready=%s\nready-reason=%s\n' \
         "$applicable" "$reason" "$path" "$owner" "$identity" "$want" "$runnable" "$companions" "$ready" "$ready_reason"
     return "$complete"
+}
+
+# _observe_probe TIMEOUT COMMAND ARGS...: run a version probe from a neutral
+# directory, so no project override answers and nothing is installed.
+_observe_probe() {
+    local seconds="$1"; shift
+    (cd / && env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 timeout "$seconds" "$@" 2>/dev/null </dev/null)
 }
 
 # observation_field KEY < OBSERVATION

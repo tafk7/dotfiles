@@ -47,6 +47,8 @@ record_component_outcome() {
     binary="${TOOL_BINARY[$name]}"
     if [[ "${TOOL_METHOD[$name]:-}" == eget && -x "$HOME/.local/bin/$binary" ]]; then
         path="$HOME/.local/bin/$binary"
+    elif [[ "$name" == node ]]; then
+        path="$(node_default_dir 2>/dev/null)/bin/node" || path=""
     else
         path="$(command -v "$binary" 2>/dev/null || true)"
     fi
@@ -1430,8 +1432,13 @@ install_work_packages() {
         [[ "${DRY_RUN:-false}" == true ]] || track_install sbx not-applicable
     fi
 
-    # Version managers (Python is handled by uv, installed in the shell tier)
-    run_installer "nvm" || failed=true
+    # Version managers and the runtimes versions.lock pins through them
+    # (Python is handled by uv, installed in the shell tier).
+    if run_installer "nvm"; then
+        run_installer "node" || failed=true
+    else
+        failed=true
+    fi
     if [[ -d "$HOME/.nvm/default/bin" && ":$PATH:" != *":$HOME/.nvm/default/bin:"* ]]; then
         PATH="$HOME/.nvm/default/bin:$PATH"
         export PATH

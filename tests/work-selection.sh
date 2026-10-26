@@ -68,7 +68,7 @@ done
     tool_applicable() { [[ "$1" != sbx ]]; }
     INSTALL_NA=()
     DRY_RUN=false install_work_packages >/dev/null
-    assert_eq "$calls" " docker docker-access nvm rust" "work tools where sbx does not apply"
+    assert_eq "$calls" " docker docker-access nvm node rust" "work tools where sbx does not apply"
     [[ " ${INSTALL_NA[*]} " == *" sbx "* ]] || fail "sbx not recorded as not applicable"
 )
 
