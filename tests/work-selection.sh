@@ -53,7 +53,9 @@ run_installer() { calls+=" $1"; }
 output="$(DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_OS_VERSION=24.04 \
     HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
     XDG_CACHE_HOME="$XDG_CACHE_HOME" "$ROOT/setup.sh" --work --dry-run --no-hooks --no-git --no-theme 2>&1)"
-[[ "$output" == *"installer: sbx"* && "$output" != *"installer: tailscale"* \
+# The plan comes from this host's observations, so it names only what differs;
+# Tailscale and the cloud CLIs are never part of it.
+[[ "$output" != *"Skipping sbx"* && "$output" != *tailscale* \
    && "$output" != *"Azure CLI: yes"* && "$output" != *"Google Cloud CLI: yes"* \
    && "$output" != *"AWS CLI v2: yes"* ]] || fail "work did not include sbx cleanly"
 
@@ -65,8 +67,8 @@ for platform in wsl:24.04 ubuntu:22.04; do
         HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
         XDG_CACHE_HOME="$XDG_CACHE_HOME" "$ROOT/setup.sh" --work --dry-run --no-hooks --no-git --no-theme 2>&1)" || rc=$?
     [[ $rc -eq 0 ]] || fail "--work on $platform was refused: $output"
-    [[ "$output" == *"Would ensure Docker apt repo"* && "$output" == *"installer: nvm"* \
-       && "$output" != *"installer: sbx"* && "$output" != *"Would ensure the sbx kit builder"* \
+    [[ "$output" == *"Would install nvm"* && "$output" != *"Would install sbx"* \
+       && "$output" != *"Would ensure the sbx kit builder"* \
        && "$output" == *"Skipping sbx: it is not applicable"* ]] || fail "--work on $platform did not skip only sbx: $output"
 done
 (

@@ -156,14 +156,16 @@ feature_enabled() {
 apply_feature_requests() {
     if [[ -n "${THEME_REQUEST:-}" ]]; then
         if [[ "${DRY_RUN:-false}" == "true" ]]; then
-            printf '  [DRY RUN] Would set theme feature: %s\n' "$THEME_REQUEST"
+            [[ "$(preference_get feature.theme 2>/dev/null || echo enabled)" == "$THEME_REQUEST" ]] \
+                || printf '  [DRY RUN] Would set theme feature: %s\n' "$THEME_REQUEST"
         else
             preference_set feature.theme "$THEME_REQUEST" || return 1
         fi
     fi
     if [[ -n "${AGENT_BADGE_REQUEST:-}" ]]; then
         if [[ "${DRY_RUN:-false}" == "true" ]]; then
-            printf '  [DRY RUN] Would set agent-badge feature: %s\n' "$AGENT_BADGE_REQUEST"
+            [[ "$(preference_get feature.agent-badge 2>/dev/null || echo enabled)" == "$AGENT_BADGE_REQUEST" ]] \
+                || printf '  [DRY RUN] Would set agent-badge feature: %s\n' "$AGENT_BADGE_REQUEST"
         else
             preference_set feature.agent-badge "$AGENT_BADGE_REQUEST" || return 1
         fi

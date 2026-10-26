@@ -46,9 +46,14 @@ organization manages those CLIs. The shell helpers work with whatever `claude`, 
 
 Setup options:
 
-- `--dry-run` previews all changes.
-- `--force` reinstalls components that dotfiles installed. Setup never replaces
-  tools that something else installed unless you pass `--force`.
+- `--dry-run` shows what would change, from what is installed now, and
+  changes nothing; on an up-to-date machine it prints no actions.
+- `--only X,Y` installs just those selected components; a need that is not
+  installed blocks one instead of being installed, and configs are left alone.
+- `--reinstall[=X,Y]` reinstalls components that dotfiles installed (all of
+  the selection, or the named ones); `--overwrite-configs` replaces configs that
+  differ, keeping backups; `--force` is both. Setup never replaces tools that
+  something else installed unless you reinstall them.
 - `--no-hooks` skips the repository's pre-commit hook.
 - `--no-git` skips `~/.gitconfig`.
 - `--git-name` and `--git-email` set your Git identity without a prompt.
@@ -223,13 +228,17 @@ to do, 3 when a check could not be made, 2 when something needs you (Tailscale
 enrollment, a group login), and 0 otherwise. `--latest` adds newer upstream
 releases of pinned tools.
 
-`dotfiles update` takes upstream changes: it fetches and shows them,
-fast-forwards the install-path checkout, runs setup with the machine profile,
-and verifies. It stops on uncommitted changes, a detached HEAD, or a branch that
-has diverged from its upstream.
+`dotfiles apply` brings the machine to the checkout and its profile without
+pulling: it installs, moves, or repairs what the profile selects, runs their
+configure steps, and deploys configs. `dotfiles update` takes upstream
+changes: it fetches and shows them, fast-forwards the install-path checkout,
+applies the profile, and verifies. It stops on uncommitted changes, a detached
+HEAD, or a branch that has diverged from its upstream.
 
 ```bash
-dotfiles update                   # pull, setup with the profile, verify
+dotfiles update                   # pull, apply the profile, verify
+dotfiles apply --dry-run          # what applying the profile would change
+dotfiles apply --only node        # one component (blocked if nvm is missing)
 dotfiles verify                   # this machine against the checkout and profile
 ./bin/verify --tier work          # a tier against current reality (also --all)
 ./bin/diff-config                 # drift between tracked configs and $HOME

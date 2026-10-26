@@ -43,7 +43,7 @@ upstream_commit() {
 # Nothing upstream: setup still applies the profile, and verify runs.
 update
 assert_eq "$UPDATE_RC" 0 "update with nothing upstream: $UPDATE_OUTPUT"
-[[ "$UPDATE_OUTPUT" == *"up to date with its upstream"* && "$UPDATE_OUTPUT" == *"Running: setup.sh --config --no-hooks"* ]] \
+[[ "$UPDATE_OUTPUT" == *"up to date with its upstream"* && "$UPDATE_OUTPUT" == *"Applying the profile: setup.sh --config --no-hooks"* ]] \
     || fail "no-op update did not apply the profile: $UPDATE_OUTPUT"
 
 # A normal update pulls, re-execs the new code, and reports the revisions.

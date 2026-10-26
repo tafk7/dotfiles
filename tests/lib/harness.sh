@@ -80,6 +80,9 @@ install_mutation_spies() {
             > "$TEST_ROOT/bin/$command"
         /bin/chmod +x "$TEST_ROOT/bin/$command"
     done
+    # Unit state queries are reads: report an inactive, disabled unit.
+    printf '#!/bin/sh\ncase "$1" in is-active) exit 3 ;; is-enabled) echo disabled; exit 1 ;; esac\nprintf "systemctl\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \
+        > "$TEST_ROOT/bin/systemctl"
     export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
 }
 

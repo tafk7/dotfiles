@@ -24,6 +24,8 @@ THEME_REQUEST=""       # Empty preserves preference; enabled/disabled are explic
 AGENT_BADGE_REQUEST=""
 FORCE_OVERWRITE=false
 FORCE_REINSTALL=false
+REINSTALL_COMPONENTS=""  # --reinstall=X,Y: reinstall only these components.
+ONLY_COMPONENTS=""       # --only X,Y: install only these, configs untouched.
 SHOW_HELP=false
 DRY_RUN=false
 NO_HOOKS=false
@@ -56,6 +58,17 @@ require_option_value() {
         PARSE_ERROR=true
         return 1
     fi
+}
+
+# require_components OPTION LIST: every comma-separated name is a component.
+require_components() {
+    local name
+    [[ -n "$2" ]] || { error "$1 requires component names"; PARSE_ERROR=true; return 1; }
+    for name in ${2//,/ }; do
+        [[ -n "${TOOL_BINARY[$name]:-}" ]] && continue
+        error "$1: unknown component: $name"
+        PARSE_ERROR=true
+    done
 }
 
 # Git identity (optional; falls back to existing config or interactive prompt).
@@ -120,6 +133,30 @@ parse_arguments() {
                 FORCE_REINSTALL=true
                 shift
                 ;;
+            --reinstall)
+                FORCE_REINSTALL=true
+                shift
+                ;;
+            --reinstall=*)
+                REINSTALL_COMPONENTS="${1#--reinstall=}"
+                require_components --reinstall "$REINSTALL_COMPONENTS"
+                shift
+                ;;
+            --overwrite-configs)
+                FORCE_OVERWRITE=true
+                shift
+                ;;
+            --only)
+                require_option_value "$1" "${2:-}" || { shift; continue; }
+                ONLY_COMPONENTS="$2"
+                require_components --only "$ONLY_COMPONENTS"
+                shift 2
+                ;;
+            --only=*)
+                ONLY_COMPONENTS="${1#--only=}"
+                require_components --only "$ONLY_COMPONENTS"
+                shift
+                ;;
             --dry-run)
                 DRY_RUN=true
                 shift
@@ -157,6 +194,15 @@ parse_arguments() {
                 shift
                 ;;
         esac
+    done
+    # --only names components this run selects; the rest of the profile is not
+    # installed behind the operator's back.
+    local name
+    for name in ${ONLY_COMPONENTS//,/ }; do
+        [[ -n "${TOOL_BINARY[$name]:-}" ]] || continue
+        component_selected "$name" && continue
+        error "--only: $name is not selected by this run's tier or capabilities"
+        PARSE_ERROR=true
     done
     [[ "$PARSE_ERROR" == "false" ]]
 }
@@ -313,8 +359,15 @@ EOF
     cat << 'EOF'
 
 OPTIONS:
-    --force             Force overwrite configs and reinstall tools
-    --dry-run           Preview actions without making changes
+    --dry-run           Show what would change, from what is installed now;
+                        change nothing. Lines marked Unknown could not be
+                        checked in advance.
+    --only X[,Y]        Install only these selected components, in order;
+                        a need that is not installed blocks one rather than
+                        being installed. Configs are left as they are.
+    --reinstall[=X,Y]   Reinstall every selected component, or the named ones.
+    --overwrite-configs Replace configs that differ, keeping backups.
+    --force             Both: --reinstall --overwrite-configs
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.
@@ -469,32 +522,32 @@ phase_install_packages() {
 phase_setup_configs() {
     log "Phase 3: Configuration and Validation"
     local failed=false
+    if [[ -n "$ONLY_COMPONENTS" ]]; then
+        log "Configs left as they are (--only)"
+        return 0
+    fi
     
     # Backups are created lazily by the first operation that actually displaces
     # user data. Matching symlinks and dry-runs create no backup directories.
     ACTIVE_BACKUP_DIR=""
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would process configurations:"
         readarray -t sorted_configs < <(printf '%s\n' "${!CONFIG_MAP[@]}" | sort)
         for config in "${sorted_configs[@]}"; do
             local mapping="${CONFIG_MAP[$config]}"
             local target type owner
             IFS=: read -r target type owner <<< "$mapping"
-            if ! config_owner_present "$owner"; then
-                log "  ⊘ $target (skipped — $owner not installed)"
-                continue
-            fi
-            if [[ "$type" == "gitconfig" && "$NO_GIT" == "true" ]]; then
-                log "  ⊘ $target (skipped — --no-git)"
-                continue
-            fi
-            if [[ -e "$target" ]]; then
-                if [[ -L "$target" ]]; then
-                    log "  ↻ $target (symlink exists - would update)"
-                else
-                    log "  ⚠️  $target (file exists - would backup)"
-                fi
+            config_owner_present "$owner" || continue
+            [[ "$type" != "gitconfig" || "$NO_GIT" != "true" ]] || continue
+            if [[ "$type" == gitconfig ]]; then
+                local portable="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
+                [[ -f "$portable" ]] && git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable" \
+                    || log "  ✓ $target (would add the portable include)"
+            elif [[ -L "$target" ]]; then
+                [[ "$(readlink -f "$target")" == "$(readlink -f "$(config_source_path "$config")")" ]] \
+                    || log "  ↻ $target (links to $(readlink "$target"); would relink)"
+            elif [[ -e "$target" ]]; then
+                log "  ⚠️  $target (file exists - would backup and link)"
             else
                 log "  ✓ $target (would create $type)"
             fi
@@ -552,7 +605,8 @@ phase_setup_configs() {
 
     if feature_enabled theme; then
         if [[ "$DRY_RUN" == "true" ]]; then
-            log "[DRY RUN] Would apply the theme to a running tmux server"
+            # A server's socket, checked without starting tmux.
+            [[ ! -S "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/default" ]] || log "[DRY RUN] Would apply the theme to the running tmux server"
         else
             "$DOTFILES_DIR/bin/theme-switcher" tmux-init || failed=true
         fi
@@ -564,7 +618,8 @@ phase_setup_configs() {
     if [[ "$NO_HOOKS" == "true" ]]; then
         log "Skipping git hooks install (--no-hooks)"
     elif [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would install git hooks (use --no-hooks to skip)"
+        "$DOTFILES_DIR/bin/install-git-hooks" --check >/dev/null 2>&1 \
+            || log "[DRY RUN] Would install git hooks (use --no-hooks to skip)"
     else
         "$DOTFILES_DIR/bin/install-git-hooks" --quiet || { warn "git hooks install failed"; failed=true; }
     fi

@@ -1,7 +1,9 @@
 #!/bin/bash
-# The dotfiles front door: update, verify, and the machine profile.
+# The dotfiles front door: update, apply, verify, and the machine profile.
 #
 # Usage: dotfiles update [--dry-run]
+#        dotfiles apply [--dry-run] [--only X,Y] [--reinstall[=X,Y]]
+#                       [--overwrite-configs] [--force]
 #        dotfiles verify [-v] [--latest] [--smoke]
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
@@ -28,15 +30,22 @@ Usage: dotfiles <command> [options]
 
 Commands:
   update                Take upstream changes: fetch and show them, fast-forward
-                        this checkout, run setup with the machine profile, then
-                        verify. Needs the install path's checkout, on a branch
-                        with an upstream, without uncommitted changes; a branch
-                        that has diverged from its upstream stops it.
-    --dry-run           Fetch and show; preview setup without pulling.
-                        Not yet: an exact preview of what would change, retiring
-                        configs removed upstream, stale-process tracking, nvm
-                        following a moved pin, the Node/Rust/aws-cli pins, sbx
-                        hold receipts, editor plugins, and --upgrade.
+                        this checkout, apply the machine profile, then verify.
+                        Needs the install path's checkout, on a branch with an
+                        upstream, without uncommitted changes; a branch that has
+                        diverged from its upstream stops it.
+    --dry-run           Fetch and show; preview the apply without pulling.
+                        Not yet: retiring configs removed upstream, stale-process
+                        tracking, editor plugins, and --upgrade.
+  apply                 Bring this machine to the checkout and its profile:
+                        install, move, or repair what the profile selects, run
+                        their configure steps, then deploy configs. No pull.
+    --dry-run           Show what would change, from what is installed now.
+    --only X[,Y]        Only these components; configs are left alone. A need
+                        that is not installed blocks one instead of installing.
+    --reinstall[=X,Y]   Reinstall everything selected, or the named components.
+    --overwrite-configs Replace configs that differ, keeping backups.
+    --force             Both of the above.
   verify                Check this machine against the checkout and its profile.
                         Changes nothing. Exit 1: setup has work to do; 3: a check
                         could not be made; 2: something needs you; 0: healthy.
@@ -143,22 +152,51 @@ confirm() {
     [[ -z "$answer" || "$answer" =~ ^[Yy] ]]
 }
 
-# Plan, then apply the whole profile through setup. A failed apply keeps the
-# saved intent; verify reports what is missing until an apply succeeds.
+# Plan, then apply the whole profile. A failed apply keeps the saved intent;
+# verify reports what is missing until an apply succeeds.
 apply_profile() {
-    local assume_yes="$1" no_apply="$2"
-    local -a args
-    readarray -t args < <(profile_setup_args)
-    printf 'plan:    %s/setup.sh %s\n' "$DOTFILES_DIR" "${args[*]}"
+    local assume_yes="$1" no_apply="$2" plan
+    plan="$(cmd_apply --dry-run 2>&1 | grep -Ei 'would|unknown|blocked' | sed 's/^\[[A-Z]*\] //; s/^ *//; s/^\[DRY RUN\] //' || true)"
+    if [[ -z "$plan" ]]; then
+        printf 'plan:    nothing to change\n'
+        return 0
+    fi
+    printf 'plan:\n%s\n' "$(sed 's/^/  /' <<< "$plan")"
     if [[ "$no_apply" == true ]]; then
-        printf 'Saved; not applied (--no-apply).\n'
+        printf 'Saved; not applied (--no-apply). Apply it with: dotfiles apply\n'
         return 0
     fi
     if [[ "$assume_yes" != true ]] && ! confirm "apply now?"; then
-        printf 'Saved; not applied. Apply it with the command above.\n'
+        printf 'Saved; not applied. Apply it with: dotfiles apply\n'
         return 0
     fi
-    "$DOTFILES_DIR/setup.sh" "${args[@]}" || { error "Apply failed; the profile keeps the new intent"; return 1; }
+    cmd_apply || { error "Apply failed; the profile keeps the new intent"; return 1; }
+}
+
+# apply: the whole profile through setup, from what is installed now. Exit 1
+# when setup failed or blocked something, 3 without a readable profile.
+cmd_apply() {
+    local dry_run=false rc=0
+    local -a extra=() args=()
+    while (( $# )); do
+        case "$1" in
+            --dry-run) dry_run=true; extra+=("$1") ;;
+            --only) [[ -n "${2:-}" ]] || { error "--only requires component names"; return 64; }; extra+=("$1" "$2"); shift ;;
+            --only=*|--reinstall|--reinstall=*|--overwrite-configs|--force) extra+=("$1") ;;
+            --help|-h) usage; return 0 ;;
+            *) error "Unknown option: $1"; usage >&2; return 64 ;;
+        esac
+        shift
+    done
+    if ! profile_exists; then
+        error "No machine profile yet; create one with: dotfiles profile --propose"
+        return 3
+    fi
+    profile_load || return 3
+    [[ "$dry_run" == true ]] || operation_begin "$SCRIPT_DIR/dotfiles" apply "${ORIGINAL_ARGS[@]}"
+    readarray -t args < <(profile_setup_args)
+    "$DOTFILES_DIR/setup.sh" "${args[@]}" "${extra[@]}" || rc=$?
+    case "$rc" in 0|64) return "$rc" ;; *) return 1 ;; esac
 }
 
 cmd_profile() {
@@ -320,10 +358,12 @@ update_continue() {
     fi
     profile_load || return 3
     readarray -t args < <(profile_setup_args)
-    [[ "$dry_run" != true ]] || args+=(--dry-run)
-    log "Running: setup.sh ${args[*]}"
-    "$DOTFILES_DIR/setup.sh" "${args[@]}" || setup_rc=$?
-    [[ "$dry_run" != true ]] || return "$(( setup_rc == 0 ? 0 : 1 ))"
+    log "Applying the profile: setup.sh ${args[*]}"
+    if [[ "$dry_run" == true ]]; then
+        cmd_apply --dry-run || setup_rc=$?
+        return "$(( setup_rc == 0 ? 0 : 1 ))"
+    fi
+    cmd_apply || setup_rc=$?
     echo
     "$SCRIPT_DIR/dotfiles" verify || verify_rc=$?
     after="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD)"
@@ -394,6 +434,7 @@ cmd_update() {
 ORIGINAL_ARGS=("$@")
 case "${1:-}" in
     update) shift; ORIGINAL_ARGS=("$@"); cmd_update "$@" ;;
+    apply) shift; ORIGINAL_ARGS=("$@"); cmd_apply "$@" ;;
     verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;
     profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
     --help|-h|help|"") usage ;;

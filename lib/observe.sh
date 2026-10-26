@@ -98,6 +98,12 @@ observe_component() {
         line=""
     fi
     [[ -z "$line" ]] || IFS=$'\t' read -r _ _ recorded_owner _ _ recorded_path _ _ <<< "$line"
+    # Node releases under an NVM dotfiles owns are dotfiles' (install-node.sh)
+    # until Node has a record of its own.
+    if [[ "$name" == node && -z "$line" && -n "$path" ]]; then
+        IFS=$'\t' read -r _ _ recorded_owner _ < <(ledger_line nvm 2>/dev/null || true) || true
+        recorded_path="$path"
+    fi
 
     if [[ -n "$path" ]]; then
         if [[ "$method" == apt ]] && apt_package_installed "${TOOL_APT_PACKAGE[$name]:-$name}"; then
@@ -204,6 +210,18 @@ observe_component() {
 _observe_probe() {
     local seconds="$1"; shift
     (cd / && env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 timeout "$seconds" "$@" 2>/dev/null </dev/null)
+}
+
+# Whether an observed identity is the wanted one: same kind, same value; an APT
+# version matches its upstream version with any Debian revision.
+identity_matches() {
+    local want="$1" have="$2"
+    [[ "$want" == - ]] && return 0
+    [[ "${want%%:*}" == "${have%%:*}" ]] || return 1
+    case "${want%%:*}" in
+        apt) [[ "${have#apt:}" == "${want#apt:}" || "${have#apt:}" == "${want#apt:}"-* ]] ;;
+        *) [[ "$have" == "$want" ]] ;;
+    esac
 }
 
 # observation_field KEY < OBSERVATION

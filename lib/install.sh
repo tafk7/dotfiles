@@ -439,7 +439,7 @@ write_dotfiles_env() {
     local path_file="$DOTFILES_STATE_DIR/install-path"
 
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log "[DRY RUN] Would record install path in $path_file"
+        [[ -f "$path_file" && "$(<"$path_file")" == "$DOTFILES_DIR" ]] || log "[DRY RUN] Would record install path in $path_file"
         return 0
     fi
 
@@ -677,8 +677,13 @@ install_apt() {
     shift
     local packages=("$@")
 
+    # A preview lists only what is missing, read from dpkg's database.
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log "[DRY RUN] Would install $label APT packages: ${packages[*]}"
+        local pkg missing_now=()
+        for pkg in "${packages[@]}"; do
+            apt_package_installed "$pkg" || missing_now+=("$pkg")
+        done
+        (( ${#missing_now[@]} == 0 )) || log "[DRY RUN] Would install $label APT packages: ${missing_now[*]}"
         return 0
     fi
 
@@ -855,6 +860,12 @@ preserve_existing_tool() {
     return 0
 }
 
+# Whether this run reinstalls NAME: --reinstall or --force (FORCE_REINSTALL),
+# or --reinstall=NAME,... (REINSTALL_COMPONENTS).
+tool_reinstall() {
+    [[ "${FORCE_REINSTALL:-false}" == true || ",${REINSTALL_COMPONENTS:-}," == *",$1,"* ]]
+}
+
 # Installer exit codes: 0 = installed/updated, 2 = already up to date, 1 = failed
 run_installer() {
     local name="$1"
@@ -873,7 +884,7 @@ run_installer() {
     fi
 
     local args=()
-    [[ "${FORCE_REINSTALL:-false}" == "true" ]] && args+=(--force)
+    tool_reinstall "$name" && args+=(--force)
 
     local rc=0
     "$script" "${args[@]+"${args[@]}"}" || rc=$?
@@ -919,10 +930,14 @@ install_eget_tools() {
     done
 
     # A binary on PATH outside ~/.local/bin belongs to the system or an admin, and
-    # a pinned copy would shadow it. Skip it unless --force.
-    if [[ "${FORCE_REINSTALL:-false}" != "true" ]]; then
+    # a pinned copy would shadow it. Skip it unless reinstalling.
+    if (( ${#eget_tools[@]} )); then
         local -a to_download=() existing binary managed_target
         for name in "${eget_tools[@]}"; do
+            if tool_reinstall "$name"; then
+                to_download+=("$name")
+                continue
+            fi
             binary="${TOOL_BINARY[$name]}"
             managed_target="$HOME/.local/bin/$binary"
             if [[ -x "$managed_target" ]]; then
@@ -1002,7 +1017,7 @@ install_eget_tools() {
         # Current means the locked build: the binary's digest is the lock's
         # identity, and every companion is there and runs.
         target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
-        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" ]] \
+        if ! tool_reinstall "$name" && [[ -x "$target" ]] \
            && [[ "$(sha256sum "$target" | awk '{print $1}')" == "$digest" ]]; then
             companion_ready=true
             for companion in ${TOOL_COMPANIONS[$name]:-}; do
@@ -1127,18 +1142,27 @@ configure_locale() {
     fi
 }
 
+# package_set_packages SET: the APT packages in a package set, one per line.
+package_set_packages() {
+    case "$1" in
+        # The first apt layer (sudo): zsh, build toolchain, clipboard, and the
+        # tmux build deps that install-tmux.sh compiles against.
+        dev)
+            printf '%s\n' ${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[languages]} ${PACKAGES[terminal]} ${PACKAGES[diagramming]}
+            if is_wsl; then printf '%s\n' ${PACKAGES[wsl]}; fi
+            ;;
+        work) printf '%s\n' python3-dev python3-venv ;;
+        *) return 1 ;;
+    esac
+}
+
 # install_package_set SET: the apt packages a tier installs beyond its
 # components (lib/registry.sh's package sets).
 install_package_set() {
+    local -a packages=()
+    readarray -t packages < <(package_set_packages "$1") || true
     case "$1" in
         dev)
-            # The first apt layer (sudo): zsh, build toolchain, clipboard, and
-            # the tmux build deps that install-tmux.sh compiles against.
-            # PACKAGES values are space-separated lists; word splitting is intended.
-            # shellcheck disable=SC2206
-            local packages=(${PACKAGES[core]} ${PACKAGES[development]} ${PACKAGES[languages]} ${PACKAGES[terminal]} ${PACKAGES[diagramming]})
-            # shellcheck disable=SC2206
-            is_wsl && packages+=(${PACKAGES[wsl]})
             # zsh is the registry component among these packages; it is
             # reported installed only when this run installed it.
             local zsh_result=ok
@@ -1152,7 +1176,7 @@ install_package_set() {
                 if command -v zsh >/dev/null 2>&1; then track_install zsh "$zsh_result"; else track_install zsh fail; return 1; fi
             fi
             ;;
-        work) install_apt "work" python3-dev python3-venv ;;
+        work) install_apt "work" "${packages[@]}" ;;
         *) error "Unknown package set: $1"; return 1 ;;
     esac
 }
@@ -1305,8 +1329,7 @@ configure_docker_host_access() {
     if ! host_systemd_running; then
         warn "systemd is not managing this host; Docker service readiness must be handled manually"
     elif [[ "$endpoint" != unix:///run/user/*/docker.sock ]]; then
-        if [[ "${DRY_RUN:-false}" != true ]] \
-           && systemctl is-enabled --quiet docker 2>/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
+        if systemctl is-enabled --quiet docker 2>/dev/null && systemctl is-active --quiet docker 2>/dev/null; then
             log "docker service already enabled and running"
         else
             safe_sudo systemctl enable --now docker || warn "Could not enable/start docker via systemd"
@@ -1340,8 +1363,11 @@ ensure_sbx_kits_builder() {
     local args=(buildx create --name "$SBX_KITS_BUILDER" --driver docker-container
         --driver-opt network=host)
     [[ ! -f "$SBX_KITS_BUILDKITD_CONFIG" ]] || args+=(--buildkitd-config "$SBX_KITS_BUILDKITD_CONFIG")
+    # A preview runs no docker command (buildx records state even to inspect);
+    # it reads whether buildx has the builder's instance file.
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log "[DRY RUN] Would ensure the sbx kit builder: docker ${args[*]}"
+        [[ -f "${DOCKER_CONFIG:-$HOME/.docker}/buildx/instances/$SBX_KITS_BUILDER" ]] \
+            || log "[DRY RUN] Would ensure the sbx kit builder: docker ${args[*]}"
         return 0
     fi
     if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
@@ -1369,29 +1395,106 @@ use_default_node() {
     return 0
 }
 
+# plan_component NAME: what installing would do to NAME, from its
+# observation: one "[DRY RUN] Would ..." line, an unknown, or nothing when it
+# is current or not dotfiles' to change.
+plan_component() {
+    local name="$1" obs rc=0 path owner identity want runnable companions
+    if tool_reinstall "$name"; then
+        log "[DRY RUN] Would reinstall $name"
+        return 0
+    fi
+    obs="$(observe_component "$name" 2>/dev/null)" || rc=$?
+    if (( rc != 0 )); then
+        log "[DRY RUN] Unknown: $name could not be observed ($(observation_field ready-reason <<< "$obs"))"
+        return 0
+    fi
+    path="$(observation_field path <<< "$obs")"
+    owner="$(observation_field owner <<< "$obs")"
+    identity="$(observation_field identity <<< "$obs")"
+    want="$(observation_field want <<< "$obs")"
+    runnable="$(observation_field runnable <<< "$obs")"
+    companions="$(observation_field companions <<< "$obs")"
+    if [[ -z "$path" ]]; then
+        if [[ "$want" == - ]]; then log "[DRY RUN] Would install $name"; else log "[DRY RUN] Would install $name ${want#*:}"; fi
+        return 0
+    fi
+    case "$owner" in
+        dotfiles)
+            if [[ "$runnable" != yes ]]; then
+                log "[DRY RUN] Would repair $name (installed at $path but does not run)"
+            elif [[ "$companions" != ok ]]; then
+                log "[DRY RUN] Would repair $name (companions ${companions#missing:} missing)"
+            elif ! identity_matches "$want" "$identity"; then
+                log "[DRY RUN] Would move $name from ${identity#*:} to ${want#*:}"
+            fi
+            ;;
+        package-manager)
+            identity_matches "$want" "$identity" || log "[DRY RUN] Would move $name from ${identity#apt:} to ${want#apt:}"
+            ;;
+    esac
+    return 0
+}
+
+# Whether the run installs entry NAME: selected, and named by --only when it
+# is given (ONLY_COMPONENTS). Package sets are left out under --only.
+_install_wanted() {
+    if [[ "$1" == packages:* ]]; then
+        [[ -z "${ONLY_COMPONENTS:-}" ]] && package_set_selected "${1#packages:}"
+    else
+        component_selected "$1" && [[ -z "${ONLY_COMPONENTS:-}" || ",$ONLY_COMPONENTS," == *",$1,"* ]]
+    fi
+}
+
+# The first of NAME's needs that is neither present nor installed earlier in
+# this --only run, or nothing.
+_unmet_need() {
+    local name="$1" need needs="${TOOL_NEEDS[$1]:-}" pkg
+    for need in ${needs//,/ }; do
+        if [[ "$need" == packages:* ]]; then
+            while IFS= read -r pkg; do
+                apt_package_installed "$pkg" || { printf '%s (package %s)\n' "$need" "$pkg"; return 0; }
+            done < <(package_set_packages "${need#packages:}")
+        elif [[ ",$ONLY_COMPONENTS," != *",$need,"* ]] && ! tool_is_present "$need"; then
+            printf '%s\n' "$need"
+            return 0
+        fi
+    done
+    return 0
+}
+
 # install_selection: install every selected entry of the registry's install
 # order. Selection is the caller's: component_selected NAME and
-# package_set_selected SET (setup.sh). eget tools install in one batch at the
-# first one's place; a component whose need failed in this run is not
-# attempted; one that does not apply here is recorded as not applicable; each
-# applicable component's configure steps run after its install step installed
-# it or found it present, its own or external (lib/configure.sh).
+# package_set_selected SET (setup.sh), narrowed by --only (ONLY_COMPONENTS),
+# whose components install only when their needs are met. eget tools install
+# in one batch at the first one's place; a component whose need failed in this
+# run is not attempted; one that does not apply here is recorded as not
+# applicable; each applicable component's configure steps run after its
+# install step installed it or found it present, its own or external
+# (lib/configure.sh). A dry run prints the plan from observations instead.
 install_selection() {
-    local entry kind need needs failed=false eget_done=false
+    local entry kind need needs blocker failed=false eget_done=false
     local -a eget_tools=() failed_here=()
     for entry in "${REGISTRY_ORDER[@]}"; do
         [[ "$entry" != packages:* && "${TOOL_INSTALL[$entry]}" == eget ]] || continue
-        component_selected "$entry" && eget_tools+=("$entry")
+        _install_wanted "$entry" && eget_tools+=("$entry")
     done
     for entry in "${REGISTRY_ORDER[@]}"; do
+        _install_wanted "$entry" || continue
         if [[ "$entry" == packages:* ]]; then
-            package_set_selected "${entry#packages:}" || continue
-            log "Installing the ${entry#packages:} tier's packages..."
+            [[ "${DRY_RUN:-false}" == true ]] || log "Installing the ${entry#packages:} tier's packages..."
             install_package_set "${entry#packages:}" || { failed=true; failed_here+=("$entry"); }
             continue
         fi
-        component_selected "$entry" || continue
         kind="${TOOL_INSTALL[$entry]}"
+        if [[ -n "${ONLY_COMPONENTS:-}" ]]; then
+            blocker="$(_unmet_need "$entry")"
+            if [[ -n "$blocker" ]]; then
+                error "Blocked: $entry needs $blocker, which is not installed"
+                failed=true; failed_here+=("$entry")
+                continue
+            fi
+        fi
         if [[ "$kind" != eget ]]; then
             needs="${TOOL_NEEDS[$entry]:-}"
             for need in ${needs//,/ }; do
@@ -1406,6 +1509,15 @@ install_selection() {
                 [[ "${DRY_RUN:-false}" == true ]] || track_install "$entry" not-applicable
                 continue
             fi
+        fi
+        if [[ "${DRY_RUN:-false}" == true ]]; then
+            if [[ "$kind" == eget ]]; then
+                tool_applicable "$entry" && plan_component "$entry"
+            elif [[ "$kind" != packages:* ]]; then
+                plan_component "$entry"
+            fi
+            configure_component "$entry" || failed=true
+            continue
         fi
         case "$kind" in
             eget)

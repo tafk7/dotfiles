@@ -25,13 +25,19 @@ Claude invariant guard rules in `.agents/invariants.json`) read
 `dotfiles update` brings a machine up to its checkout's upstream: it takes
 the operation lock, checks that this checkout is the install path, on a branch
 with an upstream and without uncommitted changes, fetches and shows the
-incoming commits, fast-forwards, re-executes the pulled code, runs setup with
-the machine profile's flags, and verifies. An ahead-only branch skips the pull;
+incoming commits, fast-forwards, re-executes the pulled code, applies the
+machine profile (`dotfiles apply`), and verifies. An ahead-only branch skips the pull;
 a diverged one stops it. It does not yet move unpinned packages (`--upgrade`)
 or retire configs removed upstream.
 
-To move a pin, use `bin/check-updates`, bump the pin, and rerun setup with the
-component's tier. Direct `eget --download-all` bypasses platform/tier selection, ownership
+`dotfiles apply` runs setup with the profile's flags. Its dry run is a plan
+built from observations: it names only components to install, move to their
+pin, or repair, configure steps with work to do, and configs that differ, and
+marks what it could not check as Unknown. `--only X,Y` narrows the run to
+those components and blocks one whose needs are not installed;
+`--reinstall=X,Y` reinstalls only those.
+
+To move a pin, use `bin/check-updates`, bump the pin, and run `dotfiles apply`. Direct `eget --download-all` bypasses platform/tier selection, ownership
 recording, companion handling, and staged replacement. `check-updates` exits 1
 for failed lookups, 2 for updates found with `--outdated`, and 0 otherwise.
 
@@ -40,7 +46,7 @@ skipped because it already existed is not owned, even under `~/.local/bin`, and
 recorded ownership only holds for the same resolved path. Self-updating
 vendor CLIs (Claude, Codex, opencode) are the exception: they may move within
 their ownership roots, and setup records the new path. Adopting an existing
-local install requires `--force`. AI installers keep their vendor-specific
+local install requires `--reinstall` (or `--force`). AI installers keep their vendor-specific
 contracts ([supply chain](supply-chain.md)).
 
 Ledgers written before ownership was recorded explicitly may contain ownership

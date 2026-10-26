@@ -57,7 +57,7 @@ profile_load
 assert_eq "$(profile_setup_args | paste -sd ' ')" "--work --tail --claude --codex --opencode" "an exclusion in the setup arguments"
 out="$(dotfiles profile --add gcloud --no-apply)"
 assert_eq "$(profile_value capabilities)" "gcloud,tail" "adding a capability"
-[[ "$out" == *"plan:"*"setup.sh --work --gcloud --tail"* && "$out" == *"not applied"* ]] || fail "add did not show the plan: $out"
+[[ "$out" == *"plan:"*"Would install nvm"* && "$out" == *"not applied"* ]] || fail "add did not show the plan: $out"
 rc=0
 DOTFILES_TEST_OS_VERSION=26.04 dotfiles profile --add azure --no-apply >/dev/null 2>&1 || rc=$?
 [[ $rc -ne 0 && "$(profile_value capabilities)" == "gcloud,tail" ]] || fail "an unsupported addition was saved"
