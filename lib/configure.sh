@@ -39,10 +39,22 @@ _agent_badge_wanted() {
 # application's home).
 configure_ai_settings() {
     if [[ "${DRY_RUN:-false}" == true ]]; then
-        log "[DRY RUN] Would reconcile $1's portable settings (bin/ai-config $1 --dry-run previews them)"
+        "$DOTFILES_DIR/bin/ai-config" "$1" --check >/dev/null 2>&1 \
+            || log "[DRY RUN] Would reconcile $1's portable settings (bin/ai-config $1 --dry-run shows how)"
         return 0
     fi
     "$DOTFILES_DIR/bin/ai-config" "$1"
+}
+
+# The badge plugin's state for NAME: unregistered (not enabled), current, or
+# stale (an installed cache that differs from this checkout).
+_badge_plugin_state() {
+    local out rc=0
+    out="$("$DOTFILES_DIR/bin/ai-config" "$1" --check-plugin 2>/dev/null)" || rc=$?
+    if [[ "$out" == info:* ]]; then echo unregistered
+    elif (( rc == 0 )); then echo current
+    else echo stale
+    fi
 }
 
 # Register the agent-badge plugin from this repository, which is also a
@@ -56,7 +68,7 @@ configure_agent_badge() {
     fi
     cmd="$(_ai_cli_command "$name")" || return 0
     if [[ "${DRY_RUN:-false}" == true ]]; then
-        log "[DRY RUN] Would register the agent-badge plugin with $name"
+        [[ "$(_badge_plugin_state "$name")" != unregistered ]] || log "[DRY RUN] Would register the agent-badge plugin with $name"
         return 0
     fi
     case "$name" in
@@ -84,7 +96,7 @@ update_agent_badge() {
     local name="$1" cmd
     _agent_badge_wanted || return 0
     cmd="$(_ai_cli_command "$name")" || return 0
-    "$DOTFILES_DIR/bin/ai-config" "$name" --check-plugin >/dev/null 2>&1 && return 0
+    [[ "$(_badge_plugin_state "$name")" == stale ]] || return 0
     if [[ "${DRY_RUN:-false}" == true ]]; then
         log "[DRY RUN] Would update $name's agent-badge plugin to this checkout's version"
         return 0
@@ -117,6 +129,7 @@ configure_pi_settings() {
     local src="$DOTFILES_DIR/configs/pi-settings.json" dest="$HOME/.pi/agent/settings.json"
     [[ -f "$src" ]] || return 0
     if [[ -e "$dest" ]]; then
+        [[ "${DRY_RUN:-false}" != true ]] || return 0
         log "Existing $dest left untouched."
         log "  To disable install/update telemetry, add \"enableInstallTelemetry\": false"
         log "  (see configs/pi-settings.json and docs/ai-tools-egress.md)."
@@ -138,13 +151,8 @@ configure_tailscaled() {
         warn "systemd is unavailable, so tailscaled was not enabled"
         return 0
     fi
-    # A preview runs no systemctl at all, queries included.
-    if [[ "${DRY_RUN:-false}" == true ]]; then
-        log "[DRY RUN] Would enable and start tailscaled unless it is masked or already running"
-        return 0
-    fi
     if [[ "$(systemctl is-enabled tailscaled 2>/dev/null || true)" == masked ]]; then
-        log "tailscaled is masked; leaving it as it is"
+        [[ "${DRY_RUN:-false}" == true ]] || log "tailscaled is masked; leaving it as it is"
         return 0
     fi
     if systemctl is-enabled --quiet tailscaled 2>/dev/null && systemctl is-active --quiet tailscaled 2>/dev/null; then

@@ -67,8 +67,15 @@ CAPABILITIES (orthogonal - combine with any tier):
                         signature-verified. Requires sudo.
 
 OPTIONS:
-    --force             Force overwrite configs and reinstall tools
-    --dry-run           Preview actions without making changes
+    --dry-run           Show what would change, from what is installed now;
+                        change nothing. Lines marked Unknown could not be
+                        checked in advance.
+    --only X[,Y]        Install only these selected components, in order;
+                        a need that is not installed blocks one rather than
+                        being installed. Configs are left as they are.
+    --reinstall[=X,Y]   Reinstall every selected component, or the named ones.
+    --overwrite-configs Replace configs that differ, keeping backups.
+    --force             Both: --reinstall --overwrite-configs
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
     --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
                         one alone). Also skips the delta pager wiring.

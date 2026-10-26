@@ -32,18 +32,6 @@ verify_expected_components() {
     fi
 }
 
-# Whether an observed identity is the wanted one: same kind, same value; an APT
-# version matches its upstream version with any Debian revision.
-identity_matches() {
-    local want="$1" have="$2"
-    [[ "$want" == - ]] && return 0
-    [[ "${want%%:*}" == "${have%%:*}" ]] || return 1
-    case "${want%%:*}" in
-        apt) [[ "${have#apt:}" == "${want#apt:}" || "${have#apt:}" == "${want#apt:}"-* ]] ;;
-        *) [[ "$have" == "$want" ]] ;;
-    esac
-}
-
 verify_component() {
     local name="$1" section=Components obs rc=0
     local applicable path owner identity want runnable companions ready ready_reason

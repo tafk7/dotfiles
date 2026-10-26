@@ -13,6 +13,7 @@ reset_args() {
     INSTALL_TIER=config SELECTED_CAPABILITIES=() SELECTED_AI_TOOLS=()
     THEME_REQUEST="" AGENT_BADGE_REQUEST="" FORCE_OVERWRITE=false FORCE_REINSTALL=false
     SHOW_HELP=false DRY_RUN=false NO_HOOKS=false NO_GIT=false PARSE_ERROR=false
+    REINSTALL_COMPONENTS="" ONLY_COMPONENTS=""
 }
 # Selected capabilities as "name=value" in table order.
 selection() {
@@ -31,6 +32,17 @@ reset_args; parse_arguments --tail; assert_eq "$INSTALL_TIER" config; assert_eq 
 reset_args; parse_arguments --azure --aws; assert_eq "$INSTALL_TIER" config; assert_eq "$(selection)" "azure=yes aws=yes"
 reset_args; parse_arguments --claude --pi; assert_eq "$(selection)" "ai=some"; assert_eq "${SELECTED_AI_TOOLS[*]}" "claude pi"
 reset_args; parse_arguments --codex --ai --claude; assert_eq "$(selection)" "ai=all" "--ai lost to a later per-tool flag"
+
+# --force is both halves; each half alone; --reinstall and --only take names.
+reset_args; parse_arguments --bash --reinstall; assert_eq "$FORCE_REINSTALL/$FORCE_OVERWRITE" true/false "--reinstall"
+reset_args; parse_arguments --bash --overwrite-configs; assert_eq "$FORCE_REINSTALL/$FORCE_OVERWRITE" false/true "--overwrite-configs"
+reset_args; parse_arguments --bash --force; assert_eq "$FORCE_REINSTALL/$FORCE_OVERWRITE" true/true "--force"
+reset_args; parse_arguments --bash --reinstall=fd,bat; assert_eq "$REINSTALL_COMPONENTS/$FORCE_REINSTALL" "fd,bat/false" "--reinstall=LIST"
+reset_args; parse_arguments --bash --only fd,sd; assert_eq "$ONLY_COMPONENTS" "fd,sd" "--only"
+reset_args; if parse_arguments --bash --only bogus >/dev/null 2>&1; then fail "--only accepted an unknown component"; fi
+reset_args; if parse_arguments --bash --reinstall=bogus >/dev/null 2>&1; then fail "--reinstall accepted an unknown component"; fi
+reset_args; if parse_arguments --bash --only claude >/dev/null 2>&1; then fail "--only accepted an unselected component"; fi
+reset_args; parse_arguments --claude --only claude || fail "--only refused a selected AI CLI"
 
 reset_args
 if parse_arguments --git-name --dev >/dev/null 2>&1; then fail "missing --git-name value accepted"; fi
