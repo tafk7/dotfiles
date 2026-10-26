@@ -10,7 +10,7 @@ ENTRY_DIR="$DOTFILES_DIR/entry"
 # Docker Sandboxes, pinned like every other tool and held in APT: sbx changes
 # weekly, and kits and controllers built on it (Cardinal requires an exact
 # version) break on an unplanned upgrade. Bump deliberately.
-SBX_VERSION="0.46.0"
+SBX_VERSION="0.49.2"
 # Neovim and tmux, pinned with their release assets' SHA-256 so installing
 # needs no GitHub API lookup (anonymous calls are rate-limited per address).
 # bin/check-updates shows newer releases; bump version and checksums together
