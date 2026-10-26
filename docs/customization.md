@@ -107,6 +107,13 @@ The value is `target:type:owner`. Shell rc sources live in `entry/`, everything
 else in `configs/`. An empty owner means the config is always linked; a named
 owner links it only when that tool is present. Run `./setup.sh --config`.
 
+To stop managing a config, delete its entry (and source). Setup records each
+config it deploys in `deployed.tsv`, and retires one whose entry is gone: a
+link that still points where setup pointed it is removed, a rendered file that
+still has the content setup wrote is moved aside, each with a backup. A target
+changed since then is kept and reported once. `bin/diff-config` and
+`dotfiles verify` list retirements before setup makes them.
+
 ## Adding aliases, functions, and commands
 
 Every `shell/tools/*.sh` file is sourced by `shell/init.sh`; add to the matching

@@ -540,8 +540,12 @@ phase_setup_configs() {
             config_owner_present "$owner" || continue
             [[ "$type" != "gitconfig" || "$NO_GIT" != "true" ]] || continue
             if [[ "$type" == gitconfig ]]; then
-                local portable="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
-                [[ -f "$portable" ]] && git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable" \
+                local portable
+                portable="$(portable_gitconfig_path)"
+                if [[ ! -f "$portable" ]] || ! cmp -s <(render_portable_gitconfig "$(config_source_path "$config")") "$portable"; then
+                    log "  ✓ $portable (would render the portable Git config)"
+                fi
+                git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable" \
                     || log "  ✓ $target (would add the portable include)"
             elif [[ -L "$target" ]]; then
                 [[ "$(readlink -f "$target")" == "$(readlink -f "$(config_source_path "$config")")" ]] \
@@ -552,6 +556,7 @@ phase_setup_configs() {
                 log "  ✓ $target (would create $type)"
             fi
         done
+        retire_deployed_configs || failed=true
         is_wsl && log "[DRY RUN] Would setup WSL clipboard integration"
         is_wsl && [[ -f "$HOME/.ssh/use-windows-agent" ]] && log "[DRY RUN] Would install the WSL ssh-agent bridge service (marker present)"
     else
@@ -573,7 +578,7 @@ phase_setup_configs() {
             case "$type" in
                 symlink)
                     if process_symlink "$source" "$target"; then
-                        ledger_record "config.${config//\//.}" yes dotfiles installed "" "$target" symlink || failed=true
+                        deployed_record "$target" link "$(readlink "$target")" "$config" || failed=true
                     else
                         failed=true
                     fi
@@ -583,8 +588,10 @@ phase_setup_configs() {
                         log "Skipping $target (--no-git)"
                     else
                         if process_git_config "$source" "$target" "$FORCE_OVERWRITE"; then
-                            ledger_record config.git yes dotfiles installed "" \
-                                "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig" include || failed=true
+                            local portable
+                            portable="$(portable_gitconfig_path)"
+                            deployed_record "$portable" rendered "sha256:$(sha256sum "$portable" | awk '{print $1}')" "$config" \
+                                && deployed_record "$target" merged "include:$portable" "$config" || failed=true
                         else
                             failed=true
                         fi
@@ -596,6 +603,7 @@ phase_setup_configs() {
                     ;;
             esac
         done
+        retire_deployed_configs || failed=true
     fi
     
     if is_wsl && [[ "$DRY_RUN" != "true" ]]; then

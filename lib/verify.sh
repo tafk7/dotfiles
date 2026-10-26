@@ -194,17 +194,26 @@ verify_configs() {
                 fi
                 ;;
             gitconfig)
-                local portable="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
+                local portable
+                portable="$(portable_gitconfig_path)"
                 if profile_exists && profile_load 2>/dev/null && _profile_in_list "${PROFILE[opt-outs]}" no-git; then
                     outcome ok "$section" "$target" "skipped (no-git)"
-                elif [[ -f "$portable" ]] && git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable"; then
-                    outcome ok "$section" "$target" "includes $portable"
-                else
+                elif [[ ! -f "$portable" ]] || ! git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable"; then
                     outcome convergence "$section" "$target" "lacks the portable include ($portable)"
+                elif ! cmp -s <(render_portable_gitconfig "$source_path") "$portable"; then
+                    outcome convergence "$section" "$portable" "differs from what setup renders (bin/diff-config gitconfig shows how)"
+                else
+                    outcome ok "$section" "$target" "includes $portable, as setup renders it"
                 fi
                 ;;
         esac
     done < <(printf '%s\n' "${!CONFIG_MAP[@]}" | LC_ALL=C sort)
+    # What setup deployed from a source that has since left the manifest.
+    local kind identity source run
+    while IFS=$'\t' read -r target kind identity source run; do
+        [[ -n "$target" && -z "${CONFIG_MAP[$source]+x}" ]] || continue
+        outcome convergence "$section" "$target" "its source $source left the manifest; setup retires it if unchanged"
+    done < <(deployed_entries 2>/dev/null)
 }
 
 verify_ai() {

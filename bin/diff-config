@@ -8,10 +8,13 @@
 #
 # Status legend:
 #   ✅ linked     symlink points at dotfiles source (no drift possible)
-#   ✏️  drifted    target exists but content differs from source
+#   ✅ included   ~/.gitconfig includes the portable config, as setup renders it
+#   ✏️  drifted    target exists but content differs from source (or, for the
+#                 portable Git config, from what setup would render now)
 #   ⚠️  divergent  symlink exists but points elsewhere
 #   ❌ missing    target doesn't exist
-#   📝 template   gitconfig-style processed template (compared post-substitution)
+#   ⊘ skipped    its tool is not installed, so setup does not deploy it
+#   🗑 retiring   setup deployed it from a source that left the manifest
 
 set -euo pipefail
 
@@ -20,6 +23,7 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
+source "$DOTFILES_DIR/lib/state.sh"
 
 SHOW_DIFF=false
 FILTER_KEY=""
@@ -53,6 +57,7 @@ inspect_one() {
     local target="${mapping%%:*}"
     local remainder="${mapping#*:}"
     local type="${remainder%%:*}"
+    local owner="${remainder#*:}"
     local source_path
     source_path="$(config_source_path "$key")"
 
@@ -62,6 +67,10 @@ inspect_one() {
     local status_icon="" detail=""
     local needs_diff=false
 
+    if ! config_owner_present "$owner"; then
+        printf "  %b  %-32s  ← %s  %s(%s not installed)%s\n" "${DIM}⊘ skipped${NC}" "$short_target" "$short_source" "$DIM" "$owner" "$NC"
+        return 0
+    fi
     if [[ ! -e "$target" && ! -L "$target" ]]; then
         status_icon="${RED}❌ missing${NC}"
         printf "  %b  %-32s  ← %s\n" "$status_icon" "$short_target" "$short_source"
@@ -97,14 +106,19 @@ inspect_one() {
             fi
             ;;
         gitconfig)
-            local portable="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig"
-            if [[ -f "$portable" ]] \
-               && git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable"; then
-                status_icon="${GREEN}✅ included${NC}"
-                detail="(portable base; user config preserved)"
-            else
+            local portable
+            portable="$(portable_gitconfig_path)"
+            if [[ ! -f "$portable" ]] \
+               || ! git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "$portable"; then
                 status_icon="${RED}❌ missing include${NC}"
                 detail="(run setup.sh --config)"
+            elif ! cmp -s <(render_portable_gitconfig "$source_path") "$portable"; then
+                status_icon="${YELLOW}✏️  drifted${NC}"
+                detail="(${portable/#$HOME/~} differs from what setup renders)"
+                needs_diff=true
+            else
+                status_icon="${GREEN}✅ included${NC}"
+                detail="(portable base; user config preserved)"
             fi
             ;;
         *)
@@ -119,7 +133,9 @@ inspect_one() {
     if [[ "$needs_diff" == "true" && "$SHOW_DIFF" == "true" ]]; then
         echo
         echo "──── diff: $short_target ←→ $short_source ────"
-        if [[ -d "$source_path" && -d "$target" ]]; then
+        if [[ "$type" == gitconfig ]]; then
+            diff_cmd <(render_portable_gitconfig "$source_path") "$(portable_gitconfig_path)"
+        elif [[ -d "$source_path" && -d "$target" ]]; then
             diff -r -u "$source_path" "$target" || true
         else
             diff_cmd "$source_path" "$target"
@@ -149,6 +165,13 @@ main() {
     for key in "${sorted_keys[@]}"; do
         inspect_one "$key"
     done
+    # Deployed from sources that have left the manifest: setup retires each
+    # one that is still exactly what it wrote.
+    local target kind identity source run
+    while IFS=$'\t' read -r target kind identity source run; do
+        [[ -n "$target" && -z "${CONFIG_MAP[$source]+x}" ]] || continue
+        printf "  %b  %-32s  ← %s  %s(left the manifest)%s\n" "${YELLOW}🗑 retiring${NC}" "${target/#$HOME/~}" "$source" "$DIM" "$NC"
+    done < <(deployed_entries 2>/dev/null)
 
     echo
     echo "${DIM}Tip: pass --diff to print unified diffs for drifted files.${NC}"
