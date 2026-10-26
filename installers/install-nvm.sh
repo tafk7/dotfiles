@@ -56,6 +56,7 @@ else
         nvm_installer="$(mktemp)"
         downloaded_installer=true
         download_installer_script "https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh" "$nvm_installer"
+        verify_sha256 "$nvm_installer" "$(versions_field nvm sha256 any)" || { rm -f "$nvm_installer"; exit 1; }
     elif [[ ! -s "$nvm_installer" ]]; then
         error "DOTFILES_NVM_INSTALLER_SCRIPT is missing or empty: $nvm_installer"
         exit 1

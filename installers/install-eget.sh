@@ -1,6 +1,7 @@
 #!/bin/bash
 # Install eget (GitHub release binary manager)
-# Bootstraps eget itself — all other binary tools are then managed via eget.toml
+# Bootstraps eget itself, as versions.lock pins it; eget then installs the
+# other binary tools.
 
 set -euo pipefail
 
@@ -29,22 +30,22 @@ elif command -v eget >/dev/null 2>&1; then
     warn "Existing eget binary is broken — reinstalling"
 fi
 
-ARCH=$(get_arch)
-case "$ARCH" in
-    x86_64)  EGET_ARCH="amd64" ;;
-    aarch64) EGET_ARCH="arm64" ;;
-esac
+# The archive, its checksum, the file in it, and that file's digest.
+IFS=$'\t' read -r _ _ _ _ EGET_ASSET EGET_ASSET_SHA256 EGET_MEMBER EGET_IDENTITY \
+    < <(versions_row eget "$(get_arch)") || { error "versions.lock has no eget row for $(get_arch)"; exit 1; }
 
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 cd "$TEMP_DIR"
 
 log "Downloading eget v${EGET_VERSION}..."
-download_https "https://github.com/zyedidia/eget/releases/download/v${EGET_VERSION}/eget-${EGET_VERSION}-linux_${EGET_ARCH}.tar.gz" eget.tar.gz
+download_https "https://github.com/zyedidia/eget/releases/download/v${EGET_VERSION}/$EGET_ASSET" eget.tar.gz
+verify_sha256 eget.tar.gz "$EGET_ASSET_SHA256" || exit 1
 
 validate_tar_archive eget.tar.gz
 tar xf eget.tar.gz
-STAGED_EGET="$TEMP_DIR/eget-${EGET_VERSION}-linux_${EGET_ARCH}/eget"
+STAGED_EGET="$TEMP_DIR/$EGET_MEMBER"
+[[ "$EGET_IDENTITY" != sha256:* ]] || verify_sha256 "$STAGED_EGET" "${EGET_IDENTITY#sha256:}" || exit 1
 chmod +x "$STAGED_EGET"
 "$STAGED_EGET" --version >/dev/null 2>&1 || { error "Staged eget binary does not run"; exit 1; }
 atomic_replace_binary eget "$STAGED_EGET" "$HOME/.local/bin/eget"

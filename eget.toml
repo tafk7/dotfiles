@@ -1,10 +1,12 @@
-# eget.toml — pinned releases for the eget-managed tools. Install through
-# setup.sh, which adds tier selection, staging, and ownership recording.
+# eget.toml — release tags and asset filters for the eget-managed tools.
+# Install through setup.sh, which adds tier selection, staging, and ownership
+# recording.
 #
-# setup.sh does not resolve these entries itself: eget.lock records, per tool
-# and architecture, the asset these filters select, its SHA-256 and the file to
-# extract, and setup.sh downloads exactly that (no GitHub API call, so no
-# rate limit on a fresh machine). After bumping a `tag`, regenerate the lock:
+# setup.sh does not read this file: versions.lock records, per tool and
+# architecture, the asset these filters select, its SHA-256, the file to
+# extract and that file's digest, and setup.sh downloads exactly that (no
+# GitHub API call, so no rate limit on a fresh machine). After bumping a `tag`,
+# regenerate the lock's rows:
 #
 #     python3 tests/eget-selection.py --refresh
 #

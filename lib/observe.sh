@@ -24,28 +24,11 @@ version_token() {
     grep -oE '[0-9]+(\.[0-9]+)+[a-z]?' | head -n1
 }
 
-# The eget.toml tag pinned for an eget tool.
-eget_pinned_tag() {
-    local name="$1" config="$DOTFILES_DIR/eget.toml" slug
-    slug="${TOOL_EGET_REPO[$name]:-}"
-    if [[ -z "$slug" ]]; then
-        slug="$(grep -Po '^\["\K[^"]+' "$config" 2>/dev/null | awk -F/ -v name="$name" '$2 == name { print; exit }')"
-    fi
-    [[ -n "$slug" ]] || return 1
-    awk -v section="[\"$slug\"]" '
-        $0 == section { active=1; next }
-        active && /^\[/ { exit }
-        active && /^[[:space:]]*tag[[:space:]]*=/ {
-            line=$0; sub(/^[^"]*"/, "", line); sub(/".*$/, "", line); print line; exit
-        }
-    ' "$config"
-}
-
 # What a component should be, as KIND:VALUE, or - when versions are not pinned.
 component_want() {
     local name="$1" tag
     if [[ "${TOOL_METHOD[$name]:-}" == eget ]]; then
-        tag="$(eget_pinned_tag "$name")" && [[ -n "$tag" ]] && { printf 'tag:%s\n' "$tag"; return; }
+        tag="$(versions_field "$name" want 2>/dev/null)" && [[ -n "$tag" ]] && { printf 'tag:%s\n' "$tag"; return; }
         printf -- '-\n'; return
     fi
     case "$name" in
@@ -75,7 +58,7 @@ observe_component() {
     [[ -n "${TOOL_BINARY[$name]:-}" ]] || { printf 'observe: unknown component: %s\n' "$name" >&2; return 2; }
     local binary="${TOOL_BINARY[$name]}" method="${TOOL_METHOD[$name]}"
     local applicable=yes reason="" path="" owner=none identity="-" want runnable=no companions=ok ready=no ready_reason=""
-    local line recorded_owner="" recorded_path="" recorded_note="" probe_timeout="${DOTFILES_OBSERVE_TIMEOUT:-${TOOL_TIMEOUT[$name]:-10}}"
+    local line recorded_owner="" recorded_path="" probe_timeout="${DOTFILES_OBSERVE_TIMEOUT:-${TOOL_TIMEOUT[$name]:-10}}"
 
     want="$(component_want "$name")"
     if ! tool_applicable "$name"; then
@@ -106,7 +89,7 @@ observe_component() {
         fi
         line=""
     fi
-    [[ -z "$line" ]] || IFS=$'\t' read -r _ _ recorded_owner _ _ recorded_path recorded_note _ <<< "$line"
+    [[ -z "$line" ]] || IFS=$'\t' read -r _ _ recorded_owner _ _ recorded_path _ _ <<< "$line"
 
     if [[ -n "$path" ]]; then
         if [[ "$method" == apt ]] && apt_package_installed "${TOOL_APT_PACKAGE[$name]:-$name}"; then
@@ -141,14 +124,13 @@ observe_component() {
             version="$(printf '%s\n' "$output" | version_line | version_token || true)"
             [[ -z "$version" ]] || identity="version:$version"
         fi
+        # An eget tool is its locked release when its digest is the lock's.
         if [[ "$method" == eget && -f "$path" ]]; then
-            local digest pinned_hash=""
+            local digest
             digest="$(sha256sum "$path" | awk '{print $1}')"
             identity="sha256:$digest"
-            if [[ "$recorded_note" =~ pin=([^[:space:]]+)\ sha256=([0-9a-f]{64}) ]]; then
-                pinned_hash="${BASH_REMATCH[2]}"
-                [[ "$pinned_hash" != "$digest" ]] || identity="tag:${BASH_REMATCH[1]}"
-            fi
+            [[ "$want" == - || "$(versions_field "$name" identity 2>/dev/null)" != "sha256:$digest" ]] \
+                || identity="$want"
         fi
 
         local companion missing=""

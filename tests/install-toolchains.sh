@@ -37,6 +37,17 @@ if DOTFILES_NVM_INSTALLER_SCRIPT="$bad" "$ROOT/installers/install-nvm.sh" --forc
 fi
 [[ "$(sha256sum "$HOME/.nvm/nvm.sh" | awk '{print $1}')" == "$before" ]] || fail "failed NVM update damaged working install"
 
+# A downloaded NVM installer that is not the locked install.sh never runs.
+mkdir -p "$TEST_ROOT/bin"
+printf '#!/bin/bash\nwhile (( $# )); do [[ "$1" == --output ]] && dest="$2"; shift; done\nprintf "#!/bin/sh\\ntouch %s/nvm-ran\\n" > "$dest"\n' \
+    "$TEST_ROOT" > "$TEST_ROOT/bin/curl"
+chmod +x "$TEST_ROOT/bin/curl"
+if PATH="$TEST_ROOT/bin:$PATH" "$ROOT/installers/install-nvm.sh" --force >"$TEST_ROOT/nvm-out" 2>&1; then
+    fail "an NVM installer off the lock was accepted"
+fi
+[[ ! -e "$TEST_ROOT/nvm-ran" && "$(<"$TEST_ROOT/nvm-out")" == *"Checksum mismatch"* ]] || fail "an NVM installer off the lock ran: $(<"$TEST_ROOT/nvm-out")"
+rm "$TEST_ROOT/bin/curl"
+
 rust_installer="$TEST_ROOT/rust-install.sh"
 cat > "$rust_installer" <<'EOF'
 #!/bin/sh

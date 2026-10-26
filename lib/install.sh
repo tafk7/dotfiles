@@ -886,12 +886,11 @@ run_installer() {
     esac
 }
 
-# Install the binary tools declared in eget.toml, as the assets eget.lock pins
+# Install the eget-method tools, as the assets versions.lock pins
 install_eget_tools() {
-    local config="$DOTFILES_DIR/eget.toml" lock="$DOTFILES_DIR/eget.lock"
     local requested="${1:-}" arch
-    if [[ ! -f "$config" ]]; then
-        error "eget.toml not found at $config"
+    if [[ ! -r "$DOTFILES_VERSIONS_LOCK" ]]; then
+        error "versions.lock not found at $DOTFILES_VERSIONS_LOCK"
         return 1
     fi
 
@@ -961,10 +960,6 @@ install_eget_tools() {
         return 0
     fi
 
-    if [[ ! -f "$lock" ]]; then
-        error "eget.lock not found at $lock"
-        return 1
-    fi
     arch="$(tool_arch)" || return 1
 
     # ~/.local/bin may not be on PATH yet on a fresh machine.
@@ -975,78 +970,43 @@ install_eget_tools() {
         return 1
     fi
 
-    # Map each tool name to its eget repo slug by parsing the config headers
-    # (["owner/repo"]). eget.toml stays the single source of truth for slugs. The
-    # repo basename is the registry tool name except where TOOL_EGET_REPO says
-    # otherwise (gh ships from cli/cli); an override must still name a slug that
-    # eget.toml pins, so a typo can't fetch an unpinned release.
-    local -A tool_slug=() pinned_slug=()
-    local slug
-    while IFS= read -r slug; do
-        tool_slug["${slug##*/}"]="$slug"
-        pinned_slug["$slug"]=1
-    done < <(grep -Po '^\["\K[^"]+' "$config")
-
     # Run eget per tool rather than --download-all so skipped system tools are
     # never fetched. eget's exit code doesn't distinguish "up to date" from
     # "failed", so each tool is judged by whether its binary lands on disk.
     local any_missing=false
     for name in "${eget_tools[@]}"; do
-        slug="${TOOL_EGET_REPO[$name]:-${tool_slug[$name]:-}}"
-        if [[ -z "$slug" || -z "${pinned_slug[$slug]:-}" ]]; then
-            warn "No eget.toml entry for $name${slug:+ ($slug)} — skipping"
+        # The release, asset, checksum, file to extract, and the extracted
+        # binary's digest come from versions.lock, so the download names an
+        # exact URL and eget never asks the GitHub API (anonymous calls are
+        # limited per address, which fresh machines and CI runners share).
+        local lock_row want source asset asset_sha256 member identity digest target companion_ready companion
+        if ! lock_row="$(versions_row "$name" "$arch")"; then
+            warn "versions.lock has no $name row for $arch (run: python3 tests/eget-selection.py --refresh)"
             track_install "$name" fail
             any_missing=true
             continue
         fi
-        local pinned current_output target existing_record recorded_note recorded_hash actual_hash companion_ready companion_output companion
-        pinned="$(awk -v section="[\"$slug\"]" '
-            $0 == section { active=1; next }
-            active && /^\[/ { exit }
-            active && /^[[:space:]]*tag[[:space:]]*=/ {
-                line=$0; sub(/^[^"]*"/, "", line); sub(/".*$/, "", line); print line; exit
-            }
-        ' "$config")"
+        IFS=$'\t' read -r _ _ want source asset asset_sha256 member identity <<< "$lock_row"
+        digest="${identity#sha256:}"
+        if [[ "$identity" != sha256:* || "$asset_sha256" == - || "$source" != */* ]]; then
+            warn "versions.lock's $name row lacks a release, asset digest, or binary identity"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        # Current means the locked build: the binary's digest is the lock's
+        # identity, and every companion is there and runs.
         target="$HOME/.local/bin/${TOOL_BINARY[$name]}"
-        companion_ready=true
-        for companion in ${TOOL_COMPANIONS[$name]:-}; do
-            companion_output="$("$HOME/.local/bin/$companion" --version 2>/dev/null || true)"
-            [[ -n "$pinned" && "$companion_output" == *"${pinned#v}"* ]] || companion_ready=false
-        done
-        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" && -n "$pinned" && "$companion_ready" == true ]]; then
-            existing_record="$(ledger_line "$name" 2>/dev/null || true)"
-            recorded_note=""
-            if [[ -n "$existing_record" ]]; then
-                IFS=$'\t' read -r _ _ _ _ _ _ recorded_note _ <<< "$existing_record"
-            fi
-            if [[ "$recorded_note" == *" pin=$pinned "* && "$recorded_note" =~ sha256=([0-9a-f]{64}) ]]; then
-                recorded_hash="${BASH_REMATCH[1]}"
-                actual_hash="$(sha256sum "$target" | awk '{print $1}')"
-                if [[ "$actual_hash" == "$recorded_hash" ]]; then
-                    track_install "$name" skip
-                    continue
-                fi
-            fi
-            current_output="$("$target" --version 2>/dev/null || true)"
-            if [[ "$current_output" == *"${pinned#v}"* ]]; then
+        if [[ "${FORCE_REINSTALL:-false}" != "true" && -x "$target" ]] \
+           && [[ "$(sha256sum "$target" | awk '{print $1}')" == "$digest" ]]; then
+            companion_ready=true
+            for companion in ${TOOL_COMPANIONS[$name]:-}; do
+                "$HOME/.local/bin/$companion" --version >/dev/null 2>&1 || companion_ready=false
+            done
+            if [[ "$companion_ready" == true ]]; then
                 track_install "$name" skip
                 continue
             fi
-        fi
-
-        # The asset, its checksum and the file to extract come from eget.lock,
-        # so the download names an exact URL and eget never asks the GitHub API
-        # (anonymous calls are limited per address, which fresh machines and CI
-        # runners share).
-        local lock_row lock_tag asset asset_sha256 member
-        lock_row="$(awk -F'\t' -v repo="$slug" -v arch="$arch" \
-            '!/^#/ && $1 == repo && $3 == arch { print; exit }' "$lock")"
-        IFS=$'\t' read -r _ lock_tag _ asset asset_sha256 member <<< "$lock_row"
-        if [[ -z "$lock_row" || "$lock_tag" != "$pinned" ]]; then
-            warn "eget.lock has no $slug $pinned asset for $arch (run: python3 tests/eget-selection.py --refresh)"
-            track_install "$name" fail
-            any_missing=true
-            continue
         fi
 
         local stage_home stage_config staged staged_hash companion companions_ok
@@ -1068,7 +1028,7 @@ install_eget_tools() {
         fi
         extract_args+=(--verify-sha256 "$asset_sha256")
         if ! HOME="$stage_home" EGET_CONFIG="$stage_config" "$eget_bin" "${extract_args[@]}" \
-                "https://github.com/$slug/releases/download/$lock_tag/$asset" < /dev/null; then
+                "https://github.com/$source/releases/download/$want/$asset" < /dev/null; then
             rm -rf "$stage_home"
             track_install "$name" fail
             any_missing=true
@@ -1080,6 +1040,16 @@ install_eget_tools() {
             [[ ! -f "$stage_home/.local/bin/$companion" ]] || chmod +x "$stage_home/.local/bin/$companion"
         done
         if [[ ! -x "$staged" ]] || ! "$staged" --version >/dev/null 2>&1; then
+            rm -rf "$stage_home"
+            track_install "$name" fail
+            any_missing=true
+            continue
+        fi
+        # The archive matched its checksum; the binary in it must be the build
+        # the lock records too.
+        staged_hash="$(sha256sum "$staged" | awk '{print $1}')"
+        if [[ "$staged_hash" != "$digest" ]]; then
+            warn "$name: the extracted binary is not the locked build (sha256 $staged_hash, expected $digest)"
             rm -rf "$stage_home"
             track_install "$name" fail
             any_missing=true
@@ -1102,9 +1072,8 @@ install_eget_tools() {
             atomic_replace_binary "$name" "$stage_home/.local/bin/$companion" "$HOME/.local/bin/$companion" \
                 || { companions_ok=false; break; }
         done
-        staged_hash="$(sha256sum "$staged" | awk '{print $1}')"
         if [[ "$companions_ok" != true ]] \
-           || ! atomic_replace_binary "$name" "$staged" "$target" "pin=$pinned sha256=$staged_hash"; then
+           || ! atomic_replace_binary "$name" "$staged" "$target" "pin=$want sha256=$staged_hash"; then
             rm -rf "$stage_home"
             track_install "$name" fail
             any_missing=true

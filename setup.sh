@@ -429,6 +429,18 @@ phase_verify_system() {
         warn "Ubuntu ${os_version:-unknown} is outside the tested support matrix"
     fi
     get_arch >/dev/null || return 1
+    # Every download's pin comes from versions.lock; a malformed lock stops a
+    # tier that downloads before anything is fetched.
+    local lock_problems
+    lock_problems="$(versions_problems)"
+    if [[ -n "$lock_problems" ]]; then
+        if tier_includes bash; then
+            error "versions.lock is invalid:"
+            sed 's/^/  /' <<< "$lock_problems" >&2
+            return 1
+        fi
+        warn "versions.lock is invalid (not needed for the config tier): $(head -n1 <<< "$lock_problems")"
+    fi
     if is_wsl && [[ "$(wsl_version)" != 2 ]]; then
         error "WSL1 is unsupported; use WSL2"
         return 1

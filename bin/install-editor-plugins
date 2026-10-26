@@ -16,11 +16,11 @@ config_dir="$(nvim --headless -u NONE -i NONE -c 'lua io.write(vim.fn.stdpath("c
 [[ "$config_dir" == /* ]] || { error 'Neovim returned an invalid config directory'; exit 1; }
 plug="$config_dir/autoload/plug.vim"
 if [[ ! -f "$plug" ]]; then
-    revision=88e31471818e9a29a8a20a0ee61360cfd7bdc1cd
+    revision="$(versions_field vim-plug want any)"
     staged="$(mktemp)"
     trap 'rm -f "$staged"' EXIT
     download_https "https://raw.githubusercontent.com/junegunn/vim-plug/$revision/plug.vim" "$staged"
-    grep -q '^function! plug#begin' "$staged" || { error 'Unexpected vim-plug artifact'; exit 1; }
+    verify_sha256 "$staged" "$(versions_field vim-plug sha256 any)" || exit 1
     mkdir -p "$config_dir/autoload"
     install -m 0644 "$staged" "$plug"
 fi

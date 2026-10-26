@@ -93,6 +93,7 @@ assert_eq "$(ledger_field claude 2)/$(ledger_field claude 3)" "external/present"
 repo="$TEST_ROOT/repo"
 mkdir -p "$repo"
 DOTFILES_DIR="$repo"
+DOTFILES_VERSIONS_LOCK="$repo/versions.lock"
 TOOL_METHOD=(['demo']=eget ['other']=eget)
 TOOL_BINARY=(['demo']=demo ['other']=other)
 TOOL_TIER=(['demo']=bash ['other']=bash)
@@ -100,7 +101,6 @@ TOOL_PLATFORM=(['demo']=ubuntu ['other']=ubuntu)
 TOOL_ARCHES=(['demo']='x86_64,aarch64' ['other']='x86_64,aarch64')
 TOOL_OWNERSHIP_ROOTS=(['demo']="$HOME/.local/bin" ['other']="$HOME/.local/bin")
 TOOL_UPDATE_CONTRACT=(['demo']=staged-release ['other']=staged-release)
-TOOL_EGET_REPO=(['demo']=example/demo ['other']=example/other)
 run_installer() { :; }
 tier_includes() { return 0; }
 # The fake eget writes a binary reporting the tag in the URL, and fails for
@@ -116,15 +116,18 @@ tag="${url%/*}"; tag="${tag##*/}"
 printf '#!/bin/sh\necho "%s %s"\n' "${to##*/}" "${tag#v}" > "$to"
 FAKE_EGET
 chmod +x "$HOME/.local/bin/eget"
+# pin DEMO_TAG OTHER_TAG: versions.lock rows whose identity is the binary the
+# fake eget writes for that tag.
 pin() {
-    local demo_tag="$1" other_tag="$2" arch repo_slug tag
-    printf '["example/demo"]\ntag = "%s"\n["example/other"]\ntag = "%s"\n' "$demo_tag" "$other_tag" > "$repo/eget.toml"
-    for repo_slug in example/demo:"$demo_tag" example/other:"$other_tag"; do
-        tag="${repo_slug#*:}"
+    local name tag arch digest
+    for name in demo:"$1" other:"$2"; do
+        tag="${name#*:}" name="${name%%:*}"
+        digest="$(printf '#!/bin/sh\necho "%s %s"\n' "$name" "${tag#v}" | sha256sum | awk '{print $1}')"
         for arch in x86_64 aarch64; do
-            printf '%s\t%s\t%s\tasset.tar.gz\t%s\t-\n' "${repo_slug%%:*}" "$tag" "$arch" "$(printf '0%.0s' {1..64})"
+            printf '%s\t%s\t%s\texample/%s\tasset.tar.gz\t%s\t-\tsha256:%s\n' \
+                "$name" "$arch" "$tag" "$name" "$(printf '0%.0s' {1..64})" "$digest"
         done
-    done > "$repo/eget.lock"
+    done > "$DOTFILES_VERSIONS_LOCK"
 }
 pin v2.0.0 v2.0.0
 install_eget_tools >/dev/null 2>&1 || fail "initial eget install failed"

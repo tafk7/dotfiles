@@ -42,13 +42,16 @@ assert_eq "$(fixture_managed_snapshot)" "$before" "observation changed HOME or X
 export PATH="$TEST_SYSTEM_PATH"
 rm -f "$TEST_ROOT"/bin/{mkdir,mv,rm,ln,cp,chmod,install,apt,apt-get,dpkg,tee,systemctl,sudo}
 
-# --- Identity: an eget tool matching its recorded pin and digest is identified
-# by tag; anything else by digest.
+# --- Identity: an eget tool whose digest is versions.lock's identity is its
+# locked tag; anything else is its digest.
 obs="$(observe_component eza)"
 assert_eq "$(field owner "$obs")" external "an unrecorded binary is not owned"
-[[ "$(field identity "$obs")" == sha256:* ]] || fail "unrecorded eget identity: $(field identity "$obs")"
-assert_eq "$(field want "$obs")" "tag:$(eget_pinned_tag eza)" "eget want"
+[[ "$(field identity "$obs")" == sha256:* ]] || fail "eget identity off the lock: $(field identity "$obs")"
+assert_eq "$(field want "$obs")" "tag:$(versions_field eza want)" "eget want"
 digest="$(sha256sum "$HOME/.local/bin/eza" | awk '{print $1}')"
+awk -F '\t' -v OFS='\t' -v d="sha256:$digest" '$1 == "eza" && $2 == "x86_64" { $8 = d } 1' \
+    "$ROOT/versions.lock" > "$TEST_ROOT/versions.lock"
+DOTFILES_VERSIONS_LOCK="$TEST_ROOT/versions.lock"
 ledger_record eza yes dotfiles installed v0.23.4 "$HOME/.local/bin/eza" "staged-release pin=v0.23.4 sha256=$digest"
 obs="$(observe_component eza)"
 assert_eq "$(field owner "$obs")/$(field identity "$obs")/$(field runnable "$obs")" "dotfiles/tag:v0.23.4/yes" "owned eget tool"

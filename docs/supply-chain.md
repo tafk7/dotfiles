@@ -5,27 +5,34 @@ timeouts, and a non-empty response. Installer scripts are downloaded to a file
 and checked for a shell shebang before execution; they are never piped directly
 from the network into a shell and are never executed with `sudo`.
 
+`versions.lock` is the one record of what dotfiles downloads itself: per
+component and architecture, the wanted release, the artifact, its SHA-256, the
+file extracted from it, and the installed identity (the extracted binary's
+SHA-256, or the version it reports). Installers and checks read only the lock;
+`lib/versions.sh` parses it and setup refuses a malformed one before a tier that
+downloads.
+
 | Component | Version policy | Authenticity / replacement contract |
 |---|---|---|
-| eget | pinned release | HTTPS-trusted release asset; staged executable check and atomic replacement |
-| eget-managed CLI tools | pinned in `eget.toml`; asset locked in `eget.lock` | exact asset by download URL (no GitHub API call), SHA-256 verified against the lock; staged executable check and atomic replacement |
-| Neovim | pinned release (`lib/config.sh`) | release asset SHA-256 verified against the pin; archive-layout and executable checks; staged tree replacement |
-| vim-plug | commit `88e31471818e9a29a8a20a0ee61360cfd7bdc1cd` | explicit `install-editor-plugins` action; HTTPS-trusted immutable source; existing manager preserved |
+| eget | pinned release (`versions.lock`) | release archive SHA-256 and extracted binary SHA-256 verified against the lock; staged executable check and atomic replacement |
+| eget-managed CLI tools | tags in `eget.toml`; asset, archive SHA-256 and binary SHA-256 in `versions.lock` | exact asset by download URL (no GitHub API call), archive verified against the lock, extracted binary verified against the lock's identity; current only when the installed binary's SHA-256 is the lock's; staged executable check and atomic replacement |
+| Neovim | pinned release (`versions.lock`) | release asset SHA-256 verified against the lock; archive-layout and executable checks; staged tree replacement |
+| vim-plug | pinned commit (`versions.lock`) | explicit `install-editor-plugins` action; `plug.vim` SHA-256 verified against the lock; existing manager preserved |
 | Neovim plugins | commit-pinned in `configs/init.vim` | cloned by `install-editor-plugins`; no post-install hooks, so the fzf plugin never downloads its own binary and uses the eget-pinned `fzf` on PATH |
-| tmux | pinned release (`lib/config.sh`) | source archive SHA-256 verified against the pin; staged build and executable check before replacement |
-| NVM | pinned installer (`NVM_VERSION` in `lib/config.sh`) | HTTPS-trusted installer file; no shell-RC modification; prior tree retained on installer failure |
+| tmux | pinned release (`versions.lock`) | source archive SHA-256 verified against the lock; staged build and executable check before replacement |
+| NVM | pinned installer (`versions.lock`) | installer `install.sh` SHA-256 verified against the lock before it runs; no shell-RC modification; prior tree retained on installer failure |
 | Rust | moving rustup installer | HTTPS-trusted installer file; in-place upstream mutation; recover with `rustup update`/`rustup self uninstall` |
 | Claude Code | moving official installer | HTTPS-trusted installer file; verified owned launcher after execution |
 | Codex | moving official installer | HTTPS-trusted installer file; official `CODEX_NON_INTERACTIVE=1` mode; release layout preserves the prior launcher on failed migration |
 | opencode | moving official installer | HTTPS-trusted installer file with `--no-modify-path`; verified owned binary and launcher |
 | Pi | npm package | npm registry trust, isolated prefix, lifecycle scripts disabled, verified launcher; one exact known transitive `node-domexception@1.0.0` deprecation line is filtered while all other npm diagnostics remain visible |
 | Ubuntu/Docker/Azure packages | APT | package-manager in-place transaction; Docker and Microsoft repository keys are fingerprint checked |
-| Docker Sandboxes | Docker signed APT repository | `docker-sbx`; executable check; sandbox state and credentials preserved |
+| Docker Sandboxes | Docker signed APT repository; version pinned in `versions.lock` and held | `docker-sbx`; executable check; sandbox state and credentials preserved |
 | Tailscale | Tailscale signed APT repository | release-specific official keyring/list; no enrollment or auth-key handling |
 | Google Cloud CLI | Google signed APT repository | official `google-cloud-cli` package; credentials preserved |
 | AWS CLI v2 | signed AWS distribution | amd64/arm64 ZIP plus detached signature verified with the AWS CLI Team key and pinned fingerprint; `/usr/local/aws-cli` ownership explicit |
 
-The `eget.lock`, Neovim and tmux checksums pin the bytes first seen over HTTPS
+The checksums in `versions.lock` pin the bytes first seen over HTTPS
 when the version was bumped, cross-checked with the SHA-256 digest GitHub
 publishes for the asset where it has one. They make every later install
 identical and detect a release asset that changes afterwards; they do not vouch
