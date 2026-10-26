@@ -94,6 +94,11 @@ Durable state lives under
 - `deployed.tsv`: each config setup deployed (link, rendered file, or merged
   include) with the exact link target or content digest it wrote; the only
   authority for retiring a config whose source left the manifest;
+- `changes.tsv`: when an operation last changed what each running consumer
+  reads (shell startup, Neovim's config, a component's binary or settings),
+  for staleness reports; shells record when they loaded under
+  `$XDG_RUNTIME_DIR/dotfiles/shells/`;
+- `path-segments`: the PATH entries the last refresh published to tmux;
 - `install-path`: fallback checkout discovery for flattened deployments;
 - `transactions/`: one journal per interrupted artifact replacement;
 - `operation.lock`: the lock a state-changing command holds, with its run id;
@@ -201,6 +206,8 @@ lib/observe.sh                 side-effect-free component observation
 lib/install.sh                 host mutation used by setup and installers
 lib/configure.sh               configure steps: settings, plugins, services
 lib/environment.sh             the managed environment; lib/env-producer.sh computes it
+lib/refresh.sh                 refresh of running processes (tmux)
+lib/staleness.sh               which shells and programs predate a change
 lib/work-host.sh               read-only work-host probes
 installers/                    component-specific installation
 configs/                       tracked configuration sources

@@ -140,6 +140,9 @@ reload() {
     case "${1:-}" in
         --soft)
             unset _DOTFILES_ENV_LOADED _DOTFILES_BASE_ENV _PROFILE_LOADED
+            # Keeps this shell's load time: a soft reload cannot remove old
+            # definitions, so it stays stale (shell/staleness.sh).
+            _DOTFILES_SOFT_RELOAD=1
             if [[ -n "${ZSH_VERSION:-}" ]]; then
                 source ~/.zshenv
                 source ~/.zshrc

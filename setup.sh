@@ -585,8 +585,11 @@ phase_setup_configs() {
 
             case "$type" in
                 symlink)
+                    local before_link
+                    before_link="$(deployed_line "$target" 2>/dev/null | cut -f3)"
                     if process_symlink "$source" "$target"; then
                         deployed_record "$target" link "$(readlink "$target")" "$config" || failed=true
+                        [[ "$before_link" == "$(readlink "$target")" ]] || config_changed "$config"
                     else
                         failed=true
                     fi
@@ -652,6 +655,17 @@ phase_setup_configs() {
         return 1
     fi
     success "Configuration complete"
+}
+
+# A changed config makes the processes that read it at startup stale: shells
+# for the shell entry files, Neovim for its init. tmux reloads its config on
+# refresh, and other tools read theirs on each run.
+config_changed() {
+    case "$1" in
+        bash.sh|zsh.sh|zshenv|zprofile|profile.sh|bash_profile) change_record shell "$1 linked" ;;
+        init.vim) change_record neovim "init.vim linked" ;;
+    esac
+    return 0
 }
 
 process_symlink() {

@@ -23,6 +23,7 @@ source "$DOTFILES_DIR/lib/outcomes.sh"
 source "$DOTFILES_DIR/lib/operation.sh"
 source "$DOTFILES_DIR/lib/profile.sh"
 source "$DOTFILES_DIR/lib/verify.sh"
+source "$DOTFILES_DIR/lib/staleness.sh"
 
 usage() {
     cat <<'EOF'
@@ -307,6 +308,7 @@ cmd_verify() {
         verify_ai
         verify_host
         verify_environment
+        staleness_report
         [[ "$latest" != true ]] || verify_upstream
         if [[ "$smoke" == true ]]; then
             if work_smoke_test >&2; then
@@ -363,6 +365,12 @@ update_continue() {
     if [[ "$dry_run" == true ]]; then
         cmd_apply --dry-run || setup_rc=$?
         return "$(( setup_rc == 0 ? 0 : 1 ))"
+    fi
+    # Shells read the pulled startup files only when they next load them.
+    after="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD)"
+    if [[ "$before" != "$after" ]] \
+       && git -C "$DOTFILES_DIR" diff --name-only "$before" "$after" -- shell entry | grep -q .; then
+        change_record shell "pulled $before..$after"
     fi
     cmd_apply || setup_rc=$?
     echo

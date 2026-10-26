@@ -14,6 +14,7 @@ DOTFILES_JOURNAL_DIR="$DOTFILES_STATE_DIR/transactions"
 DOTFILES_THEME_STATE_FILE="$DOTFILES_STATE_DIR/theme.tsv"
 DOTFILES_HOLDS_FILE="$DOTFILES_STATE_DIR/holds.tsv"
 DOTFILES_DEPLOYED_FILE="$DOTFILES_STATE_DIR/deployed.tsv"
+DOTFILES_CHANGES_FILE="$DOTFILES_STATE_DIR/changes.tsv"
 DOTFILES_STATE_LOCK="$DOTFILES_STATE_DIR/.lock"
 
 _state_error() { printf 'Error: %s\n' "$*" >&2; }
@@ -51,7 +52,8 @@ state_validate() {
         _state_validate_file "$DOTFILES_LEDGER_FILE" ledger 8 &&
         _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 &&
         _state_validate_file "$DOTFILES_HOLDS_FILE" holds 4 &&
-        _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 || return 1
+        _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 &&
+        _state_validate_file "$DOTFILES_CHANGES_FILE" changes 3 || return 1
     while IFS= read -r journal; do
         _state_validate_file "$journal" journal 2 || return 1
     done < <(_journal_files)
@@ -513,6 +515,40 @@ deployed_entries() {
     _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 || return 1
     [[ -f "$DOTFILES_DEPLOYED_FILE" ]] || return 0
     tail -n +2 "$DOTFILES_DEPLOYED_FILE"
+}
+
+# Change events: when an operation last changed what a running consumer reads
+# (shell startup, the tmux config, nvim's config, or a component's binary or
+# settings). A process started before its consumer's event is stale until it
+# restarts (lib/staleness.sh). Columns: consumer, epoch seconds, reason.
+change_record() {
+    local consumer="$1" reason="$2" when="${3:-}"
+    [[ "${DRY_RUN:-false}" != true ]] || return 0
+    _state_valid_atom "$consumer" || { _state_error "Invalid change consumer: $consumer"; return 1; }
+    [[ -n "$when" ]] || when="$(date +%s)"
+    reason="$(_state_clean_field "$reason")"
+    (
+        _state_lock_acquire || exit 1
+        trap _state_lock_release EXIT INT TERM
+        _state_validate_file "$DOTFILES_CHANGES_FILE" changes 3 || exit 1
+        local staged
+        staged="$(mktemp "$DOTFILES_STATE_DIR/changes.tsv.tmp.XXXXXX")" || exit 1
+        {
+            printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA"
+            if [[ -f "$DOTFILES_CHANGES_FILE" ]]; then
+                awk -F '\t' -v key="$consumer" 'NR > 1 && $1 != key { print }' "$DOTFILES_CHANGES_FILE"
+            fi
+            printf '%s\t%s\t%s\n' "$consumer" "$when" "$reason"
+        } > "$staged" || exit 1
+        _state_commit_file "$staged" "$DOTFILES_CHANGES_FILE"
+    )
+}
+
+# change_line CONSUMER: the consumer's last change event, or nothing.
+change_line() {
+    _state_validate_file "$DOTFILES_CHANGES_FILE" changes 3 2>/dev/null || return 1
+    [[ -f "$DOTFILES_CHANGES_FILE" ]] || return 1
+    awk -F '\t' -v key="$1" 'NR > 1 && $1 == key { print; found=1 } END { exit found ? 0 : 1 }' "$DOTFILES_CHANGES_FILE"
 }
 
 record_install_path() {

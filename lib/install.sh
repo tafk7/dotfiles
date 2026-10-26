@@ -40,6 +40,8 @@ track_install() {
             INSTALL_FAIL+=("state:$name")
             return 1
         }
+        # Processes started before a new binary keep running the old one.
+        [[ "$status" != ok ]] || change_record "$name" "$name installed" || true
     fi
 }
 

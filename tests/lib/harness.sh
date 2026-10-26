@@ -16,6 +16,9 @@ fixture_init() {
     export XDG_CACHE_HOME="$TEST_ROOT/cache"
     export TMPDIR="$TEST_ROOT/tmp"
     export TMUX_TMPDIR="$TEST_ROOT/tmux"
+    # Shells record when they loaded under the runtime directory.
+    mkdir -p "$TEST_ROOT/run"
+    export XDG_RUNTIME_DIR="$TEST_ROOT/run"
     export TMUX=""
     export DOTFILES_DIR="$TEST_REPO_ROOT"
     export DOTFILES_BACKUP_PREFIX="$TEST_ROOT/backups"

@@ -69,6 +69,9 @@ source "$DOTFILES_DIR/shell/lazy/nvm.sh"
 
 source "$DOTFILES_DIR/shell/local.sh"
 
+# When this shell loaded its startup files, for staleness reports.
+[[ $- == *i* ]] && source "$DOTFILES_DIR/shell/staleness.sh"
+
 # Mark each prompt for tmux (OSC 133;A) so Ctrl+E/D in review jump between
 # commands. Starship rebuilds PS1 before every Bash prompt, so Bash re-adds the
 # mark in a PROMPT_COMMAND step after Starship's; Zsh's PROMPT is set once.
