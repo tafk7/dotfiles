@@ -72,16 +72,27 @@ user's decision, 2026-10-26).
 
 ## Adoption on this machine (after the plan is complete)
 
-1. Fast-forward `main`.
-2. Move `PROJECTS_DIRS` (and any `EDITOR`) from `~/.shell.local` to
+1. Move `PROJECTS_DIRS` (and any `EDITOR`) from `~/.shell.local` to
    `~/.shell.env`.
-3. `dotfiles profile --propose`, then confirm (add `editor-plugins` if wanted).
-4. `dotfiles apply --dry-run`, review, then `dotfiles apply` (it ends with a
-   refresh of the tmux server).
-5. Restart the tmux server once, so its own process drops the inherited
-   guards; then `reload` (or reopen) shells that `dotfiles verify` lists as
-   stale.
-6. `dotfiles verify -v`.
+2. Fast-forward `main` with git (main has no `dotfiles update`).
+3. `dotfiles profile --propose`, then confirm. It reads only ledger rows
+   dotfiles or the package manager installed, so here it proposes tier work and
+   all AI tools, without `tail` or `gcloud` (recorded external); add what is
+   wanted (`--add tail`, `editor-plugins`, opt-outs) with `--no-apply`.
+4. `dotfiles apply --dry-run`, review, then `dotfiles apply` in a terminal (the
+   sbx hold question needs one on machines main set up; it ends with a refresh
+   of the tmux server, which clears the guards from its global environment).
+5. Adopt rustup if wanted: `dotfiles apply --only rust --reinstall=rust`.
+6. Replace every shell started before the pull: they have no load records,
+   and a git pull records no change event, so nothing lists them. In those
+   shells `reload` is still the old soft one; use `exec "$SHELL" -l`.
+7. `dotfiles verify -v`.
+
+Other machines main set up: main's sbx installer held docker-sbx at 0.46.0
+without a receipt, so the first apply asks once whether to adopt the hold.
+Components recorded `unknown` (present before the ledger) are preserved and
+not pinned until adopted with `--reinstall=NAME`. Global npm packages stay
+with the previous Node release; the installer names them.
 
 What the first apply will change here, from read-only checks:
 
