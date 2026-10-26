@@ -55,6 +55,8 @@ assert_eq "$UPDATE_RC" 0 "normal update: $UPDATE_OUTPUT"
 after="$(git -C "$checkout" rev-parse --short HEAD)"
 [[ "$after" != "$before" && "$UPDATE_OUTPUT" == *"new code running"* && "$UPDATE_OUTPUT" == *"update: $before -> $after"* ]] \
     || fail "update did not pull and re-exec the new code: $UPDATE_OUTPUT"
+assert_eq "$(grep -c 'Refreshing running processes' <<< "$UPDATE_OUTPUT")" 1 "refreshes in one update"
+
 
 # Uncommitted changes stop it before anything is pulled.
 printf '\n' >> "$checkout/README.md"

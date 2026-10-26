@@ -237,8 +237,14 @@ changes: it fetches and shows them, fast-forwards the install-path checkout,
 applies the profile, and verifies. It stops on uncommitted changes, a detached
 HEAD, or a branch that has diverged from its upstream.
 
+`dotfiles refresh` brings running processes up to date with the disk: the
+tmux server's environment, config, badge, and theme. It lists shells and
+programs that started before a change dotfiles made and need a restart
+(`reload` a shell). Every apply, and so every update, ends with one refresh.
+
 ```bash
-dotfiles update                   # pull, apply the profile, verify
+dotfiles update                   # pull, apply the profile, refresh, verify
+dotfiles refresh                  # tmux up to date; list what needs a restart
 dotfiles apply --dry-run          # what applying the profile would change
 dotfiles apply --only node        # one component (blocked if nvm is missing)
 dotfiles verify                   # this machine against the checkout and profile

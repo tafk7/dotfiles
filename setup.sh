@@ -622,7 +622,9 @@ phase_setup_configs() {
         setup_wsl_ssh_agent || failed=true
     fi
 
-    if feature_enabled theme; then
+    if [[ -n "${DOTFILES_REFRESH_FOLLOWS:-}" ]]; then
+        log "Running processes (tmux, theme) are refreshed after setup"
+    elif feature_enabled theme; then
         if [[ "$DRY_RUN" == "true" ]]; then
             # A server's socket, checked without starting tmux.
             [[ ! -S "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/default" ]] || log "[DRY RUN] Would apply the theme to the running tmux server"
