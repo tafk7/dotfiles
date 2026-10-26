@@ -13,7 +13,8 @@ sudo-free, so tier-owned APT packages start at dev. Groups map to selections in
 
 - `install_dev_packages`: core, development, languages, terminal, diagramming
   (plus wsl on WSL), then the tmux and Neovim installers
-- `install_work_packages`: NVM/Node, Docker, sbx/KVM host access, Rust
+- `install_work_packages`: Docker, sbx/KVM host access, NVM then the pinned
+  Node, Rust
 - `install_ai_packages`: the named AI CLI installers
 - `install_rdp_packages`: rdp, then the xrdp configuration installer
 - `install_tail_packages`: Tailscale package/service without enrollment

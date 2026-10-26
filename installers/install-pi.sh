@@ -71,7 +71,7 @@ require_node() {
     if [[ -z "$have" ]] || ! version_ge "$have" "$PI_NODE_MIN"; then
         warn "Pi needs Node >= $PI_NODE_MIN; found ${have:-unknown}."
         warn "Upgrade Node, then re-run: ./setup.sh --pi"
-        warn "    (with NVM: nvm install --lts && nvm alias default node)"
+        warn "    (./setup.sh --work installs the pinned Node through NVM)"
         exit 1
     fi
 }

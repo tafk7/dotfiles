@@ -10,9 +10,13 @@ development and local Docker Sandboxes:
 ./setup.sh --full --tail
 ```
 
-`work` includes the lower config, bash, and dev tiers, then adds NVM, Docker
-Engine and Docker host access, Rust, and, where sbx applies, `docker-sbx` with
-KVM host access and its kit builder. Tailscale is independent:
+`work` includes the lower config, bash, and dev tiers, then adds NVM with the
+pinned Node release (and the npm it bundles) as its default, Docker Engine and
+Docker host access, rustup with the pinned Rust toolchain as its default, and,
+where sbx applies, `docker-sbx` with KVM host access and its kit builder.
+Project versions (`.nvmrc`, `rust-toolchain.toml`) and other installed
+releases are never changed; Node and the toolchain move only with
+`versions.lock`. Tailscale is independent:
 `--tail` installs its package and service without selecting work or AI.
 `--full` remains exactly `--work --ai`, so add `--tail` explicitly when wanted.
 

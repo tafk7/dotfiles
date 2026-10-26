@@ -23,7 +23,7 @@ and changes nothing.
 | `--config` | Links configs for tools that are already installed | No |
 | `--bash` | Pinned CLI tools in `~/.local/bin` through eget: starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gdu, glow, lazygit, gh, uv, sd, direnv | No |
 | `--dev` | zsh, build tools, clipboard, Neovim, tmux, shellcheck, harper-ls | Yes |
-| `--work` | NVM, Docker, Rust, and Docker Sandboxes (`sbx`) with KVM access where supported | Yes |
+| `--work` | NVM and pinned Node, Docker, rustup and the pinned Rust toolchain, and Docker Sandboxes (`sbx`) with KVM access where supported | Yes |
 
 Each tier includes the ones before it. If you pass several tiers, the highest
 one wins. Every tier runs on each supported platform; `sbx` and its KVM access

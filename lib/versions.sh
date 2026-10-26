@@ -6,7 +6,8 @@
 #   component  registry name (or vim-plug)
 #   arch       x86_64 | aarch64 | any
 #   want       the release tag, version, commit, or APT version wanted
-#   source     where it comes from: owner/repo on GitHub, or apt:PACKAGE
+#   source     where it comes from: owner/repo on GitHub, a download host,
+#              apt:PACKAGE, rustup (a channel toolchain), or node (bundled npm)
 #   artifact   the downloaded file (release asset, script, archive)
 #   sha256     the artifact's SHA-256
 #   member     the file to extract from the artifact (- for the artifact itself)
@@ -78,7 +79,9 @@ versions_problems() {
             versions_row "$name" "$arch" >/dev/null || printf '%s has no row for %s\n' "$name" "$arch"
         done
     done
-    for name in neovim tmux eget nvm vim-plug sbx; do
-        versions_row "$name" x86_64 >/dev/null || printf '%s has no row\n' "$name"
+    for name in neovim tmux eget nvm vim-plug sbx node npm rust aws-cli; do
+        for arch in x86_64 aarch64; do
+            versions_row "$name" "$arch" >/dev/null || printf '%s has no row for %s\n' "$name" "$arch"
+        done
     done
 }

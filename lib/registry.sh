@@ -65,6 +65,7 @@ wsl2-ssh-agent  -               eget       bash  -             wsl            - 
 neovim          nvim            installer  dev   -             -              -       -                  -                 -
 tmux            -               installer  dev   -             -              -       -                  -                 -
 nvm             -               installer  work  -             -              -       -                  -                 file-nonempty $HOME/.nvm/nvm.sh
+node            -               installer  work  -             -              -       -                  -                 function _registry_node_present
 rust            rustc           installer  work  -             -              -       -                  -                 command cargo
 claude          -               installer  -     ai            -              -       -                  -                 -
 codex           -               installer  -     ai            -              -       -                  -                 runs
@@ -119,6 +120,11 @@ nvm        update-source          nvm-sh/nvm
 nvm        ownership-roots        $HOME/.nvm
 nvm        update-contract        vendor-installer-preserve-existing
 nvm        paths                  $HOME/.nvm
+# Node is the release versions.lock pins, installed through nvm into a
+# versioned directory and made nvm's default.
+node       ownership-roots        $HOME/.nvm
+node       update-contract        versioned-nvm-install
+node       removal-instructions   Run 'nvm uninstall <version>' for one release; uninstalling nvm removes them all.
 rust       ownership-roots        $HOME/.cargo|$HOME/.rustup
 rust       update-contract        vendor-installer-in-place
 rust       removal-instructions   Run 'rustup self uninstall' after separately backing up any Cargo credentials/configuration.
@@ -307,10 +313,30 @@ _registry_ripgrep_present() {
     fi
 }
 
-# Whether the vendor updates the tool in place into a new versioned path, so a
-# recorded path inside its ownership roots goes stale by design.
+# The Node release directory nvm's default alias names: an exact version in
+# the alias, else the $NVM_DIR/default link setup maintains. Nothing is run.
+node_default_dir() {
+    local nvm_dir="${NVM_DIR:-$HOME/.nvm}" alias="" dir=""
+    [[ ! -r "$nvm_dir/alias/default" ]] || alias="$(head -n1 "$nvm_dir/alias/default")"
+    if [[ "$alias" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+        dir="$nvm_dir/versions/node/v${BASH_REMATCH[1]}"
+    elif [[ -L "$nvm_dir/default" ]]; then
+        dir="$(readlink -f "$nvm_dir/default" 2>/dev/null || true)"
+    fi
+    [[ -n "$dir" && -x "$dir/bin/node" ]] || return 1
+    printf '%s\n' "$dir"
+}
+
+_registry_node_present() {
+    local dir
+    dir="$(node_default_dir)" && "$dir/bin/node" --version >/dev/null 2>&1
+}
+
+# Whether the tool moves into a new versioned path when it updates (a vendor
+# updater, or a pin move into nvm's next version directory), so a recorded path
+# inside its ownership roots goes stale by design.
 tool_moves_itself() {
-    [[ "${TOOL_UPDATE_CONTRACT[$1]:-}" == moving-vendor-installer* ]]
+    [[ "${TOOL_UPDATE_CONTRACT[$1]:-}" == moving-vendor-installer* || "${TOOL_UPDATE_CONTRACT[$1]:-}" == versioned-* ]]
 }
 
 # Return the uninstall paths for a tool (expanded).

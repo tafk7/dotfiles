@@ -21,7 +21,8 @@ downloads.
 | Neovim plugins | commit-pinned in `configs/init.vim` | cloned by `install-editor-plugins`; no post-install hooks, so the fzf plugin never downloads its own binary and uses the eget-pinned `fzf` on PATH |
 | tmux | pinned release (`versions.lock`) | source archive SHA-256 verified against the lock; staged build and executable check before replacement |
 | NVM | pinned installer (`versions.lock`) | installer `install.sh` SHA-256 verified against the lock before it runs; no shell-RC modification; prior tree retained on installer failure |
-| Rust | moving rustup installer | HTTPS-trusted installer file; in-place upstream mutation; recover with `rustup update`/`rustup self uninstall` |
+| Node | pinned release and its bundled npm (`versions.lock`) | installed by NVM, which checks the archive against nodejs.org's `SHASUMS256.txt`; the installed `node` binary's SHA-256 verified against the lock; an independently upgraded npm is restored to the bundled version; other releases and `.nvmrc` versions untouched |
+| Rust | moving rustup installer; pinned default toolchain (`versions.lock`) | HTTPS-trusted installer file; toolchains verified by rustup against the channel manifest; the default moves only with the pin, set and read from `/` without `RUSTUP_TOOLCHAIN` or auto-install; recover with `rustup self uninstall` |
 | Claude Code | moving official installer | HTTPS-trusted installer file; verified owned launcher after execution |
 | Codex | moving official installer | HTTPS-trusted installer file; official `CODEX_NON_INTERACTIVE=1` mode; release layout preserves the prior launcher on failed migration |
 | opencode | moving official installer | HTTPS-trusted installer file with `--no-modify-path`; verified owned binary and launcher |
@@ -30,7 +31,7 @@ downloads.
 | Docker Sandboxes | Docker signed APT repository; version pinned in `versions.lock` and held | `docker-sbx`; executable check; sandbox state and credentials preserved |
 | Tailscale | Tailscale signed APT repository | release-specific official keyring/list; no enrollment or auth-key handling |
 | Google Cloud CLI | Google signed APT repository | official `google-cloud-cli` package; credentials preserved |
-| AWS CLI v2 | signed AWS distribution | amd64/arm64 ZIP plus detached signature verified with the AWS CLI Team key and pinned fingerprint; `/usr/local/aws-cli` ownership explicit |
+| AWS CLI v2 | pinned release (`versions.lock`) | versioned amd64/arm64 ZIP verified against the lock's SHA-256 and its detached signature with the AWS CLI Team key and pinned fingerprint; `/usr/local/aws-cli` ownership explicit |
 
 The checksums in `versions.lock` pin the bytes first seen over HTTPS
 when the version was bumped, cross-checked with the SHA-256 digest GitHub
