@@ -22,8 +22,16 @@ Claude invariant guard rules in `.agents/invariants.json`) read
 
 ## Updates and ownership
 
-Use `bin/check-updates`, bump the pin, and rerun setup with the component's
-tier. Direct `eget --download-all` bypasses platform/tier selection, ownership
+`dotfiles update` brings a machine up to its checkout's upstream: it takes
+the operation lock, checks that this checkout is the install path, on a branch
+with an upstream and without uncommitted changes, fetches and shows the
+incoming commits, fast-forwards, re-executes the pulled code, runs setup with
+the machine profile's flags, and verifies. An ahead-only branch skips the pull;
+a diverged one stops it. It does not yet move unpinned packages (`--upgrade`)
+or retire configs removed upstream.
+
+To move a pin, use `bin/check-updates`, bump the pin, and rerun setup with the
+component's tier. Direct `eget --download-all` bypasses platform/tier selection, ownership
 recording, companion handling, and staged replacement. `check-updates` exits 1
 for failed lookups, 2 for updates found with `--outdated`, and 0 otherwise.
 

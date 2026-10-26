@@ -1,7 +1,8 @@
 #!/bin/bash
-# The dotfiles front door: verify this machine, and show or change its profile.
+# The dotfiles front door: update, verify, and the machine profile.
 #
-# Usage: dotfiles verify [-v] [--latest] [--smoke]
+# Usage: dotfiles update [--dry-run]
+#        dotfiles verify [-v] [--latest] [--smoke]
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
 set -euo pipefail
@@ -26,6 +27,16 @@ usage() {
 Usage: dotfiles <command> [options]
 
 Commands:
+  update                Take upstream changes: fetch and show them, fast-forward
+                        this checkout, run setup with the machine profile, then
+                        verify. Needs the install path's checkout, on a branch
+                        with an upstream, without uncommitted changes; a branch
+                        that has diverged from its upstream stops it.
+    --dry-run           Fetch and show; preview setup without pulling.
+                        Not yet: an exact preview of what would change, retiring
+                        configs removed upstream, stale-process tracking, nvm
+                        following a moved pin, the Node/Rust/aws-cli pins, sbx
+                        hold receipts, editor plugins, and --upgrade.
   verify                Check this machine against the checkout and its profile.
                         Changes nothing. Exit 1: setup has work to do; 3: a check
                         could not be made; 2: something needs you; 0: healthy.
@@ -277,8 +288,112 @@ cmd_verify() {
     return "$rc"
 }
 
+# update's checks before it pulls; prints the problem and returns 3.
+update_preconditions() {
+    local install_path="" branch
+    git -C "$DOTFILES_DIR" rev-parse --git-dir >/dev/null 2>&1 \
+        || { error "$DOTFILES_DIR is not a Git checkout"; return 3; }
+    [[ ! -f "$DOTFILES_STATE_DIR/install-path" ]] || install_path="$(<"$DOTFILES_STATE_DIR/install-path")"
+    if [[ "$install_path" != "$DOTFILES_DIR" ]]; then
+        error "This checkout is not the install path (${install_path:-none recorded}); update that checkout instead"
+        return 3
+    fi
+    branch="$(git -C "$DOTFILES_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+        || { error "The checkout is on a detached HEAD; check out a branch first"; return 3; }
+    git -C "$DOTFILES_DIR" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1 \
+        || { error "Branch $branch has no upstream to update from"; return 3; }
+    if [[ -n "$(git -C "$DOTFILES_DIR" status --porcelain --untracked-files=no)" ]]; then
+        error "The checkout has uncommitted changes; commit or stash them first"
+        git -C "$DOTFILES_DIR" status --short --untracked-files=no >&2
+        return 3
+    fi
+}
+
+# Everything after the pull, run by the new code: setup with the profile, then
+# verify, then the report.
+update_continue() {
+    local before="$1" dry_run="$2" setup_rc=0 verify_rc=0 after
+    local -a args
+    if ! profile_exists; then
+        error "No machine profile yet; create one with: dotfiles profile --propose"
+        return 3
+    fi
+    profile_load || return 3
+    readarray -t args < <(profile_setup_args)
+    [[ "$dry_run" != true ]] || args+=(--dry-run)
+    log "Running: setup.sh ${args[*]}"
+    "$DOTFILES_DIR/setup.sh" "${args[@]}" || setup_rc=$?
+    [[ "$dry_run" != true ]] || return "$(( setup_rc == 0 ? 0 : 1 ))"
+    echo
+    "$SCRIPT_DIR/dotfiles" verify || verify_rc=$?
+    after="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD)"
+    echo
+    if [[ "$before" == "$after" ]]; then
+        printf 'update: at %s; ' "$after"
+    else
+        printf 'update: %s -> %s; ' "$before" "$after"
+    fi
+    if (( setup_rc != 0 )); then
+        printf 'setup failed (see its log in %s/logs)\n' "$DOTFILES_STATE_DIR"
+        return 1
+    fi
+    case "$verify_rc" in
+        0|2) printf 'setup completed\n'; return 0 ;;
+        3) printf 'setup completed; some checks could not be made\n'; return 3 ;;
+        *) printf 'setup completed; verify found remaining work\n'; return 1 ;;
+    esac
+}
+
+cmd_update() {
+    local dry_run=false before="" ahead behind
+    while (( $# )); do
+        case "$1" in
+            --dry-run) dry_run=true ;;
+            --continue) [[ -n "${2:-}" ]] || { error "--continue requires a revision"; return 64; }; before="$2"; shift ;;
+            --help|-h) usage; return 0 ;;
+            *) error "Unknown option: $1"; usage >&2; return 64 ;;
+        esac
+        shift
+    done
+    # After the pull this process re-execs the new code with --continue; the
+    # lock spans the re-exec, which keeps the pid.
+    if [[ -n "$before" ]]; then
+        update_continue "$before" "$dry_run"
+        return
+    fi
+    [[ "$dry_run" == true ]] || operation_begin "$SCRIPT_DIR/dotfiles" update "${ORIGINAL_ARGS[@]}"
+    update_preconditions || return
+    before="$(git -C "$DOTFILES_DIR" rev-parse --short HEAD)"
+    git -C "$DOTFILES_DIR" fetch --quiet || { error "git fetch failed"; return 3; }
+    ahead="$(git -C "$DOTFILES_DIR" rev-list --count '@{upstream}..HEAD')"
+    behind="$(git -C "$DOTFILES_DIR" rev-list --count 'HEAD..@{upstream}')"
+    if (( ahead > 0 && behind > 0 )); then
+        error "The branch has diverged from its upstream ($ahead local, $behind upstream commits); reconcile it by hand"
+        return 3
+    fi
+    if (( behind == 0 )); then
+        if (( ahead > 0 )); then
+            log "The checkout is $ahead commit(s) ahead of its upstream; nothing to pull"
+        else
+            log "The checkout is up to date with its upstream"
+        fi
+        update_continue "$before" "$dry_run"
+        return
+    fi
+    log "Upstream changes ($behind):"
+    git -C "$DOTFILES_DIR" log --oneline --no-decorate 'HEAD..@{upstream}'
+    if [[ "$dry_run" == true ]]; then
+        log "[DRY RUN] Would pull; previewing setup with the current checkout"
+        update_continue "$before" true
+        return
+    fi
+    git -C "$DOTFILES_DIR" pull --ff-only --quiet || { error "git pull --ff-only failed"; return 3; }
+    exec "$BASH" "$SCRIPT_DIR/dotfiles" update --continue "$before"
+}
+
 ORIGINAL_ARGS=("$@")
 case "${1:-}" in
+    update) shift; ORIGINAL_ARGS=("$@"); cmd_update "$@" ;;
     verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;
     profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
     --help|-h|help|"") usage ;;

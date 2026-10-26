@@ -223,7 +223,13 @@ to do, 3 when a check could not be made, 2 when something needs you (Tailscale
 enrollment, a group login), and 0 otherwise. `--latest` adds newer upstream
 releases of pinned tools.
 
+`dotfiles update` takes upstream changes: it fetches and shows them,
+fast-forwards the install-path checkout, runs setup with the machine profile,
+and verifies. It stops on uncommitted changes, a detached HEAD, or a branch that
+has diverged from its upstream.
+
 ```bash
+dotfiles update                   # pull, setup with the profile, verify
 dotfiles verify                   # this machine against the checkout and profile
 ./bin/verify --tier work          # a tier against current reality (also --all)
 ./bin/diff-config                 # drift between tracked configs and $HOME
