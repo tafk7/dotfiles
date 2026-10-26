@@ -19,6 +19,11 @@ class ConfigurationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name)
+        # ai-config's writes take the operation lock, which --home doesn't
+        # move; keep it out of the real state directory and out of snapshots.
+        lock_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(lock_dir.cleanup)
+        self.lock = Path(lock_dir.name) / 'operation.lock'
 
     def put(self, name, text):
         path = self.home / name
@@ -27,6 +32,7 @@ class ConfigurationTests(unittest.TestCase):
         return path
 
     def run_config(self, *args, ok=True, env=None):
+        env = {**(env or os.environ), 'DOTFILES_OPERATION_LOCK': str(self.lock)}
         result = subprocess.run([str(ROOT / 'bin/ai-config'), '--home', str(self.home), *args], capture_output=True, text=True, env=env)
         self.assertEqual(result.returncode == 0, ok, result.stdout + result.stderr)
         return result
