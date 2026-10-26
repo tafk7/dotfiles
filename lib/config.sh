@@ -79,6 +79,43 @@ config_owner_present() {
     fi
 }
 
+# The portable Git configuration setup renders and ~/.gitconfig includes.
+portable_gitconfig_path() {
+    printf '%s/dotfiles/gitconfig\n' "${XDG_CONFIG_HOME:-$HOME/.config}"
+}
+
+# render_portable_gitconfig SOURCE: the portable Git config for this machine on
+# stdout: the conflict style its Git supports, and the editor, merge tool, and
+# pager lines only where nvim and delta are installed.
+render_portable_gitconfig() {
+    local git_version conflict_style=diff3 has_nvim=0 has_delta=0
+    command -v nvim >/dev/null 2>&1 && has_nvim=1
+    command -v delta >/dev/null 2>&1 && has_delta=1
+    git_version="$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)"
+    if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
+        conflict_style=zdiff3
+    fi
+    sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$1" |
+        awk -v nvim="$has_nvim" -v delta="$has_delta" '
+            !nvim && /^[[:space:]]*(editor = nvim|tool = nvimdiff)$/ { next }
+            !delta && /^[[:space:]]*(pager = delta|diffFilter = delta --color-only)$/ { next }
+            { print }
+        '
+}
+
+# Whether a deployed target sits under the roots setup may change: inside
+# $HOME, or inside a custom XDG_CONFIG_HOME, never either root itself.
+config_target_approved() {
+    local target="$1" home parent canon config
+    [[ "$target" == /* ]] || return 1
+    home="$(cd "$HOME" 2>/dev/null && pwd -P)" || return 1
+    parent="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || return 1
+    canon="$parent/$(basename "$target")"
+    config="$(realpath -m -- "${XDG_CONFIG_HOME:-$HOME/.config}")"
+    [[ "$canon" == "$home"/* ]] && return 0
+    [[ "$config" != / && "$canon" == "$config"/* ]]
+}
+
 # APT package groups. Tier-owned APT starts at dev; the bash tier is sudo-free.
 declare -A PACKAGES=(
     [core]="git build-essential locales"

@@ -569,6 +569,58 @@ safe_symlink() {
     success "Linked $source -> $target"
 }
 
+# retire_deployed_configs: retire what setup deployed whose source left the
+# manifest (CONFIG_MAP), only if the target is still exactly what setup wrote:
+# the same link target string, or the same content digest. Links are removed,
+# never followed; rendered files move to the backup; each retirement is
+# backed up and reported, and a changed target is kept and reported once.
+# Records whose source is still in the manifest are left alone, whatever this
+# run skipped (an absent owner, --no-git).
+retire_deployed_configs() {
+    local target kind identity source run failed=false dest
+    while IFS=$'\t' read -r target kind identity source run; do
+        [[ -n "$target" && -z "${CONFIG_MAP[$source]+x}" ]] || continue
+        if ! config_target_approved "$target"; then
+            warn "Not retiring $target: it is outside the roots setup manages"
+            [[ "${DRY_RUN:-false}" == true ]] || deployed_remove "$target" || failed=true
+            continue
+        fi
+        local current=""
+        case "$kind" in
+            link) [[ -L "$target" ]] && current="$(readlink "$target")" ;;
+            rendered) [[ -f "$target" && ! -L "$target" ]] && current="sha256:$(sha256sum "$target" | awk '{print $1}')" ;;
+            merged)
+                git config --file "$target" --get-all include.path 2>/dev/null | grep -Fxq "${identity#include:}" \
+                    && current="$identity"
+                ;;
+        esac
+        if [[ "${DRY_RUN:-false}" == true ]]; then
+            if [[ "$current" == "$identity" ]]; then
+                log "[DRY RUN] Would retire $target (its source $source left the dotfiles manifest)"
+            elif [[ -e "$target" || -L "$target" ]]; then
+                log "$target changed since setup deployed it; it will be kept"
+            fi
+            continue
+        fi
+        if [[ "$current" == "$identity" ]]; then
+            ensure_backup_dir || { failed=true; continue; }
+            dest="$(backup_dest "$target" "$ACTIVE_BACKUP_DIR")"
+            mkdir -p "$(dirname "$dest")" || { failed=true; continue; }
+            case "$kind" in
+                link) cp -P "$target" "$dest" && rm -f "$target" ;;
+                rendered) mv "$target" "$dest" ;;
+                merged) cp "$target" "$dest" \
+                    && git config --file "$target" --fixed-value --unset-all include.path "${identity#include:}" ;;
+            esac || { error "Could not retire $target"; failed=true; continue; }
+            success "Retired $target (its source $source left the dotfiles manifest; backup: $dest)"
+        elif [[ -e "$target" || -L "$target" ]]; then
+            warn "Kept $target: it changed since setup deployed it from $source, which left the manifest"
+        fi
+        deployed_remove "$target" || failed=true
+    done < <(deployed_entries)
+    [[ "$failed" == false ]]
+}
+
 cleanup_old_backups() {
     local keep_count="${1:-10}"
     local backup_type="${2:-}"
@@ -607,27 +659,13 @@ process_git_config() {
     local source="$1"
     local target="$2"
     local force="${3:-false}"
-    local portable_dir="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
-    local portable="$portable_dir/gitconfig"
-    local rendered git_version conflict_style="diff3"
-    local has_nvim=0 has_delta=0
-    command -v nvim >/dev/null 2>&1 && has_nvim=1
-    command -v delta >/dev/null 2>&1 && has_delta=1
+    local portable portable_dir rendered
+    portable="$(portable_gitconfig_path)"
+    portable_dir="$(dirname "$portable")"
 
     mkdir -p "$portable_dir" || return 1
     rendered="$(mktemp "${TMPDIR:-/tmp}/dotfiles-gitconfig.XXXXXX")" || return 1
-
-    git_version=$(git --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1)
-    if [[ -n "$git_version" ]] && version_gte "$git_version" "2.35"; then
-        conflict_style="zdiff3"
-    fi
-
-    sed -e "s|{{CONFLICT_STYLE}}|$conflict_style|g" "$source" |
-        awk -v nvim="$has_nvim" -v delta="$has_delta" '
-            !nvim && /^[[:space:]]*(editor = nvim|tool = nvimdiff)$/ { next }
-            !delta && /^[[:space:]]*(pager = delta|diffFilter = delta --color-only)$/ { next }
-            { print }
-        ' > "$rendered" || { rm -f "$rendered"; return 1; }
+    render_portable_gitconfig "$source" > "$rendered" || { rm -f "$rendered"; return 1; }
 
     if [[ ! -f "$portable" ]] || ! cmp -s "$rendered" "$portable"; then
         chmod 600 "$rendered" || return 1

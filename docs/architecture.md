@@ -91,6 +91,9 @@ Durable state lives under
 - `theme.tsv`: global theme selection;
 - `holds.tsv`: receipts for the APT holds setup placed or adopted (sbx), and a
   remembered refusal to adopt someone else's;
+- `deployed.tsv`: each config setup deployed (link, rendered file, or merged
+  include) with the exact link target or content digest it wrote; the only
+  authority for retiring a config whose source left the manifest;
 - `install-path`: fallback checkout discovery for flattened deployments;
 - `transactions/`: one journal per interrupted artifact replacement;
 - `operation.lock`: the lock a state-changing command holds, with its run id;

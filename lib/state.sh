@@ -13,6 +13,7 @@ DOTFILES_JOURNAL_FILE="$DOTFILES_STATE_DIR/transaction.tsv"
 DOTFILES_JOURNAL_DIR="$DOTFILES_STATE_DIR/transactions"
 DOTFILES_THEME_STATE_FILE="$DOTFILES_STATE_DIR/theme.tsv"
 DOTFILES_HOLDS_FILE="$DOTFILES_STATE_DIR/holds.tsv"
+DOTFILES_DEPLOYED_FILE="$DOTFILES_STATE_DIR/deployed.tsv"
 DOTFILES_STATE_LOCK="$DOTFILES_STATE_DIR/.lock"
 
 _state_error() { printf 'Error: %s\n' "$*" >&2; }
@@ -49,7 +50,8 @@ state_validate() {
     _state_validate_file "$DOTFILES_PREFERENCES_FILE" preferences 2 &&
         _state_validate_file "$DOTFILES_LEDGER_FILE" ledger 8 &&
         _state_validate_file "$DOTFILES_THEME_STATE_FILE" theme 2 &&
-        _state_validate_file "$DOTFILES_HOLDS_FILE" holds 4 || return 1
+        _state_validate_file "$DOTFILES_HOLDS_FILE" holds 4 &&
+        _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 || return 1
     while IFS= read -r journal; do
         _state_validate_file "$journal" journal 2 || return 1
     done < <(_journal_files)
@@ -459,6 +461,58 @@ hold_owned() {
 # Whether dpkg holds PACKAGE (read-only; no root needed).
 apt_package_held() {
     [[ "$(dpkg-query -W -f='${db:Status-Want}' "$1" 2>/dev/null)" == hold ]]
+}
+
+# Deployed configs: one record per entry setup wrote, made after the write
+# succeeded. Columns: target, kind (link | rendered | merged), identity (the
+# link's target string, sha256:DIGEST, or include:PATH), source (the
+# CONFIG_MAP key), and the operation's run id. Only these records authorize
+# retiring a config.
+deployed_record() {
+    local target="$1" kind="$2" identity="$3" source="$4" run="${DOTFILES_OPERATION:--}"
+    _state_valid_atom "$target" || { _state_error "Invalid deployed target: $target"; return 1; }
+    case "$kind" in link|rendered|merged) ;; *) _state_error "Invalid deployed kind: $kind"; return 1 ;; esac
+    identity="$(_state_clean_field "$identity")"
+    [[ "$(deployed_line "$target" 2>/dev/null | cut -f1-4)" != "$target"$'\t'"$kind"$'\t'"$identity"$'\t'"$source" ]] || return 0
+    _deployed_write "$target" "$(printf '%s\t%s\t%s\t%s\t%s' "$target" "$kind" "$identity" "$source" "$(_state_clean_field "$run")")"
+}
+
+deployed_remove() {
+    deployed_line "$1" >/dev/null 2>&1 || return 0
+    _deployed_write "$1" ""
+}
+
+# _deployed_write TARGET LINE: replace TARGET's record with LINE (none if empty).
+_deployed_write() {
+    local target="$1" line="$2"
+    (
+        _state_lock_acquire || exit 1
+        trap _state_lock_release EXIT INT TERM
+        _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 || exit 1
+        local staged
+        staged="$(mktemp "$DOTFILES_STATE_DIR/deployed.tsv.tmp.XXXXXX")" || exit 1
+        {
+            printf 'schema\t%s\n' "$DOTFILES_STATE_SCHEMA"
+            if [[ -f "$DOTFILES_DEPLOYED_FILE" ]]; then
+                awk -F '\t' -v key="$target" 'NR > 1 && $1 != key { print }' "$DOTFILES_DEPLOYED_FILE"
+            fi
+            [[ -z "$line" ]] || printf '%s\n' "$line"
+        } > "$staged" || exit 1
+        _state_commit_file "$staged" "$DOTFILES_DEPLOYED_FILE"
+    )
+}
+
+deployed_line() {
+    _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 || return 1
+    [[ -f "$DOTFILES_DEPLOYED_FILE" ]] || return 1
+    awk -F '\t' -v key="$1" 'NR > 1 && $1 == key { print; found=1 } END { exit found ? 0 : 1 }' "$DOTFILES_DEPLOYED_FILE"
+}
+
+# Every deployed record, one per line.
+deployed_entries() {
+    _state_validate_file "$DOTFILES_DEPLOYED_FILE" deployed 5 || return 1
+    [[ -f "$DOTFILES_DEPLOYED_FILE" ]] || return 0
+    tail -n +2 "$DOTFILES_DEPLOYED_FILE"
 }
 
 record_install_path() {
