@@ -32,8 +32,17 @@ automatic updater and makes `$.http.fetch` fail in Claude Code mods (use
 new releases and never shares sessions: its own updater reruns the upstream
 installer without `--no-modify-path`, which would append to the repo-owned
 `~/.bashrc`. Use `bin/ai-update claude`, `codex` or `opencode` to update
-explicitly through the official installer's `--force` path, including
-configuration and plugin provisioning.
+explicitly through the official installer's `--force` path, followed by the
+CLI's configure steps.
+
+Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
+not part of the installers: setup runs them after each selected AI CLI's
+install step, whether it installed the CLI, found it current, or found an
+external one, but not after a failed install. Registration adds this
+repository as a marketplace and installs the plugin; a separate update step
+brings an installed plugin to this checkout's version when its cache is stale
+(`bin/ai-config claude --check-plugin`). OpenCode's settings are written only
+for V2, so an external V1 keeps its own.
 
 Before changes, files are copied into private, uniquely named subdirectories of
 `~/.claude/backups`, `~/.codex/backups` or `~/.config/opencode/backups`. Alternate configuration homes use their

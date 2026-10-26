@@ -161,7 +161,12 @@ def main():
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--plugins', action='store_true', help='also check enabled badge caches with --check')
+    parser.add_argument('--check-plugin', action='store_true', help='check only the enabled badge cache (claude or codex)')
     args = parser.parse_args()
+    if args.check_plugin:
+        if args.component not in ('claude', 'codex'):
+            parser.error('--check-plugin needs claude or codex')
+        return 0 if check_plugin(args.component, desired(args.component, args.home)[0]) else 1
     # Validate every document and target before writing any of them.
     plans = [(c, *desired(c, args.home)) for c in (['codex', 'claude', 'opencode'] if args.component == 'all' else [args.component])]
     ok = True

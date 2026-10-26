@@ -29,8 +29,11 @@ BIN
 chmod +x "$HOME/.opencode/bin/opencode"
 EOF
 export DOTFILES_OPENCODE_INSTALLER_SCRIPT="$installer"
+# OpenCode's configure step, as setup runs it after the installer.
+configure_opencode() { bash -c 'source "$1/lib/install.sh" && configure_component opencode' _ "$ROOT" >/dev/null 2>&1; }
 "$ROOT/installers/install-opencode.sh" >/dev/null
 [[ "$(opencode --version)" == 'opencode v2.0.22' ]] || fail 'owned V1 was not upgraded'
+configure_opencode || fail "OpenCode's configure step failed"
 python3 -c 'import json,os; d=json.load(open(os.path.join(os.environ["XDG_CONFIG_HOME"],"opencode/opencode.json"))); assert d["update"]=="notify" and "autoupdate" not in d and d["provider"]=={"mine":{}}'
 rc=0
 "$ROOT/installers/install-opencode.sh" >/dev/null || rc=$?
@@ -59,5 +62,6 @@ chmod +x "$TEST_ROOT/external/opencode"
 rc=0
 PATH="$TEST_ROOT/external:$PATH" "$ROOT/installers/install-opencode.sh" --force >/dev/null 2>&1 || rc=$?
 [[ "$rc" == 2 ]] || fail 'external installation was shadowed'
-cmp "$XDG_CONFIG_HOME/opencode/opencode.json" "$TEST_ROOT/before.json" || fail 'external config changed'
+PATH="$TEST_ROOT/external:$PATH" configure_opencode || fail "OpenCode's configure step failed for an external V1"
+cmp "$XDG_CONFIG_HOME/opencode/opencode.json" "$TEST_ROOT/before.json" || fail 'external V1 config changed'
 printf 'install-opencode: ok\n'

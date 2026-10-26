@@ -28,26 +28,6 @@ PI_PREFIX="$HOME/.pi/agent/install"         # matches upstream's managed-mode di
 PI_REAL="$PI_PREFIX/bin/pi"
 PI_LINK="$HOME/.local/bin/pi"               # our PATH-visible symlink
 
-# Provision ~/.pi/agent/settings.json with install telemetry off, only when the
-# file is absent: it is user-owned (models, keybindings, trust), so an existing
-# file only gets a hint. The separate startup version check is controlled by
-# PI_SKIP_VERSION_CHECK / PI_OFFLINE (see docs/ai-tools-egress.md).
-provision_pi_settings() {
-    local src="$DOTFILES_DIR/configs/pi-settings.json"
-    local dest="$HOME/.pi/agent/settings.json"
-    [[ -f "$src" ]] || return 0
-    mkdir -p "$(dirname "$dest")"
-
-    if [[ -e "$dest" ]]; then
-        log "Existing $dest left untouched."
-        log "  To disable install/update telemetry, add \"enableInstallTelemetry\": false"
-        log "  (see configs/pi-settings.json and docs/ai-tools-egress.md)."
-        return 0
-    fi
-    cp "$src" "$dest"
-    success "Provisioned ~/.pi/agent/settings.json (install/update telemetry off)."
-}
-
 # Compare dotted versions without bc/sort -V dependence on field count.
 # Returns 0 when $1 >= $2.
 version_ge() {
@@ -75,10 +55,6 @@ require_node() {
         exit 1
     fi
 }
-
-# Config is independent of the binary install state — provision on every run so
-# it lands even when the binary is already present (the early exits below).
-provision_pi_settings
 
 # Verify by absolute path: on a fresh machine ~/.local/bin is not guaranteed to
 # be on the installer process's PATH.

@@ -116,9 +116,10 @@ aws-cli         aws             installer  -     aws           -              - 
 #                          (installers/install-NAME.sh; default otherwise),
 #                          packages:SET (by that package set; recorded only),
 #                          bootstrap (by the eget batch), or function:NAME
-#   configure              space-separated functions setup runs after the
-#                          install step when the component applies, whether
-#                          or not the install changed anything
+#   configure              space-separated functions (lib/configure.sh) setup
+#                          runs after the install step when the component
+#                          applies, whether or not the install changed
+#                          anything; each gets the component name
 _REGISTRY_OVERRIDES="
 eget       install                bootstrap
 zsh        install                packages:dev
@@ -132,11 +133,16 @@ sbx        configure              configure_work_host ensure_sbx_kits_builder
 node       needs                  nvm
 node       configure              use_default_node
 claude     policy                 vendor
+claude     configure              configure_ai_settings configure_agent_badge update_agent_badge
 codex      policy                 vendor
+codex      configure              configure_ai_settings configure_agent_badge update_agent_badge
 opencode   policy                 vendor
+opencode   configure              configure_opencode_settings
 pi         policy                 vendor
 pi         needs                  node
+pi         configure              configure_pi_settings
 xrdp       install                function:install_rdp_packages
+tailscale  configure              configure_tailscaled
 gh         eget-repo              cli/cli
 harper-ls  eget-repo              Automattic/harper
 uv         companions             uvx

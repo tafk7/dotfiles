@@ -1,6 +1,7 @@
 #!/bin/bash
 # Install the stable OpenCode V2 CLI without modifying shell startup files.
 # Existing V2 installs are reconciled; --force updates. Owned V1 installs migrate.
+# Its settings are a configure step (lib/configure.sh), written only for V2.
 set -euo pipefail
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
@@ -30,7 +31,6 @@ fi
 if [[ "$FORCE" != true ]] && v2_version "$OPENCODE_REAL"; then
     mkdir -p "$HOME/.local/bin"
     ln -sfn "$OPENCODE_REAL" "$OPENCODE_LINK"
-    "$DOTFILES_DIR/bin/ai-config" opencode
     success "OpenCode V2 already installed; update with bin/ai-update opencode."
     exit 2
 fi
@@ -79,7 +79,5 @@ fi
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$OPENCODE_REAL" "$OPENCODE_LINK"
 warn_if_rc_changed "$rc_before"
-# Native preferences only after a verified V2 binary is available.
-"$DOTFILES_DIR/bin/ai-config" opencode
 [[ -z "$backup_dir" ]] || log "Previous binary retained at $backup_dir"
 success "Installed $("$OPENCODE_REAL" --version)"

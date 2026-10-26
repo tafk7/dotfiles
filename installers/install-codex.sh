@@ -22,45 +22,6 @@ FORCE=false
 CODEX_BIN="$HOME/.local/bin/codex"
 CODEX_INSTALLER_URL="https://chatgpt.com/codex/install.sh"
 
-# Reconcile portable keys and assets; all backups stay in the application home.
-provision_codex_config() {
-    "$DOTFILES_DIR/bin/ai-config" codex
-}
-
-# Install the agent-badge plugin (plugins/agent-badge-codex) from this repo,
-# which is also a marketplace (.agents/plugins/marketplace.json). Registered as
-# a local directory so it tracks the working tree and needs no network. Never
-# fatal: the badge is a convenience.
-provision_agent_badge_plugin() {
-    [[ "${DOTFILES_AGENT_BADGE_ENABLED:-1}" == "1" ]] || {
-        log "Agent-badge disabled; skipping plugin registration."
-        return 0
-    }
-    local codex_cmd="${1:-}"
-    [[ -n "$codex_cmd" && -x "$codex_cmd" ]] || codex_cmd="$(command -v codex 2>/dev/null || true)"
-    [[ -n "$codex_cmd" ]] || return 0
-    [[ -f "$DOTFILES_DIR/.agents/plugins/marketplace.json" ]] || return 0
-
-    if ! "$codex_cmd" plugin marketplace add "$DOTFILES_DIR" >/dev/null 2>&1; then
-        warn "Could not register $DOTFILES_DIR as a Codex plugin marketplace."
-        return 0
-    fi
-    if "$codex_cmd" plugin add agent-badge@tafk7 >/dev/null 2>&1; then
-        success "Plugin agent-badge installed (tmux window badges for agent sessions)."
-        # tmux survives plugin cache replacement. Repair its paths immediately,
-        # including when no new agent session has started since the update.
-        if [[ -n "${TMUX:-}" ]]; then
-            "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" wire >/dev/null 2>&1 || true
-        fi
-        # Stated on every run: Codex silently skips untrusted hooks, which looks
-        # exactly like a broken install.
-        log "  Run /hooks inside Codex once to review and trust them."
-        log "  Until you do, they are skipped silently and no badges appear."
-    else
-        warn "Could not install the agent-badge plugin; see plugins/agent-badge-codex/README.md."
-    fi
-}
-
 run_official_installer() {
     local installer_path="${DOTFILES_CODEX_INSTALLER_SCRIPT:-}"
     local downloaded=false
@@ -99,10 +60,6 @@ run_official_installer() {
     fi
 }
 
-# Config is independent of the binary — provision on every run so it lands even
-# when the binary is already present (the early exits below).
-provision_codex_config
-
 # Never shadow an externally managed Codex, including under the repository-wide
 # --force flag. Replacing another manager's binary must be a separate, explicit
 # operation rather than a side effect of refreshing dotfiles.
@@ -110,7 +67,6 @@ EXTERNAL_CODEX="$(command -v codex 2>/dev/null || true)"
 if [[ -n "$EXTERNAL_CODEX" && "$EXTERNAL_CODEX" != "$CODEX_BIN" ]]; then
     warn "Found an externally-managed codex on PATH: $EXTERNAL_CODEX"
     warn "Skipping install to avoid a shadow copy at $CODEX_BIN."
-    provision_agent_badge_plugin "$EXTERNAL_CODEX"
     exit 2
 fi
 
@@ -119,7 +75,6 @@ fi
 if [[ "$FORCE" != true && -L "$CODEX_BIN" && -x "$CODEX_BIN" ]] \
     && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex already installed ($("$CODEX_BIN" --version 2>/dev/null | head -n1))."
-    provision_agent_badge_plugin "$CODEX_BIN"
     exit 2
 fi
 
@@ -138,7 +93,6 @@ fi
 
 if [[ -x "$CODEX_BIN" ]] && "$CODEX_BIN" --version >/dev/null 2>&1; then
     success "Codex installed: $("$CODEX_BIN" --version 2>/dev/null | head -n1)"
-    provision_agent_badge_plugin "$CODEX_BIN"
     exit 0
 fi
 

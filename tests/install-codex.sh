@@ -72,16 +72,27 @@ run_expect() {
 use_home() {
     export HOME="$1"
     mkdir -p "$HOME"
+    export XDG_CONFIG_HOME="$HOME/.config" XDG_STATE_HOME="$HOME/.local/state" XDG_CACHE_HOME="$HOME/.cache"
     export PATH="$HOME/.local/bin:$SYSTEM_PATH"
     export DOTFILES_DIR="$REPO_ROOT"
     export DOTFILES_CODEX_INSTALLER_SCRIPT="$STUB_INSTALLER"
 }
 
-# Fresh install creates the official-style launcher and provisions config.
+# Codex's configure steps (settings, agent-badge), as setup runs them after
+# the installer.
+configure_codex() {
+    bash -c 'source "$1/lib/install.sh" && configure_component codex' _ "$REPO_ROOT" >/dev/null 2>&1 \
+        || fail "Codex's configure steps failed"
+}
+
+# Fresh install creates the official-style launcher; configuring provisions
+# config.
 use_home "$TEST_ROOT/home-fresh"
 run_expect 0 "$REPO_ROOT/installers/install-codex.sh"
 [[ -L "$HOME/.local/bin/codex" ]] || fail "fresh install did not create launcher symlink"
-[[ -f "$HOME/.codex/config.toml" ]] || fail "fresh install did not provision config"
+[[ ! -e "$HOME/.codex/config.toml" ]] || fail "the installer wrote configuration itself"
+configure_codex
+[[ -f "$HOME/.codex/config.toml" ]] || fail "configuring did not provision config"
 grep -qx 'model_reasoning_effort = "high"' "$HOME/.codex/config.toml" \
     || fail "fresh config did not receive portable preferences"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "fresh install invocation count"
@@ -99,6 +110,7 @@ trust_level = "trusted"
 LOCAL_STATE
 run_expect 2 "$REPO_ROOT/installers/install-codex.sh"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "ordinary rerun called installer"
+configure_codex
 grep -qx 'model_reasoning_effort = "high"' "$HOME/.codex/config.toml" \
     || fail "ordinary rerun did not refresh managed settings"
 grep -qx '\[projects\."/tmp/example"\]' "$HOME/.codex/config.toml" \
@@ -133,5 +145,9 @@ export PATH="$external_bin:$SYSTEM_PATH"
 run_expect 2 "$REPO_ROOT/installers/install-codex.sh" --force
 [[ "$(cat "$TEST_STATE/count")" == 2 ]] || fail "external install was shadowed"
 [[ ! -e "$HOME/.local/bin/codex" ]] || fail "external install created a shadow launcher"
+# An external Codex still gets its settings.
+configure_codex
+grep -qx 'model_reasoning_effort = "high"' "$HOME/.codex/config.toml" \
+    || fail "an external Codex did not get its portable settings"
 
 printf 'Codex installer ownership tests passed.\n'

@@ -76,6 +76,12 @@ snapshot_case() {
         configure_work_host() { CALLS+=" +kvm"; }
         ensure_sbx_kits_builder() { CALLS+=" +kits-builder"; }
         use_default_node() { CALLS+=" +node-path"; }
+        configure_ai_settings() { CALLS+=" +settings"; }
+        configure_opencode_settings() { CALLS+=" +settings"; }
+        configure_pi_settings() { CALLS+=" +settings"; }
+        configure_agent_badge() { CALLS+=" +badge"; }
+        update_agent_badge() { CALLS+=" +badge-update"; }
+        configure_tailscaled() { CALLS+=" +tailscaled"; }
         tool_applicable() { return 0; }
         track_install() { CALLS+=" $2:$1"; }
         run_installer() { CALLS+=" $1"; }

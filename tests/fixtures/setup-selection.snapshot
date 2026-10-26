@@ -330,7 +330,7 @@ AI CLIs: all (claude, codex, opencode, pi)
 -- components
 bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls jq lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude codex opencode pi
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[sbx] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -384,7 +384,7 @@ AI CLIs: all (claude, codex, opencode, pi)
 -- components
 claude codex jq opencode pi 
 -- install
-eget[jq] claude codex opencode pi
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -430,7 +430,7 @@ AI CLIs: claude
 -- components
 claude jq 
 -- install
-eget[jq] claude
+eget[jq] claude +settings +badge +badge-update
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -476,7 +476,7 @@ AI CLIs: claude codex
 -- components
 claude codex jq 
 -- install
-eget[jq] claude codex
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -522,7 +522,7 @@ AI CLIs: all (claude, codex, opencode, pi)
 -- components
 claude codex jq opencode pi 
 -- install
-eget[jq] claude codex opencode pi
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -568,7 +568,7 @@ AI CLIs: all (claude, codex, opencode, pi)
 -- components
 claude codex jq opencode pi 
 -- install
-eget[jq] claude codex opencode pi
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -614,7 +614,7 @@ AI CLIs: claude claude
 -- components
 claude jq 
 -- install
-eget[jq] claude
+eget[jq] claude +settings +badge +badge-update
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -660,7 +660,7 @@ AI CLIs: pi opencode
 -- components
 opencode pi 
 -- install
-opencode pi
+opencode +settings pi +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -757,7 +757,7 @@ Tailscale: yes (--tail)
 -- components
 tailscale 
 -- install
-tailscale
+tailscale +tailscaled
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[tailscale] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -997,7 +997,7 @@ Google Cloud CLI: yes (--gcloud)
 -- components
 bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow harper-ls jq lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude codex opencode pi tailscale gcloud
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings tailscale +tailscaled gcloud
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale gcloud] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1109,7 +1109,7 @@ Tailscale: yes (--tail)
 -- components
 bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls jq lazygit neovim node nvm ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude codex tailscale
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update tailscale +tailscaled
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1171,7 +1171,7 @@ AWS CLI v2: yes (--aws)
 -- components
 aws-cli azure-cli bat btop delta direnv eget eza fd fzf gcloud gdu gh glow lazygit pi ripgrep sd starship tailscale uv wsl2-ssh-agent xrdp zoxide 
 -- install
-eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd wsl2-ssh-agent] pi rdp tailscale azure-cli gcloud aws-cli
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd wsl2-ssh-agent] pi +settings rdp tailscale +tailscaled azure-cli gcloud aws-cli
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo systemctl] applicable=[tailscale azure-cli gcloud aws-cli] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl

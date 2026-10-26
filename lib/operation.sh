@@ -84,7 +84,7 @@ operation_begin() {
 operation_read_only_args() {
     local arg
     for arg in "$@"; do
-        case "$arg" in --help|-h|--dry-run|--check|--list|-l) return 0 ;; esac
+        case "$arg" in --help|-h|--dry-run|--check|--check-plugin|--list|-l) return 0 ;; esac
     done
     return 1
 }
