@@ -1,7 +1,8 @@
 #!/bin/bash
-# The dotfiles front door: show or change this machine's profile.
+# The dotfiles front door: verify this machine, and show or change its profile.
 #
-# Usage: dotfiles profile [--add X | --remove X | --tier T | --propose]
+# Usage: dotfiles verify [-v] [--latest] [--smoke]
+#        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
 set -euo pipefail
 
@@ -13,14 +14,24 @@ export DOTFILES_DIR
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/config.sh"
 source "$DOTFILES_DIR/lib/state.sh"
+source "$DOTFILES_DIR/lib/work-host.sh"
+source "$DOTFILES_DIR/lib/observe.sh"
+source "$DOTFILES_DIR/lib/outcomes.sh"
 source "$DOTFILES_DIR/lib/operation.sh"
 source "$DOTFILES_DIR/lib/profile.sh"
+source "$DOTFILES_DIR/lib/verify.sh"
 
 usage() {
     cat <<'EOF'
 Usage: dotfiles <command> [options]
 
 Commands:
+  verify                Check this machine against the checkout and its profile.
+                        Changes nothing. Exit 1: setup has work to do; 3: a check
+                        could not be made; 2: something needs you; 0: healthy.
+    -v                  List every check, passing ones included.
+    --latest            Also look up newer releases of pinned tools (network).
+    --smoke             Also create, run, and remove one local sbx sandbox.
   profile               Show this machine's profile: what dotfiles manages here.
   profile --add X       Manage X: a capability (rdp, tail, azure, gcloud, aws),
                         ai (every AI CLI) or one AI CLI, an opt-out (no-git,
@@ -218,8 +229,57 @@ cmd_profile() {
     esac
 }
 
+cmd_verify() {
+    local verbose=false latest=false smoke=false records rc i
+    while (( $# )); do
+        case "$1" in
+            -v|--verbose) verbose=true ;;
+            --latest) latest=true ;;
+            --smoke) smoke=true ;;
+            --help|-h) usage; return 0 ;;
+            *) error "Unknown option: $1"; usage >&2; return 64 ;;
+        esac
+        shift
+    done
+    # The smoke test creates a sandbox, so it runs as an operation.
+    [[ "$smoke" != true ]] || operation_begin "$SCRIPT_DIR/dotfiles" verify "${ORIGINAL_ARGS[@]}"
+    records="$(
+        if ! operation_joined && ! operation_held_here; then
+            for ((i = 0; i < ${DOTFILES_OPERATION_WAIT:-5} * 4; i++)); do operation_busy || break; sleep 0.25; done
+            if operation_busy; then
+                outcome incomplete State operation "in progress: $(operation_describe_holder); results may change"
+            fi
+        fi
+        verify_checkout
+        verify_state
+        verify_components
+        verify_configs
+        verify_ai
+        verify_host
+        verify_environment
+        [[ "$latest" != true ]] || verify_upstream
+        if [[ "$smoke" == true ]]; then
+            if work_smoke_test >&2; then
+                outcome ok "Local sandboxes" "smoke test" "created, ran, and removed a local shell sandbox"
+            else
+                outcome health "Local sandboxes" "smoke test" "failed (see the output above)"
+            fi
+        fi
+    )"
+    if [[ "$verbose" == true ]]; then
+        outcome_render -v <<< "$records"
+    else
+        outcome_render <<< "$records"
+    fi
+    rc="$(outcome_exit verify <<< "$records")"
+    [[ -z "$(outcome_render <<< "$records")" ]] || echo
+    printf '%s\n' "$(outcome_summary <<< "$records")"
+    return "$rc"
+}
+
 ORIGINAL_ARGS=("$@")
 case "${1:-}" in
+    verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;
     profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
     --help|-h|help|"") usage ;;
     *) error "Unknown command: $1"; usage >&2; exit 64 ;;

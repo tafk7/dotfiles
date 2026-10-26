@@ -78,7 +78,7 @@ component ledger changes the run made. Set `DOTFILES_SETUP_LOG=0` to skip it.
 
 After setup:
 
-1. Restart the shell and run `./bin/verify --installed`.
+1. Restart the shell and run `dotfiles verify`.
 2. After `--dev`, run `./bin/install-editor-plugins` to install Neovim plugins.
 3. Run `gh auth login` on each machine that needs GitHub access.
 
@@ -216,8 +216,16 @@ adding tools, configs, and aliases.
 
 ## Maintenance
 
+`dotfiles verify` checks the checkout, state, the profile's components,
+configs, AI settings, and host readiness, and changes nothing. It prints only
+what needs attention (`-v` lists every check) and exits 1 when setup has work
+to do, 3 when a check could not be made, 2 when something needs you (Tailscale
+enrollment, a group login), and 0 otherwise. `--latest` adds newer upstream
+releases of pinned tools.
+
 ```bash
-./bin/verify --installed          # health of what this machine recorded
+dotfiles verify                   # this machine against the checkout and profile
+./bin/verify --tier work          # a tier against current reality (also --all)
 ./bin/diff-config                 # drift between tracked configs and $HOME
 ./bin/check-updates               # pinned tool versions vs latest releases
 ./bin/uninstall-tool --dry-run X  # remove a component that dotfiles installed
