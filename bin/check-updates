@@ -6,6 +6,7 @@
 #   check-updates              Print table for all pinned tools
 #   check-updates --outdated   Only show tools that have a newer release
 #   check-updates --json       Machine-readable JSON output
+#   check-updates --records    Outcome records (lib/outcomes.sh) for dotfiles verify
 #   check-updates <tool>       Check a single tool by short name (e.g. starship)
 #
 # Auth: GITHUB_TOKEN if set; else `gh auth token` if gh is installed and
@@ -19,11 +20,13 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 
 source "$DOTFILES_DIR/lib/runtime.sh"
 source "$DOTFILES_DIR/lib/registry.sh"
+source "$DOTFILES_DIR/lib/outcomes.sh"
 
 readonly EGET_TOML="$DOTFILES_DIR/eget.toml"
 
 ONLY_OUTDATED=false
 JSON_OUTPUT=false
+RECORDS_OUTPUT=false
 FILTER_TOOL=""
 
 # Resolved at startup: the bearer token to use (may be empty) and a
@@ -51,13 +54,14 @@ resolve_github_auth() {
 }
 
 usage() {
-    sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+    sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --outdated) ONLY_OUTDATED=true; shift ;;
         --json)     JSON_OUTPUT=true;   shift ;;
+        --records)  RECORDS_OUTPUT=true; shift ;;
         --help|-h)  usage; exit 0 ;;
         -*)         error "Unknown flag: $1"; usage; exit 1 ;;
         *)          FILTER_TOOL="$1"; shift ;;
@@ -177,6 +181,19 @@ emit_json() {
     echo "]"
 }
 
+# Newer releases are advisory; a failed lookup is an incomplete check.
+emit_records() {
+    local name repo pinned latest status
+    while IFS='|' read -r name repo pinned latest status; do
+        [[ -n "$name" ]] || continue
+        case "$status" in
+            ok|ahead) outcome ok Upstream "$name" "$pinned is current" ;;
+            outdated) outcome advisory Upstream "$name" "$latest is available (pinned $pinned)" ;;
+            *) outcome incomplete Upstream "$name" "release lookup failed" ;;
+        esac
+    done
+}
+
 emit_table() {
     local name repo pinned latest status icon
     local outdated_count=0 error_count=0 total=0
@@ -259,7 +276,10 @@ main() {
     local rows contracts_failed=false
     rows="$(collect_rows)"
 
-    if [[ "$JSON_OUTPUT" == "true" ]]; then
+    if [[ "$RECORDS_OUTPUT" == true ]]; then
+        echo "$rows" | emit_records
+        return 0
+    elif [[ "$JSON_OUTPUT" == "true" ]]; then
         echo "$rows" | emit_json
     else
         echo "$rows" | emit_table

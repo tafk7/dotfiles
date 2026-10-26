@@ -21,4 +21,9 @@ gh_latest_tag() { printf 'v2\n'; }
 rc=0
 main >/dev/null || rc=$?
 assert_eq "$rc" 2 "outdated exit status"
+JSON_OUTPUT=false RECORDS_OUTPUT=true ONLY_OUTDATED=false
+assert_eq "$(main)" $'advisory\tUpstream\tgh\tv2 is available (pinned v1)' "outdated record"
+gh_latest_tag() { return 1; }
+output="$(main)" || fail "records mode failed on a failed lookup"
+assert_eq "$output" $'incomplete\tUpstream\tgh\trelease lookup failed' "failed lookup record"
 printf 'check-updates: ok\n'
