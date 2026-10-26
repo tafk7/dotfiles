@@ -238,14 +238,11 @@ verify_ai() {
     done
 }
 
-# Enrolled editor plugins: vim-plug and each plugin at its pin.
+# Neovim's plugins, where Neovim is expected (the dev tier): vim-plug and
+# each plugin at its pin. A missing Neovim is reported under Components.
 verify_editor_plugins() {
     local section="Editor plugins" out rc=0 line
-    profile_exists && profile_load 2>/dev/null && [[ "${PROFILE[editor-plugins]}" == yes ]] || return 0
-    if ! command -v nvim >/dev/null 2>&1; then
-        outcome convergence "$section" plugins "enrolled, but Neovim is not installed (the dev tier installs it)"
-        return
-    fi
+    verify_expects neovim && command -v nvim >/dev/null 2>&1 || return 0
     out="$(NO_COLOR=1 "$DOTFILES_DIR/bin/install-editor-plugins" --check 2>&1)" || rc=$?
     case "$rc" in
         0) outcome ok "$section" plugins "vim-plug and every plugin at its pin" ;;

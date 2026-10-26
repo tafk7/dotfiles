@@ -114,10 +114,9 @@ update_agent_badge() {
     log "Updated $name's agent-badge plugin (restart $name sessions to load it)."
 }
 
-# The editor plugins, when this run enrolls them (--editor-plugins, which the
-# profile's editor-plugins=yes passes): vim-plug and each plugin at its pin.
+# Neovim's plugins, with Neovim (the dev tier): vim-plug and each plugin
+# configs/init.vim declares at its pin.
 configure_editor_plugins() {
-    [[ "${EDITOR_PLUGINS:-false}" == true ]] || return 0
     command -v nvim >/dev/null 2>&1 || return 0
     local rc=0
     if [[ "${DRY_RUN:-false}" == true ]]; then

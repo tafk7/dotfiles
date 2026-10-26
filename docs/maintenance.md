@@ -134,17 +134,20 @@ Migration code is removed once every machine has migrated. Nothing reads a
 checkout's `generated/` directory any longer; an old checkout's copy is ignored
 and safe to delete.
 
-## Optional editor and badge setup
+## Editor plugins and the agent badge
 
-Editor plugins are opt-in: enroll them with `dotfiles profile --add
-editor-plugins` (or `setup.sh --editor-plugins`), and setup runs
+Neovim's plugins come with Neovim in the dev tier: setup runs
 `bin/install-editor-plugins` as Neovim's configure step. It installs the
 pinned vim-plug revision, installs missing plugins, and moves each plugin
 checkout to the commit `configs/init.vim` pins; a vim-plug that dotfiles did
 not install, and a checkout with local changes, are left alone and reported.
 `--check` (and setup's dry run) reports what would change, and
 `dotfiles verify` lists anything off its pin. Ordinary editor startup never
-touches the network.
+touches the network. `init.vim` sets a plugin's key mappings only when the
+plugin is installed, so a Neovim without them keeps its own keys. There is no
+linter plugin: one that runs a project's own tools on edit (ALE prefers a
+checkout's `node_modules` and virtualenv executables) runs code from every
+checkout opened.
 Existing plugin and undo directories under Neovim's config root keep working;
 fresh profiles use XDG data and state.
 

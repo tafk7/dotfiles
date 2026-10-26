@@ -4,8 +4,10 @@
 " Plugins
 " ==============================================================================
 
-" Installing plugins is an explicit action (bin/install-editor-plugins); editor
-" startup never downloads or executes remote code.
+" The dev tier installs vim-plug and these plugins at their pinned commits
+" (bin/install-editor-plugins, Neovim's configure step); editor startup never
+" downloads or executes remote code. No linter plugin: one that runs a
+" project's own tools on edit runs code from every checkout opened.
 
 let s:vim_plug = stdpath('config') . '/autoload/plug.vim'
 if filereadable(s:vim_plug)
@@ -42,7 +44,6 @@ Plug 'machakann/vim-highlightedyank', { 'commit': '285a61425e79742997bbde76a91be
 
 " Syntax and language support
 Plug 'sheerun/vim-polyglot', { 'commit': 'f061eddb7cdcc614c8406847b2bfb53099832a4e' }
-Plug 'dense-analysis/ale', { 'commit': 'e1789bc54483d76ac9ddb40b633d1645c8281914' }
 
 call plug#end()
 endif
@@ -228,11 +229,20 @@ nnoremap <silent> <Space> :nohlsearch<CR>
 " Plugin Configuration
 " ==============================================================================
 
+" Whether plugin NAME is declared above and installed. A plugin's mappings
+" are set only when it is, so Neovim without plugins keeps its own keys.
+function! s:has_plugin(name) abort
+    let l:plug = get(get(g:, 'plugs', {}), a:name, {})
+    return has_key(l:plug, 'dir') && isdirectory(l:plug.dir)
+endfunction
+
 " FZF - Essential file navigation
-nnoremap <C-p> :Files<CR>
-nnoremap <leader>f :Files<CR>
-nnoremap <leader>b :Buffers<CR>
-nnoremap <leader>g :Rg<CR>
+if s:has_plugin('fzf.vim')
+    nnoremap <C-p> :Files<CR>
+    nnoremap <leader>f :Files<CR>
+    nnoremap <leader>b :Buffers<CR>
+    nnoremap <leader>g :Rg<CR>
+endif
 
 " FZF layout
 let g:fzf_layout = { 'window': { 'width': 0.9, 'height': 0.9 } }
@@ -248,47 +258,31 @@ let g:airline_powerline_fonts = 0
 let g:airline#extensions#tabline#enabled = 1
 let g:airline#extensions#tabline#formatter = 'unique_tail'
 let g:airline#extensions#branch#enabled = 1
-let g:airline#extensions#ale#enabled = 1
 
 " Git - Fugitive (main git operations)
-nnoremap <leader>gs :Git<CR>
-nnoremap <leader>gd :Gdiffsplit<CR>
-nnoremap <leader>gc :Git commit<CR>
-nnoremap <leader>gb :Git blame<CR>
+if s:has_plugin('vim-fugitive')
+    nnoremap <leader>gs :Git<CR>
+    nnoremap <leader>gd :Gdiffsplit<CR>
+    nnoremap <leader>gc :Git commit<CR>
+    nnoremap <leader>gb :Git blame<CR>
+endif
 
 " GitGutter (hunk navigation with 'h' prefix)
 let g:gitgutter_sign_added = '+'
 let g:gitgutter_sign_modified = '~'
 let g:gitgutter_sign_removed = '-'
-nnoremap <leader>hn :GitGutterNextHunk<CR>
-nnoremap <leader>hp :GitGutterPrevHunk<CR>
-nnoremap <leader>hs :GitGutterStageHunk<CR>
-nnoremap <leader>hu :GitGutterUndoHunk<CR>
-
-" ALE (Async Lint Engine)
-let g:ale_sign_error = '●'
-let g:ale_sign_warning = '.'
-let g:ale_lint_on_enter = 0
-let g:ale_lint_on_text_changed = 'delay'
-let g:ale_echo_msg_format = '[%linter%] %s [%severity%]'
-let g:ale_linters = {
-\   'python': ['ruff'],
-\   'javascript': ['eslint'],
-\   'typescript': ['tsserver', 'eslint'],
-\}
-let g:ale_fixers = {
-\   '*': ['remove_trailing_lines', 'trim_whitespace'],
-\   'python': ['black', 'ruff'],
-\   'javascript': ['prettier'],
-\   'typescript': ['prettier'],
-\}
-nnoremap <leader>af :ALEFix<CR>
-nnoremap <leader>an :ALENext<CR>
-nnoremap <leader>ap :ALEPrevious<CR>
+if s:has_plugin('vim-gitgutter')
+    nnoremap <leader>hn :GitGutterNextHunk<CR>
+    nnoremap <leader>hp :GitGutterPrevHunk<CR>
+    nnoremap <leader>hs :GitGutterStageHunk<CR>
+    nnoremap <leader>hu :GitGutterUndoHunk<CR>
+endif
 
 " Commentary
-nnoremap <leader>/ :Commentary<CR>
-vnoremap <leader>/ :Commentary<CR>
+if s:has_plugin('vim-commentary')
+    nnoremap <leader>/ :Commentary<CR>
+    vnoremap <leader>/ :Commentary<CR>
+endif
 
 " ==============================================================================
 " Auto Commands

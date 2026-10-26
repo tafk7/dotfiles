@@ -50,7 +50,7 @@ user's decision, 2026-10-26).
 | 2.6 | `dotfiles apply`; dry run planned from observations; `--only` with blockers; `--reinstall[=X]`, `--overwrite-configs` |
 | 2.7 | `deployed.tsv`; retirement of configs whose source left the manifest; gitconfig content check; honest `diff-config` |
 | 2.8 | Three-way retirement of AI settings keys, with conflicts remembered |
-| 2.9 | Editor plugins under the profile; vim-plug and plugins at their pins |
+| 2.9 | Editor plugins with the dev tier; vim-plug and plugins at their pins |
 | 3.1 | Environment producer (`lib/env-producer.sh`, `lib/environment.sh`): owned and respected variables, PATH segments |
 | 3.2 | tmux refresh: one server's environment, guards, PATH segments, session overrides reported, config, badge, theme, version check |
 | 3.3 | Staleness: change events (`changes.tsv`), shell load records under `$XDG_RUNTIME_DIR`, process scan; verify's Running section |
@@ -79,7 +79,7 @@ user's decision, 2026-10-26).
 3. `dotfiles profile --propose`, then confirm. It reads only ledger rows
    dotfiles or the package manager installed, so here it proposes tier work and
    all AI tools, without `tail` or `gcloud` (recorded external); add what is
-   wanted (`--add tail`, `editor-plugins`, opt-outs) with `--no-apply`.
+   wanted (`--add tail`, opt-outs) with `--no-apply`.
 4. `dotfiles apply --dry-run`, review, then `dotfiles apply` in a terminal (the
    sbx hold question needs one on machines main set up; it ends with a refresh
    of the tmux server, which clears the guards from its global environment).
@@ -126,5 +126,9 @@ What the first apply will change here, from read-only checks:
   component, never after a failed one.
 - 2.6: `--only` refuses a component the run does not select, and skips the
   config phase.
+- 2.9: Neovim's plugins come with the dev tier rather than a profile key
+  (the user's decision, 2026-10-26), and ALE is gone: it ran a checkout's own
+  linters on edit. A profile's `editor-plugins` line is ignored and dropped on
+  the next save.
 - Phase gates: the work continues in the worktree past the gates; adoption
   waits until the plan is complete.
