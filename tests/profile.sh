@@ -46,12 +46,14 @@ assert_eq "$(profile_value tier)/$(profile_value opt-outs)" "config/no-git,no-ho
 "$ROOT/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1
 assert_eq "$(profile_value opt-outs)" "no-git,no-hooks" "a later run without an opt-out removed it"
 
-# --- dotfiles profile: show, add, remove, tier.
+# --- dotfiles profile: show, add, remove, tier. The editor-plugins key, from
+# profiles before the dev tier included the plugins, is ignored and dropped.
 printf 'schema\t1\ntier\twork\ncapabilities\ttail\nai\tall\nai.exclude\t-\nopt-outs\t-\neditor-plugins\tno\n' > "$DOTFILES_PROFILE_FILE"
 shown="$(dotfiles profile)"
 [[ "$shown" == *"tier            work"* && "$shown" == *"ai              all"* ]] || fail "profile display: $shown"
 out="$(dotfiles profile --remove pi)"
 assert_eq "$(profile_value ai)/$(profile_value ai.exclude)" "all/pi" "removing one tool under ai=all"
+! grep -q '^editor-plugins' "$DOTFILES_PROFILE_FILE" || fail "a retired key survived a save"
 [[ "$out" == *"uninstall-tool pi"* ]] || fail "removal did not print the uninstall command: $out"
 profile_load
 assert_eq "$(profile_setup_args | paste -sd ' ')" "--work --tail --claude --codex --opencode" "an exclusion in the setup arguments"
@@ -88,12 +90,6 @@ out="$(dotfiles profile --propose </dev/null)"
 profile_exists && fail "a proposal was saved without confirmation"
 dotfiles profile --propose --yes >/dev/null
 assert_eq "$(profile_value tier)/$(profile_value capabilities)/$(profile_value ai)" "work/tail/claude" "saved proposal"
-
-# Editor plugins: setup's flag enrolls them, and the profile passes it back.
-profile_load
-profile_merge "$(profile_value tier)" "" "" "" "" yes
-assert_eq "${PROFILE[editor-plugins]}/${PROFILE_CHANGES[*]}" "yes/+ editor-plugins" "enrolling editor plugins"
-[[ "$(profile_setup_args)" == *"--editor-plugins"* ]] || fail "the profile does not pass --editor-plugins: $(profile_setup_args)"
 
 # A damaged profile is reported, not silently replaced.
 printf 'schema\t1\ntier\tgalaxy\n' > "$DOTFILES_PROFILE_FILE"

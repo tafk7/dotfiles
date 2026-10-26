@@ -124,5 +124,3 @@ call s:hi('SpellBad',                 'NONE', 'NONE', 'undercurl')
 call s:hi('SpellCap',                 'NONE', 'NONE', 'underline')
 call s:hi('SpellRare',                'NONE', 'NONE', 'underline')
 call s:hi('SpellLocal',               'NONE', 'NONE', 'underline')
-hi! link ALEErrorSign DiagnosticError
-hi! link ALEWarningSign DiagnosticWarn

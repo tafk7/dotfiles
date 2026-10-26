@@ -59,6 +59,18 @@ verify
 assert_eq "$VERIFY_RC" 1 "convergence with health findings"
 ln -s "$ROOT/configs/editorconfig" "$HOME/.editorconfig"
 
+# Neovim's plugins are checked where the profile expects Neovim (the dev
+# tier), not on a config-tier machine that happens to have one.
+printf '#!/bin/sh\nprintf "%%s\\n%%s\\n" "$HOME/.config/nvim" "$HOME/.local/share/nvim"\n' > "$TEST_ROOT/bin/nvim"
+chmod +x "$TEST_ROOT/bin/nvim"
+verify
+[[ "$VERIFY_OUTPUT" != *"Editor plugins"* ]] || fail "plugins checked below the dev tier: $VERIFY_OUTPUT"
+sed -i 's/^tier\t.*/tier\tdev/' "$XDG_STATE_HOME/dotfiles/profile"
+verify
+[[ "$VERIFY_OUTPUT" == *$'Editor plugins\n'*"fix  plugins: install vim-plug"* ]] || fail "dev-tier plugins not checked: $VERIFY_OUTPUT"
+sed -i 's/^tier\t.*/tier\tconfig/' "$XDG_STATE_HOME/dotfiles/profile"
+rm "$TEST_ROOT/bin/nvim"
+
 # An operation in progress makes the result incomplete.
 flock "$XDG_STATE_HOME/dotfiles/operation.lock" sleep 20 &
 holder=$!

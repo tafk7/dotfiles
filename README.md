@@ -22,7 +22,7 @@ and changes nothing.
 |---|---|---|
 | `--config` | Links configs for tools that are already installed | No |
 | `--bash` | Pinned CLI tools in `~/.local/bin` through eget: starship, eza, bat, fd, ripgrep, fzf, zoxide, delta, btop, gdu, glow, lazygit, gh, uv, sd, direnv | No |
-| `--dev` | zsh, build tools, clipboard, Neovim, tmux, shellcheck, harper-ls | Yes |
+| `--dev` | zsh, build tools, clipboard, Neovim and its pinned plugins, tmux, shellcheck, harper-ls | Yes |
 | `--work` | NVM and pinned Node, Docker, rustup and the pinned Rust toolchain, and Docker Sandboxes (`sbx`) with KVM access where supported | Yes |
 
 Each tier includes the ones before it. If you pass several tiers, the highest
@@ -84,10 +84,7 @@ component ledger changes the run made. Set `DOTFILES_SETUP_LOG=0` to skip it.
 After setup:
 
 1. Restart the shell and run `dotfiles verify`.
-2. For Neovim plugins, enroll them once (`dotfiles profile --add editor-plugins`,
-   or `--editor-plugins` with `--dev`); setup then keeps vim-plug and every
-   plugin at its pinned commit.
-3. Run `gh auth login` on each machine that needs GitHub access.
+2. Run `gh auth login` on each machine that needs GitHub access.
 
 For `--work` host setup (KVM, `sbx login`, Tailscale enrollment, the pinned
 sbx and its kit builder), see [docs/work.md](docs/work.md). Generic sbx kits

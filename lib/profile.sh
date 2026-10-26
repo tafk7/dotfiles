@@ -9,7 +9,6 @@
 #   ai              all | comma-separated AI tools | - (none)
 #   ai.exclude      AI tools left out of `all` (dotfiles profile --remove)
 #   opt-outs        no-git, no-hooks
-#   editor-plugins  yes | no
 # Feature toggles (theme, agent-badge) stay in preferences.tsv.
 #
 # Changing the profile changes what is managed, never what is removed.
@@ -19,14 +18,17 @@ _DOTFILES_PROFILE_LOADED=1
 
 DOTFILES_PROFILE_FILE="$DOTFILES_STATE_DIR/profile"
 DOTFILES_PROFILE_SCHEMA=1
-PROFILE_KEYS=(tier capabilities ai ai.exclude opt-outs editor-plugins)
+PROFILE_KEYS=(tier capabilities ai ai.exclude opt-outs)
+# Keys an earlier profile may hold, ignored on load and dropped on the next
+# save: editor-plugins (the dev tier includes the plugins now).
+PROFILE_RETIRED_KEYS=(editor-plugins)
 PROFILE_OPT_OUTS=(no-git no-hooks)
 declare -A PROFILE=()
 
 profile_exists() { [[ -f "$DOTFILES_PROFILE_FILE" ]]; }
 
 profile_reset() {
-    PROFILE=([tier]=config [capabilities]="" [ai]="" [ai.exclude]="" [opt-outs]="" [editor-plugins]=no)
+    PROFILE=([tier]=config [capabilities]="" [ai]="" [ai.exclude]="" [opt-outs]="")
 }
 
 _profile_tier_rank() {
@@ -88,8 +90,6 @@ profile_check() {
     for item in ${PROFILE[opt-outs]//,/ }; do
         [[ " ${PROFILE_OPT_OUTS[*]} " == *" $item "* ]] || { printf 'unknown opt-out: %s\n' "$item"; return 1; }
     done
-    [[ "${PROFILE[editor-plugins]}" == yes || "${PROFILE[editor-plugins]}" == no ]] \
-        || { printf 'editor-plugins must be yes or no\n'; return 1; }
 }
 
 # Load the profile into PROFILE; defaults when there is none.
@@ -100,7 +100,7 @@ profile_load() {
     { IFS=$'\t' read -r key value && [[ "$key" == schema && "$value" == "$DOTFILES_PROFILE_SCHEMA" ]]; } \
         < "$DOTFILES_PROFILE_FILE" || { printf 'Error: unsupported profile schema: %s\n' "$DOTFILES_PROFILE_FILE" >&2; return 1; }
     while IFS=$'\t' read -r key value; do
-        [[ "$key" == schema || -z "$key" ]] && continue
+        [[ "$key" == schema || -z "$key" || " ${PROFILE_RETIRED_KEYS[*]} " == *" $key "* ]] && continue
         [[ " ${PROFILE_KEYS[*]} " == *" $key "* ]] || { printf 'Error: unknown profile key: %s\n' "$key" >&2; return 1; }
         [[ "$value" != - ]] || value=""
         PROFILE[$key]="$value"
@@ -155,7 +155,6 @@ profile_setup_args() {
         while IFS= read -r item; do printf -- '--%s\n' "$item"; done < <(profile_ai_tools)
     fi
     for item in ${PROFILE[opt-outs]//,/ }; do printf -- '--%s\n' "$item"; done
-    [[ "${PROFILE[editor-plugins]}" != yes ]] || printf -- '--editor-plugins\n'
 }
 
 profile_describe() {
@@ -165,22 +164,17 @@ profile_describe() {
     printf 'capabilities    %s\n' "$(printf '%s' "${PROFILE[capabilities]:-none}" | sed 's/,/, /g')"
     printf 'ai              %s\n' "$(printf '%s' "$ai" | sed 's/,/, /g')"
     printf 'opt-outs        %s\n' "$(printf '%s' "${PROFILE[opt-outs]:-none}" | sed 's/,/, /g')"
-    printf 'editor-plugins  %s\n' "${PROFILE[editor-plugins]}"
 }
 
-# profile_merge TIER CAPABILITIES AI_MODE AI_TOOLS OPT_OUTS [EDITOR_PLUGINS]:
-# fold one setup run's flags into PROFILE. Flags only add: a higher tier
-# raises it, capabilities and AI tools join (and leave ai.exclude), opt-outs
-# and editor plugins (yes) set. Nothing is lowered or removed. AI_MODE is all,
-# some, or empty. Each addition is appended to PROFILE_CHANGES as "+ X".
+# profile_merge TIER CAPABILITIES AI_MODE AI_TOOLS OPT_OUTS: fold one setup
+# run's flags into PROFILE. Flags only add: a higher tier raises it,
+# capabilities and AI tools join (and leave ai.exclude), opt-outs set.
+# Nothing is lowered or removed. AI_MODE is all, some, or empty. Each addition
+# is appended to PROFILE_CHANGES as "+ X".
 PROFILE_CHANGES=()
 profile_merge() {
-    local tier="$1" capabilities="$2" ai_mode="$3" ai_tools="$4" opt_outs="$5" editor_plugins="${6:-}" item
+    local tier="$1" capabilities="$2" ai_mode="$3" ai_tools="$4" opt_outs="$5" item
     PROFILE_CHANGES=()
-    if [[ "$editor_plugins" == yes && "${PROFILE[editor-plugins]}" != yes ]]; then
-        PROFILE_CHANGES+=("+ editor-plugins")
-        PROFILE[editor-plugins]=yes
-    fi
     if (( $(_profile_tier_rank "$tier") > $(_profile_tier_rank "${PROFILE[tier]}") )); then
         PROFILE_CHANGES+=("+ tier $tier")
         PROFILE[tier]="$tier"

@@ -77,8 +77,8 @@ Commands:
     --smoke             Also create, run, and remove one local sbx sandbox.
   profile               Show this machine's profile: what dotfiles manages here.
   profile --add X       Manage X: a capability (rdp, tail, azure, gcloud, aws),
-                        ai (every AI CLI) or one AI CLI, an opt-out (no-git,
-                        no-hooks), or editor-plugins. Saved, then applied.
+                        ai (every AI CLI) or one AI CLI, or an opt-out
+                        (no-git, no-hooks). Saved, then applied.
   profile --remove X    Stop managing X. Nothing is uninstalled; the commands
                         that would remove it are printed.
   profile --tier T      Set the tier (config, bash, dev, work). Raising it
@@ -108,7 +108,7 @@ validate_addition() {
         done < <(tools_for_capability "$item")
     elif is_ai_tool "$item"; then
         tool_applicable "$item" || { error "$item is not supported on this platform"; return 1; }
-    elif [[ "$item" != ai && "$item" != editor-plugins ]] && ! is_opt_out "$item"; then
+    elif [[ "$item" != ai ]] && ! is_opt_out "$item"; then
         error "Unknown selection: $item"
         return 64
     fi
@@ -128,8 +128,6 @@ add_item() {
         fi
     elif is_opt_out "$item"; then
         PROFILE[opt-outs]="$(_profile_list_add "${PROFILE[opt-outs]}" "$item")"
-    else
-        PROFILE[editor-plugins]=yes
     fi
 }
 
@@ -153,8 +151,6 @@ remove_item() {
         UNMANAGED+=("$item")
     elif is_opt_out "$item"; then
         PROFILE[opt-outs]="$(_profile_list_remove "${PROFILE[opt-outs]}" "$item")"
-    elif [[ "$item" == editor-plugins ]]; then
-        PROFILE[editor-plugins]=no
     else
         error "Unknown selection: $item"
         return 64

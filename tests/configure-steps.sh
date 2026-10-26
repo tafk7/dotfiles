@@ -71,6 +71,17 @@ printf '{"mine": true}\n' > "$HOME/.pi/agent/settings.json"
 configure_pi_settings pi >/dev/null
 assert_eq "$(<"$HOME/.pi/agent/settings.json")" '{"mine": true}' "existing Pi settings"
 
+# Neovim's plugins come with Neovim: its configure step plans vim-plug and
+# the plugins init.vim declares, without a linter plugin.
+printf '#!/bin/sh\nprintf "%%s\\n%%s\\n" "$HOME/.config/nvim" "$HOME/.local/share/nvim"\n' > "$TEST_ROOT/external/nvim"
+chmod +x "$TEST_ROOT/external/nvim"
+select_run --dev --only neovim --dry-run
+output="$(install_selection 2>&1)" || fail "Neovim's dry run failed: $output"
+[[ "$output" == *"Would install vim-plug"* && "$output" == *"Would install plugins: vim-fugitive"* \
+   && "$output" != *"plugins:"*" ale"* ]] || fail "Neovim's step did not plan the plugins: $output"
+DRY_RUN=false ONLY_COMPONENTS=""
+rm "$TEST_ROOT/external/nvim"
+
 # A masked tailscaled is the operator's decision.
 printf '#!/bin/sh\necho tailscale\n' > "$TEST_ROOT/external/tailscale"
 printf '#!/bin/sh\n[ "$1" = is-enabled ] && { echo masked; exit 1; }\nexit 3\n' > "$TEST_ROOT/external/systemctl"
