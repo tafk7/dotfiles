@@ -228,6 +228,30 @@ verify_ai() {
     done
 }
 
+# Enrolled editor plugins: vim-plug and each plugin at its pin.
+verify_editor_plugins() {
+    local section="Editor plugins" out rc=0 line
+    profile_exists && profile_load 2>/dev/null && [[ "${PROFILE[editor-plugins]}" == yes ]] || return 0
+    if ! command -v nvim >/dev/null 2>&1; then
+        outcome convergence "$section" plugins "enrolled, but Neovim is not installed (the dev tier installs it)"
+        return
+    fi
+    out="$(NO_COLOR=1 "$DOTFILES_DIR/bin/install-editor-plugins" --check 2>&1)" || rc=$?
+    case "$rc" in
+        0) outcome ok "$section" plugins "vim-plug and every plugin at its pin" ;;
+        1)
+            while IFS= read -r line; do
+                [[ "$line" != *"Would "* ]] || outcome convergence "$section" plugins "${line#*Would }"
+            done <<< "$out"
+            ;;
+        *) outcome incomplete "$section" plugins "the check failed: $(tail -n1 <<< "$out")" ;;
+    esac
+    # What the check leaves alone: a foreign vim-plug, a changed checkout.
+    while IFS= read -r line; do
+        [[ "$line" != *"left alone"* && "$line" != *"stays at"* ]] || outcome advisory "$section" plugins "${line#\[WARN\] }"
+    done <<< "$out"
+}
+
 # Host readiness from lib/work-host.sh, whose checks report through
 # check_pass/check_warn/check_fail: none of it can be fixed by apply.
 _verify_host_section=""

@@ -93,8 +93,15 @@ and safe to delete.
 
 ## Optional editor and badge setup
 
-`bin/install-editor-plugins` bootstraps the pinned vim-plug revision and
-installs Neovim plugins, so ordinary editor startup never touches the network.
+Editor plugins are opt-in: enroll them with `dotfiles profile --add
+editor-plugins` (or `setup.sh --editor-plugins`), and setup runs
+`bin/install-editor-plugins` as Neovim's configure step. It installs the
+pinned vim-plug revision, installs missing plugins, and moves each plugin
+checkout to the commit `configs/init.vim` pins; a vim-plug that dotfiles did
+not install, and a checkout with local changes, are left alone and reported.
+`--check` (and setup's dry run) reports what would change, and
+`dotfiles verify` lists anything off its pin. Ordinary editor startup never
+touches the network.
 Existing plugin and undo directories under Neovim's config root keep working;
 fresh profiles use XDG data and state.
 

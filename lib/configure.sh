@@ -109,6 +109,20 @@ update_agent_badge() {
     log "Updated $name's agent-badge plugin (restart $name sessions to load it)."
 }
 
+# The editor plugins, when this run enrolls them (--editor-plugins, which the
+# profile's editor-plugins=yes passes): vim-plug and each plugin at its pin.
+configure_editor_plugins() {
+    [[ "${EDITOR_PLUGINS:-false}" == true ]] || return 0
+    command -v nvim >/dev/null 2>&1 || return 0
+    local rc=0
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        "$DOTFILES_DIR/bin/install-editor-plugins" --check 2>&1 | sed 's/^\[INFO\] Would /[INFO] [DRY RUN] Would /' >&2 || true
+        return 0
+    fi
+    "$DOTFILES_DIR/bin/install-editor-plugins" || rc=$?
+    (( rc == 0 || rc == 2 ))
+}
+
 # OpenCode's settings are V2's; an external V1 keeps its own.
 configure_opencode_settings() {
     local cmd version
