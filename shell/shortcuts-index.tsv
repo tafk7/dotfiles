@@ -233,7 +233,7 @@ shell│fr│Find and replace text across files│replace
 shell│cheat│Show this interactive cheatsheet│cheatsheet
 shell│verify│Validate dotfiles installation health│verify
 shell│diff-config│Show drift between dotfiles sources and ~/│diff-config [--diff] [name]
-shell│check-updates│Compare eget.toml pins against latest GitHub releases│check-updates [--outdated] [tool]
+shell│check-updates│Compare every pin with its newest release; list advisories│check-updates [--outdated] [--json] [tool]
 shell│uninstall-tool│Remove a tool installed by dotfiles (--list to inspect)│uninstall-tool <name>
 shell│install-git-hooks│Install dotfiles pre-commit lint hook in this clone│install-git-hooks [--check] [--uninstall]
 shell│da│Allow direnv in current directory│direnv allow

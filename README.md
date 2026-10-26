@@ -250,7 +250,7 @@ dotfiles apply --only node        # one component (blocked if nvm is missing)
 dotfiles verify                   # this machine against the checkout and profile
 ./bin/verify --tier work          # a tier against current reality (also --all)
 ./bin/diff-config                 # drift between tracked configs and $HOME
-./bin/check-updates               # pinned tool versions vs latest releases
+./bin/check-updates               # every pin vs its newest release, plus advisories
 ./bin/uninstall-tool --dry-run X  # remove a component that dotfiles installed
 ls ~/.local/state/dotfiles/backups/   # configs replaced during setup
 ```
