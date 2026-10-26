@@ -34,7 +34,9 @@ Usage: dotfiles <command> [options]
 
 Commands:
   update                Take upstream changes: fetch and show them, fast-forward
-                        this checkout, apply the machine profile, then verify.
+                        this checkout, apply the machine profile (components,
+                        --upgrade work, configs, one refresh), then verify and
+                        report what still needs attention.
                         Needs the install path's checkout, on a branch with an
                         upstream, without uncommitted changes; a branch that has
                         diverged from its upstream stops it.
@@ -424,6 +426,10 @@ update_continue() {
         printf 'update: at %s; ' "$after"
     else
         printf 'update: %s -> %s; ' "$before" "$after"
+    fi
+    if journal_pending; then
+        printf 'an interrupted replacement is pending for %s (the next apply reconciles it); ' \
+            "$(journal_pending_components | paste -sd ' ')"
     fi
     if (( setup_rc != 0 )); then
         printf 'setup failed (see its log in %s/logs)\n' "$DOTFILES_STATE_DIR"
