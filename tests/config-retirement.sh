@@ -33,6 +33,19 @@ assert_eq "$(record "$portable")" "rendered	sha256:$(sha256sum "$portable" | awk
 assert_eq "$(record "$HOME/.gitconfig")" "merged	include:$portable	gitconfig" "the merged include's record"
 [[ -z "$(record "$HOME/.tmux.conf")" ]] || fail "a config whose owner is absent was recorded"
 
+# A change event only for a link that changed on disk: a first run over links
+# already in place (no records yet) records none; a recreated link does. Under
+# dotfiles apply, its refresh follows, so setup prints no next steps.
+change_record shell "marker" 1000
+rm "$DOTFILES_DEPLOYED_FILE"
+DOTFILES_REFRESH_FOLLOWS=1 setup_config
+assert_eq "$(change_line shell | cut -f2-)" "1000	marker" "links already in place"
+[[ "$SETUP_OUTPUT" != *"Next Steps"* ]] || fail "next steps printed before apply's refresh: $SETUP_OUTPUT"
+rm "$HOME/.bashrc"
+setup_config
+[[ "$(change_line shell | cut -f3)" == "bash.sh linked" ]] || fail "a recreated link recorded no change: $(change_line shell)"
+[[ "$SETUP_OUTPUT" == *"Next Steps"*"dotfiles verify"* ]] || fail "setup's next steps: $SETUP_OUTPUT"
+
 # Entries whose sources left the manifest: one unchanged, one redirected, one
 # outside the approved roots, and an unchanged rendered file.
 ln -s "$ROOT/configs/retired-thing" "$HOME/.retired-thing"

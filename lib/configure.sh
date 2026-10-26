@@ -66,7 +66,7 @@ _badge_plugin_state() {
 # marketplace, as a local directory: it tracks the working tree and needs no
 # network. Never fatal: the badge is a convenience.
 configure_agent_badge() {
-    local name="$1" cmd
+    local name="$1" cmd before
     if ! _agent_badge_wanted; then
         log "Agent-badge disabled; skipping $name plugin registration."
         return 0
@@ -76,6 +76,7 @@ configure_agent_badge() {
         [[ "$(_badge_plugin_state "$name")" != unregistered ]] || log "[DRY RUN] Would register the agent-badge plugin with $name"
         return 0
     fi
+    before="$(_badge_plugin_state "$name")"
     case "$name" in
         claude)
             [[ -f "$DOTFILES_DIR/.claude-plugin/marketplace.json" ]] || return 0
@@ -91,6 +92,8 @@ configure_agent_badge() {
     esac || { warn "Could not register the agent-badge plugin with $name; see plugins/agent-badge-$name/README.md."; return 0; }
     # tmux survives plugin cache replacement; repair its paths now.
     [[ -z "${TMUX:-}" ]] || "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" wire >/dev/null 2>&1 || true
+    # Codex's plugin add replaces its cache, so a stale plugin moves here too.
+    [[ "$before" == current ]] || change_record "$name" "agent-badge plugin registered" || true
     log "Agent-badge registered with $name (tmux window badges; new sessions pick it up)."
 }
 
@@ -111,6 +114,7 @@ update_agent_badge() {
         codex) "$cmd" plugin add agent-badge@tafk7 >/dev/null 2>&1 ;;
     esac || { warn "Could not update $name's agent-badge plugin; see plugins/agent-badge-$name/README.md."; return 0; }
     [[ -z "${TMUX:-}" ]] || "$DOTFILES_DIR/plugins/shared/agent-badge.tmux" wire >/dev/null 2>&1 || true
+    change_record "$name" "agent-badge plugin updated" || true
     log "Updated $name's agent-badge plugin (restart $name sessions to load it)."
 }
 
@@ -124,6 +128,7 @@ configure_editor_plugins() {
         return 0
     fi
     "$DOTFILES_DIR/bin/install-editor-plugins" || rc=$?
+    (( rc != 0 )) || change_record neovim "its plugins changed" || true
     (( rc == 0 || rc == 2 ))
 }
 

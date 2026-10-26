@@ -171,7 +171,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -221,7 +221,7 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -271,7 +271,7 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -321,11 +321,11 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify --tier work
+   dotfiles verify
 
 3. Authenticate and smoke-test local sandboxes manually:
    sbx login
-   ./bin/verify --tier work --smoke
+   dotfiles verify --smoke
 
 4. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -375,11 +375,11 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify --tier work
+   dotfiles verify
 
 3. Authenticate and smoke-test local sandboxes manually:
    sbx login
-   ./bin/verify --tier work --smoke
+   dotfiles verify --smoke
 
 4. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -425,7 +425,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -471,7 +471,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -517,7 +517,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -563,7 +563,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -609,7 +609,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -655,7 +655,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -701,7 +701,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -748,7 +748,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Connect to the RDP desktop:
    mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
@@ -798,7 +798,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up
@@ -848,7 +848,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -895,7 +895,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -942,7 +942,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -990,7 +990,7 @@ Next Steps:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 2. Switch theme (default: gruvbox):
    ./bin/theme-switcher
@@ -1042,11 +1042,11 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify --tier work --tail
+   dotfiles verify
 
 3. Authenticate and smoke-test local sandboxes manually:
    sbx login
-   ./bin/verify --tier work --smoke
+   dotfiles verify --smoke
 
 4. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up
@@ -1100,7 +1100,7 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 3. Connect to the RDP desktop:
    mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
@@ -1154,11 +1154,11 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify --tier work --tail
+   dotfiles verify
 
 3. Authenticate and smoke-test local sandboxes manually:
    sbx login
-   ./bin/verify --tier work --smoke
+   dotfiles verify --smoke
 
 4. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up
@@ -1216,7 +1216,7 @@ Next Steps:
    (Recommended for locale and shell changes)
 
 2. Verify installation:
-   ./bin/verify
+   dotfiles verify
 
 3. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up

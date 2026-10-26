@@ -592,7 +592,7 @@ phase_setup_configs() {
             case "$type" in
                 symlink)
                     local before_link
-                    before_link="$(deployed_line "$target" 2>/dev/null | cut -f3)"
+                    before_link="$(readlink "$target" 2>/dev/null || true)"
                     if process_symlink "$source" "$target"; then
                         deployed_record "$target" link "$(readlink "$target")" "$config" || failed=true
                         [[ "$before_link" == "$(readlink "$target")" ]] || config_changed "$config"
@@ -666,7 +666,8 @@ phase_setup_configs() {
 }
 
 # A changed config makes the processes that read it at startup stale: shells
-# for the shell entry files, Neovim for its init. tmux reloads its config on
+# for the shell entry files, Neovim for its init. Called only when the link on
+# disk changed, so a first run over links already in place records nothing. tmux reloads its config on
 # refresh, and other tools read theirs on each run.
 config_changed() {
     case "$1" in
@@ -745,23 +746,28 @@ run_installation() {
     echo
 
     local needs_restart=false
+    local -a notices=()
+    if tier_includes "work" && command -v docker >/dev/null 2>&1 && [[ "$(host_group_state docker)" == pending ]]; then
+        notices+=("* Docker group membership requires restart")
+        needs_restart=true
+    fi
+    if tier_includes "work" && tool_applicable sbx && [[ "$(host_group_state kvm)" == pending ]]; then
+        notices+=("* KVM group membership requires a new login")
+        needs_restart=true
+    fi
+
+    # Under dotfiles apply, its refresh and report follow; only what needs a
+    # new login is said here.
+    if [[ -n "${DOTFILES_REFRESH_FOLLOWS:-}" ]]; then
+        (( ${#notices[@]} == 0 )) || printf '%s\n' "${notices[@]}"
+        return 0
+    fi
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "Next Steps:"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
-
-    if tier_includes "work" && command -v docker >/dev/null 2>&1; then
-        if [[ "$(host_group_state docker)" == pending ]]; then
-                echo "* Docker group membership requires restart"
-                needs_restart=true
-        fi
-    fi
-
-    if tier_includes "work" && tool_applicable sbx && [[ "$(host_group_state kvm)" == pending ]]; then
-        echo "* KVM group membership requires a new login"
-        needs_restart=true
-    fi
+    (( ${#notices[@]} == 0 )) || printf '%s\n' "${notices[@]}"
 
     local nvm_installed=false
     if tier_includes "work" && [[ -d "$HOME/.nvm" ]]; then
@@ -787,22 +793,14 @@ run_installation() {
     fi
 
     echo "$step. Verify installation:"
-    if tier_includes "work"; then
-        if capability_selected tail; then
-            echo "   ./bin/verify --tier work --tail"
-        else
-            echo "   ./bin/verify --tier work"
-        fi
-    else
-        echo "   ./bin/verify"
-    fi
+    echo "   dotfiles verify"
     echo
     ((step++))
 
     if tier_includes "work" && tool_applicable sbx; then
         echo "$step. Authenticate and smoke-test local sandboxes manually:"
         echo "   sbx login"
-        echo "   ./bin/verify --tier work --smoke"
+        echo "   dotfiles verify --smoke"
         echo
         ((step++))
     fi
