@@ -70,9 +70,15 @@ CLI's signed archives, resolved commits (vim-plug and Neovim plugins), and the
 APT version Docker publishes for sbx. It checks both architectures before
 writing, refuses a release younger than 14 days unless `--security` (for a fix
 to an advisory affecting the pin), edits files, and never commits. An sbx bump
-needs the kits rebuilt. Direct `eget --download-all` bypasses platform/tier selection, ownership
-recording, companion handling, and staged replacement. `check-updates` exits 1
-for failed lookups, 2 for updates found with `--outdated`, and 0 otherwise.
+needs the kits rebuilt. Direct `eget --download-all` bypasses platform/tier
+selection, ownership recording, companion handling, and staged replacement.
+
+`check-updates` covers every row of `versions.lock` and every Neovim plugin
+pin, with the advisories published since each pinned release (GitHub
+repository advisories, Node security releases). It exits 1 for failed lookups,
+2 with `--outdated` when something is behind or has an advisory, and 0
+otherwise; `--json` is for scripts, and `dotfiles verify --latest` reads its
+`--records`.
 
 Only a successful installation establishes ownership. A binary that setup
 skipped because it already existed is not owned, even under `~/.local/bin`, and
