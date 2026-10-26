@@ -33,6 +33,15 @@ verify_expected_components() {
     fi
 }
 
+# verify_expects NAME: whether NAME is among the expected components. Reads
+# the whole list first: piped into grep -q, the writer can be cut off early,
+# and under pipefail its SIGPIPE reads as "not expected".
+verify_expects() {
+    local expected
+    expected="$(verify_expected_components)"
+    grep -Fxq -- "$1" <<< "$expected"
+}
+
 verify_component() {
     local name="$1" section=Components obs rc=0
     local applicable path owner identity want runnable companions ready ready_reason
@@ -101,7 +110,7 @@ verify_components() {
     # sbx is the one pinned APT package: setup holds it, and moves only the
     # holds it placed or was told to adopt.
     local package="${TOOL_APT_PACKAGE[sbx]}"
-    if verify_expected_components | grep -Fxq sbx && tool_applicable sbx && apt_package_installed "$package"; then
+    if verify_expects sbx && tool_applicable sbx && apt_package_installed "$package"; then
         if ! apt_package_held "$package"; then
             outcome convergence Components "sbx hold" "$package is not held; setup holds it at the pin"
         elif hold_owned "$package"; then
@@ -112,7 +121,7 @@ verify_components() {
             outcome health Components "sbx hold" "$package is held by someone other than dotfiles; run setup in a terminal to decide whether dotfiles adopts the hold"
         fi
     fi
-    if feature_enabled agent-badge && verify_expected_components | grep -Eqx 'claude|codex'; then
+    if feature_enabled agent-badge && { verify_expects claude || verify_expects codex; }; then
         if command -v jq >/dev/null 2>&1; then
             outcome ok Components jq "agent-badge JSON dependency"
         else
@@ -220,7 +229,7 @@ verify_configs() {
 verify_ai() {
     local section=AI component
     for component in codex claude; do
-        verify_expected_components | grep -Fxq "$component" || continue
+        verify_expects "$component" || continue
         if "$DOTFILES_DIR/bin/ai-config" "$component" --check --plugins >/dev/null 2>&1; then
             outcome ok "$section" "$component settings" "portable settings applied"
         else
