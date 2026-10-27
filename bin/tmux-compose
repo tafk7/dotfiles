@@ -6,19 +6,22 @@
 #                                       focus between a pane and its compose pane
 #     tmux-compose send TARGET FILE     paste FILE into TARGET and submit it
 #     tmux-compose stage TARGET FILE    paste FILE into TARGET without submitting
-#     tmux-compose return TARGET FILE   put the draft FILE back in Claude's box
-#     tmux-compose editor PANE FILE     Claude's $VISUAL, through compose-editor
+#     tmux-compose return TARGET FILE   put the draft FILE back in the agent's box
+#     tmux-compose editor AGENT PANE FILE   an agent's $VISUAL, through
+#                                       compose-editor
+#     tmux-compose fullscreen PANE      the prompt in nvim in the agent's place
 #     tmux-compose forward TARGET KEY   send a scroll key (PPage, NPage, C-Home,
 #                                       C-End) to TARGET
 #
 # The compose pane runs nvim with NVIM_PROSE=1 (configs/nvim/lua/dotfiles/
 # prose.lua), DOTFILES_COMPOSE_TARGET, and DOTFILES_COMPOSE_DRAFT, listening on
-# DRAFT.sock so that a pull can make it reread the draft. The pair is
-# recorded both ways: @compose_target on the compose pane, @compose_pane on the
-# target. Drafts live under ${XDG_STATE_HOME:-~/.local/state}/dotfiles/compose,
-# one per target pane, named by the tmux server's start time and the pane ID so
-# a restarted server never reopens another pane's draft; sent prompts are
-# appended to history.md there.
+# a socket (@compose_socket on the compose pane) so that a pull can make it
+# reread the draft. The pair is recorded both ways: @compose_target on the
+# compose pane, @compose_pane on the target. Drafts live under
+# ${XDG_STATE_HOME:-~/.local/state}/dotfiles/compose, one per target pane,
+# named by the tmux server's start time and the pane ID so a restarted server
+# never reopens another pane's draft; sent prompts are appended to history.md
+# there.
 #
 # Sending pastes through a named buffer (the export hook ignores named loads, so
 # drafts never reach the clipboard), deleted by the paste, then presses the
@@ -28,16 +31,20 @@
 #   opencode  Ctrl+X Enter (prompt.queue)
 # Anything else, such as a shell, only gets the paste: Enter would run it.
 #
-# Claude's prompt box: when Claude's $VISUAL is compose-editor, its Ctrl+G runs
-# `editor`, which acts on the pane option @compose-editor and clears it:
+# The agent's prompt box: when an agent's $VISUAL is compose-editor, its
+# external-editor key runs `editor` on the box, which acts on the pane option
+# @compose-editor and clears it:
 #   (none), pull  move the box text to the end of the draft, empty the box, and
-#                 open or focus the compose pane; Alt+V in Claude sends Ctrl+G
-#   push:FILE     the box becomes FILE's text (deleted), followed by anything
-#                 typed into the box meanwhile; `return` sends this
-#   fullscreen    nvim with the prose profile in Claude's place (Ctrl+Shift+G)
-# Claude blanks its pane while the editor runs, so the editor never waits on
-# the compose pane: while compose is open the prompt lives there, otherwise in
-# the box.
+#                 open or focus the compose pane; Alt+V in the agent asks this
+#   push          the box becomes the draft's text, followed by anything typed
+#                 into the box meanwhile, and the draft empties; `return` asks
+#   fullscreen    nvim with the prose profile in the agent's place
+#                 (Ctrl+Shift+G; Claude and OpenCode)
+# The agents blank or suspend their screen while the editor runs, so the editor
+# never waits on the compose pane: while compose is open the prompt lives there,
+# otherwise in the box. A request the agent doesn't take, because a dialog or
+# its transcript view has the key, is withdrawn: Alt+V then opens the pane
+# without the box, and a draft being returned stays in the draft.
 #
 # @compose-size sets the split's height (default 30%).
 
@@ -71,22 +78,55 @@ draft_of() {
     printf '%s' "$draft"
 }
 
-# Whether PANE runs a Claude whose $VISUAL is compose-editor, so that its
-# Ctrl+G reaches `editor`.
-claude_editor() {
-    local tty pid cmd
-    [[ "$(tmux display-message -p -t "$1" '#{pane_current_command}')" == claude ]] || return 1
+# The agent PANE runs, if its $VISUAL is compose-editor, so that its
+# external-editor key reaches `editor`.
+joined_agent() {
+    local agent tty pid cmd
+    agent=$(tmux display-message -p -t "$1" '#{pane_current_command}')
+    case "$agent" in claude | codex | opencode) ;; *) return 1 ;; esac
     tty=$(tmux display-message -p -t "$1" '#{pane_tty}')
     while read -r pid cmd _; do
-        [[ "${cmd##*/}" == claude ]] || continue
-        tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -q '^VISUAL=.*compose-editor$' && return 0
+        [[ "${cmd##*/}" == "$agent" ]] || continue
+        if tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -q '^VISUAL=.*compose-editor$'; then
+            printf '%s' "$agent"
+            return 0
+        fi
     done < <(ps -t "${tty#/dev/}" -o pid=,args= 2>/dev/null)
+    return 1
+}
+
+# The key that opens AGENT's external editor on its prompt box: Claude's
+# chat:externalEditor, Codex's open_external_editor as configs/codex.defaults.toml
+# sets it, and OpenCode's prompt.editor (leader e).
+editor_key() {
+    case "$1" in
+        claude) echo C-g ;;
+        codex) echo C-e ;;
+        opencode) echo C-x e ;;
+    esac
+}
+
+# Ask AGENT in PANE to run `editor` with REQUEST, waiting TENTHS tenths of a
+# second for it to take the request. One it doesn't take (a dialog or its
+# transcript view has the key) is withdrawn, so that it can't apply to a later
+# editor key.
+ask() {
+    local pane="$1" agent="$2" request="$3" tenths="$4" i
+    cancel_mode "$pane"
+    tmux set -p -t "$pane" @compose-editor "$request"
+    # shellcheck disable=SC2046  # one argument per key
+    tmux send-keys -t "$pane" $(editor_key "$agent")
+    for ((i = 0; i < tenths; i++)); do
+        [[ -z "$(pane_option "$pane" @compose-editor)" ]] && return 0
+        sleep 0.1
+    done
+    [[ "$(pane_option "$pane" @compose-editor)" == "$request" ]] && tmux set -pu -t "$pane" @compose-editor
     return 1
 }
 
 # Focus PANE's compose pane, opening it first if needed.
 open() {
-    local pane="$1" compose size draft dir
+    local pane="$1" compose size draft dir socket
     compose=$(pane_option "$pane" @compose_pane)
     if pane_alive "$compose" && [[ "$(pane_option "$compose" @compose_target)" == "$pane" ]]; then
         tmux select-pane -t "$compose"
@@ -94,42 +134,44 @@ open() {
     fi
 
     draft=$(draft_of "$pane")
-    rm -f "$draft.sock"
+    # Under the runtime directory when there is one: a socket path is limited
+    # to 107 bytes, and a long state directory would stop nvim from starting.
+    if [[ -d "${XDG_RUNTIME_DIR:-}" ]]; then
+        socket="$XDG_RUNTIME_DIR/dotfiles-compose/${draft##*/}.sock"
+        [[ -d "${socket%/*}" ]] || mkdir -m 700 "${socket%/*}"
+    else
+        socket="$draft.sock"
+    fi
+    rm -f "$socket"
     size=$(tmux show -gqv @compose-size)
     dir=$(tmux display-message -p -t "$pane" '#{pane_current_path}')
     compose=$(tmux split-window -v -l "${size:-30%}" -t "$pane" -c "$dir" -P -F '#{pane_id}' \
         -e NVIM_PROSE=1 -e "DOTFILES_COMPOSE_TARGET=$pane" -e "DOTFILES_COMPOSE_DRAFT=$draft" \
-        "nvim --listen $(printf '%q' "$draft.sock") -- $(printf '%q' "$draft")") || fail "could not split the pane"
+        "nvim --listen $(printf '%q' "$socket") -- $(printf '%q' "$draft")") || fail "could not split the pane"
     tmux set -p -t "$compose" @compose_target "$pane"
+    tmux set -p -t "$compose" @compose_socket "$socket"
     tmux set -p -t "$pane" @compose_pane "$compose"
 }
 
 toggle() {
-    local pane="$1" target
+    local pane="$1" target agent
     target=$(pane_option "$pane" @compose_target)
     if [[ -n "$target" ]]; then
         pane_alive "$target" || fail "its agent pane is gone"
         tmux select-pane -t "$target"
         return
     fi
-    if claude_editor "$pane"; then
-        # Through Claude's Ctrl+G, which brings the box along. Should Claude not
-        # run its editor (it may not while busy), open the pane anyway.
-        cancel_mode "$pane"
-        tmux set -p -t "$pane" @compose-editor pull
-        tmux send-keys -t "$pane" C-g
-        for _ in {1..15}; do
-            [[ -z "$(pane_option "$pane" @compose-editor)" ]] && return
-            sleep 0.1
-        done
-        tmux set -pu -t "$pane" @compose-editor
+    # Through the agent's editor key, which brings the box along; Claude takes
+    # it in about 0.2 s, even mid-turn.
+    if agent=$(joined_agent "$pane"); then
+        ask "$pane" "$agent" pull 10 && return
     fi
     open "$pane"
 }
 
-# Ctrl+G with no request: the box text moves to the end of the draft.
+# No request: the box text moves to the end of the draft.
 pull() {
-    local pane="$1" file="$2" text draft current
+    local agent="$1" pane="$2" file="$3" text draft current compose socket
     text=$(<"$file")
     if ! blank "$text"; then
         draft=$(draft_of "$pane")
@@ -139,63 +181,81 @@ pull() {
         else
             printf '%s\n\n%s\n' "$current" "$text" > "$draft"
         fi
-        # An open compose nvim rereads the draft.
-        [[ -S "$draft.sock" ]] && nvim --server "$draft.sock" --remote-expr 'execute("checktime")' >/dev/null 2>&1
+        # An open compose nvim rereads the draft and moves to its end. Headless
+        # and off the agent's terminal, the client doesn't wait a second on
+        # terminal queries.
+        compose=$(pane_option "$pane" @compose_pane)
+        socket=$(pane_alive "$compose" && pane_option "$compose" @compose_socket)
+        [[ -S "$socket" ]] && nvim --clean --headless --server "$socket" \
+            --remote-expr "luaeval(\"require('dotfiles.prose').reread()\")" </dev/null >/dev/null 2>&1
     fi
-    : > "$file"
+    # OpenCode keeps its box when the editor leaves the file empty; a lone
+    # newline empties it.
+    if [[ "$agent" == opencode ]]; then
+        printf '\n' > "$file"
+    else
+        : > "$file"
+    fi
     open "$pane"
 }
 
-# The box becomes TEXT_FILE's text, then whatever was typed into it meanwhile.
+# The box becomes the draft's text, then whatever was typed into it meanwhile;
+# the draft empties.
 push() {
-    local text_file="$1" file="$2" text box
-    text=$(<"$text_file")
-    rm -f "$text_file"
+    local pane="$1" file="$2" draft text box
+    draft=$(draft_of "$pane")
+    text=$(<"$draft")
+    blank "$text" && return 0
     box=$(<"$file")
     if blank "$box"; then
         printf '%s' "$text" > "$file"
     else
         printf '%s\n\n%s' "$text" "$box" > "$file"
     fi
+    : > "$draft"
 }
 
 editor() {
-    local pane="$1" file="$2" request
+    local agent="$1" pane="$2" file="$3" request
     request=$(pane_option "$pane" @compose-editor)
     tmux set -pu -t "$pane" @compose-editor
     case "$request" in
         fullscreen) NVIM_PROSE=1 exec nvim -- "$file" ;;
-        push:*) [[ -r "${request#push:}" ]] && push "${request#push:}" "$file" ;;
-        *) pull "$pane" "$file" ;;
+        push) push "$pane" "$file" ;;
+        *) pull "$agent" "$pane" "$file" ;;
     esac
 }
 
-# Quitting the compose pane: the draft goes back to Claude's box through its
-# Ctrl+G, exactly as written, and the draft is emptied. If Claude doesn't run
-# its editor within 3 s, the draft is pasted instead. Other targets keep the
-# draft for next time.
+# Quitting the compose pane: the draft goes back to the agent's box through its
+# editor key, exactly as written, and the draft empties. The tmux server waits
+# for the agent, so nvim quits at once; if the agent doesn't take it within 3 s,
+# the draft is kept and a message says so. Other targets keep the draft for
+# next time.
 give_back() {
-    local target="$1" draft="$2" text handoff
-    text=$(<"$draft")
-    blank "$text" && return 0
+    local target="$1" draft="$2" agent
+    blank "$(<"$draft")" && return 0
     pane_alive "$target" || fail "the agent pane is gone; the draft is kept"
-    claude_editor "$target" || return 0
+    agent=$(joined_agent "$target") || return 0
+    tmux run-shell -b "$(printf '%q ' "$(readlink -f "$0")" confirm "$target" "$agent")"
+}
 
-    handoff=$(mktemp "${TMPDIR:-/tmp}/compose-return.XXXXXX") || fail "no temporary file"
-    printf '%s' "$text" > "$handoff"
-    cancel_mode "$target"
-    tmux set -p -t "$target" @compose-editor "push:$handoff"
-    tmux send-keys -t "$target" C-g
-    for _ in {1..30}; do
-        if [[ ! -e "$handoff" ]]; then
-            : > "$draft"
-            return 0
-        fi
-        sleep 0.1
-    done
-    tmux set -pu -t "$target" @compose-editor
-    rm -f "$handoff"
-    paste stage "$target" "$draft" && : > "$draft"
+confirm() {
+    ask "$1" "$2" push 30 \
+        || tmux display-message "compose: $2 didn't take the draft (a dialog open?); it's kept, Alt+V reopens it"
+}
+
+# Ctrl+Shift+G: nvim in Claude's or OpenCode's place. An agent without
+# compose-editor gets its own editor key, so that its own editor opens; a Codex
+# gets Ctrl+G, since its Ctrl+Shift+G is a permission-mode key.
+fullscreen() {
+    local pane="$1" agent
+    if agent=$(joined_agent "$pane") && [[ "$agent" != codex ]]; then
+        ask "$pane" "$agent" fullscreen 20 || true
+    elif [[ "$(tmux display-message -p -t "$pane" '#{pane_current_command}')" == opencode ]]; then
+        tmux send-keys -t "$pane" C-x e
+    else
+        tmux send-keys -t "$pane" C-g
+    fi
 }
 
 paste() {
@@ -232,10 +292,12 @@ case "${1:-}" in
     toggle) toggle "${2:?pane}" ;;
     send | stage) paste "$1" "${2:?target}" "${3:?file}" ;;
     return) give_back "${2:?target}" "${3:?file}" ;;
-    editor) editor "${2:?pane}" "${3:?file}" ;;
+    confirm) confirm "${2:?target}" "${3:?agent}" ;;
+    editor) editor "${2:?agent}" "${3:?pane}" "${4:?file}" ;;
+    fullscreen) fullscreen "${2:?pane}" ;;
     forward) tmux send-keys -t "${2:?target}" "${3:?key}" ;;
     *)
-        echo "usage: tmux-compose toggle PANE | send|stage|return TARGET FILE | editor PANE FILE | forward TARGET KEY" >&2
+        echo "usage: tmux-compose toggle PANE | send|stage|return TARGET FILE | editor AGENT PANE FILE | fullscreen PANE | forward TARGET KEY" >&2
         exit 2
         ;;
 esac

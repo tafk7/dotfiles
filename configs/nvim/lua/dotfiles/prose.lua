@@ -141,6 +141,16 @@ local function deliver(action)
   vim.cmd('silent write')
 end
 
+-- A pull from the agent's prompt box (tmux-compose, through the --listen
+-- socket) appended to the draft on disk: reread it and continue after the
+-- pulled text.
+function M.reread()
+  vim.cmd('silent! checktime')
+  local last = vim.api.nvim_buf_line_count(0)
+  vim.api.nvim_win_set_cursor(0, { last, #vim.api.nvim_buf_get_lines(0, last - 1, last, false)[1] })
+  return ''
+end
+
 local function forward(key)
   return function() vim.fn.system({ compose, 'forward', target, key }) end
 end
@@ -174,7 +184,7 @@ local function compose_keys(buf)
   })
 end
 
--- Quitting (:q, :wq, ZZ) puts the draft back in Claude's prompt box; :cq
+-- Quitting (:q, :wq, ZZ) puts the draft back in the agent's prompt box; :cq
 -- keeps it here for next time.
 if target and target ~= '' then
   vim.api.nvim_create_autocmd('VimLeavePre', {
