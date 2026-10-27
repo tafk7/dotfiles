@@ -26,9 +26,9 @@ an existing config).
   `api.anthropic.com` (`skipWebFetchPreflight: true` to stop), managed-settings
   poll → `api.anthropic.com` (org-managed only), auto-updater → `downloads.claude.ai`.
 
-**What we ship:** `bin/ai-config claude` merges the explicitly owned preferences
-from `configs/claude-settings.json`, including `DISABLE_TELEMETRY=1` and
-`DISABLE_ERROR_REPORTING=1`. Unlisted keys remain local.
+**What we ship:** `bin/ai-config claude` keeps the enforced keys in
+`configs/claude-settings.json`, including `DISABLE_TELEMETRY=1` and
+`DISABLE_ERROR_REPORTING=1`, on every machine. Unlisted keys remain local.
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is not shipped, so Claude's automatic
 updater runs. Setting it to `1` locally disables the updater as well (confirmed
 by Claude Code 2.1.273's `doctor`); `bin/ai-update claude` then updates explicitly.
@@ -108,9 +108,11 @@ Two startup calls to `pi.dev`, both documented upstream:
   requests. Disable with `enableInstallTelemetry: false` in `settings.json`, or
   `PI_TELEMETRY=0`.
 
-We ship `configs/pi-settings.json` (`enableInstallTelemetry: false`),
-provisioned to `~/.pi/agent/settings.json` **only when absent** — it is a rich
-user-owned file (models, keybindings, trust, compaction). Note this disables the
+`shell/env.sh` exports `PI_TELEMETRY=0`, which wins over the settings file for
+every Pi started from a dotfiles shell, tmux pane, or agent. We also ship
+`configs/pi-settings.json` (`enableInstallTelemetry: false`), provisioned to
+`~/.pi/agent/settings.json` **only when absent** — it is a rich user-owned file
+(models, keybindings, trust, compaction). Note this disables the
 telemetry ping but **not** the version check; those are independent.
 
 `--offline` / `PI_OFFLINE=1` disables *all* startup network operations (update

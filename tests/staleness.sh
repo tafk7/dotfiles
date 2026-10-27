@@ -67,6 +67,17 @@ for _ in 1 2; do
         || fail "a stale program was not listed: $(report)"
 done
 
+# Codex's app-server daemon outlives a restart in a pane; the line says how
+# to restart it.
+mkdir -p "$TEST_ROOT/app-server"
+cp "$(command -v sleep)" "$TEST_ROOT/app-server/codex"
+"$TEST_ROOT/app-server/codex" 60 &
+daemon=$!; pids+=("$daemon")
+change_record codex "codex settings changed" "$(( $(date +%s) + 100 ))"
+line="$(report | grep $'^advisory\tRunning\tcodex\t' || true)"
+[[ " ${line#*pids } " == *" $daemon "* && "$line" == *"(its background server: codex app-server daemon restart)"* ]] \
+    || fail "the Codex daemon's restart was not named: $line"
+
 # No runtime directory: the limit is reported, not taken as current.
 [[ "$(XDG_RUNTIME_DIR='' staleness_report 2>/dev/null)" == *"not tracked: XDG_RUNTIME_DIR is unset"* ]] || fail "missing runtime dir"
 

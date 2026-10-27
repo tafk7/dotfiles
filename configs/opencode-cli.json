@@ -1,7 +1,3 @@
 {
-  "$schema": "https://opencode.ai/v2/cli.json",
-  "keybinds": {
-    "session.first": "ctrl+home,ctrl+g,home,alt+home",
-    "session.last": "ctrl+end,ctrl+alt+g,end"
-  }
+  "$schema": "https://opencode.ai/v2/cli.json"
 }

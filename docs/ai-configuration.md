@@ -4,19 +4,33 @@
 native installers call it too. Run it from this checkout, or set `DOTFILES_DIR`
 when invoking an installer through another path. Python 3.11+ is required.
 
-| Source | Owned destination |
+| Source | Destination |
 |---|---|
-| `configs/codex.toml` | Declared keys in `~/.codex/config.toml` |
-| `configs/claude-settings.json` | Declared keys in `~/.claude/settings.json` |
+| `configs/codex.toml`, `codex.defaults.toml` | Declared keys in `~/.codex/config.toml` |
+| `configs/claude-settings.json`, `.defaults.json` | Declared keys in `~/.claude/settings.json` |
 | `configs/opencode.json` | Declared keys in `~/.config/opencode/opencode.json` |
-| `configs/opencode-cli.json` | Declared keys in `~/.config/opencode/cli.json`, once the V2 CLI is installed |
+| `configs/opencode-cli.json`, `.defaults.json` | Declared keys in `~/.config/opencode/cli.json`, once the V2 CLI is installed |
 | `configs/ai/codex/` | Corresponding portable asset files under `~/.codex/` |
 | `configs/ai/claude/` | Corresponding portable asset files under `~/.claude/` |
 
-The merge is recursive: declared leaves win; unlisted values remain. Lists are
-owned as a whole. Removing a key from the source stops managing it; it does not
-delete a local value. Asset files listed in the source are owned as a whole;
-unlisted files are never deleted. Account identity, project state, credentials,
+Each source holds two kinds of key, both in the user's own files, so this works
+without root and touches no other user:
+
+- Enforced keys (`codex.toml`, `claude-settings.json`, `opencode.json`,
+  `opencode-cli.json`) are the same on every machine: telemetry and metrics
+  off, no commit attribution, Claude's status line, opencode's sharing and
+  update policy. Every apply puts them back, and verify reports a difference.
+- Defaults (the `.defaults` siblings) are where each machine starts: model,
+  effort, theme, key bindings, approval and sandbox policy. A default is
+  written where the key is absent, and kept up to date with the repo while
+  the machine still holds the value dotfiles last wrote. Once the machine
+  changes or removes it, in the app or by hand, it is the machine's: never
+  reverted, never reported. Moving a key from enforced to default hands it
+  over with its current value.
+
+The merge is recursive and lists count as single values; unlisted values
+remain. Asset files listed in the source are owned as a whole; unlisted files
+are never deleted. Account identity, project state, credentials,
 plugin registrations, hook trust, and session histories are not portable assets.
 
 Codex defaults to high reasoning. The model, provider, context window, and
@@ -47,10 +61,10 @@ brings an installed plugin to this checkout's version when its cache is stale
 for V2, so an external V1 keeps its own.
 
 A portable key that leaves `configs/` is retired from each settings file by a
-three-way comparison: `bin/ai-config` records the leaves it applied (in
-`~/.local/state/dotfiles/ai/`), and removes one the overlay no longer has only
-while the file still holds the value it wrote; a table emptied by the removal
-goes too. A key edited since is kept and reported once, and the record
+three-way comparison: `bin/ai-config` records the enforced leaves it applied
+and the defaults it last wrote (in `~/.local/state/dotfiles/ai/`), and removes
+one the sources no longer have only while the file still holds the value it
+wrote; a table emptied by the removal goes too. A key edited since is kept and reported once, and the record
 remembers it. Keys still in the overlay keep winning, lists count as single
 values, and Pi's seed-once settings stay the user's. A key listed in
 `configs/ai/released.json` is handed to the machine instead: dropped from the

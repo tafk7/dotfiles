@@ -5,9 +5,13 @@ A sandbox gets none of the host's Claude or Codex state (docs/work.md). This
 copies the explicitly portable subset of configs/ into kits/ai-preferences/,
 which the kit's image carries and its install hook places in the agent's home:
 
-  configs/claude-settings.json   the keys in SETTINGS_KEYS, as Claude Code's
-                                 managed settings (/etc/claude-code), which the
-                                 harness kit's own settings.json cannot clobber
+  configs/claude-settings.json   the keys in SETTINGS_KEYS, enforced and
+  (and .defaults.json)           default alike, as Claude Code's managed
+                                 settings (/etc/claude-code): the harness kit
+                                 rewrites ~/.claude/settings.json on every
+                                 create, and install hooks run in no fixed
+                                 order, so a sandbox has no settings file of
+                                 its own to hold defaults
   configs/ai/claude/             keybindings (content skills come from their owners' kits)
   configs/ai/codex/              the skills in CODEX_SKILLS
 
@@ -26,6 +30,8 @@ from filecmp import dircmp
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "lib"))
+from config_files import merge  # noqa: E402
 KIT = ROOT / "kits" / "ai-preferences"
 SETTINGS_KEYS = (
     "attribution",
@@ -40,7 +46,9 @@ GENERATED = ("home", "etc")
 
 
 def render(out: Path) -> None:
-    settings = json.loads((ROOT / "configs" / "claude-settings.json").read_text())
+    configs = ROOT / "configs"
+    settings = merge(json.loads((configs / "claude-settings.defaults.json").read_text()),
+                     json.loads((configs / "claude-settings.json").read_text()))
     managed = {key: settings[key] for key in SETTINGS_KEYS if key in settings}
     target = out / "etc" / "claude-code" / "managed-settings.json"
     target.parent.mkdir(parents=True)
