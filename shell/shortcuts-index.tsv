@@ -168,6 +168,8 @@ shell│Ctrl+Shift+Delete│Cut next word to tmux buffer│TAFK F14 widget
 shell│Alt+Shift+Backspace│Cut from cursor to line start into tmux buffer│TAFK F15 widget
 shell│Alt+Shift+Delete│Cut from cursor to line end into tmux buffer│TAFK F16 widget
 shell│Shift+Tab│Spell-correct the word at the cursor (zsh)│spell-word
+shell│Alt+I│Turn the request typed at the prompt into a command (never run); again: correct it at refine>│shell/tools/ai-command.sh → bin/ai-command (Claude)
+shell│Alt+Shift+I│Start a new AI command conversation; the next Alt+I takes the line as a new request│_ai_command_reset
 # Navigation
 shell│.. [N]│Go up N directories (default 1)│cd .. N times
 shell│...│Go up two directories│cd ../..
