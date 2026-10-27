@@ -350,8 +350,10 @@ Branch `scrollback-keys`, worktree `~/dev/dotfiles-scrollback`.
     the agent, zoom again if the window was zoomed.
   - Handled failures exit 0 after their message, since a non-zero status makes
     `run-shell` cover the pane with its own.
-- `bin/compose-editor`: run by `claude` on `*/cc-transcript-*.txt` while the
-  pane has `@review-file`, move the file there (`.part`, then rename) and exit.
+- `bin/compose-editor`: run by `claude` on any file but its prompt box while
+  the pane has `@review-file`, move the file there (`.part`, then rename) and
+  exit. The transcript is `cc-transcript-*.txt` today; not matching the name
+  keeps a rename from leaving Claude stopped behind an editor.
 - `bin/codex-transcript` ★ (Python): the rollout of the thread whose id (or
   its 29-character prefix) is in `--title`, else the newest one whose
   `session_meta` has `--cwd`; Markdown from its `item_completed` thread items.
