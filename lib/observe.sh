@@ -207,9 +207,10 @@ observe_component() {
 
 # _observe_probe TIMEOUT COMMAND ARGS...: run a version probe from a neutral
 # directory, so no project override answers and nothing is installed.
+# DO_NOT_TRACK: gh writes a telemetry device id even for --version.
 _observe_probe() {
     local seconds="$1"; shift
-    (cd / && env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 timeout "$seconds" "$@" 2>/dev/null </dev/null)
+    (cd / && env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 DO_NOT_TRACK=1 timeout "$seconds" "$@" 2>/dev/null </dev/null)
 }
 
 # Whether an observed identity is the wanted one: same kind, same value; an APT

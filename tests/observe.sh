@@ -16,7 +16,16 @@ field() { observation_field "$1" <<< "$2"; }
 # through each installer's --observe.
 mkdir -p "$HOME/.local/bin"
 printf '#!/bin/sh\necho "eza - banner\nv0.23.4 [+git]"\n' > "$HOME/.local/bin/eza"
-chmod +x "$HOME/.local/bin/eza"
+# Like gh 2.100: a telemetry device id written even for --version, unless
+# DO_NOT_TRACK or GH_TELEMETRY=false.
+cat > "$HOME/.local/bin/gh" <<'GH'
+#!/bin/sh
+if [ -z "${DO_NOT_TRACK:-}" ] && [ "${GH_TELEMETRY:-}" != false ]; then
+    mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/gh" && echo id > "${XDG_STATE_HOME:-$HOME/.local/state}/gh/device-id"
+fi
+echo "gh version 2.100.0 (2026-09-03)"
+GH
+chmod +x "$HOME/.local/bin/eza" "$HOME/.local/bin/gh"
 install_mutation_spies
 # Service queries are reads; every other systemctl use is still a mutation.
 printf '#!/bin/sh\ncase "$1" in is-active|is-enabled) exit 3 ;; esac\nprintf "systemctl\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \
