@@ -31,9 +31,10 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
 # shellcheck source=../lib/runtime.sh
 source "$DOTFILES_DIR/lib/runtime.sh"
 
-PROFILE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/git/profiles"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+PROFILE_DIR="${CONFIG_HOME%/}/git/profiles"
 LOCAL_CONFIG="$HOME/.gitconfig.local"
-ALLOWED_SIGNERS="${XDG_CONFIG_HOME:-$HOME/.config}/git/allowed_signers"
+ALLOWED_SIGNERS="${CONFIG_HOME%/}/git/allowed_signers"
 # What add needs from the account's token: register authentication and signing
 # keys, and read the verified emails.
 GH_SCOPES="admin:public_key,admin:ssh_signing_key,user:email"
@@ -133,7 +134,7 @@ choose() {
     for i in "${!options[@]}"; do printf '  %d) %s\n' "$((i + 1))" "${options[i]}" >&2; done
     printf 'Choice [1-%d]: ' "${#options[@]}" >&2
     read -r reply || die "no choice made"
-    if [[ ! "$reply" =~ ^[0-9]+$ ]] || (( reply < 1 || reply > ${#options[@]} )); then
+    if [[ ! "$reply" =~ ^[1-9][0-9]*$ ]] || (( reply > ${#options[@]} )); then
         die "not a choice: $reply"
     fi
     printf '%s\n' "${options[reply - 1]}"
