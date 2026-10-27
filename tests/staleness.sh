@@ -55,9 +55,17 @@ touch -d "@$(( $(date +%s) + 100 ))" "$HOME/.shell.local"
 [[ "$(report)" == *"possibly stale: ~/.shell.local or ~/.shell.env changed after they loaded: pids"*"$fresh_shell"* ]] \
     || fail "a hand edit was not reported: $(report)"
 
+# fake_program PATH: a process named after PATH's file. A script, not a copy
+# of sleep: where coreutils is one multicall binary (Ubuntu 26.04's uutils),
+# a copy named claude is not sleep.
+fake_program() {
+    printf '#!/bin/sh\nwhile :; do sleep 1; done\n' > "$1"
+    chmod +x "$1"
+}
+
 # A program started before its consumer changed, on every report.
-cp "$(command -v sleep)" "$TEST_ROOT/claude"
-"$TEST_ROOT/claude" 60 &
+fake_program "$TEST_ROOT/claude"
+"$TEST_ROOT/claude" &
 program=$!; pids+=("$program")
 change_record claude "claude installed" "$(( $(date +%s) + 100 ))"
 # (This host's own claude processes may be listed too.)
@@ -70,8 +78,8 @@ done
 # Codex's app-server daemon outlives a restart in a pane; the line says how
 # to restart it.
 mkdir -p "$TEST_ROOT/app-server"
-cp "$(command -v sleep)" "$TEST_ROOT/app-server/codex"
-"$TEST_ROOT/app-server/codex" 60 &
+fake_program "$TEST_ROOT/app-server/codex"
+"$TEST_ROOT/app-server/codex" &
 daemon=$!; pids+=("$daemon")
 change_record codex "codex settings changed" "$(( $(date +%s) + 100 ))"
 line="$(report | grep $'^advisory\tRunning\tcodex\t' || true)"
