@@ -37,8 +37,8 @@ harper-ls	aarch64	v2.12.0	Automattic/harper	harper-ls-aarch64-unknown-linux-musl
 harper-ls	x86_64	v2.12.0	Automattic/harper	harper-ls-x86_64-unknown-linux-musl.tar.gz	4e75b75b347dc09aeb1b7ebdddc617682b1897997c69e5e61ed5c31f75983343	harper-ls	sha256:44e5770cf53287f5e9437f76762e016bbd2cab93c6248214c847a8df67f78ff5
 jq	aarch64	jq-1.8.2	jqlang/jq	jq-linux-arm64	8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309	-	sha256:8b85c817833814ddca00a144c33705546355afccf0cf39b188f3cdb48b852309
 jq	x86_64	jq-1.8.2	jqlang/jq	jq-linux-amd64	b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f	-	sha256:b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f
-lazygit	aarch64	v0.59.0	jesseduffield/lazygit	lazygit_0.59.0_linux_arm64.tar.gz	a334a6c125169f21942f1a8b02043932575547a6250a1a734d62111efd92aa8f	lazygit	sha256:d9bf5faf03359576daf4fbc94c9db9cd0c3d2f5db2876d161a9e4c311cab78c6
-lazygit	x86_64	v0.59.0	jesseduffield/lazygit	lazygit_0.59.0_linux_x86_64.tar.gz	264283f40a40c899d702a338b20622f690221f753f03bac827c1f34e91f516c2	lazygit	sha256:9b31d9743260f23e44b298af21d552ece2edb39e0de56b84dd379da785a306ca
+lazygit	aarch64	v0.66.1	jesseduffield/lazygit	lazygit_0.66.1_linux_arm64.tar.gz	add91327af13343f37d2d610512d0982ef5c75da5cc962b5159748adc8a11a86	lazygit	sha256:0152a2bb556257c9002c21cf03b389f2156fd5db9eea571758d4a4df5099c55f
+lazygit	x86_64	v0.66.1	jesseduffield/lazygit	lazygit_0.66.1_linux_x86_64.tar.gz	7b3f30c2c06a42cf575280f907e58d7ea08411408b6b62bc926bc91cbc6c3f46	lazygit	sha256:4db0ff90c7a2408c21d850f8f63f9f8af655ef5428895058ee22ecde6122b599
 neovim	aarch64	v0.12.6	neovim/neovim	nvim-linux-arm64.tar.gz	8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815	nvim-linux-arm64/bin/nvim	version:0.12.6
 neovim	x86_64	v0.12.6	neovim/neovim	nvim-linux-x86_64.tar.gz	474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87	nvim-linux-x86_64/bin/nvim	version:0.12.6
 node	aarch64	v24.22.1	nodejs.org	node-v24.22.1-linux-arm64.tar.xz	dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e	node-v24.22.1-linux-arm64/bin/node	sha256:c8c5721679d8d1a09e9987e345d5f9a64899bb85f7a384783ba8a93e6e62348a
