@@ -87,6 +87,7 @@ jobs:
           ./bin/dotfiles-feature --help     >/dev/null
           ./bin/opencode-contract --help    >/dev/null
           ./bin/viz --help                  >/dev/null
+          ./bin/ai-command --help           >/dev/null
 
       - name: Codex installer ownership behavior
         run: |
