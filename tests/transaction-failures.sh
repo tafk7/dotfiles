@@ -7,8 +7,8 @@ fixture_init
 trap fixture_cleanup EXIT
 source "$ROOT/lib/install.sh"
 mkdir -p "$HOME/.local/bin" "$TEST_ROOT/stage"
-cp /usr/bin/true "$HOME/.local/bin/eza"
-cp /usr/bin/echo "$TEST_ROOT/stage/eza"
+fake_command "$HOME/.local/bin/eza" true
+fake_command "$TEST_ROOT/stage/eza" echo
 export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
 
 record_component_outcome eza skip
@@ -32,13 +32,13 @@ journal_pending && fail "resolved failure kept its journal"
 [[ "$(ledger_line eza)" == $'eza\tyes\tdotfiles\tinstalled\t'* ]] || fail "resolved failure was not recorded"
 unset -f mv
 atomic_replace_binary eza "$TEST_ROOT/stage/eza" "$HOME/.local/bin/eza" || fail "replacement after a resolved failure"
-cp /usr/bin/echo "$TEST_ROOT/stage/eza"
+fake_command "$TEST_ROOT/stage/eza" echo
 
 # An artifact that does not validate keeps its journal, which blocks only its
 # own component; another component's replacement proceeds.
 eval "real_ledger_record() $(declare -f ledger_record | tail -n +2)"
 ledger_record() { [[ "${7:-}" != *pin=* ]] || return 74; real_ledger_record "$@"; }
-cp /usr/bin/false "$TEST_ROOT/stage/broken"
+fake_command "$TEST_ROOT/stage/broken" false
 if atomic_replace_binary eza "$TEST_ROOT/stage/broken" "$HOME/.local/bin/eza" "pin=v1 sha256=0" 2>/dev/null; then
     fail "failed ledger write returned success"
 fi
@@ -51,13 +51,13 @@ journal_begin bat "$HOME/.local/bin/bat" "$TEST_ROOT/stage/bat" "$HOME/.local/bi
     || fail "an unrelated component was blocked by another's journal"
 journal_clear bat
 journal_pending eza || fail "clearing one journal removed another"
-cp /usr/bin/true "$HOME/.local/bin/eza"
+fake_command "$HOME/.local/bin/eza" true
 journal_reconcile
 journal_pending && fail "reconciled journal kept"
 
 mkdir -p "$HOME/.local/nvim/bin" "$TEST_ROOT/tree/bin"
-cp /usr/bin/true "$HOME/.local/nvim/bin/nvim"
-cp /usr/bin/echo "$TEST_ROOT/tree/bin/nvim"
+fake_command "$HOME/.local/nvim/bin/nvim" true
+fake_command "$TEST_ROOT/tree/bin/nvim" echo
 mv() {
     [[ "$1" != "$HOME/.local/nvim" ]] || return 76
     command mv "$@"

@@ -96,5 +96,18 @@ install_mutation_spies() {
     export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
 }
 
+# fake_command PATH true|false|echo: a tiny executable standing in for a
+# binary. Not a copy of /usr/bin/true: where coreutils is one multicall binary
+# (Ubuntu 26.04's uutils), a copy under another name is not true.
+fake_command() {
+    case "$2" in
+        true) printf '#!/bin/sh\nexit 0\n' ;;
+        false) printf '#!/bin/sh\nexit 1\n' ;;
+        echo) printf '#!/bin/sh\necho "$@"\n' ;;
+        *) return 2 ;;
+    esac > "$1"
+    /bin/chmod +x "$1"
+}
+
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'${3:+ ($3)}"; }
