@@ -25,7 +25,16 @@ if [ -z "${DO_NOT_TRACK:-}" ] && [ "${GH_TELEMETRY:-}" != false ]; then
 fi
 echo "gh version 2.100.0 (2026-09-03)"
 GH
-chmod +x "$HOME/.local/bin/eza" "$HOME/.local/bin/gh"
+# Like Neovim 0.12: its state directory and log, unless NVIM_LOG_FILE. On the
+# test's PATH, which the engine here and the installers share.
+cat > "$TEST_ROOT/bin/nvim" <<'NVIM'
+#!/bin/sh
+if [ -z "${NVIM_LOG_FILE:-}" ]; then
+    mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/nvim" && : > "${XDG_STATE_HOME:-$HOME/.local/state}/nvim/log"
+fi
+echo "NVIM v0.12.5"
+NVIM
+chmod +x "$HOME/.local/bin/eza" "$HOME/.local/bin/gh" "$TEST_ROOT/bin/nvim"
 install_mutation_spies
 # Service queries are reads; every other systemctl use is still a mutation.
 printf '#!/bin/sh\ncase "$1" in is-active|is-enabled) exit 3 ;; esac\nprintf "systemctl\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \
