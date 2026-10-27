@@ -15,7 +15,7 @@ layer the same way. Layer them onto any workload, such as FINN's (`finn.yaml` in
 
 The harness kits are Docker's sandbox-kit-spec examples, adapted for sbx 0.46.0
 (see each file's header). All four build and pass `sbx kit validate` with sbx
-0.49.2 (checked 2026-10-26; `llm-gateway` with example arguments). The 0.46.0
+0.50.0 (checked 2026-10-27; `llm-gateway` with example arguments). The 0.46.0
 workarounds stay until a sandbox run shows them unnecessary: 0.48.0 started
 writing an agent-context `directory`'s instruction file, which may make the
 inline agent context and the `CLAUDE.md` link redundant. Each harness is a
@@ -37,8 +37,8 @@ kit from source needs BuildKit's OCI exporter: Docker's containerd image store,
 or `BUILDX_BUILDER=sbx-kits`, the `docker-container` builder `./setup.sh --work`
 creates (with buildkitd settings, such as a site's DNS servers, from the
 untracked `~/.config/dotfiles/buildkitd-sbx-kits.toml`). With the containerd
-image store, sbx 0.49.2 builds with the host's Docker and caches the result in
-its local kit registry. 0.49.2 also has a builder sandbox for source kits
+image store, sbx 0.50.0 builds with the host's Docker and caches the result in
+its local kit registry. It also has a builder sandbox for source kits
 (`sbx kit builder status`); whether it uses that or `sbx-kits` on a Docker
 without the containerd store has not been checked.
 

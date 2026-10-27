@@ -48,7 +48,7 @@ nvm	any	v0.40.8	nvm-sh/nvm	install.sh	48a0eee9a60e07422dce0eb5774754c83889570ca1
 ripgrep	aarch64	15.2.0	BurntSushi/ripgrep	ripgrep-15.2.0-aarch64-unknown-linux-musl.tar.gz	800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915	ripgrep-15.2.0-aarch64-unknown-linux-musl/rg	sha256:c14cdb389f34e504d69e386cfc67d5c5d9a730a990de03ca6910b2a15e30386a
 ripgrep	x86_64	15.2.0	BurntSushi/ripgrep	ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz	33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c	ripgrep-15.2.0-x86_64-unknown-linux-musl/rg	sha256:e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849
 rust	any	1.98.1	rustup	-	-	-	version:1.98.1
-sbx	any	0.49.2	apt:docker-sbx	-	-	-	apt:0.49.2
+sbx	any	0.50.0	apt:docker-sbx	-	-	-	apt:0.50.0
 sd	aarch64	v1.1.0	chmln/sd	sd-v1.1.0-aarch64-unknown-linux-musl.tar.gz	ec8c93c0533ff21f4851d11566808d4082544baf063d9b96ea77c27e98b7cd99	sd-v1.1.0-aarch64-unknown-linux-musl/sd	sha256:376d61e1f5e776a770ab832ec7be6d39a46cded8d0efdb119b458329295e7622
 sd	x86_64	v1.1.0	chmln/sd	sd-v1.1.0-x86_64-unknown-linux-musl.tar.gz	02f00f4777d43e8e95b7b8d49e1a0d6e502fed4b8e79c1c8b8063857a30caa2e	sd-v1.1.0-x86_64-unknown-linux-musl/sd	sha256:302e73682783eeeaee5d8be154d1bb9eb855f562f1537f3a77cfe58d2838a29e
 shellcheck	aarch64	v0.11.0	koalaman/shellcheck	shellcheck-v0.11.0.linux.aarch64.tar.xz	12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588	shellcheck-v0.11.0/shellcheck	sha256:127f13925eadd52c341bca0ebaf9ab0dbd78c6468f30a8f262a528bf8de47546
