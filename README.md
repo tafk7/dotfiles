@@ -161,6 +161,11 @@ yo <command>              # print output and copy it to the clipboard
   prompt in Neovim in Claude's or OpenCode's place. This works for agents
   started from a shell with these dotfiles, where `VISUAL` is
   `bin/compose-editor`.
+- **Key map:** `keymap open` maps every key across the Defy, Windows,
+  WezTerm, tmux and the pane programs: who takes each chord, what it costs to
+  press, and where sibling programs disagree. `keymap why CHORD` traces one
+  chord, and `keymap check` (run in CI) catches new broken keys. See
+  [docs/keybindings.md](docs/keybindings.md).
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.
