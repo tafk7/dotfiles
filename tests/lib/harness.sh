@@ -16,6 +16,10 @@ fixture_init() {
     export XDG_CACHE_HOME="$TEST_ROOT/cache"
     export TMPDIR="$TEST_ROOT/tmp"
     export TMUX_TMPDIR="$TEST_ROOT/tmux"
+    # The host's release must not decide what a test sees (GitHub's runner is
+    # newer than the fixtures); a test that needs another writes its own.
+    printf 'ID=ubuntu\nVERSION_ID="24.04"\nVERSION_CODENAME=noble\nUBUNTU_CODENAME=noble\n' > "$TEST_ROOT/os-release"
+    export DOTFILES_OS_RELEASE="${DOTFILES_OS_RELEASE:-$TEST_ROOT/os-release}"
     # Shells record when they loaded under the runtime directory.
     mkdir -p "$TEST_ROOT/run"
     export XDG_RUNTIME_DIR="$TEST_ROOT/run"
