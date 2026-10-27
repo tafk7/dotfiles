@@ -12,10 +12,14 @@ only way to write a long prompt in an editor hides the conversation.
 every copy reaches the Windows clipboard; prompts are composed in Neovim with
 spelling and grammar help while the conversation stays visible and live.
 
-Verified 2026-10 against Claude Code 2.1.287, Codex 0.160.0, OpenCode 2.0.22,
+Verified 2026-10 against Claude Code 2.1.311, Codex 0.164.0, OpenCode 2.1.4,
 tmux 3.7c, Neovim 0.12.5, and WezTerm 20240203 (on the `ssh.exe` path from
-Windows). "Spike" means tested on an isolated tmux server loaded with
-`configs/tmux.conf` and a captured client standing in for WezTerm.
+Windows); items 1–15 of §1.2 were first verified against Claude Code 2.1.287,
+Codex 0.160.0–0.162.1, and OpenCode 2.0.22. "Spike" means tested on an
+isolated tmux server loaded with `configs/tmux.conf` and a captured client
+standing in for WezTerm; "source" means read in the tagged release (Codex
+`rust-v0.164.0`, OpenCode `v2.1.4`); "docs" means
+[code.claude.com/docs](https://code.claude.com/docs/llms.txt).
 
 ---
 
@@ -25,13 +29,17 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
 
 | | Claude Code | Codex | OpenCode |
 |---|---|---|---|
-| Fullscreen | `tui: "fullscreen"`; default depends on install history while nonessential traffic is off | Default (`tui.fullscreen_transcript = true`) | Default |
+| Fullscreen | `tui: "fullscreen"`; default depends on install history while nonessential traffic is off | Default (`tui.fullscreen_transcript = true`, `tui.alternate_screen = "auto"`) | Always, for the full interface |
 | Mouse capture | `CLAUDE_CODE_DISABLE_MOUSE` / `_CLICKS` | On; off only when tmux `mouse` is off | `mouse` in `cli.json` |
-| Inline alternative | Classic renderer | `tui.fullscreen_transcript = false` | `opencode mini` |
-| Scroll keys | PgUp/PgDn, Ctrl+Home/End, wheel | PgUp/PgDn, wheel | PgUp/PgDn, Home/End, wheel |
-| Transcript search | `Ctrl+O`, then `/` | `F3` in the live view (`Ctrl+T` only expands output in fullscreen) | none |
-| Transcript as text | `Ctrl+O [` into scrollback; `Ctrl+O v` into `$EDITOR` | none | `C-x x` export dialog: Markdown to a temporary file |
-| Copy route inside tmux | `tmux load-buffer -w`, plus OSC 52 raw and passthrough-wrapped | OSC 52 passthrough only (≤100 KB) while `set-clipboard` is off | OSC 52 passthrough only |
+| Inline alternative | Classic renderer (`tui: "default"`, `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1`) | `fullscreen_transcript = false` or `--no-alt-screen` (§1.2.21) | `opencode mini`, without copy or export (§1.2.25) |
+| Scroll keys | PgUp/PgDn (half page), Ctrl+Home/End, wheel | PgUp/PgDn, Ctrl+Home/End, Alt+`<`/`>`, wheel | PgUp/PgDn (half page), Ctrl+Home/End (from `cli.json`) and Home/End, Ctrl+Alt+Y/E (line), wheel |
+| Transcript search | `Ctrl+O`, then `/`, `n`/`N`, `{`/`}` between prompts | `F3`, then Ctrl+P/Ctrl+N | none (the timeline filters prompts only) |
+| Start a selection from the keyboard | no (§1.2.18) | `Ctrl+Space`, anchored at the top-left of the view (§1.2.19) | no (§1.2.23) |
+| Extend / copy a selection | Shift+arrows, Shift+Home/End; `Ctrl+Shift+C`, `Ctrl+C`; copy on mouse release | arrows; `Ctrl+C`, `Ctrl+Shift+C`, `Ctrl+Insert`, Enter; copy on mouse release in tmux | mouse only; copy on release |
+| Copy the last reply | `/copy [N]` (picker when code blocks exist) | `Ctrl+O`; `/copy` steps back through older blocks and prompts | `C-x y` (`messages.copy`) |
+| Transcript as text | `Ctrl+O [` into scrollback; `Ctrl+O v` to `$VISUAL` (§1.2.16); `/export [file]` | `/export [file]`: Markdown, from the prompt box | `C-x x` export dialog: Markdown to a temporary file; `session.copy` to the clipboard |
+| Session of a pane | `sessions/<pid>.json` names it | `thread-id` in `tui.terminal_title` (§1.2.22) | not discoverable (§1.2.23) |
+| Copy route inside tmux | `tmux load-buffer -w`, plus OSC 52 raw and passthrough-wrapped | arboard; `tmux load-buffer -w` unless `set-clipboard` is off, else passthrough OSC 52 (≤100,000 bytes) | native clipboard (not over SSH) and passthrough OSC 52 (≤8 MiB) |
 | Non-interrupting submit | `Ctrl+X Enter` (`chat:queueSubmit`) | `Tab` (queue key) | `C-x Enter` (`prompt.queue`) |
 | Config | `settings.json`, `keybindings.json` | `config.toml` `[tui]`, `tui.keymap.*` | `~/.config/opencode/cli.json` |
 
@@ -89,16 +97,93 @@ Windows). "Spike" means tested on an isolated tmux server loaded with
     be bound to `selection:copy`; tmux sends Claude `Ctrl+Shift+C` instead.
     Sent to an app that hasn't asked for extended keys, tmux turns that into a
     plain `Ctrl+C`; Claude asks for them (`pane_key_mode` is `Ext 2`) (spike).
-13. **Fullscreen Codex has no transcript pager.** `Ctrl+T` expands command
-    output in place, and the `tui.keymap.pager` keys never apply there; `F3`
-    searches the full transcript (Codex 0.162.1, live test).
+13. **Fullscreen Codex has no transcript pager.** `Ctrl+T` switches the same
+    view to a detailed one in place, and the `tui.keymap.pager` keys apply only
+    to the overlay of the inline mode; `F3` searches the full transcript,
+    paging older history in as needed (Codex 0.162.1, live test; 0.164.0,
+    source: `app_backtrack.rs`, `transcript_view/search.rs`).
 14. **OpenCode V2's `C-x x` opens an export dialog**, not `$EDITOR`. Tab
     cycles Markdown, JSON, thinking, tools, Copy, Export; Export writes
     `session-<id>.md` to the temporary directory and shows its path (spike).
+    In 2.1.4 one Shift+Tab from the dialog's first item lands on Export, and
+    the file is written by OpenCode's background service, so it lands in the
+    service's temporary directory (`/tmp` here), not the pane's `$TMPDIR`
+    (spike). The Markdown has `## User` and `## Assistant` headings.
 15. **Alt+C is fzf's directory-jump widget** in both shells (`fzf --bash`,
     `fzf --zsh`, configured in `shell/fzf.sh`), so compose uses Alt+V, which is
     unbound in bash, zsh, tmux, WezTerm, Claude (on Linux), Codex, and
     OpenCode.
+16. **Claude's `Ctrl+O v` hands its transcript to `$VISUAL`.** It writes
+    `$TMPDIR/cc-transcript-<16 hex digits>.txt` (mode 600; the conversation
+    as drawn, hard-wrapped at the pane's width, prompts marked `❯ ` at column
+    0, tool output expanded), runs `$VISUAL` (else `$EDITOR`) on it as a direct
+    child with `TMUX_PANE` set, then stays in the transcript view, and leaves
+    the file behind (spike, 2.1.311).
+17. **Claude stops while its editor runs.** A `sleep 6` Bash call that
+    finished while a `Ctrl+O v` editor was open completed only when the editor
+    exited, 28 s into the turn: the whole process waits, not just the input
+    (spike). An editor that returns at once costs about 0.5 s from `Ctrl+O` to
+    the hand-off, works mid-turn, and the turn goes on (spike).
+18. **Claude can't start a selection from the keyboard.** The `Scroll`
+    context's `selection:extend*` actions (Shift+arrows, Shift+Home/End) only
+    extend a selection the mouse started; there is no action that starts one
+    (docs: fullscreen, keybindings). `/copy [N]` copies the Nth-latest reply,
+    with a picker when it holds code blocks; `/export [file]` writes the
+    conversation as plain text; both are typed into the prompt box. A
+    `command:<name>` binding runs a slash command from a key, without
+    arguments (docs).
+19. **Codex starts a selection with `Ctrl+Space`**, anchored at the top-left
+    cell of the view; arrows move its end, `Ctrl+C`, `Ctrl+Shift+C`, or
+    `Ctrl+Insert` copy, Enter copies and returns to the latest message, Esc
+    clears. The keys are fixed, not in `tui.keymap` (source:
+    `transcript_view/input.rs`). Through tmux, `Ctrl+Insert` copied the
+    selected lines as logical text by passthrough OSC 52 (spike). Mouse
+    selections copy logical source text, without display wrapping (source).
+20. **Codex exports from the prompt box only.** `/export` offers "Copy to
+    clipboard" or "Save to file" (Markdown); `/export FILE` writes directly;
+    `/copy` copies the last reply or steps back through older code blocks,
+    blockquotes, and prompts (source). Typing either into a box that holds a
+    draft would append to the draft. Codex's copies go through arboard, then
+    `tmux load-buffer -w` only when tmux `set-clipboard` isn't off, else a
+    passthrough OSC 52 of at most 100,000 bytes (source:
+    `clipboard_copy.rs`); here they reach the Windows clipboard and never the
+    tmux buffer (spike).
+21. **Codex's inline mode puts history in tmux's scrollback, until a
+    resize.** With `fullscreen_transcript = false`, `alternate_screen =
+    "never"`, or `--no-alt-screen`, finished history is written to the normal
+    screen, hard-wrapped at the width (logical lines in raw mode, Alt+R). A
+    width change sends `ESC[2J ESC[3J` and replays about 1,000 rows, which
+    clears the pane's tmux history (source: `insert_history.rs`,
+    `custom_terminal.rs`). `auto` picks inline only for Terminal.app over SSH.
+22. **A Codex pane can name its thread.** The TUI holds no session file (the
+    app-server daemon writes `sessions/YYYY/MM/DD/rollout-<time>-<thread>.jsonl`
+    under `CODEX_HOME`), and `CODEX_THREAD_ID` is set only for the commands the
+    agent runs (source). The `tui.terminal_title` item `thread-id` writes the
+    thread's UUID into the pane title, cut to 29 characters and `...`; the
+    prefix still names one rollout file (spike). Rollouts carry the
+    app-server's thread items as `item_completed` events: `UserMessage`,
+    `AgentMessage`, `CommandExecution` (command, `aggregated_output`),
+    `FileChange` (unified diffs), `McpToolCall`, `Reasoning`,
+    `ContextCompaction` (local rollouts). The default title is `activity`,
+    `thread-name`, `project-name`.
+23. **OpenCode has no keyboard selection, search, or session handle.**
+    Selection is mouse-only and copies on release (`terminal.copy`); there is
+    no find command. `messages.copy` (`C-x y`) copies the last reply's text,
+    `session.copy` (unbound) the whole transcript as Markdown,
+    `session.timeline` (`C-x g`) lists prompts with a Copy action. `opencode
+    session export ID` prints JSON only, and nothing tells which session a
+    running TUI shows: its title is `OC | <session title>` (source:
+    `routes/session/index.tsx`, `config/keybind.ts`).
+24. **OpenCode always wraps OSC 52 for tmux** and also tries the native
+    clipboard, which it skips over SSH; writes are capped at 8 MiB (source:
+    OpenTUI `terminal.zig`, `clipboard.ts`).
+25. **`opencode mini` is inline but resets history on resize.** Output goes to
+    scrollback above a redrawn footer; a resize sends `ESC[2J ESC[3J` and
+    reprints the newest messages; it has no copy or export commands (source).
+26. **tmux takes prompt marks and wrapping from any program.** OSC 133 `A`
+    printed by a viewer, not a shell, makes `previous-prompt` and
+    `next-prompt` stop at those lines, and copy-mode copies a soft-wrapped
+    line as one line (tmux 3.4 and 3.7c, test).
 
 ---
 
