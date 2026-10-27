@@ -134,7 +134,7 @@ if [[ -n "${ZSH_VERSION:-}" ]]; then
     }
 
     if [[ -o interactive ]]; then
-        autoload -Uz add-zsh-hook read-from-minibuffer
+        autoload -Uz read-from-minibuffer
         zle -N read-from-minibuffer
         zle -N ai-command _ai_command_widget
         zle -N ai-command-reset _ai_command_reset_widget
@@ -142,7 +142,9 @@ if [[ -n "${ZSH_VERSION:-}" ]]; then
         # until then "main" may be viins: bind in the emacs keymap by name.
         bindkey -M emacs '^[i' ai-command
         bindkey -M emacs '^[I' ai-command-reset
-        add-zsh-hook precmd _ai_command_reset
+        # Not add-zsh-hook: nothing else at startup loads it.
+        [[ " ${precmd_functions[*]} " == *" _ai_command_reset "* ]] || \
+            precmd_functions+=(_ai_command_reset)
     fi
 else
     # Terminal output for the Bash widget; silent where there is no terminal.
