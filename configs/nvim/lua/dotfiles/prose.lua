@@ -119,9 +119,12 @@ end
 
 vim.keymap.set('i', '<C-l>', '<C-g>u<Cmd>lua require("dotfiles.prose").fix_last()<CR><C-g>u')
 
--- Grammar through the built-in LSP client (Neovim 0.11+).
+-- Grammar through the built-in LSP client (Neovim 0.11+). harper-ls runs in
+-- its own session, and left by a Neovim that quits without waiting it can
+-- linger for good (2.12.0): on quit Neovim waits up to half a second for it,
+-- then stops it.
 if vim.fn.executable('harper-ls') == 1 and vim.lsp.config and vim.lsp.enable then
-  vim.lsp.config('harper_ls', { cmd = { 'harper-ls', '--stdio' }, filetypes = { 'markdown' } })
+  vim.lsp.config('harper_ls', { cmd = { 'harper-ls', '--stdio' }, filetypes = { 'markdown' }, exit_timeout = 500 })
   vim.lsp.enable('harper_ls')
 end
 
