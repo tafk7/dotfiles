@@ -194,7 +194,8 @@ header { display: grid; gap: 14px; }
 table.intents { border-collapse: collapse; width: 100%; min-width: 1040px; font-size: 0.82rem; }
 .intents th, .intents td { padding: 9px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
 .intents thead th { font-family: var(--f-display); font-weight: 600; font-size: 0.88rem; background: var(--sunk); }
-.intents th.intent { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 10.5rem; font-weight: 600; }
+.intents th.intent { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 10.5rem; max-width: 15rem; font-weight: 600; }
+.intents th.intent small { display: block; margin-top: 4px; font-weight: 400; font-size: 0.72rem; line-height: 1.35; color: var(--muted); }
 .intents thead th.intent { background: var(--sunk); z-index: 2; }
 .intents tr.grp th { background: var(--bg); font-family: var(--f-mono); font-weight: 400; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; }
 .intents td .chords { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -666,14 +667,20 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
   let grp = '';
   for (const it of D.intents) {
     if (it.group !== grp) { grp = it.group; ih += `<tr class="grp"><th colspan="${COLS.length + 2}">${esc(grp)}</th></tr>`; }
-    ih += `<tr><th class="intent">${esc(it.label)}</th><td class="canon">${it.canon ? kbd(it.canon) + '<br>' + ratingTag(it.press && it.press.rating) : '<span class="ctx">none shared</span>'}</td>`;
+    ih += `<tr><th class="intent">${esc(it.label)}${it.note ? `<small>${esc(it.note)}</small>` : ''}</th><td class="canon">${it.canon ? kbd(it.canon) + '<br>' + ratingTag(it.press && it.press.rating) : '<span class="ctx">none shared</span>'}</td>`;
     for (const a of COLS) {
       const c = it.apps[a];
       if (!c) { ih += '<td class="na">·</td>'; continue; }
-      const st = it.canon ? c.status : 'ok';
-      const chip = st === 'differs' ? '<span class="chip differs">differs</span>' : st === 'none' ? '<span class="chip none">missing</span>' : '';
-      const ks = c.chords.slice(0, 4).map(x => kbd(x[0], x[1] !== 'direct' ? x[1] : '')).join('');
-      const does = st !== 'ok' && c.want ? `<div class="does">${esc(fmt(c.want))} here: ${esc(human(c.does) || 'nothing')}</div>` : '';
+      const st = it.canon || c.status === 'none' ? c.status : 'ok';
+      const chip = st === 'differs' ? '<span class="chip differs">differs</span>' : st === 'none' ? `<span class="chip none">${c.blocked ? 'blocked' : 'no key'}</span>` : '';
+      // keys that only work because the terminal merges them into the real one go behind a count
+      const direct = c.chords.filter(x => x[1] !== 'collapsed'), merged = c.chords.filter(x => x[1] === 'collapsed');
+      const shown = direct.slice(0, 3).concat(merged.filter(x => x[0] === c.want || !direct.length).slice(0, 2));
+      const hidden = c.chords.filter(x => !shown.includes(x));
+      const ks = shown.map(x => kbd(x[0], x[1] !== 'direct' ? x[1] : '')).join('') +
+        (hidden.length ? `<span class="ctx" title="${esc(hidden.map(x => fmt(x[0])).join(', '))}">+${hidden.length}</span>` : '');
+      const does = (c.blocked ? `<div class="does">its ${esc(fmt(c.blocked[0]))} is taken by ${esc(c.blocked[1])}</div>` : '') +
+        (st !== 'ok' && c.want ? `<div class="does">${esc(fmt(c.want))} here: ${esc(human(c.does) || 'nothing')}</div>` : '');
       ih += `<td class="${st === 'ok' ? '' : st}">${chip}<div class="chords">${ks || '<span class="ctx">—</span>'}</div>${does}</td>`;
     }
     ih += '</tr>';

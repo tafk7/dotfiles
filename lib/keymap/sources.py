@@ -303,7 +303,7 @@ def pi(repo, notes):
         return [], None
     out = []
     for pid, keys in d['bindings'].items():
-        primary = not pid.startswith(('app.tree', 'app.models', 'app.session', 'tui.select'))
+        primary = not pid.startswith(('app.tree', 'app.models', 'app.session', 'tui.select', 'tui.altScreen.search'))
         for key in keys:
             out.append(Binding('pi', plus_any(key), pid, context=pid.rsplit('.', 1)[0], primary=primary,
                                source='pi defaults'))

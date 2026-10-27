@@ -112,7 +112,8 @@ class Build(unittest.TestCase):
         self.assertEqual(t['scrolllock']['shell']['effects'], [['wezterm', 'not delivered']])
 
     def test_judgement(self):
-        self.assertEqual(self.finding('codex', 'ctrl+shift+g')[0]['sev'], 'bug')
+        self.assertEqual(self.finding('codex', 'shift+enter')[0]['sev'], 'bug')  # plain keys merge it into Enter
+        self.assertEqual(self.finding('opencode', 'ctrl+shift+d')[0]['sev'], 'bug')  # arrives as Ctrl+D: exit
         self.assertEqual(self.finding('claude', 'ctrl+c')[0]['sev'], 'adapted')
         self.assertEqual(self.finding('shell', 'alt+f')[0]['sev'], 'cost')
         focus = next(i for i in self.data['intents'] if i['label'] == 'Focus left')
@@ -123,9 +124,10 @@ class Build(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_why(self):
-        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'why', 'ctrl+shift+g', 'codex'],
+        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'why', 'ctrl+shift+g', 'codex', 'pi'],
                            capture_output=True, text=True)
-        self.assertIn('next_permission_mode', r.stdout)
+        self.assertIn('prompt in nvim, full pane', r.stdout)
+        self.assertIn('app.editor.external', r.stdout)
         self.assertIn('LCtrl (left thumb)', r.stdout)
 
 

@@ -106,7 +106,7 @@ def intents_for(model, traces, spec):
     rows = []
     for it in spec:
         canon = it.get('canon')
-        row = dict(group=it['group'], label=it['label'], canon=canon, apps={})
+        row = dict(group=it['group'], label=it['label'], canon=canon, note=it.get('note'), apps={})
         for app, actions in it['apps'].items():
             hits = {}
             for p, rs in traces.items():
@@ -126,10 +126,19 @@ def intents_for(model, traces, spec):
             does = None
             if status != 'ok' and want and want in traces:
                 r = traces[want][app]
-                e = r['effects'][0] if r['effects'] else None
+                main = {a for lst in model.app_bindings[app].values() for _, a, _, prim in lst if prim}
+                e = next((e for e in r['effects'] if e[0] != app or e[2] in main), None)
                 does = 'nothing' if not e else (e[2] if len(e) > 2 else e[1])
+            blocked = None
+            if not hits:  # the program has a key for it, but something outside takes that key
+                for ch, lst in model.app_bindings[app].items():
+                    r = traces.get(ch.split(' ')[0], {}).get(app)
+                    if r and any(a in actions for _, a, _, _ in lst) and r['delivered'] != ch.split(' ')[0]:
+                        last = r['hops'][-1]
+                        blocked = [ch, f'{last[0]}: {last[2]}']
+                        break
             row['apps'][app] = dict(chords=[[c, hits[c]] for c in sorted(hits, key=lambda c: (c != want, len(c), c))],
-                                    status=status, want=want, does=does)
+                                    status=status, want=want, does=does, blocked=blocked)
         rows.append(row)
     return rows
 
