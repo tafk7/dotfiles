@@ -44,7 +44,7 @@ neovim	x86_64	v0.12.5	neovim/neovim	nvim-linux-x86_64.tar.gz	bce0f56eda1f1b1db6e
 node	aarch64	v24.22.1	nodejs.org	node-v24.22.1-linux-arm64.tar.xz	dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e	node-v24.22.1-linux-arm64/bin/node	sha256:c8c5721679d8d1a09e9987e345d5f9a64899bb85f7a384783ba8a93e6e62348a
 node	x86_64	v24.22.1	nodejs.org	node-v24.22.1-linux-x64.tar.xz	6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6	node-v24.22.1-linux-x64/bin/node	sha256:e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb
 npm	any	11.19.1	node	-	-	-	version:11.19.1
-nvm	any	v0.40.4	nvm-sh/nvm	install.sh	4b7412c49960c7d31e8df72da90c1fb5b8cccb419ac99537b737028d497aba4f	-	version:0.40.4
+nvm	any	v0.40.8	nvm-sh/nvm	install.sh	48a0eee9a60e07422dce0eb5774754c83889570ca1ee2566c516acbe8af03a9e	-	version:0.40.8
 ripgrep	aarch64	15.2.0	BurntSushi/ripgrep	ripgrep-15.2.0-aarch64-unknown-linux-musl.tar.gz	800b1e7206afe799dfb5a6901f23147cfaabe0e52210538100f61e86e1740915	ripgrep-15.2.0-aarch64-unknown-linux-musl/rg	sha256:c14cdb389f34e504d69e386cfc67d5c5d9a730a990de03ca6910b2a15e30386a
 ripgrep	x86_64	15.2.0	BurntSushi/ripgrep	ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz	33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c	ripgrep-15.2.0-x86_64-unknown-linux-musl/rg	sha256:e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849
 rust	any	1.98.1	rustup	-	-	-	version:1.98.1
