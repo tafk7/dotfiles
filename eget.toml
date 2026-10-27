@@ -28,7 +28,7 @@ tag = "v1.27.0"
 asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
 ["eza-community/eza"]
-tag = "v0.23.4"
+tag = "v0.23.5"
 # aarch64 also ships a gnu _no_libgit variant.
 asset_filters = ["gnu", ".tar.gz", "^no_libgit"]
 
