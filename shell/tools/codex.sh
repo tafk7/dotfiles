@@ -56,6 +56,7 @@ alias cx='codex'                       # New session
 alias cxr='codex resume'               # Resume (picker)
 alias cxc='codex resume --last'        # Continue last session
 alias cxp='codex exec'                 # One-off prompt (non-interactive)
+alias cxa='codex agents'               # Agent sessions on the shared app-server daemon
 
 # Codex with alternate config dir at ~/.codex-alt (CODEX_HOME override)
 alias cxh='CODEX_HOME="$HOME/.codex-alt" codex'

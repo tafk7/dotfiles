@@ -243,6 +243,7 @@ shell│show_path│Show PATH entries one per line│show_path
 shell│cl│Start new Claude session│claude
 shell│clc│Continue previous Claude session│claude --continue
 shell│clp│Run one-off Claude prompt│claude --print
+shell│cla│Claude agent view (background sessions)│claude agents
 shell│cll│Claude local (no global settings)│claude --setting-sources project,local
 shell│cllc│Continue Claude local session│claude --setting-sources project,local --continue
 shell│cllp│One-off Claude local prompt│claude --setting-sources project,local --print
@@ -256,6 +257,7 @@ codex│End│Move to end of composer line│tui.keymap.editor.move_line_end
 shell│cxr│Resume Codex session (picker)│codex resume
 shell│cxc│Continue last Codex session│codex resume --last
 shell│cxp│Run one-off Codex prompt│codex exec
+shell│cxa│Codex agent sessions (shared app-server daemon)│codex agents
 shell│cxh│Codex with alt config dir (~/.codex-alt)│CODEX_HOME=~/.codex-alt codex
 shell│cxhr│Resume Codex (alt dir, picker)│CODEX_HOME=~/.codex-alt codex resume
 shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex resume --last
