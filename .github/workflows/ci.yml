@@ -105,6 +105,7 @@ jobs:
           python3 tests/eget-selection.py
           python3 tests/bump.py
           python3 tests/viz.py
+          python3 tests/keymap.py
 
       - name: Cheatsheet TSV is well-formed
         run: |

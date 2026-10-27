@@ -201,6 +201,9 @@ shell│localip│Show local network IP│hostname -I
 shell│psg│Search running processes by name│ps aux | grep
 shell│fkill│Fuzzy-find and kill a process│FZF process selector + kill
 shell│killport│Kill process on a port (--force to skip confirm)│killport <port>
+shell│keymap open│Map every key across the Defy, Windows, WezTerm, tmux and the pane programs│bin/keymap build, then viz open
+shell│keymap why│Trace one chord through every layer, e.g. keymap why ctrl+shift+g│bin/keymap why <chord> [program...]
+shell│keymap free│Chords the keyboard sends that nothing binds, e.g. keymap free alt│bin/keymap free <mods>
 # Archive
 shell│extract│Extract any archive format (.tar.gz, .zip, etc.)│extract <file>
 # Tmux session management
