@@ -39,8 +39,8 @@ jq	aarch64	jq-1.8.1	jqlang/jq	jq-linux-arm64	6bc62f25981328edd3cfcfe6fe51b073f2d
 jq	x86_64	jq-1.8.1	jqlang/jq	jq-linux-amd64	020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d	-	sha256:020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d
 lazygit	aarch64	v0.59.0	jesseduffield/lazygit	lazygit_0.59.0_linux_arm64.tar.gz	a334a6c125169f21942f1a8b02043932575547a6250a1a734d62111efd92aa8f	lazygit	sha256:d9bf5faf03359576daf4fbc94c9db9cd0c3d2f5db2876d161a9e4c311cab78c6
 lazygit	x86_64	v0.59.0	jesseduffield/lazygit	lazygit_0.59.0_linux_x86_64.tar.gz	264283f40a40c899d702a338b20622f690221f753f03bac827c1f34e91f516c2	lazygit	sha256:9b31d9743260f23e44b298af21d552ece2edb39e0de56b84dd379da785a306ca
-neovim	aarch64	v0.12.5	neovim/neovim	nvim-linux-arm64.tar.gz	1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725	nvim-linux-arm64/bin/nvim	version:0.12.5
-neovim	x86_64	v0.12.5	neovim/neovim	nvim-linux-x86_64.tar.gz	bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875	nvim-linux-x86_64/bin/nvim	version:0.12.5
+neovim	aarch64	v0.12.6	neovim/neovim	nvim-linux-arm64.tar.gz	8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815	nvim-linux-arm64/bin/nvim	version:0.12.6
+neovim	x86_64	v0.12.6	neovim/neovim	nvim-linux-x86_64.tar.gz	474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87	nvim-linux-x86_64/bin/nvim	version:0.12.6
 node	aarch64	v24.22.1	nodejs.org	node-v24.22.1-linux-arm64.tar.xz	dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e	node-v24.22.1-linux-arm64/bin/node	sha256:c8c5721679d8d1a09e9987e345d5f9a64899bb85f7a384783ba8a93e6e62348a
 node	x86_64	v24.22.1	nodejs.org	node-v24.22.1-linux-x64.tar.xz	6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6	node-v24.22.1-linux-x64/bin/node	sha256:e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb
 npm	any	11.19.1	node	-	-	-	version:11.19.1
