@@ -1,24 +1,23 @@
 # Setup redesign: implementation status
 
-Every step is implemented except the end of 4.3: creating the schedule and
-its trial run wait on the user. The [plan](setup-update-plan.md)
-and [design](setup-update-redesign.md) are unchanged except as noted under
-Deviations. Adoption on this machine waits until the whole plan is done (the
-user's decision, 2026-10-26).
+Every step is implemented except the end of 4.3: the schedule is not
+created, and where it runs is open
+([scheduled-review-desktop.md](scheduled-review-desktop.md)). The
+[plan](setup-update-plan.md) and [design](setup-update-redesign.md) are
+unchanged except as noted under Deviations.
 
 ## Where things are
 
-- Branch `setup-redesign` in the worktree `~/dev/dotfiles-setup`. Nothing is
-  pushed. `git log main..setup-redesign` lists the commits.
-- The live checkout (`~/dotfiles`), tmux, and HOME have not been changed,
-  with one exception, which was reverted: early in Phase 0 a test-writing
-  mistake overwrote `~/.local/bin/eza` and `~/.local/bin/btop`. Both were
-  restored from their pinned releases, and their sha256 matches the ledger.
-- Suite: all green apart from three failures that this host's environment
-  causes and that predate the branch:
-  - `agent-badge.sh` hard-codes `/usr/bin/tmux`.
-  - `fresh-config.sh` needs some `vi`.
-  - `tmux-compose-claude.sh` has a cleanup race (intermittent).
+- Merged: `main` on GitHub fast-forwarded to the branch on 2026-10-27, with CI
+  green on every job. The `setup-redesign` branch is deleted.
+- This machine was adopted on 2026-10-26 (below); its checkout picks up
+  `main` with `dotfiles update`.
+- Early in Phase 0 a test-writing mistake overwrote `~/.local/bin/eza` and
+  `~/.local/bin/btop` on this host. Both were restored from their pinned
+  releases, and their sha256 matches the ledger.
+- Suite: green in CI. On this host two tests fail for its environment, as
+  before the branch: `agent-badge.sh` hard-codes `/usr/bin/tmux`, and
+  `fresh-config.sh` needs some `vi`; this host has neither.
 
 ## Done
 
@@ -63,42 +62,45 @@ user's decision, 2026-10-26).
 
 ## Waiting on the user
 
-- **Push and merge.** The branch is unpushed; this machine's `main` runs it
-  locally, ahead of `origin/main`.
-- **The schedule (4.3).** A scheduled Claude job runs against the GitHub
-  repository, so it needs this branch on `main` there first. Then the
-  schedule (monthly review, weekly security check) is created and one manual
-  run on a branch is checked for a reviewable pull request. Each step waits
-  for the user's go-ahead.
+- **The schedule (4.3).** Where the job runs is open
+  ([scheduled-review-desktop.md](scheduled-review-desktop.md)). Then one
+  manual run on a branch is checked for a reviewable pull request, and the
+  schedule (monthly review, weekly security check) is created. Each step
+  waits for the user's go-ahead.
 
 ## Follow-ups
 
-- Done after adoption: enforced keys and per-machine defaults for the AI
-  CLIs' settings ([ai-settings-per-machine.md](ai-settings-per-machine.md)).
+Done after adoption:
 
-- `tests/tmux-compose-claude.sh` can leave `nvim --embed` servers behind when
-  its cleanup races, and they ignore SIGTERM; three were left on this host
-  (killed with SIGKILL on 2026-10-26).
-- `dotfiles profile --propose` reads ownership from the ledger an older
-  checkout wrote: Docker and Tailscale were recorded external though both
-  are APT packages from their vendors' repositories, so `tail` was not
-  proposed. Proposing from observations would fix it.
+- Enforced keys and per-machine defaults for the AI CLIs' settings
+  ([ai-settings-per-machine.md](ai-settings-per-machine.md)).
+- `dotfiles profile --propose` observes ownership instead of reading the
+  ledger an older checkout wrote, which recorded Docker and Tailscale external
+  though both are APT packages from their vendors' repositories (so `tail`
+  was not proposed).
+- The tmux tests no longer leave processes behind. The compose test's
+  harper-ls runs in its own session and outlived the tmux servers, writing
+  into the fixture after it was removed; a Neovim caught mid-exit ignored
+  SIGTERM. The harness gathers the servers' process trees first and waits for
+  them (SIGKILL after two seconds). Five orphaned harper-ls and three Neovim
+  servers from earlier runs were stopped on this host (2026-10-26, -27).
 
 ## Adopting a machine
 
 This machine was adopted on 2026-10-26 (profile: tier work, all AI CLIs; the
-dev tier's Neovim plugins; rustup left external; tailscaled left masked).
-Left on it: pick up the commits since with a fast-forward and `dotfiles
-apply`, settle Codex's settings (above), and start the agents.
+dev tier's Neovim plugins; rustup left external; tailscaled left masked, so
+no `tail`). Left on it: `dotfiles update`, then restart the agents and
+Codex's app-server daemon.
 
 The steps, for the next machine:
 
 1. Move environment that agents and tmux need (anything set in
    `~/.shell.local` that is not interactive-only) to `~/.shell.env`.
 2. Fast-forward `main` with git (an older checkout has no `dotfiles update`).
-3. `dotfiles profile --propose`, then confirm. It reads only ledger rows
-   dotfiles or the package manager installed; add what is wanted (`--add
-   tail`, opt-outs) with `--no-apply`.
+3. `dotfiles profile --propose`, then confirm. It counts only what dotfiles
+   or the package manager installed, so an APT package installed by hand is
+   proposed; add or remove what is wanted (`--add`, `--remove`, opt-outs)
+   with `--no-apply`.
 4. `dotfiles apply --dry-run`, review, then `dotfiles apply` in a terminal (the
    sbx hold question needs one on machines an older checkout set up; it ends
    with a refresh of the tmux server, which clears the guards from its global
@@ -121,6 +123,9 @@ the installer names them.
 
 ## Deviations from the plan
 
+- 1.4: `dotfiles profile --propose` derives the profile from observations
+  (dotfiles-owned and package-manager components), not from ledger rows,
+  whose ownership an older checkout may have recorded wrong.
 - 1.6: `bin/verify` stays as it is for its `--tier`, `--all`, and capability
   modes, and isn't rewritten as a wrapper yet. `dotfiles verify` is the new
   record-based check.
