@@ -1,5 +1,5 @@
-# dundee/gdu v5.36.1 (recorded by tests/eget-selection.py --refresh)
-gdu-5.36.1.tgz
+# dundee/gdu v5.38.0 (recorded by lib/lockgen.py)
+gdu-5.38.0.tgz
 gdu.1.tgz
 gdu_android_arm64.tgz
 gdu_darwin_amd64.tgz
@@ -28,5 +28,6 @@ gdu_netbsd_arm.tgz
 gdu_openbsd_386.tgz
 gdu_openbsd_amd64.tgz
 gdu_windows_amd64.exe.zip
+gdu_windows_arm64.exe.zip
 sha256sums.txt
 sha256sums.txt.asc
