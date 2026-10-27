@@ -31,10 +31,45 @@ TK_OUTER="$TK_INNER-outer"
 TK_STUB="$TEST_REPO_ROOT/tests/lib/tmux-keys-stub.py"
 TK_MARK=0
 
+# tk_descendants PID...: those processes and everything under them.
+tk_descendants() {
+    local -A children=()
+    local -a queue=("$@")
+    local pid ppid
+    while read -r pid ppid; do children[$ppid]+=" $pid"; done < <(ps -e -o pid= -o ppid= 2>/dev/null)
+    while (( ${#queue[@]} )); do
+        pid="${queue[0]}"; queue=("${queue[@]:1}")
+        printf '%s\n' "$pid"
+        # shellcheck disable=SC2206  # one element per child pid
+        queue+=(${children[$pid]:-})
+    done
+}
+
+# What the panes ran can outlive the servers: a language server Neovim starts
+# in its own session writes its stats after Neovim exits, and a Neovim caught
+# mid-exit ignores SIGTERM. The process trees are gathered before the servers
+# go, and gone (SIGKILL after two seconds) before the fixture is removed.
 tk_cleanup() {
+    local -a servers=() left=()
+    local server pid _
+    for server in "$TK_OUTER" "$TK_INNER"; do
+        pid="$(timeout 5 tmux -L "$server" display-message -p '#{pid}' 2>/dev/null)" && servers+=("$pid")
+    done
+    if (( ${#servers[@]} )); then mapfile -t left < <(tk_descendants "${servers[@]}"); fi
     tmux -L "$TK_OUTER" kill-server 2>/dev/null || true
     tmux -L "$TK_INNER" kill-server 2>/dev/null || true
+    for _ in {1..20}; do tk_any_alive "${left[@]}" || break; sleep 0.1; done
+    if tk_any_alive "${left[@]}"; then
+        kill -KILL "${left[@]}" 2>/dev/null || true
+        for _ in {1..20}; do tk_any_alive "${left[@]}" || break; sleep 0.1; done
+    fi
     fixture_cleanup
+}
+
+tk_any_alive() {
+    local pid
+    for pid in "$@"; do kill -0 "$pid" 2>/dev/null && return 0; done
+    return 1
 }
 
 ti() { timeout 5 tmux -L "$TK_INNER" "$@"; }
