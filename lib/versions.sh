@@ -63,8 +63,10 @@ versions_problems() {
             if (arch != "x86_64" && arch != "aarch64" && arch != "any") printf "line %d: unknown arch %s\n", NR, $2
             for (i = 1; i <= 8; i++) if ($i == "") printf "line %d: empty field %d\n", NR, i
             if ($3 == "-") printf "line %d: %s has no wanted version\n", NR, $1
-            if ($6 != "-" && $6 !~ /^[0-9a-f]{64}$/) printf "line %d: %s sha256 is malformed\n", NR, $1
-            if ($8 != "-" && $8 !~ /^(sha256:[0-9a-f]{64}|version:.+|apt:.+)$/) printf "line %d: %s identity is malformed\n", NR, $1
+            # No {64}: the mawk in Ubuntu 22.04 has no interval expressions.
+            if ($6 != "-" && !(length($6) == 64 && $6 ~ /^[0-9a-f]+$/)) printf "line %d: %s sha256 is malformed\n", NR, $1
+            if ($8 != "-" && !(length($8) == 71 && $8 ~ /^sha256:[0-9a-f]+$/) && $8 !~ /^(version|apt):./) \
+                printf "line %d: %s identity is malformed\n", NR, $1
             key = $1 SUBSEP arch
             if (key in seen) printf "line %d: duplicate %s %s\n", NR, $1, arch
             seen[key] = 1
