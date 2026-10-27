@@ -15,11 +15,12 @@ parent=$(tr '\0' '\n' < "/proc/$PPID/cmdline" 2>/dev/null | head -n 1)
 
 # Review (bin/tmux-review) asks for Claude's transcript with Ctrl+O v and names
 # the file it wants in the pane option @review-file: move the transcript
-# (cc-transcript-*.txt in Claude 2.1.311; any file but the prompt box, so a new
-# name still works) there and return at once, since Claude stops while its
-# editor runs. The rename into place is atomic, so review never reads a partial
-# file.
-if [[ "${parent##*/}" == claude && "$file" != */claude-prompt-*.md && -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
+# (cc-transcript-*.txt in Claude 2.1.311; any temporary file but the prompt box,
+# so a new name still works, while a plan or CLAUDE.md is never moved) there
+# and return at once, since Claude stops while its editor runs. The rename into
+# place is atomic, so review never reads a partial file.
+if [[ "${parent##*/}" == claude && "$file" != */claude-prompt-*.md && -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]] \
+    && [[ "$file" == /tmp/* || ( -n "${TMPDIR:-}" && "$file" == "$TMPDIR"/* ) ]]; then
     review_file=$(tmux show -pqv -t "$TMUX_PANE" @review-file 2>/dev/null)
     if [[ -n "$review_file" ]]; then
         mv -f -- "$file" "$review_file.part" && mv -f -- "$review_file.part" "$review_file"
