@@ -59,6 +59,15 @@ def portable_sources(source):
     return _read(source), (_read(sibling) if sibling.exists() else {})
 
 
+def probe_version(cli):
+    """CLI --version with its XDG directories and TMPDIR in a scratch directory:
+    opencode writes a cache, a log, and its data even for --version
+    (lib/observe.sh's _observe_probe does the same for the shell side)."""
+    with tempfile.TemporaryDirectory(prefix='dotfiles-probe.', dir='/tmp') as scratch:
+        env = dict(os.environ, TMPDIR=scratch, **{f'XDG_{kind}_HOME': scratch for kind in ('CONFIG', 'CACHE', 'STATE', 'DATA')})
+        return subprocess.run([cli, '--version'], capture_output=True, text=True, timeout=15, env=env, cwd='/')
+
+
 MISSING = object()
 
 
@@ -175,7 +184,7 @@ def desired(component, home, record=None):
             # Configuration can be provisioned before installing any CLI.
             cli = (shutil.which('opencode') if home == Path.home() else None) or str(home / '.local/bin/opencode')
             try:
-                version = subprocess.run([cli, '--version'], capture_output=True, text=True, timeout=15)
+                version = probe_version(cli)
                 v2 = version.returncode == 0 and re.search(r'\bv?2\.\d+\.\d+', version.stdout)
             except (OSError, subprocess.TimeoutExpired):
                 v2 = False

@@ -17,7 +17,7 @@ printf 'schema\t1\ncomponent\tdemo\nold_path\t-\nstaged_path\t-\nnew_path\t-\n' 
 
 install_mutation_spies
 repo_before="$(fixture_snapshot "$ROOT")"
-home_before="$(fixture_snapshot "$TEST_ROOT")"
+home_before="$(fixture_manifest "$TEST_ROOT")"
 
 run_dry() {
     local output rc=0
@@ -27,6 +27,11 @@ run_dry() {
         DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" PATH="$PATH" \
         "$ROOT/setup.sh" "$@" --dry-run --no-hooks --no-git 2>&1)" || rc=$?
     [[ $rc -eq 0 ]] || fail "dry-run failed ($rc): $output"
+    # After each run, so a host tool that writes is named with its selection.
+    local after
+    after="$(fixture_manifest "$TEST_ROOT")"
+    [[ "$after" == "$home_before" ]] \
+        || fail "fixture changed during dry-run ($*): $(diff <(printf '%s\n' "$home_before") <(printf '%s\n' "$after") | grep '^[<>]' | cut -f1-2 | head -8)"
 }
 
 run_dry --config
@@ -44,7 +49,6 @@ run_dry --full --no-theme --no-agent-badge
 
 [[ ! -s "$DOTFILES_MUTATION_LOG" ]] || fail "dry-run invoked mutating commands: $(cat "$DOTFILES_MUTATION_LOG")"
 assert_eq "$(fixture_snapshot "$ROOT")" "$repo_before" "repository changed during dry-run"
-assert_eq "$(fixture_snapshot "$TEST_ROOT")" "$home_before" "fixture changed during dry-run"
 assert_eq "$(find "$DOTFILES_BACKUP_PREFIX" -mindepth 1 -maxdepth 1 -type d | wc -l)" 12 "backup retention ran"
 
 printf 'setup-safety: ok\n'
