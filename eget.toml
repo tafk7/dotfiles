@@ -39,7 +39,7 @@ tag = "v0.74.5"
 tag = "v0.9.9"
 
 ["dandavison/delta"]
-tag = "0.18.2"
+tag = "0.20.1"
 asset_filters = [".tar.gz", "gnu"]
 
 ["aristocratos/btop"]
