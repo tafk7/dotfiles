@@ -80,8 +80,9 @@ tk_raw q
 tk_wait '#{pane_in_mode}' 0 "$shell"
 
 # In a shell, Ctrl+E/D jump between the OSC 133 prompt marks. Without
-# Starship on PATH the prompt is one line, so the mark is on the command's line.
-prompt_shell=$(ti new-window -t test -P -F '#{pane_id}' \
+# Starship on PATH, and in a short directory, the prompt is one line, so the
+# mark is on the command's line.
+prompt_shell=$(ti new-window -t test -c "$TEST_ROOT" -P -F '#{pane_id}' \
     "env -u SSH_CONNECTION PATH=$(printf '%q' "$TEST_ROOT/bin:$TEST_SYSTEM_PATH") bash --rcfile $(printf '%q' "$DOTFILES_DIR/entry/bash.sh") -i")
 tk_until tk_screen_has '$' "$prompt_shell" || fail "the shell prompt never appeared"
 ti send-keys -t "$prompt_shell" 'echo first-command' Enter 'echo second-command' Enter
