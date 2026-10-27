@@ -26,6 +26,8 @@ done
 stub_reset() { rm -rf -- "${AI_STUB_DIR:?}"/*; }
 stub_calls() { if [[ -f "$AI_STUB_DIR/calls.jsonl" ]]; then wc -l < "$AI_STUB_DIR/calls.jsonl"; else echo 0; fi; }
 calls_are() { [[ "$(stub_calls)" == "$1" ]]; }
+# This run's slow stub has exited, or never got as far as waiting.
+stub_gone() { [[ ! -s "$AI_STUB_DIR/slow.pid" ]] || ! kill -0 "$(<"$AI_STUB_DIR/slow.pid")" 2>/dev/null; }
 
 # stub_call N EXPR: a Python expression over call N (-1 is the last): argv,
 # stdin, cwd, and opt(NAME), the value after option NAME ('' if absent).
@@ -320,7 +322,7 @@ e2e() {
     tk_until tk_screen_has 'ai-command: cancelled' "$pane" || fail "$shell: no cancel message: $(ti capture-pane -p -t "$pane")"
     tk_until tk_lacks 'asking claude' ti capture-pane -p -t "$pane" || fail "$shell: status left on screen"
     expect_line "executed-2" "Ctrl+C changed the command line"
-    tk_until tk_lacks claude-stub ps -eo args || fail "$shell: the interrupted request kept running"
+    tk_until stub_gone || fail "$shell: the interrupted request kept running"
 
     # A failure says so and keeps the command line; the next correction starts over.
     printf fail > "$AI_STUB_DIR/mode"
