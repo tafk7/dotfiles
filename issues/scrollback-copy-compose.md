@@ -527,13 +527,10 @@ transcript outgrows the history limit or an export key changes.
    nothing). The keyboard firmware sends F17/F18 from those positions instead;
    `configs/wezterm.lua` maps them to Shift+F5/F6, and tmux binds those.
    Pending: the firmware change, and whether Windows Terminal binds F17/F18.
-2. **Claude's Shift+Up/Down scroll a line** (`configs/ai/claude/keybindings.json`),
-   which takes those keys from `selection:extendUp/Down`: a selection started
-   with the mouse in Claude extends with Shift+Left/Right only, while Shift+Up
-   scrolls the view under it (spike). Review is unaffected. Now that
-   Shift+PgUp/PgDn scroll a few lines in every pane, this binding is only a
-   Claude-specific second way to do it; removing it would let Shift+arrows
-   extend a selection in Claude as they do in review. Keep it, or remove it?
+2. **Claude's Shift+Up/Down line scroll is gone** (decided 2026-10-27):
+   Shift+PgUp/PgDn scroll a few lines in every pane, so
+   `configs/ai/claude/keybindings.json` keeps no overrides, and Shift+arrows
+   extend a selection in Claude as they do in review.
 3. **Codex panes name their thread only after a restart.** `bin/ai-config`
    adds `terminal_title` as a default; Codex sessions started before that, and
    machines that have changed their title, fall back to the newest session in
