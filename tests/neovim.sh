@@ -92,9 +92,11 @@ output="$(nvim_run '+if &termguicolors | cquit 42 | endif')" || fail "theme --nv
 output="$(nvim_run '+if maparg("e", "n") !=# "" | cquit 43 | endif')" || fail "review mappings leaked into plain nvim: $output"
 output="$(NVIM_REVIEW=1 nvim_run '+if maparg("e", "n") !=# "k" || maparg("q", "n") !~# "qall" | cquit 44 | endif')" \
     || fail "review profile did not load: $output"
-# Its keys are tmux review's: Shift extends a selection it starts, / searches
-# upward, y copies and closes, Esc closes, Ctrl+E/D jump between prompts.
+# Its keys are tmux review's: Shift extends a selection it starts, Shift+PgUp/
+# PgDn scroll three lines, / searches upward, y copies and closes, Esc closes,
+# Ctrl+E/D jump between prompts.
 output="$(NVIM_REVIEW=1 nvim_run '+if maparg("E", "n") !=# "vk" || maparg("E", "x") !=# "k" || maparg("<S-Down>", "n") !=# "vj" | cquit 45 | endif' \
+    '+if maparg("<S-PageUp>", "n") !=# "3<C-Y>" || maparg("<S-PageDown>", "x") !=# "3<C-E>" | cquit 50 | endif' \
     '+if maparg("/", "n") !=# "?" || maparg("y", "x") !~# "+y.*qall" || maparg("<Esc>", "n") !~# "qall" | cquit 46 | endif')" \
     || fail "review keys: $output"
 printf 'start\n## User\nalpha\n## User\nbeta\n' > "$TEST_ROOT/review.md"

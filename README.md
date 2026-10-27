@@ -138,7 +138,9 @@ yo <command>              # print output and copy it to the clipboard
   from `configs/codex.defaults.toml`. `<prefix> y` or Shift+Copy copies the
   agent's last reply.
   The wheel and PgUp/PgDn page less (`glow -p`, `md`, bat, Git) and Claude's
-  transcript; in Claude, Shift+Up/Down scroll it a line at a time.
+  transcript. Shift+PgUp/PgDn scroll three lines everywhere: a shell (in
+  copy-mode), review and its nvim popup, and Claude, Codex, and OpenCode,
+  also from their compose pane (`@scroll-lines` sets the step).
   In Claude, `Ctrl+C` sends Esc, so it can't stop every background agent;
   `<prefix> Ctrl+C` sends the real key. Ctrl+Backspace/Delete delete a word
   and Alt+Backspace/Delete to the line's start or end there too, as in the
@@ -148,7 +150,7 @@ yo <command>              # print output and copy it to the clipboard
   installed harper-ls, grammar marks. `Ctrl+S` pastes the prompt and submits
   it without interrupting a running turn; `Ctrl+Shift+S` (or `,s`) pastes
   without submitting;
-  PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
+  PgUp/PgDn, Shift+PgUp/PgDn, and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
   the last spelling or grammar mark before the cursor. `Alt+V` again switches
   focus; the draft survives closing the pane.
   In testing ([issues/compose-agent-box.md](issues/compose-agent-box.md)): in
