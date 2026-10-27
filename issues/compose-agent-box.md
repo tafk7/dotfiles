@@ -3,7 +3,7 @@
 **Status:** in testing (2026-10-27). Built for Claude as step 4.3 of the
 [plan](scrollback-copy-compose-plan.md) (commit `cc9c58f`). On 2026-10-27 it
 was driven against the real agents (Claude 2.1.311, Codex 0.164.0, OpenCode
-2.1.4) in a private tmux server, four bugs were fixed (below), and it was
+2.1.4) in a private tmux server, five bugs were fixed (below), and it was
 extended to Codex and OpenCode. Follows
 [scrollback, copy, and compose](scrollback-copy-compose.md) §5.
 
@@ -74,6 +74,9 @@ Fixed:
    its path passed the 107-byte limit and nvim exited at once, so the pane
    flashed and closed. It is under `$XDG_RUNTIME_DIR` now, recorded as
    `@compose_socket`.
+5. **Each compose pane quit could leave its harper-ls running** (2.12.0, about
+   110 MB each): Neovim quit without waiting for it, and it stayed in its own
+   session indefinitely. Neovim now waits up to half a second, then stops it.
 
 Checked and fine: Claude runs its editor mid-turn (this was the open busy
 case) and takes Ctrl+G in about 0.2 s; Codex takes Ctrl+E in about 0.2 s and
