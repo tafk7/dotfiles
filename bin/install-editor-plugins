@@ -23,7 +23,8 @@ command -v git >/dev/null 2>&1 || { error 'Git is required.'; exit 1; }
 # The plugin declarations; a test seam may point at another init.vim.
 INIT="${DOTFILES_EDITOR_INIT:-$DOTFILES_DIR/configs/init.vim}"
 
-{ read -r config_dir; read -r data_dir; } < <(nvim --headless -u NONE -i NONE \
+# NVIM_LOG_FILE: Neovim creates its state directory and a log even for this.
+{ read -r config_dir; read -r data_dir; } < <(NVIM_LOG_FILE=/dev/null nvim --headless -u NONE -i NONE \
     -c 'lua io.write(vim.fn.stdpath("config") .. "\n" .. vim.fn.stdpath("data") .. "\n")' -c qall)
 [[ "$config_dir" == /* && "$data_dir" == /* ]] || { error 'Neovim returned an invalid config or data directory'; exit 1; }
 plug="$config_dir/autoload/plug.vim"
