@@ -59,7 +59,7 @@ tag = "v2.1.1"
 asset_filters = [".tar.gz", "^sbom"]
 
 ["jesseduffield/lazygit"]
-tag = "v0.59.0"
+tag = "v0.66.1"
 
 ["cli/cli"]
 tag = "v2.102.0"
