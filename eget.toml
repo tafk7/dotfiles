@@ -87,7 +87,7 @@ tag = "15.2.0"
 asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
 ["direnv/direnv"]
-tag = "v2.37.1"
+tag = "v2.38.2"
 # Release ships bare per-arch binaries (direnv.linux-amd64); a file-path
 # target renames it to plain `direnv` on install (same trick as gdu).
 asset_filters = ["direnv.linux-"]
