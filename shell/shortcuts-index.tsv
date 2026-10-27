@@ -44,9 +44,9 @@ tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 tmux│Alt+V│Open a compose pane (Neovim) under this pane, or switch focus between them│bin/tmux-compose toggle
-tmux│Ctrl+G (Claude)│Move the prompt box into the compose pane, opening it if needed│$VISUAL is bin/compose-editor → tmux-compose editor
-tmux│:q / :wq / :cq (compose on Claude)│Put the draft back in Claude's prompt box / keep it in the draft│tmux-compose return through Claude's Ctrl+G
-tmux│Ctrl+Shift+G (Claude)│Edit the prompt in Neovim in Claude's place│@compose-editor fullscreen; Ctrl+G
+tmux│Ctrl+G (Claude) / Ctrl+E (Codex) / Ctrl+X E (OpenCode)│Move the prompt box into the compose pane, opening it if needed│$VISUAL is bin/compose-editor → tmux-compose editor
+tmux│:q / :wq / :cq (compose on an agent)│Put the draft back in the agent's prompt box / keep it in the draft│tmux-compose return through the agent's editor key
+tmux│Ctrl+Shift+G (Claude, OpenCode)│Edit the prompt in Neovim in the agent's place│tmux-compose fullscreen
 tmux│Ctrl+S (compose)│Paste the draft into the agent and submit without interrupting it│Claude/OpenCode Ctrl+X Enter, Codex Tab; shells: paste only
 tmux│Ctrl+Shift+S / ,s (compose)│Paste the draft into the agent without submitting│bin/tmux-compose stage
 tmux│PgUp / PgDn / Ctrl+Home / Ctrl+End (compose)│Scroll the agent's conversation from the compose pane│bin/tmux-compose forward

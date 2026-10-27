@@ -289,7 +289,7 @@ Phase 3 checks pass.
 ### 4.3 Compose fused with Claude's prompt box
 
 In development and testing; status and open questions in
-[compose-claude-box.md](compose-claude-box.md).
+[compose-agent-box.md](compose-agent-box.md).
 
 Added after Phase 4. Claude's `Ctrl+G` (`chat:externalEditor`) runs `$VISUAL`
 on a temporary `.md` file holding the prompt box, with the editor as its direct
