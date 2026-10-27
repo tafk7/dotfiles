@@ -21,7 +21,7 @@ verify() {
     VERIFY_RC="$rc"
 }
 
-"$ROOT/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1 \
+"$ROOT/setup.sh" --config --no-hooks --no-theme >/dev/null 2>&1 \
     || fail "fixture setup failed"
 verify
 assert_eq "$VERIFY_RC" 0 "a converged config-tier machine: $VERIFY_OUTPUT"

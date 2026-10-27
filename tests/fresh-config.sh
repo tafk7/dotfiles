@@ -7,7 +7,6 @@ trap fixture_cleanup EXIT
 export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
 source "$ROOT/setup.sh"
 THEME_REQUEST=disabled
-DOTFILES_GIT_NAME=Fixture DOTFILES_GIT_EMAIL=fixture@example.com
 
 # Deterministically model a base machine, independent of CI's installed tools.
 command() {

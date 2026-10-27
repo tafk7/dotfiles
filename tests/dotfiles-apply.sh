@@ -42,7 +42,7 @@ done
 printf '#!/bin/sh\necho "eget version %s"\n' "$EGET_VERSION" > "$HOME/.local/bin/eget"
 chmod +x "$HOME/.local/bin/eget"
 ledger_record eget yes dotfiles installed "$EGET_VERSION" "$HOME/.local/bin/eget" staged-release
-"$ROOT/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1 \
+"$ROOT/setup.sh" --config --no-hooks --no-theme >/dev/null 2>&1 \
     || fail "fixture setup failed"
 "$ROOT/bin/dotfiles" profile --tier bash --no-apply >/dev/null
 

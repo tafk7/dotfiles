@@ -23,7 +23,7 @@ tar -C "$ROOT" --exclude=.git -cf - . | tar -x -C "$seed"
 git -C "$seed" init -q -b main && git -C "$seed" add -A && git -C "$seed" commit -qm seed
 git clone -q --bare "$seed" "$remote"
 git clone -q "$remote" "$checkout"
-"$checkout/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1 \
+"$checkout/setup.sh" --config --no-hooks --no-theme >/dev/null 2>&1 \
     || fail "fixture setup failed"
 
 update() {
