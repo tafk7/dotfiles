@@ -10,7 +10,7 @@ Prints the drafted command on stdout and nothing else; nothing is run. With
 --session, the conversation is created under that UUID, or with --resume
 continued; without it, nothing is kept. REQUEST is the request, or with
 CANDIDATE (the command line as it now reads) a correction to it. Errors are
-one line on stderr, exit status 1; an interrupt exits 130.
+one line on stderr, exit status 1 (2 for usage errors); an interrupt exits 130.
 
 shell/tools/ai-command.sh passes its input on stdin, so it doesn't show in the
 process list. Configuration (exported):
@@ -200,15 +200,16 @@ BACKENDS = {"claude": claude}
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--session", help="UUID of the conversation to create or resume")
     parser.add_argument("--resume", action="store_true", help="continue the --session conversation")
-    parser.add_argument("--shell", default=Path(os.environ.get("SHELL") or "sh").name)
-    parser.add_argument("--cwd", default=os.getcwd())
+    parser.add_argument("--shell", default=Path(os.environ.get("SHELL") or "sh").name,
+                        help="the user's shell and version (default: the name in $SHELL)")
+    parser.add_argument("--cwd", default=os.getcwd(), help="the user's working directory")
     parser.add_argument("--candidate", help="the command line as it now reads")
     parser.add_argument("--edited", action="store_true", help="the user changed the last command")
     parser.add_argument("--stdin", action="store_true", help="read REQUEST, NUL, CANDIDATE from stdin")
-    parser.add_argument("request", nargs="?")
+    parser.add_argument("request", nargs="?", help="the request, or with --candidate a correction")
     args = parser.parse_args()
     if args.stdin:
         if args.request is not None or args.candidate is not None:
