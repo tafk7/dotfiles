@@ -118,6 +118,9 @@ header { display: grid; gap: 14px; }
 .cap.o-tmux rect.body { fill: color-mix(in srgb, var(--l-tmux) 22%, var(--cap)); stroke: color-mix(in srgb, var(--l-tmux) 60%, var(--cap-edge)); }
 .cap.o-tmuxc rect.body { fill: url(#hatch); stroke: color-mix(in srgb, var(--l-tmux) 60%, var(--cap-edge)); }
 .cap.o-rew rect.body { stroke: var(--l-wez); stroke-dasharray: 7 5; }
+.cap.o-rewapp rect.body { stroke: var(--l-tmux); stroke-dasharray: 7 5; stroke-width: 2.5; }
+.cap.o-merged rect.body { stroke: var(--warn); stroke-width: 3.5; }
+.cap.app-on .own { fill: var(--ink); }
 .cap.o-deaf rect.body { fill: var(--sunk); stroke: var(--bug); stroke-dasharray: 3 4; }
 .cap.o-free rect.body { fill: transparent; stroke-dasharray: 6 6; }
 .cap.o-text rect.body { fill: transparent; stroke: var(--line); }
@@ -146,6 +149,9 @@ header { display: grid; gap: 14px; }
 .sw.free { border-style: dashed; background: transparent; }
 .sw.spare { border: 1px dotted var(--l-fw); background: transparent; }
 .sw.deaf { border: 1px dotted var(--bug); background: var(--sunk); }
+.sw.rewapp { border: 1px dashed var(--l-tmux); }
+.sw.merged { border: 2px solid var(--warn); }
+.legend .only-app[hidden] { display: none; }
 
 /* Trace */
 .trace h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.25rem; }
@@ -165,6 +171,7 @@ header { display: grid; gap: 14px; }
 .lanes th { font-family: var(--f-mono); font-weight: 400; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 6px 6px; }
 .lanes td { padding: 5px 6px; vertical-align: middle; }
 .lanes tr + tr td { border-top: 1px solid var(--line); }
+.lanes tr.focus td { background: color-mix(in srgb, var(--l-tmux) 9%, var(--surface)); }
 .lanes td.app { font-weight: 600; white-space: nowrap; }
 .lanes td.app small { display: block; font-weight: 400; color: var(--muted); font-size: 0.7rem; }
 .node { position: relative; height: 26px; min-width: 5.5rem; }
@@ -245,13 +252,14 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 <section id="map">
   <div class="section-head">
     <h2>Who takes each key</h2>
-    <p>Pick the modifiers you hold and a layer, then a key; its route through every layer appears below. Color is the outermost layer that acts on the chord. The eight marks along each key are the pane programs that get an action for it, in the order bash, fzf, Neovim, copy mode, Claude, Codex, OpenCode, pi. A red dot marks a broken key.</p>
+    <p>Pick the modifiers you hold and a layer, then a key; its route through every layer appears below. Color is the outermost layer that acts on the chord. The eight marks along each key are the pane programs that get an action for it, in the order bash, fzf, Neovim, copy mode, Claude, Codex, OpenCode, pi. Pick one program to label every key with what it does there instead. A red dot marks a broken key.</p>
   </div>
   <div class="map">
     <div class="panel">
       <div class="controls">
         <div><span class="ctl-label">Hold</span><span class="seg" id="mods"></span></div>
         <div><span class="ctl-label">Layer</span><span class="seg" id="fwlayer"></span></div>
+        <div><span class="ctl-label">Program</span><span class="seg" id="appsel"></span></div>
       </div>
       <div class="kb" id="kb"></div>
       <div class="legend">
@@ -264,6 +272,8 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
         <span><i class="sw free"></i>free everywhere</span>
         <span><i class="sw deaf"></i>never arrives</span>
         <span><i class="sw spare"></i>unassigned key</span>
+        <span class="only-app"><i class="sw rewapp"></i>tmux rewrites it on the way</span>
+        <span class="only-app"><i class="sw merged"></i>the program hears a different key</span>
       </div>
     </div>
     <div class="panel trace" id="trace" aria-live="polite"></div>
@@ -384,8 +394,16 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
   // ---- Keyboard -------------------------------------------------------------------------------
   const MODSETS = [['', 'None'], ['shift', 'Shift'], ['ctrl', 'Ctrl'], ['alt', 'Alt'], ['ctrl+shift', 'Ctrl+Shift'],
     ['alt+shift', 'Alt+Shift'], ['ctrl+alt', 'Ctrl+Alt'], ['prefix', 'Ctrl+A, then']];
-  let state = { mods: 'alt', fw: 0, chord: 'ctrl+shift+g' };
+  let state = { mods: 'alt', fw: 0, chord: 'ctrl+shift+g', app: '' };
   try { const s = JSON.parse(localStorage.getItem('keyroutes') || 'null'); if (s && s.mods !== undefined) state = Object.assign(state, s); } catch (e) {}
+  // #app=codex&mods=ctrl&layer=1&key=ctrl+shift+g opens the page in that view
+  for (const [k, val] of new URLSearchParams(location.hash.slice(1))) {
+    if (k === 'app' && (val === '' || APP[val])) state.app = val;
+    if (k === 'mods' && MODSETS.some(m => m[0] === val)) state.mods = val;
+    if (k === 'layer') state.fw = +val ? 1 : 0;
+    if (k === 'key') state.chord = val.replace(/ /g, '+');
+  }
+  if (state.app && !APP[state.app]) state.app = '';
   const save = () => { try { localStorage.setItem('keyroutes', JSON.stringify(state)); } catch (e) {} };
   const bugChords = new Set(bugs.map(f => f.chord.split(' ')[0]));
 
@@ -423,7 +441,51 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
   ];
   const short = (s) => { for (const [re, f] of SHORT) { const m = s.match(re); if (m) return f(m); } return s.length > 10 ? s.slice(0, 9) + '…' : s; };
 
+  const appBugs = new Set(bugs.filter(f => f.app).map(f => f.app + ' ' + f.chord.split(' ')[0]));
+  function capInfoApp(ch, a) {
+    const t = D.traces[ch];
+    const name = APP[a].label;
+    const printable = /^(shift\+)?.$/.test(ch);
+    if (!t) {
+      const bare = (D.bare[a] || {})[ch];
+      if (bare) return { cls: 'o-app app-on', own: human(bare), wrap: true, title: `${fmt(ch)} in ${name}: ${human(bare)}` };
+      return printable ? { cls: 'o-text', own: '', title: `${fmt(ch)}: types text in ${name}` }
+        : { cls: 'o-free', own: '', title: `${fmt(ch)}: nothing in ${name}` };
+    }
+    const r = t[a];
+    const taken = r.hops.find(h => h[1] === 'consume');
+    if (taken) {
+      const deaf = taken[0] === 'wezterm' && /never delivered/.test(taken[2]);
+      return { cls: deaf ? 'o-deaf' : { windows: 'o-win', wezterm: 'o-wez', tmux: 'o-tmux' }[taken[0]] || 'o-mod',
+               own: deaf ? 'lost' : short(taken[2]), title: `${fmt(ch)}: ${taken[0]} takes it before ${name} (${taken[2]})` };
+    }
+    const own = r.effects.filter(e => e[0] === a);
+    const merged = r.hops.some(h => h[0] === 'keys'), rewritten = r.hops.some(h => h[1] === 'rewrite' && h[0] === 'tmux');
+    const via = merged ? ` (${name} hears ${fmt(r.delivered)})` : rewritten ? ` (tmux sends ${fmt(r.delivered)})` : '';
+    const style = merged ? ' o-merged' : rewritten ? ' o-rewapp' : '';
+    if (own.length) {
+      const what = human(own[0][2]);
+      return { cls: 'o-app app-on' + style, own: what, wrap: true, title: `${fmt(ch)} in ${name}: ${what}${via}` };
+    }
+    if (r.prefixes && r.prefixes.length) return { cls: 'o-app app-on' + style, own: 'starts a chord', title: `${fmt(ch)} in ${name}: starts ${r.prefixes.map(p => human(p[2])).join(', ')}` };
+    if (printable && !merged && !rewritten) return { cls: 'o-text', own: '', title: `${fmt(ch)}: types text in ${name}` };
+    return { cls: 'o-free' + style, own: merged || rewritten ? '→ ' + fmt(r.delivered) : '', title: `${fmt(ch)}: nothing in ${name}${via}` };
+  }
+  function wrap(text, max) {
+    const words = text.split(' '), lines = [''];
+    for (const w of words) {
+      const cur = lines[lines.length - 1];
+      if (!cur) lines[lines.length - 1] = w;
+      else if ((cur + ' ' + w).length <= max) lines[lines.length - 1] = cur + ' ' + w;
+      else lines.push(w);
+    }
+    const out = lines.slice(0, 2).map(l => l.length > max ? l.slice(0, max - 1) + '…' : l);
+    if (lines.length > 2) out[1] = (out[1].length >= max ? out[1].slice(0, max - 1) : out[1]) + '…';
+    return out;
+  }
+
   function capInfo(ch) {
+    if (state.app && state.mods !== 'prefix') return capInfoApp(ch, state.app);
     if (state.mods === 'prefix') {
       const p = D.prefix[ch];
       return p ? { cls: 'o-tmux', own: short(p.label), title: 'Ctrl+A, ' + fmt(ch) + ': ' + p.label } : { cls: 'o-free', own: '', title: 'Ctrl+A, ' + fmt(ch) + ': unbound' };
@@ -475,9 +537,15 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
       own = info.own;
       title = info.title;
       data = ` data-chord="${esc(ch)}" tabindex="0" role="button"`;
-      if (state.mods !== 'prefix') {
+      if (state.mods !== 'prefix' && !state.app) {
         dots = ORDER.map((a, i) => `<rect class="dot${info.apps && info.apps.includes(a) ? ' on' : ''}" x="${x0 + 10 + i * 9}" y="${-y0 - 15}" width="7" height="7" rx="1.5"></rect>`).join('');
-        if (bugChords.has(ch)) dots += `<circle class="bugdot" cx="${-x0 - 13}" cy="${-y0 - 12}" r="6"></circle>`;
+      }
+      if (state.mods !== 'prefix' && (state.app ? appBugs.has(state.app + ' ' + ch) : bugChords.has(ch))) {
+        dots += `<circle class="bugdot" cx="${-x0 - 13}" cy="${-y0 - 12}" r="6"></circle>`;
+      }
+      if (info.wrap) {
+        const lines = wrap(own, Math.max(8, Math.floor((w - 20) / 7.4)));
+        own = lines;
       }
     } else {
       cls += ' o-mod'; title = e.kind;
@@ -485,8 +553,10 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     return `<g class="${cls}" transform="translate(${g.cx} ${g.cy}) rotate(${g.rot})"${data}><title>${esc(title)}</title>` +
       `<rect class="body" x="${x0}" y="${y0}" width="${w}" height="${h}" rx="11"></rect>` +
       `<text class="lg" x="${x0 + 10}" y="${y0 + 26}">${esc(lg)}</text>` +
-      (badge ? `<text class="badge" x="${-x0 - 10}" y="${dots ? y0 + 24 : -y0 - 12}" text-anchor="end">${esc(badge)}</text>` : '') +
-      (own ? `<text class="own" x="${x0 + 10}" y="${-y0 - 24}">${esc(own)}</text>` : '') + dots + '</g>';
+      (badge ? `<text class="badge" x="${-x0 - 10}" y="${e.kind === 'key' ? y0 + 24 : -y0 - 12}" text-anchor="end">${esc(badge)}</text>` : '') +
+      (Array.isArray(own)
+        ? `<text class="own" x="${x0 + 10}" y="${-y0 - (own.length > 1 ? 30 : 13)}">${own.map((l, i) => `<tspan x="${x0 + 10}" dy="${i ? 17 : 0}">${esc(l)}</tspan>`).join('')}</text>`
+        : own ? `<text class="own" x="${x0 + 10}" y="${-y0 - (dots ? 24 : 13)}">${esc(own)}</text>` : '') + dots + '</g>';
   }
   function renderKB() {
     if (!KB) { $('#kb').innerHTML = '<p class="sub">No keyboard export in configs/keyboard.</p>'; return; }
@@ -497,6 +567,16 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
   }
   $('#mods').innerHTML = MODSETS.map(m => `<button data-m="${m[0]}" aria-pressed="${state.mods === m[0]}">${m[1]}</button>`).join('');
   $('#fwlayer').innerHTML = (KB ? [0, 1] : [0]).map(l => `<button data-l="${l}" aria-pressed="${state.fw === l}">${esc(KB ? KB.layerNames[l] + (l ? ' (thumb held)' : '') : 'Base')}</button>`).join('');
+  const APPSEL = [['', 'All']].concat(['claude', 'codex', 'opencode', 'pi', 'shell', 'fzf', 'nvim', 'copy'].map(a => [a, APP[a].label.replace('tmux copy mode', 'copy mode').replace('Claude Code', 'Claude')]));
+  $('#appsel').innerHTML = APPSEL.map(m => `<button data-a="${m[0]}" aria-pressed="${state.app === m[0]}">${esc(m[1])}</button>`).join('');
+  const syncLegend = () => document.querySelectorAll('.legend .only-app').forEach(x => { x.hidden = !state.app; });
+  syncLegend();
+  $('#appsel').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.app = b.dataset.a; save();
+    $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    syncLegend(); renderKB(); renderTrace();
+  });
   $('#mods').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     state.mods = b.dataset.m; save();
@@ -564,7 +644,7 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
         (own.length > 1 ? `<div class="ctx">also: ${own.slice(1, 3).map(e => esc(human(e[2]))).join(', ')}</div>` : '');
       else if (r.prefixes && r.prefixes.length) res = `<span class="ctx">starts ${esc(r.prefixes.slice(0, 2).map(p => human(p[2])).join(', '))}</span>`;
       else res = `<span class="none">nothing</span>`;
-      h += `<tr><td class="app">${esc(APP[a].label)}<small>${esc(APP[a].kmode === 'mok2' ? 'full keys' : APP[a].kmode === 'mok1' ? 'partial keys' : 'plain keys')}</small></td>${cells}<td class="res${isBug ? ' bug' : ''}">${res}</td></tr>`;
+      h += `<tr class="${a === state.app ? 'focus' : ''}"><td class="app">${esc(APP[a].label)}<small>${esc(APP[a].kmode === 'mok2' ? 'full keys' : APP[a].kmode === 'mok1' ? 'partial keys' : 'plain keys')}</small></td>${cells}<td class="res${isBug ? ' bug' : ''}">${res}</td></tr>`;
     }
     h += '</tbody></table></div>';
     for (const f of related) {
@@ -626,13 +706,15 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
       `<p>${esc(f.cause[0].toUpperCase() + f.cause.slice(1))}. Pressing it does <b>${esc(inst)}</b>.</p>` +
       (f.via && f.via.length ? `<p class="fix">The action still answers on ${f.via.map(x => kbd(x)).join(' ')}.</p>` : '') +
       (fix ? `<p class="fix"><b>Fix:</b> ${fix}</p>` : '') +
-      `<button class="trace-link" data-chord="${esc(f.chord.split(' ')[0])}">Trace this key</button></article>`;
+      `<button class="trace-link" data-chord="${esc(f.chord.split(' ')[0])}" data-app="${esc(f.app)}">Trace this key</button></article>`;
   }
   $('#bugs').innerHTML = bugs.map(f => card(f, 'var(--bug)')).join('');
   $('#adapts').innerHTML = adapts.map(f => card(f, 'var(--l-tmux)')).join('');
   document.querySelectorAll('.trace-link').forEach(b => b.addEventListener('click', () => {
-    state.chord = b.dataset.chord; state.mods = ''; save();
+    state.chord = b.dataset.chord; state.mods = ''; state.app = b.dataset.app || state.app; save();
     $('#mods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === ''));
+    $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.a === state.app));
+    syncLegend();
     renderKB(); renderTrace(); document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
   }));
 
