@@ -314,8 +314,6 @@ def encode(k, kmode):
             key = 'h'
         if key in ('/', '-') and 'ctrl' in mods:
             key = '_'
-        if len(key) == 1 and key.isdigit():
-            mods.discard('ctrl')
     return chord.make(mods, key)
 
 

@@ -188,6 +188,10 @@ def build(repo, tmux_bin=None):
         windows={c: b.action for c, b in model.windows.items()},
         findings=findings, intents=intents,
         counts={a: sum(len(v) for v in b.values()) for a, b in model.app_bindings.items()},
+        # single keys a program acts on without a modifier (copy mode's j, k, v, y), for the per-program view
+        bare={a: {c: next((h[1] for h in lst if h[3]), lst[0][1]) for c, lst in b.items()
+                  if ' ' not in c and not route.interesting(c) and any(h[3] for h in lst)}
+              for a, b in model.app_bindings.items()},
     )
     return data, model
 
