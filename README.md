@@ -177,6 +177,15 @@ Settings not listed are left alone. See
 ./bin/ai-update opencode          # opencode only notifies about new releases
 ```
 
+`Alt+I` at a Bash or Zsh prompt, inside tmux or not, turns the request typed
+there into a command: `find every JSON file changed in the last week` becomes
+`find . -type f -name '*.json' -mtime -7`, to read, edit, and run with Enter;
+nothing runs before that. `Alt+I` again asks for a correction (`refine> use
+absolute paths and exclude node_modules`) in the same conversation, and
+`Alt+Shift+I` starts a new one. It uses your Claude login with tools and
+customizations off. See
+[AI command drafting](docs/customization.md#ai-command-drafting-alti).
+
 `bin/viz` shows an agent's charts and diagrams through the VS Code window
 connected over Remote-SSH, since agents in tmux cannot draw on the client
 screen. `viz open` sends HTML, SVG and PDF to the client browser through a
