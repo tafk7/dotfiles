@@ -1,12 +1,10 @@
 {
   "$comment": "Broken keys keymap check tolerates until they are fixed; refresh with keymap check --update.",
   "known": [
-    "codex ctrl+shift+g previous_permission_mode",
     "codex shift+enter insert_newline",
     "opencode ctrl+backspace input.delete.word.backward",
     "opencode ctrl+shift+d input.delete.line",
     "opencode ctrl+shift+e input.select.line.end",
-    "pi ctrl+shift+g tui.altScreen.searchPrevious",
     "wezterm f11 ToggleFullScreen",
     "wezterm f17 SendString(\"\\27[15;2~\")",
     "wezterm f18 SendString(\"\\27[17;2~\")"

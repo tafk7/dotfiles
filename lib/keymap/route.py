@@ -298,11 +298,11 @@ def encode(k, kmode):
     if kmode == 'mok2':
         return k
     mods, key = chord.split(k)
+    if {'ctrl', 'shift'} <= mods and len(key) == 1 and key.isalpha():
+        mods.discard('shift')
     if 'ctrl' in mods and key in ('i', 'm', '['):
         mods.discard('ctrl')
         key = {'i': 'tab', 'm': 'enter', '[': 'esc'}[key]
-    if {'ctrl', 'shift'} <= mods and len(key) == 1 and key.isalpha():
-        mods.discard('shift')
     if kmode == 'legacy':
         if key == 'enter':
             mods -= {'ctrl', 'shift'}
@@ -401,8 +401,10 @@ class Model:
                     return dict(hops=hops, effects=[['tmux', fid, label]], delivered=None)
                 hops.append(['tmux', 'cond', 'tmux-scroll: ' + label, k])
             else:
-                named = [self.apps[x]['label'] for x in APPS if x != 'copy' and
-                         f"pane_current_command}},{APPS[x]['cmd']}}}" in cmd]
+                patterns = re.findall(r'#\{m/r:([^,]+),#\{pane_current_command\}\}', cmd)
+                named = [self.apps[x]['label'] for x in APPS if x != 'copy' and (
+                    f"pane_current_command}},{APPS[x]['cmd']}}}" in cmd or
+                    any(re.fullmatch(p, APPS[x]['cmd']) for p in patterns))]
                 mine = self.apps[app]['label'] in named
                 rule = (f' (rule for {", ".join(named)})' if mine else
                         f' (fallback for programs other than {", ".join(named)})' if named else '')
