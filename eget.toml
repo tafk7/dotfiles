@@ -43,7 +43,7 @@ tag = "0.20.1"
 asset_filters = [".tar.gz", "gnu"]
 
 ["aristocratos/btop"]
-tag = "v1.4.6"
+tag = "v1.4.7"
 
 ["dundee/gdu"]
 tag = "v5.36.1"
