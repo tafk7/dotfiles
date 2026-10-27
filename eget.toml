@@ -36,7 +36,7 @@ asset_filters = ["gnu", ".tar.gz", "^no_libgit"]
 tag = "v0.74.5"
 
 ["ajeetdsouza/zoxide"]
-tag = "v0.9.9"
+tag = "v0.10.0"
 
 ["dandavison/delta"]
 tag = "0.20.1"
