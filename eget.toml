@@ -23,7 +23,7 @@ target = "~/.local/bin"
 upgrade_only = true
 
 ["starship/starship"]
-tag = "v1.24.2"
+tag = "v1.27.0"
 # aarch64 ships only a musl build; musl exists for x86_64 too.
 asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
