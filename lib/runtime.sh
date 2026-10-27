@@ -129,7 +129,8 @@ probe_quietly() {
     else
         scratch=""
     fi
-    env "${sandbox[@]}" "$@" || rc=$?
+    # export, not env: a probe must not need more than its tool on PATH.
+    (export "${sandbox[@]}"; "$@") || rc=$?
     [[ -z "$scratch" ]] || rm -rf -- "${scratch:?}"
     return "$rc"
 }
