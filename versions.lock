@@ -9,8 +9,8 @@
 # the version bundled with the node row's release). identity is how the
 # installed component is recognized: sha256:<extracted binary>,
 # version:<parsed version>, or apt:<version>.
-aws-cli	aarch64	2.37.12	awscli.amazonaws.com	awscli-exe-linux-aarch64-2.37.12.zip	829c76096e05f743267d75098bc7cc7cfae799fc7e568554ebaa6d78e6aba753	-	version:2.37.12
-aws-cli	x86_64	2.37.12	awscli.amazonaws.com	awscli-exe-linux-x86_64-2.37.12.zip	e6d3c672fb36ed4b12c354c39a993eee2b34da1437cafb10bac4480840cfa83f	-	version:2.37.12
+aws-cli	aarch64	2.37.13	awscli.amazonaws.com	awscli-exe-linux-aarch64-2.37.13.zip	f937a72a824c25f8cf38ff4249257c96840578c7eaea1d29117cdc249cbd3ebe	-	version:2.37.13
+aws-cli	x86_64	2.37.13	awscli.amazonaws.com	awscli-exe-linux-x86_64-2.37.13.zip	c92fde59827622889d3d38a44e2089a137894ce151a2c658a3988ecde4860caa	-	version:2.37.13
 bat	aarch64	v0.26.1	sharkdp/bat	bat-v0.26.1-aarch64-unknown-linux-gnu.tar.gz	422eb73e11c854fddd99f5ca8461c2f1d6e6dce0a2a8c3d5daade5ffcb6564aa	bat-v0.26.1-aarch64-unknown-linux-gnu/bat	sha256:c90a1753149144a0bb1dd9f2e309e4539e388ee8d5cbf0082df8501c98ebca4c
 bat	x86_64	v0.26.1	sharkdp/bat	bat-v0.26.1-x86_64-unknown-linux-gnu.tar.gz	726f04c8f576a7fd18b7634f1bbf2f915c43494c1c0f013baa3287edb0d5a2a3	bat-v0.26.1-x86_64-unknown-linux-gnu/bat	sha256:753976acf8ce9b8bbb60c0304ab3a6b1cf63cbc7e009133a12dc8f5b47fcb4cc
 btop	aarch64	v1.4.7	aristocratos/btop	btop-aarch64-unknown-linux-musl.tar.gz	6270de0ef4c84cf0eea61cb148b3ad9ae91a11e9c3309867ffc6b3751024c252	./btop/bin/btop	sha256:12b04763672ec47c409a0d25e9228728c6979eef8e339c8c98a8280a10200881
