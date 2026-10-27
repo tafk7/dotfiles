@@ -62,7 +62,7 @@ asset_filters = [".tar.gz", "^sbom"]
 tag = "v0.59.0"
 
 ["cli/cli"]
-tag = "v2.100.0"
+tag = "v2.102.0"
 asset_filters = ["linux_", ".tar.gz"]
 
 ["astral-sh/uv"]
