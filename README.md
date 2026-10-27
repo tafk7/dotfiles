@@ -158,8 +158,8 @@ yo <command>              # print output and copy it to the clipboard
   `Ctrl+G`, Codex `Ctrl+E`, OpenCode `Ctrl+X E`) move what is in the prompt
   box into the compose pane, and quitting it (`:q`, `:wq`) puts the draft back
   in the box; `:cq` keeps it in the draft instead. `Ctrl+Shift+G` opens the
-  prompt in Neovim in Claude's or OpenCode's place. This works for agents
-  started from a shell with these dotfiles, where `VISUAL` is
+  prompt in Neovim in Claude's, Codex's or OpenCode's place. This works for
+  agents started from a shell with these dotfiles, where `VISUAL` is
   `bin/compose-editor`.
 - **Key map:** `keymap open` maps every key across the Defy, Windows,
   WezTerm, tmux and the pane programs: who takes each chord, what it costs to

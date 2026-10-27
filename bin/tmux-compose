@@ -39,7 +39,7 @@
 #   push          the box becomes the draft's text, followed by anything typed
 #                 into the box meanwhile, and the draft empties; `return` asks
 #   fullscreen    nvim with the prose profile in the agent's place
-#                 (Ctrl+Shift+G; Claude and OpenCode)
+#                 (Ctrl+Shift+G)
 # The agents blank or suspend their screen while the editor runs, so the editor
 # never waits on the compose pane: while compose is open the prompt lives there,
 # otherwise in the box. A request the agent doesn't take, because a dialog or
@@ -244,18 +244,20 @@ confirm() {
         || tmux display-message "compose: $2 didn't take the draft (a dialog open?); it's kept, Alt+V reopens it"
 }
 
-# Ctrl+Shift+G: nvim in Claude's or OpenCode's place. An agent without
-# compose-editor gets its own editor key, so that its own editor opens; a Codex
-# gets Ctrl+G, since its Ctrl+Shift+G is a permission-mode key.
+# Ctrl+Shift+G: nvim in the agent's place. An agent without compose-editor gets
+# its own editor key, so that its own editor opens.
 fullscreen() {
-    local pane="$1" agent
-    if agent=$(joined_agent "$pane") && [[ "$agent" != codex ]]; then
+    local pane="$1" agent command
+    if agent=$(joined_agent "$pane"); then
         ask "$pane" "$agent" fullscreen 20 || true
-    elif [[ "$(tmux display-message -p -t "$pane" '#{pane_current_command}')" == opencode ]]; then
-        tmux send-keys -t "$pane" C-x e
-    else
-        tmux send-keys -t "$pane" C-g
+        return
     fi
+    command=$(tmux display-message -p -t "$pane" '#{pane_current_command}')
+    # shellcheck disable=SC2046  # one argument per key
+    case "$command" in
+        claude | codex | opencode) tmux send-keys -t "$pane" $(editor_key "$command") ;;
+        *) tmux send-keys -t "$pane" C-g ;;
+    esac
 }
 
 paste() {

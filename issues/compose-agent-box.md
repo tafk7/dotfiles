@@ -18,7 +18,7 @@ the agent's prompt box.
 | Ctrl+S in compose | Sends and keeps the pane open (unchanged) |
 | `:q`, `:wq`, `ZZ` in compose | nvim quits at once, and the draft goes back into the box, exactly as written, followed by anything typed into the box meanwhile; the draft empties. If the agent doesn't take it within 3 s (a dialog or its transcript view has the key), the draft stays in the draft and tmux says so |
 | `:cq` in compose | The box is left alone; the draft is kept for next time |
-| Ctrl+Shift+G in Claude or OpenCode | The prompt in nvim with the prose profile, in the agent's place |
+| Ctrl+Shift+G in Claude, Codex or OpenCode | The prompt in nvim with the prose profile, in the agent's place |
 
 ## How
 

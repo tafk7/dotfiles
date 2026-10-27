@@ -176,8 +176,8 @@ tk_raw "${CTRL_SHIFT_G}x"
 tk_until grep -q x "$app_log" || fail "app stub got no input"
 assert_eq "$(tk_input "$app_log")" '^Gx' "Ctrl+Shift+G outside an agent"
 
-# Codex: Ctrl+E and Alt+V pull, quitting returns; its Ctrl+Shift+G stays its
-# own (a permission-mode key), arriving as Ctrl+G.
+# Codex: Ctrl+E and Alt+V pull, quitting returns, and Ctrl+Shift+G opens nvim in
+# its place.
 codex_log="$TEST_ROOT/codex.log"
 codex=$(ti new-window -t test -e "VISUAL=$VISUAL_EDITOR" -P -F '#{pane_id}' \
     "$(tk_stub codex "$codex_log" --paste --editor codex)")
@@ -198,9 +198,11 @@ compose return "$codex" "$codex_draft"
 tk_expect $'codex words\n\nand more' "Codex box after return" box "$codex_log"
 tk_expect '' "Codex draft after return" cat "$codex_draft"
 ti select-pane -t "$codex"
-: > "$codex_log"
+: > "$nvim_log"
 tk_raw "$CTRL_SHIFT_G"
-tk_expect '^G' "Ctrl+Shift+G in Codex" tk_input "$codex_log"
+tk_until test -s "$nvim_log" || fail "Ctrl+Shift+G ran no nvim in Codex"
+grep -qx 'prose=1' "$nvim_log" || fail "Codex fullscreen NVIM_PROSE: $(cat "$nvim_log")"
+tk_expect 'from fullscreen' "Codex box after Ctrl+Shift+G" box "$codex_log"
 
 # OpenCode: Ctrl+X e and Alt+V pull, emptying the box with a lone newline (an
 # empty file would leave it), quitting returns, and Ctrl+Shift+G opens nvim in
@@ -237,6 +239,12 @@ tk_ready "$own_log"
 tk_wait '#{pane_current_command}' opencode
 tk_raw "$CTRL_SHIFT_G"
 tk_expect '^Xe' "Ctrl+Shift+G in an OpenCode without compose-editor" tk_input "$own_log"
+own_codex_log="$TEST_ROOT/own-codex.log"
+ti new-window -t test "$(tk_stub codex "$own_codex_log" --paste)"
+tk_ready "$own_codex_log"
+tk_wait '#{pane_current_command}' codex
+tk_raw "$CTRL_SHIFT_G"
+tk_expect '^E' "Ctrl+Shift+G in a Codex without compose-editor" tk_input "$own_codex_log"
 
 # With real nvim: quitting puts the draft back, :cq keeps it, and a pull into
 # an open pane shows up in nvim, where typing goes on after the pulled text.
