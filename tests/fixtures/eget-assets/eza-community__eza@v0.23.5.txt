@@ -1,5 +1,5 @@
-# eza-community/eza v0.23.4 (recorded by tests/eget-selection.py --refresh)
-completions-0.23.4.tar.gz
+# eza-community/eza v0.23.5 (recorded by lib/lockgen.py)
+completions-0.23.5.tar.gz
 eza.exe_x86_64-pc-windows-gnu.tar.gz
 eza.exe_x86_64-pc-windows-gnu.zip
 eza_aarch64-unknown-linux-gnu.tar.gz
@@ -14,4 +14,4 @@ eza_x86_64-unknown-linux-gnu.tar.gz
 eza_x86_64-unknown-linux-gnu.zip
 eza_x86_64-unknown-linux-musl.tar.gz
 eza_x86_64-unknown-linux-musl.zip
-man-0.23.4.tar.gz
+man-0.23.5.tar.gz
