@@ -5,14 +5,17 @@ input byte, so a test can see exactly what tmux forwarded to the application.
 Run it under the name tmux should report as pane_current_command
 (`exec -a claude python3 tmux-keys-stub.py ...`); tk_stub builds that command.
 
---claude imitates Claude's fullscreen transcript dump: on Ctrl+O [ it leaves
-the alternate screen at once and, after a pause, writes a transcript over the
-normal screen (`dump`, `short` for one that fits the screen), or does nothing
-(`never`); Esc returns to the alternate screen.
+--claude imitates Claude's transcript view: Ctrl+O toggles it (its footer
+reads "Showing detailed transcript"), and v in it writes the transcript to
+$TMPDIR/cc-transcript-<hex>.txt and runs $VISUAL on that file as a direct
+child, reading no input until the editor exits (`transcript`), or does nothing
+(`never`).
 
---opencode imitates OpenCode's export dialog driven to Export (Ctrl+X x, five
-Tabs, Enter): it writes session-stub.md to the temporary directory and shows
-"Session exported".
+--title sets the terminal title, as Codex does with its thread id.
+
+--opencode imitates OpenCode's export dialog driven to Export (Ctrl+X x,
+Shift+Tab, Enter): it writes session-stub.md to the temporary directory and
+shows "Session exported" until Esc.
 
 --editor imitates an agent's prompt box and its external editor (claude, the
 default: Ctrl+G; codex: Ctrl+E; opencode: Ctrl+X e): typed and pasted text goes
@@ -38,7 +41,8 @@ parser.add_argument("--alt", action="store_true", help="draw on the alternate sc
 parser.add_argument("--mouse", action="store_true", help="enable SGR mouse reporting")
 parser.add_argument("--paste", action="store_true", help="enable bracketed paste, as the agents do")
 parser.add_argument("--extkeys", action="store_true", help="request extended keys (modifyOtherKeys 2), as Claude does")
-parser.add_argument("--claude", choices=["dump", "short", "never"], help="answer Ctrl+O [ like Claude")
+parser.add_argument("--claude", choices=["transcript", "never"], help="answer Ctrl+O v like Claude")
+parser.add_argument("--title", help="set the terminal title")
 parser.add_argument("--opencode", action="store_true", help="answer the export keys like OpenCode")
 parser.add_argument("--editor", nargs="?", const="claude", choices=["claude", "codex", "opencode"],
                     help="keep a prompt box and run $VISUAL on it like that agent")
@@ -53,15 +57,26 @@ def write(text):
 
 
 ALT_SCREEN = "\x1b[?1049h\x1b[H\x1b[2Jstub on the alternate screen\r\n"
+TRANSCRIPT_VIEW = "\x1b[H\x1b[2Jtranscript\x1b[40;1H Showing detailed transcript \u00b7 ctrl+o to toggle"
 TRANSCRIPT = []
 for turn in ("first", "second", "third"):
     TRANSCRIPT += [f"\u276f {turn} question", f"\u25cf {turn} answer"]
     TRANSCRIPT += [f"  {turn} detail {n}" for n in range(1, 31)]
 
-if args.claude == "short":
-    TRANSCRIPT = TRANSCRIPT[:4]
-
 box = ""
+transcript_view = False
+
+
+def claude_key(byte):
+    """Ctrl+O and v, as Claude's transcript view takes them."""
+    global transcript_view
+    if byte == 0x0F:
+        transcript_view = not transcript_view
+        write(TRANSCRIPT_VIEW if transcript_view else ALT_SCREEN)
+    elif byte == ord("v") and transcript_view and args.claude == "transcript":
+        with tempfile.NamedTemporaryFile("w", prefix="cc-transcript-", suffix=".txt", delete=False) as out:
+            out.write("\n".join(TRANSCRIPT) + "\n")
+        subprocess.run([os.environ.get("VISUAL", "vi"), out.name])
 
 
 # Each agent's external-editor key and its name for the prompt file.
@@ -112,6 +127,8 @@ def type_into_box(data):
 
 if args.alt or args.claude or args.opencode:
     write(ALT_SCREEN)
+if args.title:
+    write(f"\x1b]2;{args.title}\x07")
 if args.mouse:
     write("\x1b[?1000h\x1b[?1006h")
 if args.extkeys:
@@ -121,27 +138,21 @@ if args.paste:
 
 with open(args.log, "ab", buffering=0) as log:
     open(args.log + ".ready", "w").close()
-    previous = received = b""
+    received = b""
     while True:
         data = os.read(fd, 1024)
         if not data:
             break
         log.write(data)
-        if args.claude in ("dump", "short") and b"\x0f[" in previous + data:
-            # Claude leaves the alternate screen, prepares the dump (0.5 s for
-            # a large session), then overwrites the screen from the top: a
-            # second dump grows history by one transcript, not one plus a
-            # screenful.
-            write("\x1b[?1049l")
-            time.sleep(0.8)
-            write("\x1b[H" + "".join(line + "\x1b[K\r\n" for line in TRANSCRIPT))
-        if args.claude and data == b"\x1b":
-            write(ALT_SCREEN)
+        if args.claude:
+            for byte in data:
+                claude_key(byte)
         received += data
         if args.editor:
             type_into_box(data)
-        if args.opencode and received.endswith(b"\x18x\t\t\t\t\t\r"):
+        if args.opencode and received.endswith(b"\x18x\x1b[Z\r"):
             with open(os.path.join(tempfile.gettempdir(), "session-stub.md"), "w") as export:
                 export.write("\n".join(TRANSCRIPT) + "\n")
             write("\x1b[H\x1b[2JSession exported\r\n")
-        previous = data[-1:]
+        elif args.opencode and data == b"\x1b":
+            write(ALT_SCREEN)

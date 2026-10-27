@@ -3,14 +3,27 @@
 # on its prompt box (Claude's Ctrl+G, Codex's Ctrl+E, OpenCode's Ctrl+X E), it
 # joins the box to the compose pane: `tmux-compose editor` moves the box into
 # the compose draft, puts a draft back, or opens nvim in the agent's place
-# (Ctrl+Shift+G). Any other file gets $EDITOR: git's, another program's, and
-# the agents' own other uses of $VISUAL, such as Claude's transcript (v in its
-# Ctrl+O view), plans, and /memory.
+# (Ctrl+Shift+G). Claude's transcript (v in its Ctrl+O view) goes to review when
+# review asked for it. Any other file gets $EDITOR: git's, another program's,
+# and the agents' own other uses of $VISUAL, such as Claude's transcript when
+# you press v yourself, plans, and /memory.
 
 set -uo pipefail
 
 file="${!#}"
 parent=$(tr '\0' '\n' < "/proc/$PPID/cmdline" 2>/dev/null | head -n 1)
+
+# Review (bin/tmux-review) asks for Claude's transcript with Ctrl+O v and names
+# the file it wants in the pane option @review-file: move the transcript there
+# and return at once, since Claude stops while its editor runs. The rename into
+# place is atomic, so review never reads a partial file.
+if [[ "${parent##*/}" == claude && "$file" == */cc-transcript-*.txt && -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
+    review_file=$(tmux show -pqv -t "$TMUX_PANE" @review-file 2>/dev/null)
+    if [[ -n "$review_file" ]]; then
+        mv -f -- "$file" "$review_file.part" && mv -f -- "$review_file.part" "$review_file"
+        exit
+    fi
+fi
 # Each agent's name for its prompt-box file (Claude 2.1.311, Codex 0.164,
 # OpenCode 2.1.4).
 agent=''

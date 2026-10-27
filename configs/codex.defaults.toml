@@ -18,6 +18,10 @@ persistence = "save-all"
 # encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
 [tui]
 status_line = ["context-used", "total-output-tokens", "model"]
+# Codex's default title, plus the thread id, which tells review (prefix+f in
+# tmux, bin/tmux-review) which session file is this pane's. tmux shows window
+# names, not pane titles, so the id isn't seen there.
+terminal_title = ["activity", "thread-name", "project-name", "thread-id"]
 
 [tui.keymap.editor]
 move_line_end = "end"
