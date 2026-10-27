@@ -206,17 +206,20 @@ profile_merge() {
     done
 }
 
-# A profile derived from the ledger: only components dotfiles or the package
-# manager installed count, never discovered external tools. Fills PROFILE.
+# A profile derived from what is installed: only components dotfiles or the
+# package manager installed count, never external tools. Ownership is
+# observed (lib/observe.sh), not read from the ledger, whose rows an older
+# checkout may have written wrong. Fills PROFILE.
 profile_propose() {
-    local name applicable ownership status tier=config tool capability
+    local name obs rc tier=config tool capability
     local -a ai_present=()
     profile_reset
-    [[ -f "$DOTFILES_LEDGER_FILE" ]] || return 0
-    while IFS=$'\t' read -r name applicable ownership status _; do
-        [[ "$applicable" == yes && "$status" == installed ]] || continue
-        [[ "$ownership" == dotfiles || "$ownership" == package-manager ]] || continue
-        [[ -n "${TOOL_BINARY[$name]:-}" ]] || continue
+    while IFS= read -r name; do
+        rc=0
+        obs="$(observe_component "$name" 2>/dev/null)" || rc=$?
+        (( rc == 0 || rc == 3 )) || continue
+        [[ "$(observation_field applicable <<< "$obs")" == yes && -n "$(observation_field path <<< "$obs")" ]] || continue
+        case "$(observation_field owner <<< "$obs")" in dotfiles|package-manager) ;; *) continue ;; esac
         if [[ -n "${TOOL_TIER[$name]:-}" ]] \
            && (( $(_profile_tier_rank "${TOOL_TIER[$name]}") > $(_profile_tier_rank "$tier") )); then
             tier="${TOOL_TIER[$name]}"
@@ -228,7 +231,7 @@ profile_propose() {
                 *) PROFILE[capabilities]="$(_profile_list_add "${PROFILE[capabilities]}" "$capability")" ;;
             esac
         done
-    done < <(tail -n +2 "$DOTFILES_LEDGER_FILE")
+    done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | LC_ALL=C sort)
     PROFILE[tier]="$tier"
     if (( ${#ai_present[@]} )); then
         if (( ${#ai_present[@]} == $(profile_ai_tool_names | wc -l) )); then

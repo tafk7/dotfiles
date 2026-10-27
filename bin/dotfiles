@@ -83,8 +83,8 @@ Commands:
                         that would remove it are printed.
   profile --tier T      Set the tier (config, bash, dev, work). Raising it
                         applies the new tier; lowering it uninstalls nothing.
-  profile --propose     Derive a profile from the component ledger and offer
-                        to save it.
+  profile --propose     Derive a profile from what dotfiles or the package
+                        manager installed here and offer to save it.
 
 Options:
   --yes                 Apply (or save a proposal) without asking.
@@ -271,7 +271,7 @@ cmd_profile() {
 
     if [[ -z "$action" ]]; then
         if ! profile_exists; then
-            printf 'No machine profile yet. Derive one from the ledger with: dotfiles profile --propose\n'
+            printf 'No machine profile yet. Derive one from what is installed with: dotfiles profile --propose\n'
             return 0
         fi
         profile_load || return 3
@@ -315,7 +315,7 @@ cmd_profile() {
         propose)
             profile_exists && warn "A profile already exists; saving the proposal replaces it."
             profile_propose
-            printf 'Proposed from the component ledger (only what dotfiles or the package manager installed):\n'
+            printf 'Proposed from what is installed (only what dotfiles or the package manager installed):\n'
             profile_describe | sed 's/^/  /'
             if [[ "$assume_yes" == true ]] || confirm "save this profile?"; then
                 profile_save || return 1

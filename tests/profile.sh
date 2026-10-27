@@ -75,20 +75,28 @@ out="$(dotfiles profile --tier dev)"
 assert_eq "$(profile_value tier)" dev "lowering the tier"
 [[ "$out" == *"uninstall-tool docker"* && "$out" != *"Saved; not applied"* ]] || fail "lowering the tier: $out"
 
-# --- A proposal comes from the ledger, ignoring external and failed rows, and
-# is saved only when confirmed.
+# --- A proposal comes from what is installed: dotfiles' own installs and APT
+# packages, whatever the ledger recorded (an older checkout recorded Docker and
+# Tailscale external), never an external tool or a failed install. It is saved
+# only when confirmed.
 rm -f "$DOTFILES_PROFILE_FILE" "$DOTFILES_LEDGER_FILE"
+printf '#!/bin/sh\nfor package; do :; done\ncase "$package" in docker-ce|tailscale) ;; *) exit 1 ;; esac\ncase "$*" in *Status*) printf installed ;; *) printf 1.0 ;; esac\n' \
+    > "$TEST_ROOT/bin/dpkg-query"
+chmod +x "$TEST_ROOT/bin/dpkg-query"
+for tool in docker tailscale gcloud; do fake_command "$TEST_ROOT/bin/$tool" true; done
+for tool in eza claude; do fake_command "$HOME/.local/bin/$tool" true; done
 ledger_record eza yes dotfiles installed 1 "$HOME/.local/bin/eza" staged-release
-ledger_record docker yes package-manager installed 1 /usr/bin/docker apt-in-place
-ledger_record tailscale yes package-manager installed 1 /usr/bin/tailscale apt-in-place
+ledger_record docker yes external present 1 /usr/bin/docker apt-in-place
+ledger_record tailscale yes external present 1 /usr/bin/tailscale apt-in-place
 ledger_record claude yes dotfiles installed 1 "$HOME/.local/bin/claude" moving-vendor-installer
 ledger_record gcloud yes external present 1 /snap/bin/gcloud apt-in-place
 ledger_record codex yes dotfiles failed "" "" x
-out="$(dotfiles profile --propose </dev/null)"
+propose_path="$TEST_ROOT/bin:$HOME/.local/bin:$TEST_SYSTEM_PATH"
+out="$(PATH="$propose_path" dotfiles profile --propose </dev/null)"
 [[ "$out" == *"tier            work"* && "$out" == *"capabilities    tail"* && "$out" == *"ai              claude"* ]] \
     || fail "proposal: $out"
 profile_exists && fail "a proposal was saved without confirmation"
-dotfiles profile --propose --yes >/dev/null
+PATH="$propose_path" dotfiles profile --propose --yes >/dev/null
 assert_eq "$(profile_value tier)/$(profile_value capabilities)/$(profile_value ai)" "work/tail/claude" "saved proposal"
 
 # A damaged profile is reported, not silently replaced.
