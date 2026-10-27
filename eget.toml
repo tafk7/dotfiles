@@ -33,7 +33,7 @@ tag = "v0.23.4"
 asset_filters = ["gnu", ".tar.gz", "^no_libgit"]
 
 ["junegunn/fzf"]
-tag = "v0.67.0"
+tag = "v0.74.5"
 
 ["ajeetdsouza/zoxide"]
 tag = "v0.9.9"
