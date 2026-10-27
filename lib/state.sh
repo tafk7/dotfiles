@@ -66,25 +66,32 @@ _state_lock_acquire() {
     mkdir -p "$DOTFILES_STATE_DIR" || return 1
     for ((i = 0; i < attempts; i++)); do
         if mkdir "$DOTFILES_STATE_LOCK" 2>/dev/null; then
-            printf '%s\n' "$owner" > "$DOTFILES_STATE_LOCK/pid" || {
+            # Written whole, then renamed: a reader never sees an empty owner.
+            { printf '%s\n' "$owner" > "$DOTFILES_STATE_LOCK/pid.new" \
+                && mv -f "$DOTFILES_STATE_LOCK/pid.new" "$DOTFILES_STATE_LOCK/pid"; } || {
                 rm -rf -- "$DOTFILES_STATE_LOCK"
                 return 1
             }
             return 0
         fi
+        holder=""
         if [[ -r "$DOTFILES_STATE_LOCK/pid" ]]; then
             read -r holder < "$DOTFILES_STATE_LOCK/pid" || holder=""
+        fi
+        if [[ "$holder" =~ ^[0-9]+$ ]]; then
+            if kill -0 "$holder" 2>/dev/null; then
+                sleep 0.05
+                continue
+            fi
         else
+            # No owner recorded yet: it is being taken, and stale only once
+            # old. (Breaking it here let two writers in; one update was lost.)
             lock_mtime="$(stat -c %Y "$DOTFILES_STATE_LOCK" 2>/dev/null || date +%s)"
             lock_age=$(( $(date +%s) - lock_mtime ))
             if (( lock_age < stale_seconds )); then
                 sleep 0.05
                 continue
             fi
-        fi
-        if [[ -n "$holder" && "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null; then
-            sleep 0.05
-            continue
         fi
         # A lock without a live numeric owner is stale. Only remove the exact
         # state lock path; never follow or derive this target from state data.

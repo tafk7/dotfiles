@@ -15,6 +15,13 @@ preference_set feature.agent-badge enabled & second=$!
 wait "$first"; wait "$second"
 assert_eq "$(preference_get feature.theme)" disabled "concurrent theme preference"
 assert_eq "$(preference_get feature.agent-badge)" enabled "concurrent badge preference"
+
+# A lock whose owner has created its pid file but not yet written it is held,
+# not stale: breaking it let two writers in, and one update was lost.
+mkdir "$DOTFILES_STATE_LOCK" && : > "$DOTFILES_STATE_LOCK/pid"
+DOTFILES_STATE_LOCK_ATTEMPTS=3 _state_lock_acquire 2>/dev/null && fail "a lock mid-write was broken"
+[[ -d "$DOTFILES_STATE_LOCK" ]] || fail "a lock mid-write was removed"
+rm -rf -- "$DOTFILES_STATE_LOCK"
 state_validate || fail "valid state rejected"
 THEME_REQUEST=""
 feature_enabled theme && fail "disabled theme preference did not persist"
