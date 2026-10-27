@@ -4,6 +4,7 @@
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
+  "wheelScrollAccelerationEnabled": false,
   "env": {
     "ENABLE_TOOL_SEARCH": "true"
   }

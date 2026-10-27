@@ -39,6 +39,7 @@ tmux│Alt+S / Alt+F│Move left / right between panes; at the edge, the previou
 tmux│Alt+Shift+S / Alt+Shift+F│First / last window│select-window -t {start} / {end}
 tmux│Alt+arrows│Same as Alt+ESDF (laptop)│select-pane or previous/next-window
 tmux│PgUp│Shell pane: copy mode a page up (exits at the bottom); apps scroll themselves│copy-mode -eu / send-keys PPage
+tmux│Shift+PgUp / Shift+PgDn│Scroll a few lines anywhere: shells, review, Claude, Codex, OpenCode, a compose pane's agent│bin/tmux-scroll (@scroll-lines, default 3)
 tmux│Ctrl+Home│Shell pane: copy mode at the top of history; apps get the key│copy-mode -e; history-top / send-keys C-Home
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw

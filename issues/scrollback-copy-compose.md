@@ -223,6 +223,7 @@ By intent:
 | Intent | Keys | Shell | Claude | Codex | OpenCode |
 |---|---|---|---|---|---|
 | Scroll | PgUp/PgDn, Ctrl+Home/End, wheel | copy-mode, which exits at the bottom | the agent scrolls; the prompt stays live | same | same |
+| Scroll a few lines | **5** Shift+PgUp/PgDn (`@scroll-lines`, default 3) | copy-mode, which exits at the bottom | wheel events: 3 | wheel events: 3 | a wheel event: 1 (3 lines each) |
 | Review | ScrollLock, `C-a f` | copy-mode on the pane | **5** its transcript, from `Ctrl+O v`, in a review pane | **5** its session file as Markdown, in a review pane | **5** its export, in a review pane |
 | Search | **5** `C-a /`; `/` in review | incremental search upward in review | same | same | same |
 | Start a selection | `v` in review, or Shift+arrows / E S D F | same | same | same | same |
@@ -252,6 +253,22 @@ By intent:
 | PgUp / PgDn Δ | PgUp enters copy-mode a page up; it exits at the bottom | the app scrolls | the app |
 | Wheel | copy-mode | the app scrolls | the app, or PgUp/PgDn if it doesn't take the mouse |
 | Ctrl+Home / Ctrl+End Δ | Ctrl+Home enters copy-mode at the top | top / bottom | the app |
+| Shift+PgUp / Shift+PgDn **5** | Shift+PgUp enters copy-mode a few lines up; it exits at the bottom | the app scrolls a few lines | the app |
+
+Shift+PgUp/PgDn move `@scroll-lines` lines (default 3) wherever the pane is:
+in copy-mode and review the view moves; Claude, Codex, and OpenCode get as
+many mouse-wheel events as make the lines (`bin/tmux-scroll`); a compose pane
+scrolls its agent; the review popup scrolls its nvim. The wheel is what the
+three agents share: Codex 0.164's live view scrolls by keyboard only a page at
+a time, Claude's line scroll is a keybinding (`scroll:lineUp`) and OpenCode's
+is Ctrl+Alt+Y/E. Measured on Claude 2.1.311, Codex 0.164.0, and OpenCode 2.1.4,
+a wheel event scrolls Claude and Codex one line and OpenCode three. Claude
+speeds up wheel events that come quickly, so a held key would scroll faster
+and faster there; `configs/claude-settings.defaults.json` turns that off
+(`wheelScrollAccelerationEnabled`), which also keeps a quick spin of the real
+wheel at one line a notch. Following the bottom, Claude's first step up moves
+one line. A Claude with `CLAUDE_CODE_SCROLL_SPEED` (or `/scroll-speed`) set
+scrolls that many times farther.
 
 ### 3.3 Review (frozen)
 
@@ -289,6 +306,7 @@ Inside review, in every pane:
 | Key | Action |
 |---|---|
 | PgUp / PgDn | page up / down |
+| Shift+PgUp / Shift+PgDn **5** | a few lines up / down (`@scroll-lines`) |
 | `/` Δ | incremental search upward (review starts at the bottom); `?` downward |
 | `n` / `N` | next / previous result in the search's direction |
 | `v` | start or clear the selection |
@@ -512,9 +530,10 @@ transcript outgrows the history limit or an export key changes.
 2. **Claude's Shift+Up/Down scroll a line** (`configs/ai/claude/keybindings.json`),
    which takes those keys from `selection:extendUp/Down`: a selection started
    with the mouse in Claude extends with Shift+Left/Right only, while Shift+Up
-   scrolls the view under it (spike). Review is unaffected. Keep line scroll
-   there, or move it to other keys and let Shift+arrows extend as they do in
-   review?
+   scrolls the view under it (spike). Review is unaffected. Now that
+   Shift+PgUp/PgDn scroll a few lines in every pane, this binding is only a
+   Claude-specific second way to do it; removing it would let Shift+arrows
+   extend a selection in Claude as they do in review. Keep it, or remove it?
 3. **Codex panes name their thread only after a restart.** `bin/ai-config`
    adds `terminal_title` as a default; Codex sessions started before that, and
    machines that have changed their title, fall back to the newest session in

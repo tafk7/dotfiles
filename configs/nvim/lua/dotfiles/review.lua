@@ -6,6 +6,7 @@
 --     selection, starting one if needed; v starts or ends it
 --   Ctrl+S/F and Ctrl+Left/Right move by word; Ctrl+E/D and Ctrl+Up/Down jump
 --     to the previous or next prompt, the lines matching NVIM_REVIEW_PROMPT
+--   Shift+PgUp/PgDn scroll a few lines (tmux's @scroll-lines, default 3)
 --   / searches upward, ? downward, and n/N repeat in the search's direction
 --   y or Copy (Ctrl+Insert) copies the selection and closes the popup; Esc
 --     clears the selection, else closes; q closes
@@ -41,6 +42,11 @@ end
 for _, lhs in ipairs({ '<C-d>', '<C-Down>' }) do
   vim.keymap.set({ 'n', 'x' }, lhs, jump('W'))
 end
+
+local ok, setting = pcall(vim.fn.system, { 'tmux', 'show', '-gqv', '@scroll-lines' })
+local lines = ok and tonumber(vim.trim(setting)) or 3
+vim.keymap.set({ 'n', 'x' }, '<S-PageUp>', lines .. '<C-y>')
+vim.keymap.set({ 'n', 'x' }, '<S-PageDown>', lines .. '<C-e>')
 
 vim.keymap.set({ 'n', 'x' }, '/', '?')
 vim.keymap.set({ 'n', 'x' }, '?', '/')
