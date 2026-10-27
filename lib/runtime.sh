@@ -109,3 +109,27 @@ verify_binary() {
     local flag="${2:---version}"
     command -v "$cmd" >/dev/null 2>&1 && "$cmd" "$flag" >/dev/null 2>&1
 }
+
+# probe_quietly COMMAND ARGS...: run a probe (a --version) that must leave no
+# trace. Tools write even for that: gh a telemetry id, Neovim and glow a log,
+# glow a default config, starship a cache (under ~/.cache, whatever
+# XDG_CACHE_HOME says), Codex helper files under CODEX_HOME, opencode its
+# cache, log, and data. So the probe gets its XDG directories, TMPDIR,
+# STARSHIP_CACHE, and CODEX_HOME in a scratch directory under /tmp (not
+# $TMPDIR, which a caller may be watching), removed afterwards, plus each
+# tool's own switch where it has one. HOME stays: rustup finds its toolchains
+# there. Returns the command's status.
+probe_quietly() {
+    local scratch rc=0
+    local -a sandbox=(DO_NOT_TRACK=1 NVIM_LOG_FILE=/dev/null)
+    if scratch="$(mktemp -d /tmp/dotfiles-probe.XXXXXX 2>/dev/null)"; then
+        sandbox+=(XDG_CONFIG_HOME="$scratch" XDG_CACHE_HOME="$scratch" XDG_STATE_HOME="$scratch"
+                  XDG_DATA_HOME="$scratch" XDG_RUNTIME_DIR="$scratch" TMPDIR="$scratch"
+                  STARSHIP_CACHE="$scratch" CODEX_HOME="$scratch")
+    else
+        scratch=""
+    fi
+    env "${sandbox[@]}" "$@" || rc=$?
+    [[ -z "$scratch" ]] || rm -rf -- "${scratch:?}"
+    return "$rc"
+}

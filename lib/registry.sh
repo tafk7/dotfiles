@@ -435,9 +435,9 @@ tool_is_present() {
             done
             [[ "$type" == runs ]] || return 0
             if [[ -n "${TOOL_TIMEOUT[$name]:-}" ]]; then
-                timeout --foreground "${TOOL_TIMEOUT[$name]}" "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
+                probe_quietly timeout --foreground "${TOOL_TIMEOUT[$name]}" "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
             else
-                "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
+                probe_quietly "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
             fi
             ;;
         service-active) systemctl is-active --quiet "$arg" 2>/dev/null ;;

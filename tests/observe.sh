@@ -16,12 +16,13 @@ field() { observation_field "$1" <<< "$2"; }
 # through each installer's --observe.
 mkdir -p "$HOME/.local/bin"
 printf '#!/bin/sh\necho "eza - banner\nv0.23.4 [+git]"\n' > "$HOME/.local/bin/eza"
-# Like gh 2.100: a telemetry device id written even for --version, unless
-# DO_NOT_TRACK or GH_TELEMETRY=false.
+# Stand-ins for tools that write even for --version, with the real mkdir as
+# the tools have. Like gh 2.100: a telemetry device id, unless DO_NOT_TRACK or
+# GH_TELEMETRY=false.
 cat > "$HOME/.local/bin/gh" <<'GH'
 #!/bin/sh
 if [ -z "${DO_NOT_TRACK:-}" ] && [ "${GH_TELEMETRY:-}" != false ]; then
-    mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/gh" && echo id > "${XDG_STATE_HOME:-$HOME/.local/state}/gh/device-id"
+    /bin/mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/gh" && echo id > "${XDG_STATE_HOME:-$HOME/.local/state}/gh/device-id"
 fi
 echo "gh version 2.100.0 (2026-09-03)"
 GH
@@ -30,11 +31,23 @@ GH
 cat > "$TEST_ROOT/bin/nvim" <<'NVIM'
 #!/bin/sh
 if [ -z "${NVIM_LOG_FILE:-}" ]; then
-    mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/nvim" && : > "${XDG_STATE_HOME:-$HOME/.local/state}/nvim/log"
+    /bin/mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/nvim" && : > "${XDG_STATE_HOME:-$HOME/.local/state}/nvim/log"
 fi
 echo "NVIM v0.12.5"
 NVIM
-chmod +x "$HOME/.local/bin/eza" "$HOME/.local/bin/gh" "$TEST_ROOT/bin/nvim"
+# Like glow 2.1 (a default config and a log under XDG) and starship 1.24 (a
+# cache under ~/.cache, whatever XDG_CACHE_HOME says, unless STARSHIP_CACHE).
+cat > "$HOME/.local/bin/glow" <<'GLOW'
+#!/bin/sh
+/bin/mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/glow" && : > "${XDG_CONFIG_HOME:-$HOME/.config}/glow/glow.yml"
+echo "glow version 2.1.1 (d37e988)"
+GLOW
+cat > "$HOME/.local/bin/starship" <<'STARSHIP'
+#!/bin/sh
+/bin/mkdir -p "${STARSHIP_CACHE:-$HOME/.cache/starship}"
+echo "starship 1.24.2"
+STARSHIP
+chmod +x "$HOME/.local/bin/eza" "$HOME/.local/bin/gh" "$TEST_ROOT/bin/nvim" "$HOME/.local/bin/glow" "$HOME/.local/bin/starship"
 install_mutation_spies
 # Service queries are reads; every other systemctl use is still a mutation.
 printf '#!/bin/sh\ncase "$1" in is-active|is-enabled) exit 3 ;; esac\nprintf "systemctl\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \

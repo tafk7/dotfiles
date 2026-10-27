@@ -206,13 +206,11 @@ observe_component() {
 }
 
 # _observe_probe TIMEOUT COMMAND ARGS...: run a version probe from a neutral
-# directory, so no project override answers and nothing is installed.
-# Some tools write even for --version: gh a telemetry device id (unless
-# DO_NOT_TRACK), Neovim its state directory and log (unless NVIM_LOG_FILE).
+# directory, so no project override answers and nothing is installed, and
+# without a trace (probe_quietly).
 _observe_probe() {
     local seconds="$1"; shift
-    (cd / && env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 DO_NOT_TRACK=1 NVIM_LOG_FILE=/dev/null \
-        timeout "$seconds" "$@" 2>/dev/null </dev/null)
+    (cd / && probe_quietly env -u RUSTUP_TOOLCHAIN RUSTUP_AUTO_INSTALL=0 timeout "$seconds" "$@" 2>/dev/null </dev/null)
 }
 
 # Whether an observed identity is the wanted one: same kind, same value; an APT

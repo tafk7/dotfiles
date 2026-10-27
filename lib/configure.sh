@@ -136,7 +136,7 @@ configure_editor_plugins() {
 configure_opencode_settings() {
     local cmd version
     cmd="$(_ai_cli_command opencode)" || return 0
-    version="$("$cmd" --version 2>/dev/null || true)"
+    version="$(probe_quietly "$cmd" --version 2>/dev/null || true)"
     if [[ ! "$version" =~ ^(opencode[[:space:]]+)?v?2\.[0-9]+\.[0-9]+$ ]]; then
         warn "opencode at $cmd is not V2 (${version:-no version}); its settings are left alone"
         return 0

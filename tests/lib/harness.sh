@@ -87,6 +87,9 @@ install_mutation_spies() {
             > "$TEST_ROOT/bin/$command"
         /bin/chmod +x "$TEST_ROOT/bin/$command"
     done
+    # A version probe removes its own scratch directory (lib/observe.sh).
+    printf '#!/bin/sh\ncase "$*" in "-rf -- /tmp/dotfiles-probe."*) exec /bin/rm "$@" ;; esac\nprintf "rm\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \
+        > "$TEST_ROOT/bin/rm"
     # Unit state queries are reads: report an inactive, disabled unit.
     printf '#!/bin/sh\ncase "$1" in is-active) exit 3 ;; is-enabled) echo disabled; exit 1 ;; esac\nprintf "systemctl\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \
         > "$TEST_ROOT/bin/systemctl"
