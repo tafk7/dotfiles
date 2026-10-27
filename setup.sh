@@ -29,7 +29,7 @@ ONLY_COMPONENTS=""       # --only X,Y: install only these, configs untouched.
 SHOW_HELP=false
 DRY_RUN=false
 NO_HOOKS=false
-NO_GIT=false          # --no-git: skip ~/.gitconfig entirely (no prompt, no write).
+NO_GIT=false          # --no-git: skip ~/.gitconfig entirely (no write).
 UPGRADE=false         # --upgrade: what is not pinned moves to its newest version.
 PARSE_ERROR=false
 
@@ -71,11 +71,6 @@ require_components() {
         PARSE_ERROR=true
     done
 }
-
-# Git identity (optional; falls back to existing config or interactive prompt).
-# Read by process_git_config() in lib/install.sh.
-DOTFILES_GIT_NAME="${DOTFILES_GIT_NAME:-}"
-DOTFILES_GIT_EMAIL="${DOTFILES_GIT_EMAIL:-}"
 
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
@@ -174,15 +169,12 @@ parse_arguments() {
                 UPGRADE=true
                 shift
                 ;;
-            --git-name)
-                require_option_value "$1" "${2:-}" || { shift; continue; }
-                DOTFILES_GIT_NAME="$2"
-                shift 2
-                ;;
-            --git-email)
-                require_option_value "$1" "${2:-}" || { shift; continue; }
-                DOTFILES_GIT_EMAIL="$2"
-                shift 2
+            --git-name|--git-email|--git-name=*|--git-email=*)
+                # Retired: identity is off the install track (git profiles).
+                error "${1%%=*} was removed; set a Git identity with: git profile add NAME --default"
+                PARSE_ERROR=true
+                [[ "$1" == *=* || -z "${2:-}" || "${2:-}" == --* ]] || shift
+                shift
                 ;;
             --help)
                 SHOW_HELP=true
@@ -374,8 +366,8 @@ OPTIONS:
     --overwrite-configs Replace configs that differ, keeping backups.
     --force             Both: --reinstall --overwrite-configs
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
-    --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
-                        one alone). Also skips the delta pager wiring.
+    --no-git            Skip ~/.gitconfig (leaves any existing one alone).
+                        Also skips the delta pager wiring.
     --upgrade           Also upgrade what is not pinned: the selection's APT
                         packages (only-upgrade, never removing; apt's simulated
                         transaction is shown first; held packages are skipped),
@@ -385,13 +377,9 @@ OPTIONS:
     --no-theme          Persistently disable tmux themes.
     --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
     --no-agent-badge    Install AI CLIs without registering agent-badge.
-    --git-name NAME     Set git user.name (for non-interactive installs)
-    --git-email EMAIL   Set git user.email (for non-interactive installs)
     --help              Show this help message
 
 ENVIRONMENT:
-    DOTFILES_GIT_NAME   Same as --git-name
-    DOTFILES_GIT_EMAIL  Same as --git-email
     DOTFILES_APT_LOCK_TIMEOUT
                         Seconds APT waits for another package operation (default: 120)
 
@@ -827,6 +815,17 @@ run_installation() {
         echo "$step. (Personal WSL) Use your Windows SSH agent (Bitwarden/1Password):"
         echo "   ./bin/ssh-bridge enable     # bridges vault keys into WSL, then reload"
         echo "   (Work machines using local keys: skip — leave it disabled.)"
+        echo
+        ((step++))
+    fi
+
+    # The portable config sets user.useConfigOnly, and setup sets no identity.
+    if [[ "$NO_GIT" != true ]] && command -v git >/dev/null 2>&1 \
+       && { [[ -z "$(git config --global --includes --get user.name 2>/dev/null || true)" ]] \
+            || [[ -z "$(git config --global --includes --get user.email 2>/dev/null || true)" ]]; }; then
+        echo "$step. Set your Git identity (commits are refused until one is set):"
+        echo "   git profile add NAME --default    # gh login, SSH key, signing"
+        echo "   (or set user.name and user.email in ~/.gitconfig.local)"
         echo
         ((step++))
     fi

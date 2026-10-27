@@ -21,7 +21,7 @@ run_setup() {
         XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" TMPDIR="$TMPDIR" \
         DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" DOTFILES_TEST_PLATFORM="${PLATFORM:-ubuntu}" \
         DOTFILES_TEST_OS_VERSION="${OS_VERSION:-24.04}" DOTFILES_TEST_ARCH=x86_64 PATH="${RUN_PATH:-$PATH}" \
-        "$ROOT/setup.sh" "$@" --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com
+        "$ROOT/setup.sh" "$@" --no-hooks --no-theme
 }
 
 # --- Unsupported platforms: explicit requests fail before anything changes.

@@ -680,6 +680,8 @@ process_git_config() {
 
     # Preserve the user's global file and identity. Only add our include entries
     # when absent; no timestamp backup or whole-file rendering is needed.
+    # Identity is not setup's: git profile add NAME --default writes it to
+    # ~/.gitconfig.local, and setup's summary says so while none resolves.
     local existing
     existing="$(git config --file "$target" --get-all include.path 2>/dev/null || true)"
     if ! grep -Fxq "$portable" <<< "$existing"; then
@@ -687,20 +689,6 @@ process_git_config() {
     fi
     if ! grep -Fxq "$HOME/.gitconfig.local" <<< "$existing"; then
         git config --file "$target" --add include.path "$HOME/.gitconfig.local" || return 1
-    fi
-
-    if [[ -n "${DOTFILES_GIT_NAME:-}" ]]; then
-        [[ "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || true)" == "$DOTFILES_GIT_NAME" ]] \
-            || git config --file "$HOME/.gitconfig.local" user.name "$DOTFILES_GIT_NAME" || return 1
-    fi
-    if [[ -n "${DOTFILES_GIT_EMAIL:-}" ]]; then
-        [[ "$(git config --file "$HOME/.gitconfig.local" user.email 2>/dev/null || true)" == "$DOTFILES_GIT_EMAIL" ]] \
-            || git config --file "$HOME/.gitconfig.local" user.email "$DOTFILES_GIT_EMAIL" || return 1
-    fi
-
-    if [[ -z "$(git config --file "$HOME/.gitconfig.local" user.name 2>/dev/null || git config --global user.name 2>/dev/null || true)" \
-       || -z "$(git config --file "$HOME/.gitconfig.local" user.email 2>/dev/null || git config --global user.email 2>/dev/null || true)" ]]; then
-        warn "Git identity is not configured; set it in ~/.gitconfig.local or pass --git-name/--git-email."
     fi
 
     # force is accepted for command compatibility; portable reconciliation is

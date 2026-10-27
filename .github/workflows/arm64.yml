@@ -72,7 +72,7 @@ jobs:
           su - test <<'EOSU'
           set -euo pipefail
           cd ~/dev/dotfiles
-          ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
+          ./setup.sh --bash --force
           EOSU
 
       - name: Assert every bash-tier binary executes natively and is owned
