@@ -325,6 +325,59 @@ open the prompt lives there; otherwise in the box.
   without text typed into the box meanwhile, the paste fallback, `:cq`,
   fullscreen, and `compose-editor` falling back to `$EDITOR` elsewhere.
 
+## Phase 5 — One review viewer
+
+Added after the owner found review "not really working": it was a different
+viewer in each agent (Claude's dump in copy-mode, Codex's `F3` search,
+OpenCode's export in nvim), and the Claude path rested on a settle-time
+heuristic and an Esc. The research behind it is the spec's §1.2.16–26.
+Branch `scrollback-keys`, worktree `~/dev/dotfiles-scrollback`.
+
+### 5.1 Review panes
+
+- `bin/tmux-review` (rewritten): `toggle`, `search`, `edit`, `open`, `close`,
+  and the review pane's own `show`.
+  - An agent on the alternate screen gets its conversation into a private
+    temporary directory: Claude through `Ctrl+O v` and `@review-file`, Codex
+    through `bin/codex-transcript`, OpenCode through its export dialog
+    (Shift+Tab to Export instead of five Tabs). Anything else, or an agent off
+    the alternate screen, is reviewed in place.
+  - The review pane: `split-window -Z` running `show`, which prints the text
+    without control characters, with OSC 133 before each prompt line, deletes
+    it, and signals a `wait-for` channel; then copy-mode. Options on the pane:
+    `@review-pane` (the agent), `@review-zoomed`, `@review-prompt`.
+  - `close`, from the `pane-mode-changed` hook: kill the review pane, select
+    the agent, zoom again if the window was zoomed.
+  - Handled failures exit 0 after their message, since a non-zero status makes
+    `run-shell` cover the pane with its own.
+- `bin/compose-editor`: run by `claude` on `*/cc-transcript-*.txt` while the
+  pane has `@review-file`, move the file there (`.part`, then rename) and exit.
+- `bin/codex-transcript` ★ (Python): the rollout of the thread whose id (or
+  its 29-character prefix) is in `--title`, else the newest one whose
+  `session_meta` has `--cwd`; Markdown from its `item_completed` thread items.
+- `configs/codex.defaults.toml`: `tui.terminal_title` adds `thread-id` to
+  Codex's default items.
+- `configs/tmux.conf`: `bind /` (search) and `bind o` (edit); the hook calls
+  `close`; Ctrl+E/D are `previous-prompt`/`next-prompt` only; the Copy key goes
+  on to Codex; `o` is no longer unbound in the prune list.
+- `configs/nvim/lua/dotfiles/review.lua`: review's keys (spec §3.4).
+
+### 5.2 Tests
+
+- `tests/lib/tmux-keys-stub.py`: `--claude transcript|never` toggles a
+  transcript view on `Ctrl+O` and, on `v`, writes `cc-transcript-*.txt` and
+  runs `$VISUAL` as Claude does; `--title`; `--opencode` answers Shift+Tab and
+  clears its notice on Esc.
+- `tests/tmux-review.sh`: shell in place, `C-a /`, shell prompt marks; Claude
+  with compose-editor (keys `^Ov^O`, one copy, no files left, prompt jumps, key
+  table, `y`, zoom kept, the transcript view already open, `C-a o`, `C-a /`,
+  `o` at the viewed line), without compose-editor, and never handing over;
+  Codex by thread id over a newer session (items rendered, reasoning and
+  injected context left out, a wrapped line copied whole) and by directory;
+  OpenCode's export; the hook removing a review pane that isn't active.
+- `tests/tmux-keys-selftest.sh`: the Copy key reaches Codex.
+- `tests/neovim.sh`: the popup's keys and prompt jumps.
+
 ## Adoption and manual checks
 
 After each phase is fast-forwarded into the live checkout:
@@ -335,6 +388,7 @@ After each phase is fast-forwarded into the live checkout:
 | 2 | `bin/ai-config`; restart Claude sessions (`/tui` reports fullscreen) | drag-select in Claude copies to both destinations; clicking an inactive Claude pane only focuses it; wheel scrolls Claude |
 | 3 | `C-a r`; `bin/ai-config`; new shells | Alt+S/F cross windows; ScrollLock (or `C-a f`) reviews shell, Claude, Codex, OpenCode panes; `q` returns Claude to fullscreen; `o` opens the popup; Codex review opens its search; OpenCode review opens the export in the popup; OpenCode Ctrl+Home/End and Ctrl+Tab; prompt jumps in a shell pane; `C-a y` in each agent |
 | 4 | `./setup.sh --dev --dry-run`, then for real; `C-a r` | Alt+V opens compose under Claude, Codex and OpenCode; Ctrl+S submits without interrupting a running turn; spelling and grammar marks appear; Alt+V toggles focus |
+| 5 | `C-a r`; `bin/ai-config`; restart Codex sessions | ScrollLock (or `C-a f`) in Claude, Codex, and OpenCode opens the conversation in a zoomed review pane while the agent keeps working; `q` gives the window back; Ctrl+E/D jump between prompts; `C-a /` searches; `C-a o` opens nvim; `y` reaches the Windows clipboard; the Copy key copies a Codex `Ctrl+Space` selection |
 
 Pending outside the repo: the keyboard firmware change (F17/F18), and whether
 Windows Terminal accepts the `f17`/`f18` bindings.
@@ -344,8 +398,8 @@ Windows Terminal accepts the `f17`/`f18` bindings.
 | Risk | Mitigation |
 |---|---|
 | A tmux behavior assumed here is wrong (key-table precedence, hook context, `copy-command` environment) | Each is pinned by a failing test first; adjust the binding, not the test |
-| An agent renames a key the dispatch sends (`C-o`, `C-t`, `C-x x`, submit keys) | Stub tests document the contract; `bin/ai-config --check` and the version pins in §1 are the review points on upgrade |
+| An agent renames a key the dispatch sends (`C-o`, `C-x x`, submit keys), Claude its transcript file's name, or Codex its rollout items | Stub tests document the contract; `bin/ai-config --check` and the version pins in §1 are the review points on upgrade; review reports a timeout or a missing session rather than guessing |
 | Codex rejects the pager keymap | Verified in an isolated `CODEX_HOME` before commit; drop the conflicting key |
 | OpenCode V2 config schema churn | Merge only the keys listed; the V2 check gates the write |
 | Prompt marks slow shell startup | Startup benchmark gate in step 3.3 |
-| Large Claude dumps exceed the 50k-line history | `o`/nvim or Claude's `Ctrl+O v`; Phase 5 if it bites |
+| A Claude transcript exceeds the review pane's 50k-line history | `C-a o` opens the whole file in nvim; the parked from-disk viewer if it bites |

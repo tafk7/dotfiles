@@ -92,6 +92,17 @@ output="$(nvim_run '+if &termguicolors | cquit 42 | endif')" || fail "theme --nv
 output="$(nvim_run '+if maparg("e", "n") !=# "" | cquit 43 | endif')" || fail "review mappings leaked into plain nvim: $output"
 output="$(NVIM_REVIEW=1 nvim_run '+if maparg("e", "n") !=# "k" || maparg("q", "n") !~# "qall" | cquit 44 | endif')" \
     || fail "review profile did not load: $output"
+# Its keys are tmux review's: Shift extends a selection it starts, / searches
+# upward, y copies and closes, Esc closes, Ctrl+E/D jump between prompts.
+output="$(NVIM_REVIEW=1 nvim_run '+if maparg("E", "n") !=# "vk" || maparg("E", "x") !=# "k" || maparg("<S-Down>", "n") !=# "vj" | cquit 45 | endif' \
+    '+if maparg("/", "n") !=# "?" || maparg("y", "x") !~# "+y.*qall" || maparg("<Esc>", "n") !~# "qall" | cquit 46 | endif')" \
+    || fail "review keys: $output"
+printf 'start\n## User\nalpha\n## User\nbeta\n' > "$TEST_ROOT/review.md"
+output="$(NVIM_REVIEW=1 NVIM_REVIEW_PROMPT='^## User' nvim_run "$TEST_ROOT/review.md" '+normal! G' \
+    "+call feedkeys(\"\\<C-e>\", 'xt')" '+if line(".") != 4 | cquit 47 | endif' \
+    "+call feedkeys(\"\\<C-e>\", 'xt')" '+if line(".") != 2 | cquit 48 | endif' \
+    "+call feedkeys(\"\\<C-d>\", 'xt')" '+if line(".") != 4 | cquit 49 | endif')" \
+    || fail "review prompt jumps: $output"
 
 # Alt+Backspace / Alt+Delete delete to the line's start / end in insert mode;
 # Ctrl+U undoes in insert, normal, and visual mode.

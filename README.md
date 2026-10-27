@@ -128,10 +128,15 @@ yo <command>              # print output and copy it to the clipboard
   Pause or `<prefix> E` turns that off (`CLIP OFF` shows in the status bar);
   `<prefix> e` still sends the buffer. `<prefix> v` enters copy mode on
   the screen as it is, and ScrollLock or `<prefix> f` reviews a
-  pane: copy mode for shells and Claude's transcript, transcript search in
-  Codex, the exported session in an nvim popup for OpenCode. In review,
-  E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
-  in nvim. `<prefix> y` or Shift+Copy copies the agent's last reply.
+  pane in copy mode with the same keys everywhere: a shell's history in place,
+  and the conversation of Claude, Codex, or OpenCode, as the agent exports it,
+  in a pane zoomed over the agent, which keeps working. In review, E/S/D/F
+  move, Shift selects, Ctrl+E/D jump between prompts, `/` searches upward, `y`
+  copies, and `o` opens the text in nvim with the same keys. `<prefix> /`
+  reviews and searches at once; `<prefix> o` opens the conversation in nvim.
+  Codex panes name their session once Codex runs with the `terminal_title`
+  from `configs/codex.defaults.toml`. `<prefix> y` or Shift+Copy copies the
+  agent's last reply.
   The wheel and PgUp/PgDn page less (`glow -p`, `md`, bat, Git) and Claude's
   transcript; in Claude, Shift+Up/Down scroll it a line at a time.
   In Claude, `Ctrl+C` sends Esc, so it can't stop every background agent;

@@ -1,8 +1,10 @@
 # Spec: scrollback, copy, and compose for agent panes
 
-**Status:** implemented and checked by hand through phase 4; phase 5 and
-[Codex keyboard review](codex-review-popup.md) parked. Replaces the parked
-Claude fullscreen-renderer issue and the split-pane prose-editor draft.
+**Status:** implemented and checked by hand through phase 4. Phase 5, one
+review viewer for every agent, implemented and checked against the real agents
+on an isolated tmux server; it absorbs [Codex keyboard
+review](codex-review-popup.md). Replaces the parked Claude fullscreen-renderer
+issue and the split-pane prose-editor draft.
 **Problem:** Claude Code, Codex, and OpenCode now draw their conversations on
 the terminal's alternate screen, where tmux copy-mode cannot see them. Each app
 scrolls, searches, selects, and copies differently; copies land in the tmux
@@ -183,7 +185,8 @@ standing in for WezTerm; "source" means read in the tagged release (Codex
 26. **tmux takes prompt marks and wrapping from any program.** OSC 133 `A`
     printed by a viewer, not a shell, makes `previous-prompt` and
     `next-prompt` stop at those lines, and copy-mode copies a soft-wrapped
-    line as one line (tmux 3.4 and 3.7c, test).
+    line as one line (tmux 3.4 and 3.7c, test). tmux 3.4's copy-mode search
+    misses text on wrapped lines; 3.7c finds it (spike).
 
 ---
 
@@ -197,8 +200,14 @@ standing in for WezTerm; "source" means read in the tagged release (Codex
   goes to tmux; Shift on the mouse goes to WezTerm; `C-a` is tmux commands.
   Copy/Paste keys: plain is the Windows clipboard, Alt is the tmux buffer.
 - **Two ways to read.** *Browse* is live: the app scrolls and the prompt stays
-  usable. *Review* is frozen: tmux copy-mode, or the app's own viewer where
-  tmux can't reach, for search and keyboard selection.
+  usable. *Review* is frozen: tmux copy-mode with one key table in every pane,
+  on a shell's own history or on an agent's conversation, so search, keyboard
+  selection, and copy are the same keys in Claude, Codex, and OpenCode. None of
+  the three can start a selection from the keyboard in a way that lines up
+  with the others (§1.1), so review is where keyboard selection lives.
+- **Ask the agent, don't scrape it.** An agent's conversation comes from the
+  agent's own export or session record, never from its screen; the agent keeps
+  running, and nothing waits on its interface longer than the export takes.
 - **Compose beside, never instead.** Prompts are written in a Neovim pane below
   the target and pasted in; the agent is never blocked.
 
@@ -206,7 +215,22 @@ standing in for WezTerm; "source" means read in the tagged release (Codex
 
 ## 3. Key surface
 
-★ new, Δ changed. Unmarked entries keep today's behavior.
+★ new, Δ changed in phases 1–4; **5** new or changed in phase 5. Unmarked
+entries keep the earlier behavior.
+
+By intent:
+
+| Intent | Keys | Shell | Claude | Codex | OpenCode |
+|---|---|---|---|---|---|
+| Scroll | PgUp/PgDn, Ctrl+Home/End, wheel | copy-mode, which exits at the bottom | the agent scrolls; the prompt stays live | same | same |
+| Review | ScrollLock, `C-a f` | copy-mode on the pane | **5** its transcript, from `Ctrl+O v`, in a review pane | **5** its session file as Markdown, in a review pane | **5** its export, in a review pane |
+| Search | **5** `C-a /`; `/` in review | incremental search upward in review | same | same | same |
+| Start a selection | `v` in review, or Shift+arrows / E S D F | same | same | same | same |
+| Extend it | Shift+arrows / E S D F, or moves after `v` | same | same | same | same |
+| Copy it | `y` or Copy in review | tmux buffer and Windows clipboard | same | same | same |
+| Copy the app's own selection | Copy | — | `Ctrl+Shift+C` | **5** `Ctrl+Insert` (its `Ctrl+Space` or mouse selection) | copies on mouse release |
+| Copy the last reply | `C-a y`, Shift+Copy | — | from its session file: tmux buffer and clipboard | `Ctrl+O`: clipboard | `C-x y`: clipboard |
+| Open in editor | **5** `C-a o`; `o` in review | history in the nvim popup | transcript | Markdown | Markdown |
 
 ### 3.1 Panes and windows
 
@@ -231,23 +255,30 @@ standing in for WezTerm; "source" means read in the tagged release (Codex
 
 ### 3.3 Review (frozen)
 
-**ScrollLock** ★ toggles review (laptop: `C-a f`). `C-a v` stays plain
-copy-mode of what the pane shows, so a Claude pane's live prompt can be
-selected.
+**ScrollLock** ★ toggles review (laptop: `C-a f`). **5** `C-a /` reviews and
+opens the search prompt at once; **5** `C-a o` opens the conversation or history
+in the nvim popup (§3.4). `C-a v` stays plain copy-mode of what the pane shows,
+so a Claude pane's live prompt can be selected.
 
-| Pane | Review opens |
+| Pane | Review shows |
 |---|---|
-| Shell, or a fullscreen app without special handling | tmux copy-mode |
-| Claude | clear the pane's history, send `Ctrl+O [`, wait for the text to settle, open copy-mode at the bottom. Leaving copy-mode sends `Esc`, which returns Claude to fullscreen |
-| Codex | `F3`: its search over the full transcript; the live view scrolls with PgUp/PgDn and Ctrl+Home/End (§1.2.13). Keyboard selection is parked in [codex-review-popup](codex-review-popup.md) |
-| OpenCode | the export dialog driven to Export; the Markdown opens in the review popup (§1.2.14) |
+| Shell, or any app whose output is in tmux history, including an agent off the alternate screen (Claude's classic renderer, Codex's inline mode) | the pane itself, in tmux copy-mode |
+| Claude **5** | Claude's transcript as drawn, from `Ctrl+O v` (§1.2.16). Claude's `$VISUAL` is `bin/compose-editor`, which, asked through the pane option `@review-file`, moves the file there and returns at once, since Claude stops while its editor runs (§1.2.17); `Ctrl+O` then closes Claude's transcript view, unless it was open before. A Claude whose `VISUAL` is something else (not started from a dotfiles shell) gets its own transcript view instead, where `/` searches |
+| Codex **5** | its session file as Markdown (`bin/codex-transcript`): the thread named by the id in the pane title (§1.2.22; `terminal_title` in `configs/codex.defaults.toml`), else the newest session started in the pane's directory, which the first line says. Nothing is sent to Codex |
+| OpenCode **5** | its export dialog driven to Export (`C-x x`, Shift+Tab, Enter; §1.2.14). Esc closes the "Session exported" notice 0.3 s after it shows, and again only if it is still there a second later: on its own, Esc interrupts a running turn |
 
-Clearing first keeps exactly one copy of the conversation in history, so search
-hits aren't duplicated and the 50k-line limit isn't consumed by stale dumps.
-The cost is the pane's pre-Claude output, usually just the launch command.
-After Claude exits, the pane holds the last dump as a plain transcript.
+An agent's text opens in a *review pane*: a split zoomed over the agent's
+window, in copy-mode at the bottom. It prints the text once, with control
+characters removed, and puts an OSC 133 mark before each prompt (Claude's `❯ `
+lines, the Markdown's `## User`), so prompt jumps work as in a shell
+(§1.2.26). The agent keeps running and stays live underneath; it receives only
+the keys of its own export. Leaving copy-mode (`q`, `Esc`, `y`, ScrollLock)
+removes the pane and gives focus, and the window's zoom, back to the agent.
+Each review is a fresh copy, so nothing piles up in the agent pane's history.
+`@review-timeout` (seconds, default 10) bounds the wait for Claude's
+transcript.
 
-Inside tmux review:
+Inside review, in every pane:
 
 | | Plain | Shift | Ctrl |
 |---|---|---|---|
@@ -262,7 +293,7 @@ Inside tmux review:
 | `n` / `N` | next / previous result in the search's direction |
 | `v` | start or clear the selection |
 | `y`, Alt+Copy, Copy ★ | copy the selection and exit |
-| `o` ★ | open the pane's history in an nvim popup at the same line (§3.4) |
+| `o` ★ | open what review shows in the nvim popup, at the same line (§3.4) |
 | `Esc` | clear the selection, otherwise exit |
 | `q`, ScrollLock | exit |
 
@@ -271,22 +302,27 @@ character), `o` (other end of selection), `D` (copy to end of line),
 `Ctrl+E`/`Ctrl+D`/`Ctrl+F` (scroll). `j`/`k`/`g`/`G` stay as undocumented
 aliases.
 
-Prompt jumps use tmux's `previous-prompt`/`next-prompt`, which need the shell
-to emit OSC 133 prompt marks. Claude's dump carries no marks; in a Claude
-review the keys search for `^❯ ` instead (§1.2.9).
-
+Prompt jumps use tmux's `previous-prompt`/`next-prompt`, which follow OSC 133
+marks: the shell prints them (`shell/init.sh`), and so does the review pane.
+**5** The phase 3 search for `^❯ ` in Claude's dump is gone with the dump.
 
 ### 3.4 Open in editor
 
-`o` in review writes the pane's history (`capture-pane -J -S -`, so lines
-wrapped only by the screen width stay whole) to a temporary file and opens it
-read-only in nvim in a `display-popup` covering about 90% of the window, at the
-line being viewed. `q` closes the popup and returns to review. The popup gets
-buffer-local E/S/D/F mappings, so normal nvim is untouched. Yanks go to the
-tmux buffer through nvim's tmux provider, then to the Windows clipboard.
+**5** `C-a o` opens the conversation (the text review would show; Markdown
+with whole lines for Codex and OpenCode) or a shell pane's history read-only in
+nvim, in a `display-popup` covering about 90% of the window, at the end. `o` in
+review opens what review shows (`capture-pane -J -S -`, so lines wrapped only
+by the screen width stay whole), at the line being viewed. `q` closes the
+popup and returns to where it was opened.
 
-Available for shell and Claude panes. Codex's transcript never reaches tmux
-history; OpenCode's review is already nvim.
+**5** The popup has review's keys (`configs/nvim/lua/dotfiles/review.lua`,
+loaded only with `NVIM_REVIEW`): E/S/D/F and the arrows move, Shift extends a
+selection it starts, Ctrl+S/F move by word, Ctrl+E/D jump between the prompts
+named by `NVIM_REVIEW_PROMPT`, `/` searches upward and `?` downward, `v`
+starts or ends the selection, `y` or Copy copies it and closes the popup, and
+`Esc` (with no selection) or `q` closes. Yanks go to the tmux buffer through
+nvim's tmux provider, then to the Windows clipboard. nvim adds what copy-mode
+lacks: line and block selection, text objects, and regular expressions.
 
 ### 3.5 Mouse
 
@@ -304,7 +340,7 @@ history; OpenCode's review is already nvim.
 
 | Key | Action |
 |---|---|
-| Copy (Ctrl+Insert) ★ | WezTerm already copies its own selections on mouse release. With no WezTerm selection, the key goes to tmux, which decides: in copy-mode, copy the selection; in a Claude pane, send `Ctrl+Shift+C` (`selection:copy`) while Claude reads extended keys (§1.2.12); anywhere else, swallow it so no stray escape sequence reaches a shell |
+| Copy (Ctrl+Insert) ★ | WezTerm already copies its own selections on mouse release. With no WezTerm selection, the key goes to tmux, which decides: in copy-mode, copy the selection; in a Claude pane, send `Ctrl+Shift+C` (`selection:copy`) while Claude reads extended keys (§1.2.12); **5** in a Codex pane, pass it on, and Codex copies its own selection (§1.2.19); anywhere else, swallow it so no stray escape sequence reaches a shell |
 | Alt+Copy | Enter copy-mode, or copy the selection in it |
 | Paste (Shift+Insert) | Paste the Windows clipboard (WezTerm, bracketed) |
 | Alt+Paste, `C-a p` | Paste the tmux buffer, any size |
@@ -422,14 +458,16 @@ The step-by-step execution plan, with tests and adoption checks, is in
 | 2 | Claude fullscreen with mouse capture; trimmed keybindings; focus-only clicks |
 | 3 | Alt+E/S/D/F edge crossing, browse keys, review dispatch and key table, agent keymaps, prompt marks, `C-a y` |
 | 4 | harper-ls; the Alt+V compose pane and prose profile |
+| 5 | One review viewer: each agent's conversation in copy-mode in a review pane (Claude's `Ctrl+O v` through compose-editor, Codex's session file by the thread id in its title, OpenCode's export); `C-a /`, `C-a o`; review's keys in the nvim popup; the Copy key in Codex |
 
-### Phase 5 — Parked: popup transcript viewer
+### Parked: every transcript from disk
 
-Render the session from disk into a popup, independent of the renderer and the
-history limit. Claude maps a pane to its session through
-`~/.claude/sessions/<pid>.json` (it records the tmux pane); Codex and OpenCode
-have no simple mapping. Revisit if dumps of very long sessions hit the 50k-line
-limit or the app-side viewers prove insufficient.
+Rendering Claude's and OpenCode's sessions from disk too would make review
+independent of their interfaces and of the 50k-line history limit. Claude maps
+a pane to its session through `sessions/<pid>.json`, but its JSONL is mostly
+internal API records, while `Ctrl+O v` is a supported export of exactly what it
+shows. OpenCode's TUI exposes no session id (§1.2.23). Revisit if a Claude
+transcript outgrows the history limit or an export key changes.
 
 ---
 
@@ -437,14 +475,33 @@ limit or the app-side viewers prove insufficient.
 
 - **Inline modes everywhere** (Claude classic, Codex
   `fullscreen_transcript = false`, `opencode mini`): one tmux copy-mode for
-  everything, but each is the secondary path in its app, and Claude's agent view
-  ignores it.
+  everything, but each is the secondary path in its app, Claude's agent view
+  and attached sessions ignore it, and Codex's inline mode and `opencode mini`
+  clear the pane's tmux history on every width change (§1.2.21, §1.2.25);
+  mini has no copy or export.
 - **`$EDITOR` wrapper in a split** (the original prose-editor draft): Claude
   blanks and stops reading input during the handoff (§1.2.5), so the
   conversation is neither visible nor scrollable while composing, and an
   abandoned editor pane can hang the agent.
 - **Two dedicated keys for review and editor**: they overlapped in every pane
-  type; the editor became `o` inside review.
+  type; the editor became `o` inside review. Phase 5 adds `C-a o` back only as
+  a shortcut to the same popup, so "open in editor" is one gesture.
+- **Claude's transcript dumped into its pane's history** (`Ctrl+O [`, phase 3's
+  review): it needed the pane's history cleared, a settle-time heuristic to
+  know the dump was done, and an Esc to bring Claude back, which interrupts a
+  turn if Claude has already left the dump. `Ctrl+O v` gives the same text, and
+  the editor starting is the signal that it is complete.
+- **Each agent's own viewer as review** (Claude's `Ctrl+O` view, Codex's `F3`
+  and `Ctrl+Space`): three sets of keys, none in OpenCode, and Codex's
+  selection always starts at the top-left of the view.
+- **The nvim popup as the only viewer**: one more key table to keep in step
+  with copy-mode, which shells keep for their prompt marks. It stays as `o`
+  and `C-a o`, for what copy-mode can't do.
+- **`/export FILE` typed into Codex's or Claude's prompt box**: it would land in
+  any draft there and submit it.
+- **Hint copiers** (tmux-thumbs, tmux-fingers, extrakto): they read the visible
+  screen, which is all tmux can capture of an alternate-screen app, and pick
+  patterns such as paths, hashes, and URLs, not arbitrary text.
 
 ## 8. Open questions
 
@@ -452,3 +509,13 @@ limit or the app-side viewers prove insufficient.
    nothing). The keyboard firmware sends F17/F18 from those positions instead;
    `configs/wezterm.lua` maps them to Shift+F5/F6, and tmux binds those.
    Pending: the firmware change, and whether Windows Terminal binds F17/F18.
+2. **Claude's Shift+Up/Down scroll a line** (`configs/ai/claude/keybindings.json`),
+   which takes those keys from `selection:extendUp/Down`: a selection started
+   with the mouse in Claude extends with Shift+Left/Right only, while Shift+Up
+   scrolls the view under it (spike). Review is unaffected. Keep line scroll
+   there, or move it to other keys and let Shift+arrows extend as they do in
+   review?
+3. **Codex panes name their thread only after a restart.** `bin/ai-config`
+   adds `terminal_title` as a default; Codex sessions started before that, and
+   machines that have changed their title, fall back to the newest session in
+   the pane's directory, which can be another pane's.
