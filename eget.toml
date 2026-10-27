@@ -55,7 +55,7 @@ asset_filters = ["gdu_linux_", ".tgz", "^_static"]
 target = "~/.local/bin/gdu"
 
 ["charmbracelet/glow"]
-tag = "v2.1.1"
+tag = "v2.1.2"
 asset_filters = [".tar.gz", "^sbom"]
 
 ["jesseduffield/lazygit"]
