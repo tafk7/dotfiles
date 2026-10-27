@@ -239,9 +239,10 @@ request at the prompt, in Bash and Zsh. `bin/ai-command` asks Claude.
 Zsh shows `refine>` under the command line. Bash shows the command dimmed with
 `refine>` under it, and erases both once you answer. Ctrl+C or an empty answer
 at `refine>`, and Ctrl+C while Claude is working, leave the command line as it
-was; so does a failure, which prints one line saying why. A failed or
-cancelled correction is not resumed: the next `Alt+I` asks for the correction
-again and starts a new conversation from the command line.
+was; so does a failure, which prints one line saying why. A correction that
+fails, or that you interrupt while Claude is working, is not resumed: the next
+`Alt+I` asks for the correction again and starts a new conversation from the
+command line.
 
 A conversation ends at the next prompt (you ran the command, or pressed Ctrl+C
 on the line), when you change directory, and with `Alt+Shift+I`. The next
