@@ -442,5 +442,5 @@ test suites kept the load average at 8 to 12; the configured-model call took
 - Sessions stay in `~/.claude/projects/` (under the cache directory's name)
   until Claude's `cleanupPeriodDays`; `--no-session-persistence` is used only
   for a one-off `bin/ai-command REQUEST` without `--session`.
-- Open decisions: the default model (`haiku`, low effort) and whether the
-  keys should be on by default.
+- The default model stays `haiku` at low effort (the owner's decision,
+  2026-10-27). Open: whether the keys should be on by default.
