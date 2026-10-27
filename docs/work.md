@@ -142,8 +142,9 @@ Bootstrap installs Git and updates the checkout even when setup receives
 `--dry-run`.
 
 Reconnect if group membership changed, enroll Tailscale with the intended
-routing/SSH policy, run `sbx login`, authenticate GitHub and selected tools, and
-run `./bin/verify --tier work --tail`. Use `--smoke` only when image downloads
+routing/SSH policy, run `sbx login`, set the Git identity and GitHub login
+(`git profile add NAME --default`), authenticate selected tools, and run
+`./bin/verify --tier work --tail`. Use `--smoke` only when image downloads
 and temporary resource use are acceptable.
 
 ## Cloud CLIs

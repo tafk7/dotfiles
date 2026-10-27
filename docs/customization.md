@@ -163,27 +163,50 @@ agents should have them. `~/.shell.local` and its fragments are interactive
 hooks; services, desktop applications, and plain non-interactive shells do not
 read them. Plain `bash -c` reads neither file.
 
-Employer- or account-specific helpers, such as a clone function pinned to a
-second GitHub account, belong in `~/.shell.local` until
-[git profiles](../issues/git-profiles.md) provides a tracked mechanism.
+Employer- or account-specific helpers belong in `~/.shell.local`. A clone
+function there pinned to a second GitHub account can be deleted once you use
+`gcl -p` (below).
 
-### Git identity and signing
+### Git profiles
 
 Setup renders the portable Git config to
 `${XDG_CONFIG_HOME:-~/.config}/dotfiles/gitconfig` and includes it from your
-existing `~/.gitconfig`, which it never replaces. Identity and signing go in
-`~/.gitconfig.local`. Signing is machine-local because it only works where the
-key exists:
+existing `~/.gitconfig`, which it never replaces. It sets no identity, and the
+portable config sets `user.useConfigOnly`, so a repository without one refuses
+to commit instead of guessing `username@hostname`. `git profile`
+(`bin/git-profile`) sets the commit email, SSH signing, and SSH key per
+account:
 
-```ini
-[user]
-    email = you@work.example
-    signingkey = ~/.ssh/id_ed25519.pub
-[gpg]
-    format = ssh
-[commit]
-    gpgsign = true
+```bash
+git profile add tafk7 --default   # the machine default, in ~/.gitconfig.local
+git profile add work              # a second account, as a profile
+git profile use work              # in a repository: commit, sign, push as work
+gcl -p work git@github.com:org/repo.git   # clone as work from the first fetch
+git profile whoami                # what applies here, and from which file
 ```
+
+`add` logs in with gh, or uses an account gh already holds (`--user LOGIN`, or
+one named like the profile). It offers the account's verified emails, creates
+`~/.ssh/id_ed25519_NAME` (or takes `--ssh-key PATH`, or `--ssh-key agent` for
+a key the SSH agent holds, such as Bitwarden's through `ssh-bridge`), and
+registers the key on GitHub twice, for authentication and for signing, titled
+`<hostname>-NAME`. It ends by checking that SSH authenticates as that account.
+Each step checks first, so a rerun repairs a partial setup.
+
+A profile is `~/.config/git/profiles/NAME.gitconfig`, and a repository opts in
+with one `include.path` line in its `.git/config`, so editing a profile updates
+every repository that uses it. The profile's `core.sshCommand` pins its key
+(`IdentitiesOnly`, no connection sharing), so the remote stays a plain
+`git@github.com:` URL. Profiles hold emails, logins, and key paths, never keys
+or tokens; they are untracked and regenerated per machine. `git profile remove
+NAME` deletes one and names the GitHub keys to revoke.
+
+The default identity has no `sshCommand`, so its key must be the first one ssh
+offers the host: `~/.ssh/id_ed25519`, the agent's key, or an `IdentityFile` in
+`~/.ssh/config.local`. gh keeps one active account: `gh pr` in a work
+repository acts as whichever account is active, and `whoami` says when that is
+not the profile's. The design, its checks, and its limits are in
+[git profiles](../issues/git-profiles.md).
 
 ### Secrets
 
@@ -218,6 +241,10 @@ Host github.com
     IdentityFile ~/.ssh/work_ed25519
     IdentitiesOnly yes
 ```
+
+That block pins the default key. A second account on the same host needs a
+[profile](#git-profiles), not another block: GitHub takes the first key it
+accepts as the account, whatever the repository.
 
 ## Adding a theme
 
