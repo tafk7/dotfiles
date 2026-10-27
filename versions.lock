@@ -58,7 +58,7 @@ starship	x86_64	v1.27.0	starship/starship	starship-x86_64-unknown-linux-musl.tar
 tmux	any	3.8	tmux/tmux	tmux-3.8.tar.gz	e79c699c7e949dccd0a4a125e17b8d1261e311b16979dbc8eb34542f3966d82e	-	version:3.8
 uv	aarch64	0.13.5	astral-sh/uv	uv-aarch64-unknown-linux-gnu.tar.gz	4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403	uv-aarch64-unknown-linux-gnu/uv	sha256:2914576f11ea3e2f66145703b8e15acc4a9bf0c2409f6b699cd3914966f26460
 uv	x86_64	0.13.5	astral-sh/uv	uv-x86_64-unknown-linux-gnu.tar.gz	f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f	uv-x86_64-unknown-linux-gnu/uv	sha256:8a70db72685b7138121bfcda71fa1a00cb709ed9f1fdc4ecf1dd871e8e167e52
-vim-plug	any	88e31471818e9a29a8a20a0ee61360cfd7bdc1cd	junegunn/vim-plug	plug.vim	7e2b20cd909da9c456498684c98f03c63829170f01e34595dd8e1818a217d37c	-	-
+vim-plug	any	4da42e9a5c948fb82970d522bd14cbab3d122ff1	junegunn/vim-plug	plug.vim	35415db86b8bed020c06490b8e8aab80ffd639875c2674d5713ef0d7b8379382	-	-
 wsl2-ssh-agent	aarch64	v0.9.7	mame/wsl2-ssh-agent	wsl2-ssh-agent-arm64	e9cb0347a72ca68a511e48779080b80a22af1bf670e5a52c9f35f95951ce5221	-	sha256:e9cb0347a72ca68a511e48779080b80a22af1bf670e5a52c9f35f95951ce5221
 wsl2-ssh-agent	x86_64	v0.9.7	mame/wsl2-ssh-agent	wsl2-ssh-agent	281c64f6079598de1a455292d533f3ae21837980a3d3012074bc14ad695325d8	-	sha256:281c64f6079598de1a455292d533f3ae21837980a3d3012074bc14ad695325d8
 zoxide	aarch64	v0.10.0	ajeetdsouza/zoxide	zoxide-0.10.0-aarch64-unknown-linux-musl.tar.gz	f1f16c5d6298d63dee467eedea1cdcd8490e43e493bea43acd416dc9033ef641	zoxide	sha256:1864ef686a652b9db90901c72dbb8bd3da45d98738d12f94b4f85729448f2dde
