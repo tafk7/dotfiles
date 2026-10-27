@@ -77,9 +77,12 @@ export PYTHONDONTWRITEBYTECODE=1
 export PIP_REQUIRE_VIRTUALENV=false
 export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
 
-# Pi's install and update telemetry, off for everything started from here,
-# whatever ~/.pi/agent/settings.json says.
+# Telemetry off for everything started from here: Pi's install and update
+# pings (whatever ~/.pi/agent/settings.json says), and gh's usage events (a
+# device id, command, flag names, and any AI agent running it; see
+# `gh help telemetry`).
 export PI_TELEMETRY=0
+export GH_TELEMETRY=false
 
 # Node.js
 # NODE_OPTIONS is deliberately not set: every node process would inherit it,

@@ -44,7 +44,8 @@ a test HOME linked to a worktree, or a new tmux pane after a checkout switch,
 uses the linked checkout.
 
 Variables dotfiles owns (`EDITOR`, `PROJECTS_DIRS`, `RIPGREP_CONFIG_PATH`,
-`PAGER`, `LESS`) resolve in three layers, each overriding the one before: the
+`PAGER`, `LESS`, and the telemetry switches `GH_TELEMETRY=false` and
+`PI_TELEMETRY=0`) resolve in three layers, each overriding the one before: the
 repo default, `~/.shell.env`, then an allowed `.envrc`. An inherited value
 never wins over them, so a changed default reaches the next shell that
 computes Layer 0.
