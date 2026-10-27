@@ -215,10 +215,15 @@ tk_raw q
 await_closed "$claude"
 : > "$nvim_log"
 
-# Without compose-editor as Claude's VISUAL, Ctrl+O v would stop Claude for an
-# editor in its place, so review opens Claude's own transcript view instead.
+# With another VISUAL, or a compose-editor from before the hand-over, Ctrl+O v
+# would stop Claude for an editor in its place, so review opens Claude's own
+# transcript view instead.
+mkdir -p "$TEST_ROOT/old"
+printf '#!/bin/sh\nexec vi "$@"\n' > "$TEST_ROOT/old/compose-editor"
+chmod +x "$TEST_ROOT/old/compose-editor"
 plain_log="$TEST_ROOT/claude-plain.log"
-plain=$(ti new-window -t test -P -F '#{pane_id}' "$(tk_stub claude "$plain_log" --claude transcript)")
+plain=$(ti new-window -t test -e "VISUAL=$TEST_ROOT/old/compose-editor" -P -F '#{pane_id}' \
+    "$(tk_stub claude "$plain_log" --claude transcript)")
 tk_ready "$plain_log"
 tk_wait '#{alternate_on}' 1 "$plain"
 tk_raw "$REVIEW"

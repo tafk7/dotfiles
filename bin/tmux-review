@@ -77,10 +77,11 @@ claude_transcript() {
     pid=$(agent_pid claude)
     visual=$(agent_env "$pid" VISUAL)
     claude_transcript_view && was_open=true
-    if [[ "${visual##*/}" != compose-editor ]]; then
-        # Ctrl+O v would run the editor in Claude's place and stop Claude.
+    # Any other editor, or a compose-editor from before the hand-over, would
+    # run in Claude's place for Ctrl+O v and stop Claude until it exits.
+    if [[ "${visual##*/}" != compose-editor ]] || ! grep -q '@review-file' "$visual" 2>/dev/null; then
         [[ "$was_open" == true ]] || tmux send-keys -t "$pane" C-o
-        message "Claude's VISUAL is not compose-editor, so its own transcript view is open (/ searches)"
+        message "Claude's VISUAL can't hand over its transcript, so its own transcript view is open (/ searches)"
         return 1
     fi
     tmux set -p -t "$pane" @review-file "$file"
@@ -171,7 +172,7 @@ agent_transcript() {
 # Show $work/transcript in copy-mode in a review pane zoomed over the agent.
 review_pane() {
     local review channel="tmux-review-$$"
-    if ! review=$(tmux split-window -Z -t "$pane" -P -F '#{pane_id}' \
+    if ! review=$(tmux split-window -Z -t "$pane" -c "$(pane_format '#{pane_current_path}')" -P -F '#{pane_id}' \
         "$(printf '%q ' "$self" show "$work" "$prompt" "$channel")" 2>&1); then
         message "no review pane: $review"
         rm -rf -- "$work"
