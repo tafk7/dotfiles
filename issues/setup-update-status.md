@@ -79,10 +79,6 @@ user's decision, 2026-10-26).
 - `tests/tmux-compose-claude.sh` can leave `nvim --embed` servers behind when
   its cleanup races, and they ignore SIGTERM; three were left on this host
   (killed with SIGKILL on 2026-10-26).
-- The state lock (`lib/state.sh`) breaks a lock older than 2 seconds as
-  stale, so under load two concurrent writers can both proceed and one
-  update is lost: `tests/state.sh` "concurrent badge preference" failed once
-  under the full suite on 2026-10-27, and passes alone.
 - `dotfiles profile --propose` reads ownership from the ledger an older
   checkout wrote: Docker and Tailscale were recorded external though both
   are APT packages from their vendors' repositories, so `tail` was not
