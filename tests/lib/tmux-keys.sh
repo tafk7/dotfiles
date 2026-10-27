@@ -50,18 +50,18 @@ tk_descendants() {
 # mid-exit ignores SIGTERM. The process trees are gathered before the servers
 # go, and gone (SIGKILL after two seconds) before the fixture is removed.
 tk_cleanup() {
-    local -a servers=() left=()
+    local -a tk_servers=() tk_pids=()
     local server pid _
     for server in "$TK_OUTER" "$TK_INNER"; do
-        pid="$(timeout 5 tmux -L "$server" display-message -p '#{pid}' 2>/dev/null)" && servers+=("$pid")
+        pid="$(timeout 5 tmux -L "$server" display-message -p '#{pid}' 2>/dev/null)" && tk_servers+=("$pid")
     done
-    if (( ${#servers[@]} )); then mapfile -t left < <(tk_descendants "${servers[@]}"); fi
+    if (( ${#tk_servers[@]} )); then mapfile -t tk_pids < <(tk_descendants "${tk_servers[@]}"); fi
     tmux -L "$TK_OUTER" kill-server 2>/dev/null || true
     tmux -L "$TK_INNER" kill-server 2>/dev/null || true
-    for _ in {1..20}; do tk_any_alive "${left[@]}" || break; sleep 0.1; done
-    if tk_any_alive "${left[@]}"; then
-        kill -KILL "${left[@]}" 2>/dev/null || true
-        for _ in {1..20}; do tk_any_alive "${left[@]}" || break; sleep 0.1; done
+    for _ in {1..20}; do tk_any_alive "${tk_pids[@]}" || break; sleep 0.1; done
+    if tk_any_alive "${tk_pids[@]}"; then
+        kill -KILL "${tk_pids[@]}" 2>/dev/null || true
+        for _ in {1..20}; do tk_any_alive "${tk_pids[@]}" || break; sleep 0.1; done
     fi
     fixture_cleanup
 }
