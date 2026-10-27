@@ -31,7 +31,16 @@ assert_eq "$(record "$HOME/.bashrc")" "link	$ROOT/entry/bash.sh	bash.sh" "a link
 portable="$(portable_gitconfig_path)"
 assert_eq "$(record "$portable")" "rendered	sha256:$(sha256sum "$portable" | awk '{print $1}')	gitconfig" "the rendered gitconfig's record"
 assert_eq "$(record "$HOME/.gitconfig")" "merged	include:$portable	gitconfig" "the merged include's record"
-[[ -z "$(record "$HOME/.tmux.conf")" ]] || fail "a config whose owner is absent was recorded"
+# A config whose owner is not installed here (which ones are depends on the
+# host) is neither deployed nor recorded.
+absent=""
+for config in "${!CONFIG_MAP[@]}"; do
+    IFS=: read -r target _ owner <<< "${CONFIG_MAP[$config]}"
+    [[ -n "$owner" ]] && ! config_owner_present "$owner" && { absent="$target"; break; }
+done
+if [[ -n "$absent" ]]; then
+    [[ -z "$(record "$absent")" && ! -e "$absent" ]] || fail "a config whose owner is absent was recorded: $absent"
+fi
 
 # A change event only for a link that changed on disk: a first run over links
 # already in place (no records yet) records none; a recreated link does. Under

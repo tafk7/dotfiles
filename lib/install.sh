@@ -1555,11 +1555,11 @@ upgrade_apt_packages() {
 # ones included.
 apt_upgrade() {
     local pkg plan
-    local -a held=() named=()
+    local -a held_packages=() named=()
     for pkg in "$@"; do
-        if apt_package_held "$pkg"; then held+=("$pkg"); else named+=("$pkg"); fi
+        if apt_package_held "$pkg"; then held_packages+=("$pkg"); else named+=("$pkg"); fi
     done
-    (( ${#held[@]} == 0 )) || log "Held, so not upgraded: ${held[*]}"
+    (( ${#held_packages[@]} == 0 )) || log "Held, so not upgraded: ${held_packages[*]}"
     (( ${#named[@]} )) || return 0
     [[ "${DRY_RUN:-false}" == true ]] || update_packages || return 1
     plan="$(apt-get -s -o Debug::NoLocking=1 install --only-upgrade --no-remove "${named[@]}" 2>/dev/null \
