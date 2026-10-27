@@ -46,7 +46,7 @@ validate_tar_archive "$TEST_ROOT/unsafe.tar" >/dev/null 2>&1 \
 # A skipped self-updating CLI keeps ownership after moving within its roots;
 # the ledger then records the new path.
 mkdir -p "$HOME/.local/share/claude/versions" "$HOME/.local/bin"
-cp /usr/bin/true "$HOME/.local/share/claude/versions/2"
+fake_command "$HOME/.local/share/claude/versions/2" true
 ln -sf "$HOME/.local/share/claude/versions/2" "$HOME/.local/bin/claude"
 ledger_record claude yes dotfiles installed 1 "$HOME/.local/share/claude/versions/1" test
 INSTALL_FAIL=()

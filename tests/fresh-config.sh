@@ -36,7 +36,7 @@ grep -qx 'user config' "$backup" || fail "external-XDG config not backed up"
 
 # External installers exit before any release/network lookup, even with --force.
 for name in nvim tmux eget; do
-    cp /usr/bin/true "$TEST_ROOT/bin/$name"
+    fake_command "$TEST_ROOT/bin/$name" true
 done
 for name in neovim tmux eget; do
     rc=0

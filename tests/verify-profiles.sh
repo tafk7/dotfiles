@@ -75,8 +75,8 @@ grep -Fq 'no dotfiles interactive/private functions leak' "$TEST_ROOT/no-functio
 
 # Adoption must not expose a false ownership failure for agent-private rg.
 mkdir -p "$HOME/.local/bin" "$TEST_ROOT/.codex/private"
-cp /usr/bin/true "$HOME/.local/bin/rg"
-cp /usr/bin/true "$TEST_ROOT/.codex/private/rg"
+fake_command "$HOME/.local/bin/rg" true
+fake_command "$TEST_ROOT/.codex/private/rg" true
 ledger_record ripgrep yes dotfiles installed 1 "$HOME/.local/bin/rg" test
 PATH="$TEST_ROOT/.codex/private:$HOME/.local/bin:$PATH" "$ROOT/bin/verify" --installed \
     > "$TEST_ROOT/private-rg.log" 2>&1 || true
@@ -88,7 +88,7 @@ grep -Fq 'present outside recorded ownership' "$TEST_ROOT/private-rg.log" \
     && fail "private rg was used for ownership verification"
 
 # Distinguish a missing companion from a missing primary executable.
-cp /usr/bin/true "$HOME/.local/bin/uv"
+fake_command "$HOME/.local/bin/uv" true
 ledger_record uv yes dotfiles installed 1 "$HOME/.local/bin/uv" test
 PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH" "$ROOT/bin/verify" --installed \
     > "$TEST_ROOT/missing-uvx.log" 2>&1 && fail "missing companion was accepted"
@@ -98,10 +98,10 @@ grep -Fq 'uv (missing companion: uvx)' "$TEST_ROOT/missing-uvx.log" \
 # A self-updating CLI that moved within its ownership roots is still owned; a
 # component without that contract still reports the moved path.
 mkdir -p "$HOME/.local/share/claude/versions"
-cp /usr/bin/true "$HOME/.local/share/claude/versions/2"
+fake_command "$HOME/.local/share/claude/versions/2" true
 ln -sf "$HOME/.local/share/claude/versions/2" "$HOME/.local/bin/claude"
 ledger_record claude yes dotfiles installed 1 "$HOME/.local/share/claude/versions/1" test
-cp /usr/bin/true "$HOME/.local/bin/sd-moved"
+fake_command "$HOME/.local/bin/sd-moved" true
 ln -sf "$HOME/.local/bin/sd-moved" "$HOME/.local/bin/sd"
 ledger_record sd yes dotfiles installed 1 "$HOME/.local/bin/sd" test
 PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH" "$ROOT/bin/verify" --installed \
