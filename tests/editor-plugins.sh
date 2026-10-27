@@ -61,6 +61,11 @@ plugins
 assert_eq "$PLUGINS_RC" 2 "plugins at their pins"
 plugins --check
 assert_eq "$PLUGINS_RC" 0 "--check at the pins"
+# A check writes no state, Neovim's log included, into a state dir it has
+# never seen.
+mkdir -p "$TEST_ROOT/state-check"
+XDG_STATE_HOME="$TEST_ROOT/state-check" "$ROOT/bin/install-editor-plugins" --check >/dev/null 2>&1 || true
+assert_eq "$(cd "$TEST_ROOT/state-check" && find . -mindepth 1 | sort | paste -sd' ')" "" "--check wrote state"
 
 git -C "$plugin" checkout -q --detach "$first"
 printf 'local\n' > "$plugin/LOCAL"
