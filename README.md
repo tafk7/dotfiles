@@ -73,7 +73,7 @@ dotfiles profile                  # tier, capabilities, AI CLIs, opt-outs
 dotfiles profile --add rdp        # save, show the plan, apply on confirmation
 dotfiles profile --remove pi      # stop managing pi; it stays installed
 dotfiles profile --tier dev       # lowering uninstalls nothing
-dotfiles profile --propose        # derive one from the component ledger
+dotfiles profile --propose        # derive one from what is installed
 ```
 
 Every run, including `--dry-run`, writes a log to
