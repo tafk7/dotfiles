@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile portable AI preferences and assets without installing binaries."""
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -47,17 +48,80 @@ def released(component, target):
     return {tuple(path) for path in listed}
 
 
+def _read(path):
+    return tomllib.loads(path.read_text()) if path.suffix == '.toml' else load_json(path)
+
+
+def portable_sources(source):
+    """SOURCE's enforced keys, and its defaults: the .defaults sibling, if any
+    (configs/codex.toml and configs/codex.defaults.toml)."""
+    sibling = source.with_name(f'{source.stem}.defaults{source.suffix}')
+    return _read(source), (_read(sibling) if sibling.exists() else {})
+
+
+MISSING = object()
+
+
+def _leaf(data, path):
+    """('set', value), ('absent', None), or ('blocked', None) when something
+    other than a table is in the way."""
+    node = data
+    for key in path[:-1]:
+        if key not in node:
+            return 'absent', None
+        node = node[key]
+        if not isinstance(node, dict):
+            return 'blocked', None
+    return ('set', node[path[-1]]) if path[-1] in node else ('absent', None)
+
+
+def _set_leaf(data, path, value):
+    node = data
+    for key in path[:-1]:
+        node = node.setdefault(key, {})
+    node[path[-1]] = deepcopy(value)
+
+
 class Settings:
-    """One settings document: its new text, and what retirement found."""
-    def __init__(self, target, base, overlay, previous, fmt, original=None, released=()):
+    """One settings document: its new text, and what retirement found.
+
+    overlay holds the enforced keys, put back on every run. defaults hold keys
+    a machine owns once it changes them: a default is written where the key is
+    absent and was never written, and updated while the document still holds
+    the value dotfiles last wrote (or, with nothing recorded, the default
+    itself); otherwise it is left alone. An enforced key that becomes a default
+    carries its recorded value over, so it is handed over rather than reset."""
+    def __init__(self, target, base, overlay, previous, fmt, original=None, released=(), defaults=None):
         """base is the document to merge into; original, what the target holds
         now (default: base), keeps the bytes when nothing changes; released
         paths are dropped from the record instead of retired."""
         original = base if original is None else original
+        released, defaults = set(released), defaults or {}
         recorded = {tuple(k): v for k, v in previous.get('applied', []) if tuple(k) not in released}
+        written = {tuple(k): v for k, v in previous.get('defaults', []) if tuple(k) not in released}
         self.target, self.overlay = target, overlay
-        self.conflicts_before = {tuple(k) for k in previous.get('conflicts', [])} - set(released)
-        retired, self.removed, self.conflicts = retire_leaves(base, recorded, overlay)
+        self.conflicts_before = {tuple(k) for k in previous.get('conflicts', [])} - released
+        # Keys that left both the overlay and the defaults are retired; a key
+        # moving from one to the other is not.
+        portable, enforced = merge(defaults, overlay), leaves(overlay)
+        retired, self.removed, self.conflicts = retire_leaves(base, recorded, portable)
+        retired, _, _ = retire_leaves(retired, written, portable)
+        self.written = {}
+        for path, value in leaves(defaults).items():
+            if any(path[:i] in enforced for i in range(1, len(path) + 1)):
+                continue
+            last = written.get(path, recorded.get(path, MISSING))
+            state, live = _leaf(retired, path)
+            if state == 'blocked':
+                continue
+            owned = (last is MISSING and (state == 'absent' or equivalent(live, value))) \
+                or (last is not MISSING and state == 'set' and equivalent(live, last))
+            if owned:
+                _set_leaf(retired, path, value)
+                self.written[path] = value
+            elif last is not MISSING:
+                # The machine changed or removed it; remember what was written.
+                self.written[path] = last
         data = merge(retired, overlay)
         if target.exists() and equivalent(data, original):
             self.text = target.read_text()
@@ -70,17 +134,19 @@ class Settings:
         applied = leaves(self.overlay)
         conflicts = sorted(path for path in self.conflicts_before | set(self.conflicts) if path not in applied)
         return {'applied': [[list(path), value] for path, value in sorted(applied.items())],
+                'defaults': [[list(path), value] for path, value in sorted(self.written.items())],
                 'conflicts': [list(path) for path in conflicts]}
 
 
 def json_settings(target, source, previous, released=()):
-    return Settings(target, load_json(target), load_json(source), previous, 'json', released=released)
+    overlay, defaults = portable_sources(source)
+    return Settings(target, load_json(target), overlay, previous, 'json', released=released, defaults=defaults)
 
 
 def desired(component, home, record=None):
     """The component's directory, its outputs (path, bytes, mode), and its
-    settings documents. Leaves a previous run applied and the overlay no
-    longer ships are retired (see retire_leaves)."""
+    settings documents (see Settings). Leaves a previous run applied and the
+    portable sources no longer ship are retired (see retire_leaves)."""
     record = record or {}
     directory = home / ('.' + component)
     extra, settings = [], []
@@ -89,9 +155,9 @@ def desired(component, home, record=None):
         target = directory / 'config.toml'
         check_target(target)
         original = tomllib.loads(target.read_text()) if target.exists() else {}
-        overlay = tomllib.loads((ROOT / 'configs/codex.toml').read_text())
+        overlay, defaults = portable_sources(ROOT / 'configs/codex.toml')
         settings.append(Settings(target, original, overlay, record.get(str(target), {}), 'toml',
-                                 released=released(component, target)))
+                                 released=released(component, target), defaults=defaults))
     else:
         if component == 'opencode':
             config_home = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) if home == Path.home() else home / '.config'
@@ -103,7 +169,7 @@ def desired(component, home, record=None):
             target = directory / 'settings.json'
             source = ROOT / 'configs/claude-settings.json'
         original = load_json(target)
-        overlay = load_json(source)
+        overlay, defaults = portable_sources(source)
         if component == 'opencode':
             # Until a V2 binary is installed, keep the supported V1 spelling.
             # Configuration can be provisioned before installing any CLI.
@@ -131,10 +197,10 @@ def desired(component, home, record=None):
                 overlay['autoupdate'] = overlay.pop('update')
                 # Preserve any native value until V2 is available to own it.
             document = Settings(target, base, overlay, record.get(str(target), {}), 'json', original,
-                                released(component, target))
+                                released(component, target), defaults)
         else:
             document = Settings(target, original, overlay, record.get(str(target), {}), 'json',
-                                released=released(component, target))
+                                released=released(component, target), defaults=defaults)
         settings.insert(0, document)
     outputs = [(settings[0].target, settings[0].text.encode(), 0o600), *extra]
     assets = ROOT / 'configs/ai' / component

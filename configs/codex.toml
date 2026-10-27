@@ -1,16 +1,5 @@
-# Portable keys reconciled by bin/ai-config. Unlisted local values are preserved.
-# Model, provider, context window and compaction limit depend on where requests
-# are served, so they belong to whatever configures the provider, not here.
-
-model_reasoning_effort = "high"
-plan_mode_reasoning_effort = "high"
-approvals_reviewer = "user"
-
-approval_policy = "on-request"
-sandbox_mode = "workspace-write"
-
-[history]
-persistence = "save-all"
+# Portable keys bin/ai-config keeps on every apply; unlisted local values are
+# preserved. Defaults each machine may change live in codex.defaults.toml.
 
 # Disable Codex's default-on metrics export. In release builds, stock Codex sends
 # OpenTelemetry METRICS to OpenAI's Statsig endpoint (https://ab.chatgpt.com/
@@ -20,25 +9,3 @@ persistence = "save-all"
 [otel]
 metrics_exporter = "none"
 log_user_prompt = false
-
-# TAFK line-editing semantics for the Codex composer. Windows Terminal often
-# encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
-[tui]
-status_line = ["context-used", "total-output-tokens", "model"]
-
-[tui.keymap.editor]
-move_line_end = "end"
-delete_backward = "backspace"
-delete_backward_word = ["ctrl-backspace", "ctrl-h"]
-delete_forward_word = "ctrl-delete"
-kill_line_start = "alt-backspace"
-kill_line_end = "alt-delete"
-
-
-# Ctrl stays application-local; Alt remains available for tmux navigation.
-[tui.keymap.global]
-open_external_editor = "ctrl-e"
-
-[tui.keymap.chat]
-next_permission_mode = "ctrl-g"
-previous_permission_mode = "ctrl-shift-g"

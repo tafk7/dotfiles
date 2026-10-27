@@ -12,6 +12,10 @@ _DOTFILES_STALENESS_LOADED=1
 # Programs whose processes are checked against their consumer's change event:
 # consumer, then the process names (comm) that run it.
 STALE_PROGRAMS=("claude claude" "codex codex" "opencode opencode" "neovim nvim" "tmux tmux:")
+# Stale processes a restart in a pane does not reach: consumer, a pattern in
+# the command line, and how to restart them. Codex's app-server daemon serves
+# new sessions with the config it loaded and outlives tmux.
+declare -A STALE_HINTS=([codex]="app-server|its background server: codex app-server daemon restart")
 
 # proc_start_epoch PID: when the process started, in epoch seconds.
 proc_start_epoch() {
@@ -71,7 +75,7 @@ staleness_report() {
         (( ${#stale[@]} + ${#soft[@]} + ${#possibly[@]} > 0 )) || outcome ok "$section" shells "$tracked tracked, all current"
     fi
 
-    local entry consumer comm proc found
+    local entry consumer comm proc found hint pid note
     for entry in "${STALE_PROGRAMS[@]}"; do
         read -r consumer comm <<< "$entry"
         IFS=$'\t' read -r _ event reason < <(change_line "$consumer" 2>/dev/null || true) || continue
@@ -84,8 +88,17 @@ staleness_report() {
             start="$(proc_start_epoch "${proc#/proc/}" 2>/dev/null)" || continue
             (( start < event )) && found+=("${proc#/proc/}")
         done
-        (( ${#found[@]} == 0 )) || outcome advisory "$section" "$consumer" \
-            "${#found[@]} process(es) started before $consumer changed ($reason); restart them: pids ${found[*]}"
+        (( ${#found[@]} == 0 )) && continue
+        note="" hint="${STALE_HINTS[$consumer]:-}"
+        for pid in "${found[@]}"; do
+            [[ -n "$hint" ]] || break
+            if { tr '\0' ' ' < "/proc/$pid/cmdline"; } 2>/dev/null | grep -q -- "${hint%%|*}"; then
+                note=" (${hint#*|})"
+                break
+            fi
+        done
+        outcome advisory "$section" "$consumer" \
+            "${#found[@]} process(es) started before $consumer changed ($reason); restart them: pids ${found[*]}$note"
     done
     return 0
 }

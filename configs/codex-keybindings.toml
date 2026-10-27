@@ -1,7 +1,7 @@
 # Codex TUI keybinding fragment for the TAFK workflow.
 #
-# Reference-only fragment. The same bindings are deployed automatically from
-# configs/codex.toml; keep this smaller file for copying into other setups.
+# Reference-only fragment. The same bindings are deployed as defaults from
+# configs/codex.defaults.toml; keep this smaller file for copying into other setups.
 #
 # `/keymap` can inspect and persist bindings from inside Codex. When changing
 # bindings there, mirror the resulting tui.keymap entries back into this file.

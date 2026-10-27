@@ -163,9 +163,11 @@ yo <command>              # print output and copy it to the clipboard
 
 ### AI CLIs
 
-`bin/ai-config` merges the portable settings from `configs/codex.toml`,
-`configs/claude-settings.json`, `configs/opencode.json`, and `configs/ai/` into each CLI's own
-configuration. Settings not listed in those files are left alone. See
+`bin/ai-config` merges the portable settings from `configs/` (`codex.toml`,
+`claude-settings.json`, `opencode.json`, `opencode-cli.json`, and `ai/`) into
+each CLI's own configuration. Enforced keys are the same everywhere; the
+`.defaults` files are starting values each machine keeps once it changes them.
+Settings not listed are left alone. See
 [docs/ai-configuration.md](docs/ai-configuration.md).
 
 ```bash

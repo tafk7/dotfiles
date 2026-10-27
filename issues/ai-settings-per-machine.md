@@ -1,7 +1,6 @@
 # Per-machine AI tool settings
 
-Status: proposal revised for shared hosts (2026-10-26); not implemented;
-open questions below.
+Status: implemented (2026-10-26); see Done. Docs: `docs/ai-configuration.md`.
 
 ## Problem
 
@@ -37,6 +36,11 @@ leave Alt to tmux); others are only starting points a machine should own.
 - `9cfa425`: Claude's `effortLevel` and `autoCompactEnabled` left management.
   Keys listed in `configs/ai/released.json` are dropped from the record with
   their values left in place, instead of retired.
+- The proposal below, with the user's answers: Codex's approval policy and
+  sandbox mode are defaults; no per-machine overlay. One deviation: the
+  sandbox kit delivers defaults as managed settings too, because the harness
+  kit rewrites a sandbox's `~/.claude/settings.json` on every create and
+  install hooks run in no fixed order; its output is unchanged.
 
 ## Options
 
@@ -111,19 +115,15 @@ One user-scoped design, the same on every host:
 System layers may come back later as an opt-in for hosts the user owns; their
 only gain is that enforced keys cannot drift.
 
-## Open questions
+## Questions
 
-- Codex's approval policy and sandbox mode: defaults, or enforced?
-- The research recommends a per-machine overlay now. With defaults owned by
-  each machine once changed, it would only declare a machine's values from
-  dotfiles; deferred unless an enforced key must differ on one machine.
+- Decided: Codex's approval policy and sandbox mode are defaults. The
+  per-machine overlay is not needed: separating defaults from enforced keys
+  covers it.
 - On a host whose administrator sets managed settings or `/etc` defaults,
   those still apply: managed settings win over dotfiles' user keys, and
   dotfiles' user keys win over `/etc/codex/config.toml` defaults. verify sees
   only the files dotfiles writes, not the effective settings.
-- This machine, meanwhile: Codex's `xhigh` is kept by hand, so verify reports
-  `codex settings` until this lands. Pi's telemetry can be turned off by hand
-  (`"enableInstallTelemetry": false` in `~/.pi/agent/settings.json`).
 
 ## Research brief
 

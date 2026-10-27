@@ -1,0 +1,10 @@
+{
+  "model": "opus",
+  "theme": "dark",
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "env": {
+    "ENABLE_TOOL_SEARCH": "true"
+  }
+}

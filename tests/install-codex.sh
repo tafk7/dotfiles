@@ -99,9 +99,9 @@ grep -qx 'model_reasoning_effort = "high"' "$HOME/.codex/config.toml" \
 [[ "$(cat "$TEST_STATE/environment")" == $'1\t/dev/null' ]] \
     || fail "official installer was not invoked noninteractively with profile writes disabled"
 
-# An ordinary rerun refreshes the managed block, preserves local state, and does
-# not call upstream.
-sed -i 's/model_reasoning_effort = "high"/model_reasoning_effort = "low"/' \
+# An ordinary rerun puts enforced keys back, keeps a default the machine changed
+# and other local state, and does not call upstream.
+sed -i 's/model_reasoning_effort = "high"/model_reasoning_effort = "low"/; s/metrics_exporter = "none"/metrics_exporter = "otlp"/' \
     "$HOME/.codex/config.toml"
 cat >>"$HOME/.codex/config.toml" <<'LOCAL_STATE'
 
@@ -111,8 +111,10 @@ LOCAL_STATE
 run_expect 2 "$REPO_ROOT/installers/install-codex.sh"
 [[ "$(cat "$TEST_STATE/count")" == 1 ]] || fail "ordinary rerun called installer"
 configure_codex
-grep -qx 'model_reasoning_effort = "high"' "$HOME/.codex/config.toml" \
-    || fail "ordinary rerun did not refresh managed settings"
+grep -qx 'metrics_exporter = "none"' "$HOME/.codex/config.toml" \
+    || fail "ordinary rerun did not put an enforced key back"
+grep -qx 'model_reasoning_effort = "low"' "$HOME/.codex/config.toml" \
+    || fail "ordinary rerun reset a default the machine changed"
 grep -qx '\[projects\."/tmp/example"\]' "$HOME/.codex/config.toml" \
     || fail "ordinary rerun discarded local Codex state"
 python3 -c 'import pathlib, tomllib; tomllib.loads(pathlib.Path("'$HOME'/.codex/config.toml").read_text())' \

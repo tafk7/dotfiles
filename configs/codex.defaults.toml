@@ -1,0 +1,36 @@
+# Defaults bin/ai-config writes into ~/.codex/config.toml: kept up to date while
+# a machine still holds the value dotfiles last wrote, and the machine's once it
+# changes one (Codex's /model and /keymap write here too). Model, provider,
+# context window and compaction limit depend on where requests are served, so
+# they belong to whatever configures the provider, not here.
+
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+approvals_reviewer = "user"
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[history]
+persistence = "save-all"
+
+# TAFK line-editing semantics for the Codex composer. Windows Terminal often
+# encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
+[tui]
+status_line = ["context-used", "total-output-tokens", "model"]
+
+[tui.keymap.editor]
+move_line_end = "end"
+delete_backward = "backspace"
+delete_backward_word = ["ctrl-backspace", "ctrl-h"]
+delete_forward_word = "ctrl-delete"
+kill_line_start = "alt-backspace"
+kill_line_end = "alt-delete"
+
+# Ctrl stays application-local; Alt remains available for tmux navigation.
+[tui.keymap.global]
+open_external_editor = "ctrl-e"
+
+[tui.keymap.chat]
+next_permission_mode = "ctrl-g"
+previous_permission_mode = "ctrl-shift-g"

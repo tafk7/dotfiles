@@ -1,0 +1,6 @@
+{
+  "keybinds": {
+    "session.first": "ctrl+home,ctrl+g,home,alt+home",
+    "session.last": "ctrl+end,ctrl+alt+g,end"
+  }
+}

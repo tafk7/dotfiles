@@ -40,28 +40,34 @@ class ConfigurationTests(unittest.TestCase):
     def snapshot(self):
         return {str(p.relative_to(self.home)): (p.read_bytes(), p.stat().st_mtime_ns) for p in self.home.rglob('*') if p.is_file()}
 
-    def test_preserves_unowned_values_and_updates_all_owned_keys(self):
+    def test_enforced_keys_win_and_defaults_fill_gaps(self):
         codex = self.put('.codex/config.toml', '''model_reasoning_effort = "low"
 [projects."/a.b/#project"]
 trust_level = "trusted"
+[otel]
+metrics_exporter = "otlp"
 [tui]
 screen_reader_detection_done = true
 [tui.keymap.global]
 open_external_editor = "ctrl-x"
 custom_binding = "ctrl-k"
 ''')
-        claude = self.put('.claude/settings.json', '{"env":{"LOCAL_VALUE":"keep"},"permissions":{"defaultMode":"manual"},"enabledPlugins":{"unrelated":true}}')
+        claude = self.put('.claude/settings.json', '{"env":{"LOCAL_VALUE":"keep","DISABLE_TELEMETRY":"0"},"permissions":{"defaultMode":"manual"},"enabledPlugins":{"unrelated":true}}')
         self.run_config()
         c = tomllib.loads(codex.read_text())
-        self.assertEqual(c['model_reasoning_effort'], 'high')
+        # Enforced keys replace the machine's values; defaults fill only gaps.
+        self.assertEqual(c['otel'], {'metrics_exporter': 'none', 'log_user_prompt': False})
+        self.assertEqual(c['model_reasoning_effort'], 'low')
         self.assertEqual(c['approval_policy'], 'on-request')
         # Provider-dependent keys are left to the provider's own configuration.
         self.assertNotIn('model_context_window', c)
         self.assertEqual(c['projects']['/a.b/#project']['trust_level'], 'trusted')
         self.assertTrue(c['tui']['screen_reader_detection_done'])
-        self.assertEqual(c['tui']['keymap']['global'], {'open_external_editor': 'ctrl-e', 'custom_binding': 'ctrl-k'})
+        self.assertEqual(c['tui']['keymap']['global'], {'open_external_editor': 'ctrl-x', 'custom_binding': 'ctrl-k'})
+        self.assertEqual(c['tui']['keymap']['editor']['delete_forward_word'], 'ctrl-delete')
         d = json.loads(claude.read_text())
-        self.assertEqual(d['env']['LOCAL_VALUE'], 'keep')
+        self.assertEqual(d['env'], {'LOCAL_VALUE': 'keep', 'DISABLE_TELEMETRY': '1', 'DISABLE_ERROR_REPORTING': '1',
+                                    'ENABLE_TOOL_SEARCH': 'true'})
         self.assertEqual(d['permissions'], {'defaultMode': 'manual'})
         self.assertTrue(d['enabledPlugins']['unrelated'])
         self.assertTrue(list((self.home / '.codex/backups').glob('*/config.toml')))
@@ -70,7 +76,7 @@ custom_binding = "ctrl-k"
 
     def test_claude_fullscreen_leaves_mouse_env_local(self):
         # Mouse capture is unmanaged: the overlay merges, so a live value stays.
-        claude = self.put('.claude/settings.json', '{"tui":"default","env":{"CLAUDE_CODE_DISABLE_MOUSE":"1","LOCAL_VALUE":"keep"}}')
+        claude = self.put('.claude/settings.json', '{"env":{"CLAUDE_CODE_DISABLE_MOUSE":"1","LOCAL_VALUE":"keep"}}')
         self.run_config('claude')
         d = json.loads(claude.read_text())
         self.assertEqual(d['tui'], 'fullscreen')
@@ -78,6 +84,81 @@ custom_binding = "ctrl-k"
         self.assertEqual(d['env']['LOCAL_VALUE'], 'keep')
         self.assertEqual((self.home / '.claude/keybindings.json').read_bytes(),
                          (ROOT / 'configs/ai/claude/keybindings.json').read_bytes())
+
+    def record_entry(self, component, target):
+        record_path = self.home / f'.local/state/dotfiles/ai/{component}.json'
+        record = json.loads(record_path.read_text())
+        return record_path, record, record['files'][str(target)]
+
+    def test_defaults_follow_the_repo_until_the_machine_changes_them(self):
+        claude = self.home / '.claude/settings.json'
+        self.run_config('claude')
+        defaults = json.loads((ROOT / 'configs/claude-settings.defaults.json').read_text())
+        data = json.loads(claude.read_text())
+        self.assertEqual((data['theme'], data['model']), (defaults['theme'], defaults['model']))
+        record_path, record, entry = self.record_entry('claude', claude)
+        self.assertIn([['theme'], defaults['theme']], entry['defaults'])
+        self.assertNotIn(['theme'], [path for path, _ in entry['applied']])
+
+        # A default dotfiles wrote and the machine left alone follows the repo;
+        # one the machine changed or removed is the machine's from then on.
+        entry['defaults'] = [[path, value] for path, value in entry['defaults'] if path not in (['theme'], ['tui'])]
+        entry['defaults'] += [[['theme'], 'light'], [['skipWorkflowUsageWarning'], False]]
+        record_path.write_text(json.dumps(record))
+        data.update(theme='light', skipWorkflowUsageWarning='mine')
+        del data['model'], data['tui']
+        claude.write_text(json.dumps(data))
+        result = self.run_config('claude', '--check', ok=False)
+        self.assertIn('CHECK: ' + str(claude), result.stdout)
+        self.run_config('claude')
+        data = json.loads(claude.read_text())
+        self.assertEqual(data['theme'], defaults['theme'], 'an untouched default did not follow the repo')
+        self.assertEqual(data['skipWorkflowUsageWarning'], 'mine')
+        self.assertNotIn('model', data, 'a default the machine removed came back')
+        self.assertEqual(data['tui'], defaults['tui'], 'a default never written was not written')
+        # Converged: the machine's own values are neither changed nor reported.
+        before = self.snapshot()
+        self.run_config('claude', '--check')
+        self.run_config('claude')
+        self.assertEqual(before, self.snapshot())
+
+    def test_enforced_keys_become_defaults_without_a_reset(self):
+        # Codex's reasoning effort was enforced before; a machine that chose
+        # another value keeps it, one that did not stays tracked.
+        codex = self.home / '.codex/config.toml'
+        self.run_config('codex')
+        record_path, record, entry = self.record_entry('codex', codex)
+        entry['defaults'] = [[path, value] for path, value in entry['defaults']
+                             if path not in (['model_reasoning_effort'], ['approval_policy'])]
+        entry['applied'] += [[['model_reasoning_effort'], 'high'], [['approval_policy'], 'old-policy']]
+        record_path.write_text(json.dumps(record))
+        text = codex.read_text().replace('model_reasoning_effort = "high"', 'model_reasoning_effort = "xhigh"')
+        codex.write_text(text.replace('approval_policy = "on-request"', 'approval_policy = "old-policy"'))
+        self.run_config('codex', '--check', ok=False)
+        self.run_config('codex')
+        c = tomllib.loads(codex.read_text())
+        self.assertEqual(c['model_reasoning_effort'], 'xhigh')
+        self.assertEqual(c['approval_policy'], 'on-request')
+        _, _, entry = self.record_entry('codex', codex)
+        self.assertIn([['model_reasoning_effort'], 'high'], entry['defaults'])
+        self.assertNotIn(['model_reasoning_effort'], [path for path, _ in entry['applied']])
+        self.run_config('codex', '--check')
+
+    def test_defaults_that_leave_the_repo_are_retired_when_unchanged(self):
+        claude = self.home / '.claude/settings.json'
+        self.run_config('claude')
+        record_path, record, entry = self.record_entry('claude', claude)
+        entry['defaults'] += [[['oldDefault'], 'x'], [['changedDefault'], 'y']]
+        record_path.write_text(json.dumps(record))
+        data = json.loads(claude.read_text())
+        data.update(oldDefault='x', changedDefault='mine')
+        claude.write_text(json.dumps(data))
+        self.run_config('claude')
+        data = json.loads(claude.read_text())
+        self.assertNotIn('oldDefault', data)
+        self.assertEqual(data['changedDefault'], 'mine')
+        _, _, entry = self.record_entry('claude', claude)
+        self.assertNotIn(['changedDefault'], [path for path, _ in entry['defaults']])
 
     def test_opencode_preferences_leave_providers_and_models_alone(self):
         path = self.put('.config/opencode/opencode.json',
