@@ -21,7 +21,7 @@ install_mutation_spies
 # Service queries are reads; every other systemctl use is still a mutation.
 printf '#!/bin/sh\ncase "$1" in is-active|is-enabled) exit 3 ;; esac\nprintf "systemctl\\t%%s\\n" "$*" >> "$DOTFILES_MUTATION_LOG"\nexit 97\n' \
     > "$TEST_ROOT/bin/systemctl"
-before="$(fixture_managed_snapshot)"
+before="$(fixture_managed_manifest)"
 for name in $(printf '%s\n' "${!TOOL_BINARY[@]}" | LC_ALL=C sort); do
     rc=0
     observe_component "$name" > "$TEST_ROOT/observation" 2>/dev/null || rc=$?
@@ -36,9 +36,12 @@ for name in $(printf '%s\n' "${!TOOL_BINARY[@]}" | LC_ALL=C sort); do
         cmp -s "$TEST_ROOT/observation" "$TEST_ROOT/installer-observation" \
             || fail "install-$name.sh --observe differs from the engine's observation"
     fi
+    # Checked per component, so a host tool that writes on --version is named.
+    after="$(fixture_managed_manifest)"
+    [[ "$after" == "$before" ]] \
+        || fail "$name observation changed HOME or XDG state: $(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep '^[<>]' | head -5)"
 done
 [[ ! -s "$DOTFILES_MUTATION_LOG" ]] || fail "observation ran mutating commands: $(cat "$DOTFILES_MUTATION_LOG")"
-assert_eq "$(fixture_managed_snapshot)" "$before" "observation changed HOME or XDG state"
 export PATH="$TEST_SYSTEM_PATH"
 rm -f "$TEST_ROOT"/bin/{mkdir,mv,rm,ln,cp,chmod,install,apt,apt-get,dpkg,tee,systemctl,sudo}
 
