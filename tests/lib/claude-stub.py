@@ -11,6 +11,8 @@ test can change them while a shell is running:
   reply   the command to return, `{n}` replaced by the call number
           (default: echo stub {n})
   sleep   seconds slow mode waits before answering (default 30)
+
+Slow mode writes its process ID to $AI_STUB_DIR/slow.pid before waiting.
 """
 
 import json
@@ -53,6 +55,7 @@ else:
     session = "00000000-0000-4000-8000-000000000000"
 
 if mode == "slow":
+    (stub / "slow.pid").write_text(f"{os.getpid()}\n")
     time.sleep(float(setting("sleep", "30")))
 if mode == "fail":
     sys.exit("API Error: 529 overloaded (stub)")
