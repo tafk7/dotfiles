@@ -144,6 +144,34 @@ tk_esc
 tk_wait '#{selection_present}' 0 "$review"
 tk_wait '#{pane_in_mode}' 1 "$review"
 
+# Shift is the selection switch: a move without it drops a Shift selection.
+# Ctrl+Shift+E (as WezTerm sends it) selects up to a prompt. h starts
+# a selection that plain moves extend, until h again.
+tk_raw E
+tk_wait '#{selection_present}' 1 "$review"
+tk_raw d
+tk_wait '#{selection_present}' 0 "$review"
+tk_raw '\e[27;6;69~'
+tk_wait '#{selection_present}' 1 "$review"
+tk_wait '#{m:❯ second question*,#{copy_cursor_line}}' 1 "$review"
+tk_raw '\e[1;2B'
+tk_wait '#{m:❯ second question*,#{copy_cursor_line}}' 0 "$review"
+tk_wait '#{selection_present}' 1 "$review"
+tk_raw f
+tk_wait '#{selection_present}' 0 "$review"
+tk_raw h
+tk_wait '#{selection_active}' 1 "$review"
+tk_raw d
+tk_wait '#{selection_present}' 1 "$review"
+tk_raw e
+sleep 0.2
+tk_wait '#{selection_active}' 1 "$review"
+tk_raw h
+tk_wait '#{selection_active}' 0 "$review"
+tk_raw v
+sleep 0.2
+tk_wait '#{selection_active}' 0 "$review"
+
 # Home and End stay on the line.
 row=$(ti display-message -p -t "$review" '#{copy_cursor_y}')
 tk_raw '\e[F'
@@ -155,7 +183,7 @@ assert_eq "$(ti display-message -p -t "$review" '#{copy_cursor_y}')" "$row" "Hom
 # y copies and leaves; the window is Claude's again.
 tk_raw '\005'
 tk_wait '#{m:❯ second question*,#{copy_cursor_line}}' 1 "$review"
-tk_raw 'v\e[F'
+tk_raw 'h\e[F'
 tk_raw y
 await_closed "$claude"
 assert_eq "$(ti show-buffer)" "❯ second question" "y in review"

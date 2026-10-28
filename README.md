@@ -131,8 +131,9 @@ yo <command>              # print output and copy it to the clipboard
   pane in copy mode with the same keys everywhere: a shell's history in place,
   and the conversation of Claude, Codex, or OpenCode, as the agent exports it,
   in a pane zoomed over the agent, which keeps working. In review, E/S/D/F
-  move, Shift selects, Ctrl+E/D jump between prompts, `/` searches upward, `y`
-  copies, and `o` opens the text in nvim with the same keys. `<prefix> /`
+  move, Shift selects as it does in a Windows text box, `h` toggles a
+  selection, Ctrl+E/D jump between prompts, `/` searches upward, `y` copies,
+  and `o` opens the text in nvim with the same keys. `<prefix> /`
   reviews and searches at once; `<prefix> o` opens the conversation in nvim.
   Codex panes name their session once Codex runs with the `terminal_title`
   from `configs/codex.defaults.toml`. `<prefix> y` or Shift+Copy copies the
