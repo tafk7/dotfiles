@@ -301,12 +301,14 @@ def pi(repo, notes):
     d = vendored(repo, 'pi')
     if not d:
         return [], None
+    # configs/ai/pi/keybindings.json replaces an action's keys, as pi applies it.
+    user = load_jsonc(os.path.join(repo, 'configs/ai/pi/keybindings.json'))
     out = []
-    for pid, keys in d['bindings'].items():
+    for pid, keys in {**d['bindings'], **user}.items():
         primary = not pid.startswith(('app.tree', 'app.models', 'app.session', 'tui.select', 'tui.altScreen.search'))
-        for key in keys:
+        for key in [keys] if isinstance(keys, str) else keys:
             out.append(Binding('pi', plus_any(key), pid, context=pid.rsplit('.', 1)[0], primary=primary,
-                               source='pi defaults'))
+                               source='configs/ai/pi/keybindings.json' if pid in user else 'pi defaults'))
     return out, d['version']
 
 

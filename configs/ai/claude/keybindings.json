@@ -1,5 +1,17 @@
 {
   "$schema": "https://www.schemastore.org/claude-code-keybindings.json",
   "$docs": "https://code.claude.com/docs/en/keybindings",
-  "bindings": []
+  "bindings": [
+    {
+      "context": "Chat",
+      "bindings": {
+        "meta+p": null,
+        "meta+m": "chat:modelPicker",
+        "shift+up": null,
+        "shift+down": null,
+        "ctrl+pageup": "chat:increaseEffort",
+        "ctrl+pagedown": "chat:decreaseEffort"
+      }
+    }
+  ]
 }
