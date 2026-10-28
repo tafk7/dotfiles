@@ -149,12 +149,13 @@ yo <command>              # print output and copy it to the clipboard
   PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
   the last spelling or grammar mark before the cursor. `Alt+V` again switches
   focus; the draft survives closing the pane.
-  In development ([issues/compose-claude-box.md](issues/compose-claude-box.md)):
-  in Claude, `Alt+V` and Claude's own `Ctrl+G` move what is in the prompt box
-  into the compose pane, and quitting it (`:q`, `:wq`) puts the draft back in
-  the box; `:cq` keeps it in the draft instead. `Ctrl+Shift+G` opens the
-  prompt in Neovim in Claude's place, as `Ctrl+G` used to. This works for
-  Claude sessions started from a shell with these dotfiles, where `VISUAL` is
+  In testing ([issues/compose-agent-box.md](issues/compose-agent-box.md)): in
+  Claude, Codex, and OpenCode, `Alt+V` and the agent's own editor key (Claude
+  `Ctrl+G`, Codex `Ctrl+E`, OpenCode `Ctrl+X E`) move what is in the prompt
+  box into the compose pane, and quitting it (`:q`, `:wq`) puts the draft back
+  in the box; `:cq` keeps it in the draft instead. `Ctrl+Shift+G` opens the
+  prompt in Neovim in Claude's or OpenCode's place. This works for agents
+  started from a shell with these dotfiles, where `VISUAL` is
   `bin/compose-editor`.
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)

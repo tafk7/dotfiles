@@ -63,7 +63,8 @@ for _dotfiles_editor in nvim vim nano; do
 done
 unset _dotfiles_editor
 export EDITOR
-# Claude Code's Ctrl+G opens $VISUAL. compose-editor joins it to the tmux
+# The agents' external-editor keys (Claude's Ctrl+G, Codex's Ctrl+E, OpenCode's
+# Ctrl+X E) open $VISUAL. compose-editor joins their prompt box to the tmux
 # compose pane and runs $EDITOR for everything else. A VISUAL of your own wins.
 if [[ -z "${VISUAL:-}" || "$VISUAL" == "$EDITOR" || "${VISUAL##*/}" == compose-editor ]] \
     && [[ -x "${DOTFILES_DIR:-}/bin/compose-editor" ]]; then

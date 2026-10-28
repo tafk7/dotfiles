@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
-# $VISUAL for interactive shells (shell/env.sh). Run by Claude Code in a tmux
-# pane (its Ctrl+G, chat:externalEditor), it joins Claude's prompt box to the
-# compose pane: `tmux-compose editor` moves the box into the compose draft,
-# puts a draft back, or opens nvim in Claude's place (Ctrl+Shift+G). Anything
-# else, such as git or another agent, gets $EDITOR.
+# $VISUAL for interactive shells (shell/env.sh). Run by an agent in a tmux pane
+# on its prompt box (Claude's Ctrl+G, Codex's Ctrl+E, OpenCode's Ctrl+X E), it
+# joins the box to the compose pane: `tmux-compose editor` moves the box into
+# the compose draft, puts a draft back, or opens nvim in the agent's place
+# (Ctrl+Shift+G). Any other file gets $EDITOR: git's, another program's, and
+# the agents' own other uses of $VISUAL, such as Claude's transcript (v in its
+# Ctrl+O view), plans, and /memory.
 
 set -uo pipefail
 
+file="${!#}"
 parent=$(tr '\0' '\n' < "/proc/$PPID/cmdline" 2>/dev/null | head -n 1)
-if [[ $# -gt 0 && -n "${TMUX:-}" && -n "${TMUX_PANE:-}" && "${parent##*/}" == claude ]]; then
-    exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/tmux-compose" editor "$TMUX_PANE" "${!#}"
+# Each agent's name for its prompt-box file (Claude 2.1.311, Codex 0.164,
+# OpenCode 2.1.4).
+agent=''
+case "${parent##*/}" in
+    claude) [[ "$file" == */claude-prompt-*.md ]] && agent=claude ;;
+    codex) [[ "$file" == */editor/.tmp*.md ]] && agent=codex ;;
+    opencode) [[ "${file##*/}" =~ ^[0-9]+\.md$ ]] && agent=opencode ;;
+esac
+if [[ $# -gt 0 && -n "$agent" && -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
+    exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/tmux-compose" editor "$agent" "$TMUX_PANE" "$file"
 fi
 
 editor=${EDITOR:-vi}
