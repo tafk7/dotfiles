@@ -79,6 +79,21 @@ tk_wait '#{copy_cursor_line}' 42 "$shell"
 tk_raw q
 tk_wait '#{pane_in_mode}' 0 "$shell"
 
+# Shift+ScrollLock (Shift+F7 from WezTerm) does the same. In copy-mode a click
+# puts the cursor where it lands and drops a selection.
+tk_raw '\e[18;2~'
+tk_wait '#{pane_in_mode}' 1 "$shell"
+tk_raw '41\r'
+tk_wait '#{copy_cursor_line}' 41 "$shell"
+tk_raw E
+tk_wait '#{selection_present}' 1 "$shell"
+tk_raw '\e[<0;2;3M\e[<0;2;3m'
+tk_wait '#{copy_cursor_x},#{copy_cursor_y}' '1,2' "$shell"
+tk_wait '#{selection_active},#{selection_present}' '0,0' "$shell"
+tk_wait '#{pane_in_mode}' 1 "$shell"
+tk_raw q
+tk_wait '#{pane_in_mode}' 0 "$shell"
+
 # In a shell, Ctrl+E/D jump between the OSC 133 prompt marks. Without
 # Starship on PATH, and in a short directory, the prompt is one line, so the
 # mark is on the command's line.

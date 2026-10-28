@@ -64,9 +64,18 @@ def tmux(k):
     return make(mods, k)
 
 
+# WezTerm key names that bind by Windows key code (raw:) or US position (phys:).
+WEZ_RAW = {'145': 'scrolllock', '19': 'pause'}
+WEZ_PHYS = {'Equal': '=', 'Minus': '-'}
+
+
 def wezterm(mods, key):
-    """WezTerm key assignments: mods='CTRL|SHIFT', key='PageUp'."""
+    """WezTerm key assignments: mods='CTRL|SHIFT', key='PageUp', 'raw:145', 'phys:Equal'."""
     ms = [] if mods in (None, 'NONE', '') else [MODS[m.lower()] for m in mods.split('|')]
+    if key.startswith('raw:'):
+        key = WEZ_RAW.get(key[4:], key)
+    elif key.startswith('phys:'):
+        key = WEZ_PHYS.get(key[5:], key[5:])
     return make(ms, key)
 
 
@@ -121,6 +130,10 @@ def unescape(s):
     return s.replace('\\\\', '\\').replace('\\"', '"')
 
 
+# Code points that modifyOtherKeys and CSI u name by their control character.
+CODEPOINT = {9: 'tab', 13: 'enter', 27: 'esc', 32: 'space', 127: 'backspace'}
+
+
 def decode(raw):
     """Raw characters to chords. A legacy byte that stands for two chords gives 'a|b'."""
     out, i = [], 0
@@ -137,9 +150,9 @@ def decode(raw):
             params = [int(p) for p in m.group(1).split(';') if p]
             final = m.group(2)
             if final == '~' and len(params) == 3 and params[0] == 27:
-                ms, key = xmods(params[1]), chr(params[2])  # modifyOtherKeys
+                ms, key = xmods(params[1]), CODEPOINT.get(params[2], chr(params[2]))  # modifyOtherKeys
             elif final == 'u' and params:
-                ms, key = (xmods(params[1]) if len(params) > 1 else []), chr(params[0])
+                ms, key = (xmods(params[1]) if len(params) > 1 else []), CODEPOINT.get(params[0], chr(params[0]))
             elif final == '~':
                 key = CSI_TILDE.get(params[0], f'csi{params[0]}~') if params else '?'
                 ms = xmods(params[1]) if len(params) > 1 else []

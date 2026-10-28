@@ -99,7 +99,8 @@ class Build(unittest.TestCase):
 
     def test_layers_read(self):
         self.assertEqual(self.data['notes'], [])
-        self.assertIn('ctrl+shift+g', self.data['wez'])
+        self.assertIn('ctrl+shift+tab', self.data['wez'])
+        self.assertEqual(self.data['wez']['scrolllock'][0], 'translate')  # by Windows key code, raw:145
         for app in ('claude', 'codex', 'opencode', 'pi', 'shell', 'nvim', 'copy'):
             self.assertGreater(self.data['counts'][app], 5, app)
 
@@ -109,7 +110,9 @@ class Build(unittest.TestCase):
         self.assertEqual(t['ctrl+c']['claude']['delivered'], 'esc')  # tmux's Claude rule
         self.assertEqual(t['ctrl+c']['shell']['delivered'], 'ctrl+c')
         self.assertEqual(t['super+h']['shell']['hops'][0][0], 'windows')
-        self.assertEqual(t['scrolllock']['shell']['effects'], [['wezterm', 'not delivered']])
+        self.assertEqual(t['scrolllock']['shell']['effects'][0][:2], ['tmux', 'review'])
+        self.assertEqual(t['pause']['claude']['delivered'], 'esc')  # Break stops an agent's turn
+        self.assertEqual(t['pause']['shell']['delivered'], 'ctrl+c')
 
     def test_judgement(self):
         self.assertEqual(self.finding('codex', 'shift+enter')[0]['sev'], 'bug')  # plain keys merge it into Enter
@@ -124,11 +127,10 @@ class Build(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_why(self):
-        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'why', 'ctrl+shift+g', 'codex', 'pi'],
+        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'why', 'alt+shift+v', 'codex', 'pi'],
                            capture_output=True, text=True)
         self.assertIn('prompt in nvim, full pane', r.stdout)
-        self.assertIn('app.editor.external', r.stdout)
-        self.assertIn('LCtrl (left thumb)', r.stdout)
+        self.assertIn('LAlt (left thumb)', r.stdout)
 
 
 if __name__ == '__main__':

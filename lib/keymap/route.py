@@ -35,7 +35,8 @@ ALIAS_KEYS = {
     'mok1': [{'tab', 'ctrl+i'}],
     'mok2': [],
 }
-# WezTerm on Windows never receives these keys (configs/wezterm.lua).
+# WezTerm on Windows has no names for these keys: only a binding by key code
+# (raw:145, raw:19 in configs/wezterm.lua) sees them.
 WEZTERM_DEAF = {'scrolllock', 'pause'}
 
 
@@ -375,7 +376,7 @@ class Model:
             label = self.windows[k].action if k in self.windows else 'Win-key shortcut'
             hops.append(['windows', 'consume', label, None])
             return dict(hops=hops, effects=[['windows', label]], delivered=None)
-        if chord.split(k)[1] in WEZTERM_DEAF:
+        if chord.split(k)[1] in WEZTERM_DEAF and k not in self.wez:
             hops.append(['wezterm', 'consume', 'never delivered: WezTerm does not receive this key', None])
             return dict(hops=hops, effects=[['wezterm', 'not delivered']], delivered=None)
         w = self.wez.get(k)

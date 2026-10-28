@@ -18,12 +18,16 @@ Shift+Tab, Enter): it writes session-stub.md to the temporary directory and
 shows "Session exported" until Esc.
 
 --editor imitates an agent's prompt box and its external editor (claude, the
-default: Ctrl+G; codex: Ctrl+E; opencode: Ctrl+X e): typed and pasted text goes
+default, and codex: Ctrl+G; opencode: Ctrl+X e): typed and pasted text goes
 into the box; the key writes the box to a file named as that agent names it and
 runs $VISUAL on it as a direct child; on exit 0 the file's text replaces the
 box, as that agent takes it (Codex trims trailing whitespace; OpenCode keeps the
 box for an empty file and drops a lone trailing newline). The box is written to
 LOG.box after each edit.
+
+--modes imitates Claude's permission-mode footer: a comma-separated cycle of
+mode names ("accept edits", "plan mode"; an empty name shows no mode, as in
+manual mode), the first shown at start; each Shift+Tab shows the next.
 """
 
 import argparse
@@ -46,6 +50,7 @@ parser.add_argument("--title", help="set the terminal title")
 parser.add_argument("--opencode", action="store_true", help="answer the export keys like OpenCode")
 parser.add_argument("--editor", nargs="?", const="claude", choices=["claude", "codex", "opencode"],
                     help="keep a prompt box and run $VISUAL on it like that agent")
+parser.add_argument("--modes", help="cycle these footer modes on Shift+Tab, like Claude")
 args = parser.parse_args()
 
 fd = sys.stdin.fileno()
@@ -80,7 +85,7 @@ def claude_key(byte):
 
 
 # Each agent's external-editor key and its name for the prompt file.
-EDITOR_KEYS = {"claude": b"\x07", "codex": b"\x05", "opencode": b"\x18e"}
+EDITOR_KEYS = {"claude": b"\x07", "codex": b"\x07", "opencode": b"\x18e"}
 
 
 def prompt_file():
@@ -125,8 +130,18 @@ def type_into_box(data):
             edit_box()
 
 
-if args.alt or args.claude or args.opencode:
+modes = args.modes.split(",") if args.modes is not None else []
+
+
+def show_mode():
+    label = f"\u23f5\u23f5 {modes[0]} on (shift+tab to cycle)" if modes[0] else "? for shortcuts"
+    write(f"\x1b[999;1H\x1b[2K{label}")
+
+
+if args.alt or args.claude or args.opencode or modes:
     write(ALT_SCREEN)
+if modes:
+    show_mode()
 if args.title:
     write(f"\x1b]2;{args.title}\x07")
 if args.mouse:
@@ -144,6 +159,10 @@ with open(args.log, "ab", buffering=0) as log:
         if not data:
             break
         log.write(data)
+        if modes:
+            for _ in range(data.count(b"\x1b[Z")):
+                modes.append(modes.pop(0))
+                show_mode()
         if args.claude:
             for byte in data:
                 claude_key(byte)
