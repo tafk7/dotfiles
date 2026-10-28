@@ -225,6 +225,25 @@ config.keys = {
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;71~',
   },
+  -- Ctrl+Shift+E/D/F likewise: in tmux review, Ctrl+Shift+E/S/D/F extend the
+  -- selection by a prompt or a word. WezTerm's own search is gone from
+  -- Ctrl+Shift+F: under tmux it sees only the screen, and review searches the
+  -- whole conversation.
+  {
+    key = 'e',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;69~',
+  },
+  {
+    key = 'd',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;68~',
+  },
+  {
+    key = 'f',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;70~',
+  },
 
   -- Shift + Copy: tmux copies the agent's last reply (prefix+y).
   {
@@ -287,11 +306,6 @@ config.keys = {
     key = 'p',
     mods = 'CTRL|SHIFT',
     action = act.ActivateCommandPalette,
-  },
-  {
-    key = 'f',
-    mods = 'CTRL|SHIFT',
-    action = act.Search 'CurrentSelectionOrEmptyString',
   },
   {
     key = 'F11',

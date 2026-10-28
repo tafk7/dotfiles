@@ -86,8 +86,9 @@ tmux│Ctrl+a v│Copy mode on what the pane shows now (in an agent: the live sc
 tmux│ScrollLock key / Ctrl+a f│Review the pane in copy mode: a shell's history in place; an agent's conversation (Claude, Codex, OpenCode) in a review pane zoomed over it│Shift+F5 (firmware F17) → bin/tmux-review toggle
 tmux│Ctrl+a /│Review the pane and search upward at once│bin/tmux-review search
 tmux│Ctrl+a o│Open the agent's conversation or the pane's history read-only in an nvim popup with review's keys (q closes)│bin/tmux-review edit
-tmux│e / s / d / f (and arrows)│Review: move up / left / down / right│cursor-up/-left/-down/-right
-tmux│E / S / D / F (and Shift+arrows)│Review: extend the selection, starting one if needed│begin-selection; cursor-*
+tmux│e / s / d / f (and arrows)│Review: move up / left / down / right; drops a selection Shift started│cursor-up/-left/-down/-right
+tmux│E / S / D / F (and Shift+arrows)│Review: select as you move, as Shift does in a Windows text box│begin-selection; cursor-*
+tmux│Ctrl+Shift+E/S/D/F, Shift+Home/End, Ctrl+Shift+Home/End│Review: select by prompt or word, to the line's ends, to the history's ends│begin-selection; previous-prompt, previous-word, history-top, …
 tmux│Ctrl+s / Ctrl+f (and Ctrl+←/→)│Review: word left / right│previous-word / next-word-end
 tmux│Ctrl+e / Ctrl+d (and Ctrl+↑/↓)│Review: previous / next prompt (shell and review-pane OSC 133 marks)│previous-prompt / next-prompt
 tmux│Home / End│Review: start / end of the line│start-of-line / end-of-line
@@ -95,7 +96,7 @@ tmux│PgUp / PgDn│Review: page up / down│page-up / page-down
 tmux│Ctrl+Home / Ctrl+End│Review: top / bottom of history│history-top / history-bottom
 tmux│/ and ? then n / N│Review: incremental search up / down, then next / previous result│search-backward-incremental / search-forward-incremental
 tmux│o│Review: open what review shows read-only in an nvim popup at this line, with review's keys (q closes)│bin/tmux-review open
-tmux│v│Toggle the single tmux highlight in transcript view│begin-selection / clear-selection
+tmux│h│Review: toggle a selection that plain moves extend; h or Esc ends it│begin-selection / clear-selection (@select-toggle)
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
 tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude and Codex, their own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C, Codex the key itself

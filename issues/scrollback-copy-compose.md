@@ -297,11 +297,17 @@ transcript.
 
 Inside review, in every pane:
 
-| | Plain | Shift | Ctrl |
-|---|---|---|---|
-| E / D (and ↑ / ↓) | line up / down | extend selection up / down | previous / next prompt |
-| S / F (and ← / →) | character left / right | extend selection left / right | word left / right |
-| Home / End | start / end of line | — | top / bottom |
+| | Plain | Ctrl |
+|---|---|---|
+| E / D (and ↑ / ↓) | line up / down | previous / next prompt |
+| S / F (and ← / →) | character left / right | word left / right |
+| Home / End | start / end of line | top / bottom |
+
+Shift is the selection switch, as in a Windows text box: any of these moves
+with Shift added (Shift+E, Ctrl+Shift+F, Shift+End, Ctrl+Shift+Home) starts a
+selection or extends it, and a move without Shift drops it. `h` instead starts
+a selection that plain moves extend, until `h` or `Esc` ends it. Paging,
+scrolling and search keep a selection, so it can run past a screen.
 
 | Key | Action |
 |---|---|
@@ -309,14 +315,15 @@ Inside review, in every pane:
 | Shift+PgUp / Shift+PgDn **5** | a few lines up / down (`@scroll-lines`) |
 | `/` Δ | incremental search upward (review starts at the bottom); `?` downward |
 | `n` / `N` | next / previous result in the search's direction |
-| `v` | start or clear the selection |
+| `h` | start a selection that plain moves extend, or end it |
 | `y`, Alt+Copy, Copy ★ | copy the selection and exit |
 | `o` ★ | open what review shows in the nvim popup, at the same line (§3.4) |
 | `Esc` | clear the selection, otherwise exit |
 | `q`, ScrollLock | exit |
 
 Displaced copy-mode defaults: `e` (word end), `f`/`F`/`t`/`T` (jump to
-character), `o` (other end of selection), `D` (copy to end of line),
+character), `h` (left), `v` (start a selection), `o` (other end of selection),
+`D` (copy to end of line),
 `Ctrl+E`/`Ctrl+D`/`Ctrl+F` (scroll). `j`/`k`/`g`/`G` stay as undocumented
 aliases.
 
