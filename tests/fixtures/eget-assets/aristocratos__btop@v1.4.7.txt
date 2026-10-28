@@ -1,0 +1,12 @@
+# aristocratos/btop v1.4.7 (recorded by lib/lockgen.py)
+btop-aarch64-unknown-linux-musl.tar.gz
+btop-arm-unknown-linux-musleabi.tar.gz
+btop-armv7-unknown-linux-musleabi.tar.gz
+btop-i586-unknown-linux-musl.tar.gz
+btop-i686-unknown-linux-musl.tar.gz
+btop-m68k-unknown-linux-musl.tar.gz
+btop-mips64-unknown-linux-musl.tar.gz
+btop-powerpc64-unknown-linux-musl.tar.gz
+btop-riscv64-unknown-linux-musl.tar.gz
+btop-s390x-ibm-linux-musl.tar.gz
+btop-x86_64-unknown-linux-musl.tar.gz

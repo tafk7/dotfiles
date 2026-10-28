@@ -86,9 +86,10 @@ digest="$(sha256sum "$HOME/.local/bin/eza" | awk '{print $1}')"
 awk -F '\t' -v OFS='\t' -v d="sha256:$digest" '$1 == "eza" && $2 == "x86_64" { $8 = d } 1' \
     "$ROOT/versions.lock" > "$TEST_ROOT/versions.lock"
 DOTFILES_VERSIONS_LOCK="$TEST_ROOT/versions.lock"
-ledger_record eza yes dotfiles installed v0.23.4 "$HOME/.local/bin/eza" "staged-release pin=v0.23.4 sha256=$digest"
+eza_tag="$(versions_field eza want)"
+ledger_record eza yes dotfiles installed "$eza_tag" "$HOME/.local/bin/eza" "staged-release pin=$eza_tag sha256=$digest"
 obs="$(observe_component eza)"
-assert_eq "$(field owner "$obs")/$(field identity "$obs")/$(field runnable "$obs")" "dotfiles/tag:v0.23.4/yes" "owned eget tool"
+assert_eq "$(field owner "$obs")/$(field identity "$obs")/$(field runnable "$obs")" "dotfiles/tag:$eza_tag/yes" "owned eget tool"
 printf '#!/bin/sh\necho changed\n' >> "$HOME/.local/bin/eza"
 [[ "$(field identity "$(observe_component eza)")" == sha256:* ]] || fail "a changed binary kept its tag identity"
 

@@ -29,7 +29,7 @@ Plug 'tpope/vim-unimpaired', { 'commit': 'db65482581a28e4ccf355be297f1864a4e6698
 " differs from the plugin's own version, it downloads an unverified binary
 " into the plugin, which fzf.vim then prefers. The plugin uses the PATH fzf.
 Plug 'junegunn/fzf', { 'commit': 'b224480a98a40c670c8ed89abd52d4216a470032' }
-Plug 'junegunn/fzf.vim', { 'commit': '8a0068127ac9ee23d71dab2944ce995726bef462' }
+Plug 'junegunn/fzf.vim', { 'commit': '023de3c0e158ff9c2b0992175af10be97c2f2158' }
 
 " Git integration
 Plug 'airblade/vim-gitgutter', { 'commit': '90b75207bd9b55d8ac4af15f72b4e935462014d0' }

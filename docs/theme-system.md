@@ -61,7 +61,7 @@ tmux owns the colors; programs only name them.
 | fzf | indexed `--color` in `shell/fzf.sh` |
 | Starship | ANSI names and a small indexed palette in `configs/starship.toml` |
 | btop | the built-in TTY theme, via a copy of your `btop.conf` (`shell/tools/general.sh`) |
-| lazygit | its default theme, which uses ANSI colors |
+| lazygit | its default theme, which uses ANSI colors; since 0.66 the selected line's background is RGB, computed at startup from the background, for unfocused views and on light backgrounds |
 
 Programs that emit their own RGB colors are not recolored.
 
