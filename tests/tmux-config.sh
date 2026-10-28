@@ -16,8 +16,7 @@ tar -C "$ROOT" --exclude=.git --exclude=generated --exclude=.backups -cf - . | t
 
 HOME="$TEST_ROOT/home" XDG_STATE_HOME="$TEST_ROOT/state" XDG_CACHE_HOME="$TEST_ROOT/cache" \
     XDG_CONFIG_HOME="$TEST_ROOT/config" DOTFILES_DIR="$SPACED" \
-    "$SPACED/setup.sh" --config --no-theme --no-hooks \
-    --git-name Fixture --git-email fixture@example.com >/dev/null
+    "$SPACED/setup.sh" --config --no-theme --no-hooks >/dev/null
 [[ "$(readlink -f "$TEST_ROOT/home/.bashrc")" == "$SPACED/entry/bash.sh" ]] \
     || { echo "FAIL: setup did not honor spaced checkout path" >&2; exit 1; }
 git_include="$(git config --file "$TEST_ROOT/home/.gitconfig" --get-all include.path | head -n1)"

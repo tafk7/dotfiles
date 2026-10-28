@@ -7,6 +7,14 @@ Include ~/.ssh/config.local
 # the generic defaults. Missing directories and unmatched globs are harmless.
 Include ~/.ssh/config.d/*.conf
 
+# Git hosts never share a connection. %C hashes host, port, and user, not the
+# key, so a connection opened as one account would carry another account's
+# fetches and pushes (git profiles pin a key per repository). ControlPath none
+# also keeps a client from joining a master that something else opened.
+Host github.com ssh.dev.azure.com gitlab.com
+    ControlMaster no
+    ControlPath none
+
 Host *
     ControlMaster auto
     ControlPath ~/.ssh/sockets/%C

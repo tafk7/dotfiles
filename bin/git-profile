@@ -1,0 +1,555 @@
+#!/bin/bash
+# Per-repo Git identities: commit email, signing key, and SSH key (git profile)
+#
+# Usage:
+#   git profile add NAME [--default] [--ssh-key PATH|agent] [--hostname HOST]
+#                        [--user LOGIN] [--email EMAIL]
+#   git profile use NAME          In a repository: include the profile
+#   git profile use --default     In a repository: drop the profile include
+#   git profile clone NAME [GIT-CLONE-ARGS] URL [DIR]   (gcl -p NAME URL)
+#   git profile whoami            Effective identity, signing, and SSH command
+#   git profile list
+#   git profile remove NAME       Local only; prints the GitHub keys to revoke
+#
+# A profile is ~/.config/git/profiles/NAME.gitconfig: user.email, SSH signing,
+# and a core.sshCommand that pins the profile's key. A repository opts in with
+# one include.path line in its .git/config. The machine default identity
+# (--default) lives in ~/.gitconfig.local, without an sshCommand.
+#
+# add authenticates the account with gh, picks one of its verified emails,
+# creates or selects the key, registers it for authentication and signing,
+# writes the profile, and checks that SSH authenticates as the account. Each
+# step checks first, so a rerun repairs a partial setup. An account gh already
+# holds (--user LOGIN, or one named like the profile) needs no new login.
+# `git profile --help` asks git for a manual page; use -h. See
+# issues/git-profiles.md.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$SCRIPT_DIR")}"
+# shellcheck source=../lib/runtime.sh
+source "$DOTFILES_DIR/lib/runtime.sh"
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+PROFILE_DIR="${CONFIG_HOME%/}/git/profiles"
+LOCAL_CONFIG="$HOME/.gitconfig.local"
+ALLOWED_SIGNERS="${CONFIG_HOME%/}/git/allowed_signers"
+# What add needs from the account's token: register authentication and signing
+# keys, and read the verified emails.
+GH_SCOPES="admin:public_key,admin:ssh_signing_key,user:email"
+
+usage() { sed -n '3,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage_error() { error "$1"; usage >&2; exit 64; }
+die() { error "$1"; exit 1; }
+
+# cfg FILE KEY: the value, or nothing when the file or key is absent.
+cfg() { git config --file "$1" --get "$2" 2>/dev/null || true; }
+
+# set_config FILE KEY VALUE: write only a changed value.
+set_config() {
+    [[ "$(cfg "$1" "$2")" == "$3" ]] || git config --file "$1" "$2" "$3"
+}
+
+# Paths under HOME are written ~/-relative: git expands ~/ in include.path,
+# user.signingkey, and gpg.ssh.allowedSignersFile, and sh expands it in
+# core.sshCommand.
+home_relative() {
+    if [[ "$1" == "$HOME"/* ]]; then
+        # shellcheck disable=SC2088
+        printf '~/%s\n' "${1#"$HOME"/}"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+expand_home() {
+    case "$1" in
+        \~/*) printf '%s/%s\n' "$HOME" "${1#\~/}" ;;
+        *) printf '%s\n' "$1" ;;
+    esac
+}
+
+check_name() {
+    [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+        || usage_error "invalid profile name '$1' (letters, digits, '.', '_', '-')"
+}
+profile_file() { printf '%s/%s.gitconfig\n' "$PROFILE_DIR" "$1"; }
+in_repository() { git rev-parse --git-dir >/dev/null 2>&1; }
+
+require_profile() {
+    check_name "$1"
+    [[ ! -f "$(profile_file "$1")" ]] || return 0
+    [[ "$1" != "$(cfg "$LOCAL_CONFIG" profile.name)" ]] \
+        || die "'$1' is the default identity (~/.gitconfig.local); it needs no profile"
+    die "no profile '$1' (see: git profile list; create it: git profile add $1)"
+}
+
+# The include.path values in this repository's own config that name a profile.
+profile_includes() {
+    local value
+    while IFS= read -r value; do
+        if [[ "$(dirname -- "$(expand_home "$value")")" == "$PROFILE_DIR" ]]; then
+            printf '%s\n' "$value"
+        fi
+    done < <(git config --local --get-all include.path 2>/dev/null || true)
+}
+
+# warn_overridden FILE SCOPE KEY...: warn about each key FILE sets whose
+# effective value (in SCOPE: --global, or "" for this repository) differs and
+# comes from another file, one read later or with higher priority.
+warn_overridden() {
+    local file="$1" scope="$2" key line origin
+    shift 2
+    for key in "$@"; do
+        [[ -n "$(cfg "$file" "$key")" ]] || continue
+        line="$(git config ${scope:+"$scope"} --includes --show-origin --get "$key" 2>/dev/null || true)"
+        [[ -n "$line" && "${line#*$'\t'}" != "$(cfg "$file" "$key")" ]] || continue
+        origin="${line%%$'\t'*}"
+        warn "$key comes from $(home_relative "${origin#file:}"), which overrides $(home_relative "$file")"
+    done
+}
+
+key_title() { local host; host="$(uname -n)"; printf '%s-%s\n' "${host%%.*}" "$1"; }
+
+# A public key's type and base64 body, as GitHub lists keys and as
+# allowed_signers names them.
+key_blob() { awk 'NR == 1 { print $1 " " $2 }' "$1"; }
+
+# drop_allowed_signer BLOB: remove the lines that name this key.
+drop_allowed_signer() {
+    [[ -f "$ALLOWED_SIGNERS" ]] || return 0
+    local tmp
+    tmp="$(mktemp "$ALLOWED_SIGNERS.XXXXXX")"
+    awk -v blob="$1" '{ for (i = 2; i < NF; i++) if ($i " " $(i + 1) == blob) next } { print }' \
+        "$ALLOWED_SIGNERS" > "$tmp"
+    mv "$tmp" "$ALLOWED_SIGNERS"
+}
+
+# choose PROMPT OPTION...: the option picked by number on stdin.
+choose() {
+    local prompt="$1" reply i
+    shift
+    local -a options=("$@")
+    printf '%s\n' "$prompt" >&2
+    for i in "${!options[@]}"; do printf '  %d) %s\n' "$((i + 1))" "${options[i]}" >&2; done
+    printf 'Choice [1-%d]: ' "${#options[@]}" >&2
+    read -r reply || die "no choice made"
+    if [[ ! "$reply" =~ ^[1-9][0-9]*$ ]] || (( reply > ${#options[@]} )); then
+        die "not a choice: $reply"
+    fi
+    printf '%s\n' "${options[reply - 1]}"
+}
+
+# ==============================================================================
+# use, clone, whoami, list, remove
+# ==============================================================================
+
+cmd_use() {
+    (( $# == 1 )) || usage_error "use takes a profile name, or --default"
+    in_repository || die "not in a Git repository"
+    [[ "$1" == --default ]] || require_profile "$1"
+    local value
+    local -a includes
+    mapfile -t includes < <(profile_includes)
+    for value in "${includes[@]}"; do
+        git config --local --fixed-value --unset-all include.path "$value"
+    done
+    if [[ "$1" == --default ]]; then
+        log "This repository uses the default identity"
+        return 0
+    fi
+    git config --local --add include.path "$(home_relative "$(profile_file "$1")")"
+    warn_overridden "$(profile_file "$1")" "" user.email user.signingkey core.sshCommand
+    log "This repository uses profile $1 ($(git config --get user.email || true))"
+}
+
+# git clone -c writes the include before the fetch, and the fetch reads it, so
+# the clone itself already runs with the profile's key.
+cmd_clone() {
+    (( $# >= 2 )) || usage_error "clone takes a profile name, then git clone's arguments"
+    require_profile "$1"
+    local include
+    include="$(home_relative "$(profile_file "$1")")"
+    shift
+    exec git clone -c "include.path=$include" "$@"
+}
+
+cmd_whoami() {
+    (( $# == 0 )) || usage_error "whoami takes no arguments"
+    local key line value origin host want active
+    if in_repository; then
+        printf 'In %s:\n' "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    else
+        printf 'Outside a repository (global configuration):\n'
+    fi
+    for key in profile.name user.name user.email user.signingkey gpg.format commit.gpgsign core.sshCommand profile.ghUser; do
+        line="$(git config --includes --show-origin --get "$key" 2>/dev/null || true)"
+        if [[ -z "$line" ]]; then
+            printf '  %-16s (unset)\n' "$key"
+            continue
+        fi
+        origin="${line%%$'\t'*}"
+        value="${line#*$'\t'}"
+        printf '  %-16s %s  (%s)\n' "$key" "$value" "$(home_relative "${origin#file:}")"
+    done
+    command -v gh >/dev/null 2>&1 || return 0
+    host="$(git config --includes --get profile.host 2>/dev/null || echo github.com)"
+    active="$(gh config get user --host "$host" 2>/dev/null || true)"
+    [[ -n "$active" ]] || return 0
+    printf '  %-16s %s  (active on %s)\n' "gh account" "$active" "$host"
+    want="$(git config --includes --get profile.ghUser 2>/dev/null || true)"
+    if [[ -n "$want" && "$want" != "$active" ]]; then
+        printf '  gh commands here act as %s, not %s (gh auth switch --hostname %s --user %s)\n' \
+            "$active" "$want" "$host" "$want"
+    fi
+}
+
+# list_row FILE NAME CURRENT [NOTE]: one profile, starred when it is the one
+# in effect here.
+list_row() {
+    local mark=" "
+    [[ "$2" != "$3" ]] || mark="*"
+    printf '%s %-14s %-34s %-16s %s%s\n' "$mark" "$2" "$(cfg "$1" user.email)" \
+        "$(cfg "$1" profile.ghUser)" "$(cfg "$1" profile.host)" "${4:-}"
+}
+
+cmd_list() {
+    (( $# == 0 )) || usage_error "list takes no arguments"
+    local current file name
+    current="$(git config --includes --get profile.name 2>/dev/null || true)"
+    printf '  %-14s %-34s %-16s %s\n' NAME EMAIL GITHUB HOST
+    if [[ -n "$(cfg "$LOCAL_CONFIG" user.email)" ]]; then
+        name="$(cfg "$LOCAL_CONFIG" profile.name)"
+        list_row "$LOCAL_CONFIG" "${name:--}" "$current" "  (default)"
+    fi
+    for file in "$PROFILE_DIR"/*.gitconfig; do
+        [[ -f "$file" ]] || continue
+        list_row "$file" "$(basename "$file" .gitconfig)" "$current"
+    done
+}
+
+cmd_remove() {
+    (( $# == 1 )) || usage_error "remove takes one profile name"
+    require_profile "$1"
+    local name="$1" file user host pub key
+    file="$(profile_file "$name")"
+    user="$(cfg "$file" profile.ghUser)"
+    host="$(cfg "$file" profile.host)"
+    host="${host:-github.com}"
+    pub="$(expand_home "$(cfg "$file" user.signingkey)")"
+    [[ ! -f "$pub" ]] || drop_allowed_signer "$(key_blob "$pub")"
+    rm -f -- "$file"
+    success "Removed profile $name"
+    log "Repositories that include it now use the default identity; in each: git profile use --default"
+    log "Revoke its keys on ${user:-the account}: https://$host/settings/keys"
+    log "  $(key_title "$name")          (authentication)"
+    log "  $(key_title "$name")-signing  (signing)"
+    if [[ -f "$pub" ]]; then
+        key="${pub%.pub}"
+        if [[ -f "$key" ]]; then log "Key files left in place: $(home_relative "$key") $(home_relative "$pub")"
+        else log "Key file left in place: $(home_relative "$pub")"; fi
+    fi
+}
+
+# ==============================================================================
+# add
+# ==============================================================================
+
+# Set by cmd_add for the helpers below.
+ADD_NAME="" ADD_HOST="" ADD_USER="" ADD_DEFAULT=false GH_ACCOUNT_TOKEN=""
+KEY_PUB="" KEY_ID="" KEY_BLOB="" REGISTERED=false
+
+# gh, as the profile's account whatever account is active.
+gh_api() {
+    GH_TOKEN="$GH_ACCOUNT_TOKEN" GH_ENTERPRISE_TOKEN="$GH_ACCOUNT_TOKEN" gh api --hostname "$ADD_HOST" "$@"
+}
+
+# The scopes in GH_SCOPES that a token's list ("a, b, c") does not cover;
+# nothing when gh reports no list (a token whose scopes it can't see).
+missing_scopes() {
+    local have=", $1, " scope missing=""
+    [[ -n "$1" ]] || return 0
+    for scope in ${GH_SCOPES//,/ }; do
+        case "$scope" in
+            admin:public_key) [[ "$have" == *", admin:public_key, "* || "$have" == *", write:public_key, "* ]] && continue ;;
+            admin:ssh_signing_key) [[ "$have" == *", admin:ssh_signing_key, "* || "$have" == *", write:ssh_signing_key, "* ]] && continue ;;
+            user:email) [[ "$have" == *", user:email, "* || "$have" == *", user, "* ]] && continue ;;
+        esac
+        missing+="${missing:+,}$scope"
+    done
+    printf '%s\n' "$missing"
+}
+
+# Step 1: gh holds ADD_USER's token for ADD_HOST with GH_SCOPES, else log in
+# (which sets ADD_USER). Without --user, an account gh holds under the
+# profile's name is used. Logging in or refreshing another account's token
+# makes it active in gh, so the previously active account is restored.
+gh_account() {
+    local previous login scopes found=false missing="" rc=0
+    previous="$(gh config get user --host "$ADD_HOST" 2>/dev/null || true)"
+    while IFS=$'\t' read -r login scopes; do
+        [[ "$login" == "${ADD_USER:-$ADD_NAME}" ]] || continue
+        found=true
+        missing="$(missing_scopes "$scopes")"
+    done < <(gh auth status --hostname "$ADD_HOST" --json hosts \
+                 --jq '.hosts[][] | [.login, (.scopes // "")] | @tsv' 2>/dev/null || true)
+    if [[ "$found" == true ]]; then
+        if [[ -z "$ADD_USER" ]]; then
+            ADD_USER="$ADD_NAME"
+            log "Using gh's account $ADD_USER, named like the profile (--user picks another)"
+        fi
+        if [[ -z "$missing" ]]; then
+            log "gh holds $ADD_USER's token for $ADD_HOST"
+            return 0
+        fi
+        log "gh's token for $ADD_USER lacks $missing; refreshing it"
+        [[ "$previous" == "$ADD_USER" ]] || gh auth switch --hostname "$ADD_HOST" --user "$ADD_USER"
+        gh auth refresh --hostname "$ADD_HOST" --scopes "$GH_SCOPES" || rc=$?
+        if [[ -n "$previous" && "$previous" != "$ADD_USER" ]]; then
+            gh auth switch --hostname "$ADD_HOST" --user "$previous" || rc=$?
+        fi
+        (( rc == 0 )) || die "gh auth refresh failed for $ADD_USER"
+        return 0
+    fi
+    log "Log in to $ADD_HOST as the account for profile $ADD_NAME${ADD_USER:+ ($ADD_USER)}"
+    gh auth login --hostname "$ADD_HOST" --git-protocol ssh --skip-ssh-key --scopes "$GH_SCOPES" \
+        || die "gh auth login failed"
+    login="$(gh config get user --host "$ADD_HOST" 2>/dev/null || true)"
+    [[ -n "$login" ]] || die "gh reports no active account on $ADD_HOST after logging in"
+    if [[ -n "$previous" && "$previous" != "$login" ]]; then
+        if gh auth switch --hostname "$ADD_HOST" --user "$previous" >/dev/null; then
+            log "gh's active account on $ADD_HOST is $previous again"
+        else
+            warn "Could not restore gh's active account: gh auth switch --hostname $ADD_HOST --user $previous"
+        fi
+    fi
+    [[ -z "$ADD_USER" || "$login" == "$ADD_USER" ]] || die "gh logged in as $login, not $ADD_USER"
+    ADD_USER="$login"
+}
+
+# pick_email REQUESTED RECORDED VERIFIED: one of the account's verified emails:
+# the requested one, else the recorded one while still verified, else the only
+# one, else the operator's choice.
+pick_email() {
+    local requested="$1" recorded="$2" email
+    local -a verified=()
+    while IFS= read -r email; do [[ -z "$email" ]] || verified+=("$email"); done <<< "$3"
+    (( ${#verified[@]} > 0 )) || die "$ADD_USER has no verified email on $ADD_HOST"
+    if [[ -n "$requested" ]]; then
+        for email in "${verified[@]}"; do [[ "$email" != "$requested" ]] || { printf '%s\n' "$email"; return; }; done
+        die "$requested is not a verified email of $ADD_USER (verified: ${verified[*]})"
+    fi
+    for email in "${verified[@]}"; do [[ "$email" != "$recorded" ]] || { printf '%s\n' "$email"; return; }; done
+    if (( ${#verified[@]} == 1 )); then printf '%s\n' "${verified[0]}"; return; fi
+    choose "Commit email for profile $ADD_NAME ($ADD_USER's verified emails):" "${verified[@]}"
+}
+
+# agent_key: a key the SSH agent holds (Bitwarden through ssh-bridge, say);
+# only its public half is written, as the profile's key file.
+agent_key() {
+    local keys line out="$HOME/.ssh/id_agent_$ADD_NAME.pub"
+    local -a options=()
+    keys="$(ssh-add -L 2>/dev/null)" || die "the SSH agent offers no keys (ssh-add -L)"
+    while IFS= read -r line; do [[ -z "$line" ]] || options+=("$line"); done <<< "$keys"
+    if [[ -f "$out" ]] && grep -Fq -- "$(key_blob "$out")" <<< "$keys"; then
+        KEY_PUB="$out"
+        return 0
+    fi
+    if (( ${#options[@]} == 1 )); then line="${options[0]}"
+    else line="$(choose "Key for profile $ADD_NAME (from the SSH agent):" "${options[@]}")"; fi
+    [[ -d "$HOME/.ssh" ]] || { mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"; }
+    printf '%s\n' "$line" > "$out"
+    KEY_PUB="$out"
+    log "Wrote the agent key's public half to $(home_relative "$out")"
+}
+
+# Step 3: the profile's key: KEY_PUB, and KEY_ID for ssh -i (the private key,
+# or the .pub of a key the agent holds). Without --ssh-key: one key per
+# machine per profile, generated once. The default identity has no
+# sshCommand, so its key is ~/.ssh/id_ed25519, which ssh offers unasked.
+resolve_key() {
+    local spec="$1" email="$2" path
+    case "$spec" in
+        agent) agent_key ;;
+        "")
+            path="$HOME/.ssh/id_ed25519_$ADD_NAME"
+            [[ "$ADD_DEFAULT" != true ]] || path="$HOME/.ssh/id_ed25519"
+            if [[ ! -e "$path" && ! -e "$path.pub" ]]; then
+                [[ -d "$HOME/.ssh" ]] || { mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"; }
+                log "Generating $(home_relative "$path"); choose a passphrase"
+                ssh-keygen -t ed25519 -C "$email" -f "$path" || die "ssh-keygen failed"
+            fi
+            KEY_PUB="$path.pub"
+            ;;
+        *)
+            path="$(expand_home "$spec")"
+            [[ "$path" == /* ]] || path="$PWD/$path"
+            if [[ "$path" == *.pub ]]; then KEY_PUB="$path"; else KEY_PUB="$path.pub"; fi
+            ;;
+    esac
+    [[ -f "$KEY_PUB" ]] || die "no public key at $KEY_PUB"
+    KEY_ID="$KEY_PUB"
+    [[ ! -f "${KEY_PUB%.pub}" ]] || KEY_ID="${KEY_PUB%.pub}"
+    # core.sshCommand is run by sh; a path that needs quoting is refused.
+    [[ "$(home_relative "$KEY_ID")" =~ ^[A-Za-z0-9_./~+@-]+$ ]] || die "unsupported characters in key path: $KEY_ID"
+    KEY_BLOB="$(key_blob "$KEY_PUB")"
+    log "Key: $(home_relative "$KEY_ID")"
+}
+
+# Step 4: register_key ENDPOINT TITLE KIND: add the key unless the account
+# already has it (under any title).
+register_key() {
+    local registered
+    registered="$(gh_api --paginate "$1" --jq '.[].key')" || die "could not list $ADD_USER's keys for $3"
+    if grep -Fxq -- "$KEY_BLOB" <<< "$registered"; then
+        log "$ADD_USER already has this key for $3"
+        return 0
+    fi
+    gh_api --method POST "$1" -f title="$2" -f key="$(cat "$KEY_PUB")" >/dev/null \
+        || die "could not register the key on $ADD_USER for $3"
+    REGISTERED=true
+    success "Registered the key on $ADD_USER for $3: $2"
+}
+
+# Step 8: SSH to the host the way git will for this identity, and check whom
+# the host says it authenticated. A refused profile key lets ssh fall back to
+# another key (an IdentityFile for the host in ~/.ssh/config.local), so the
+# login must match, not merely succeed.
+verify_transport() {
+    local command output who="" re='Hi ([^! ]+)!'
+    command="ssh -o ControlMaster=no -o ControlPath=none"
+    [[ "$ADD_DEFAULT" == true ]] || command="$(cfg "$1" core.sshCommand)"
+    output="$(sh -c "$command"' "$@"' ssh -o StrictHostKeyChecking=accept-new -T "git@$ADD_HOST" 2>&1 </dev/null || true)"
+    [[ ! "$output" =~ $re ]] || who="${BASH_REMATCH[1]}"
+    if [[ "$who" == "$ADD_USER" ]]; then
+        success "SSH to $ADD_HOST authenticates as $ADD_USER"
+        return 0
+    fi
+    if [[ -z "$who" ]]; then
+        error "SSH to $ADD_HOST did not authenticate: $(tail -n1 <<< "$output")"
+    elif [[ "$ADD_DEFAULT" == true ]]; then
+        error "SSH to $ADD_HOST authenticates as $who, not $ADD_USER: ssh offers another key first."
+        error "Pin this key for $ADD_HOST in ~/.ssh/config.local (IdentityFile $(home_relative "$KEY_ID"), IdentitiesOnly yes)."
+    else
+        error "SSH to $ADD_HOST authenticates as $who, not $ADD_USER: the profile's key was refused and ssh fell back to another."
+    fi
+    return 1
+}
+
+cmd_add() {
+    local spec="" email="" recorded_email="" target account account_name emails cmd profile_line
+    while (( $# )); do
+        case "$1" in
+            --default) ADD_DEFAULT=true ;;
+            --ssh-key|--hostname|--user|--email)
+                [[ -n "${2:-}" && "$2" != -* ]] || usage_error "$1 requires a value"
+                case "$1" in
+                    --ssh-key) spec="$2" ;;
+                    --hostname) ADD_HOST="$2" ;;
+                    --user) ADD_USER="$2" ;;
+                    --email) email="$2" ;;
+                esac
+                shift
+                ;;
+            -*) usage_error "unknown option: $1" ;;
+            *) [[ -z "$ADD_NAME" ]] || usage_error "add takes one profile name"; ADD_NAME="$1" ;;
+        esac
+        shift
+    done
+    [[ -n "$ADD_NAME" ]] || usage_error "add requires a profile name"
+    check_name "$ADD_NAME"
+    command -v gh >/dev/null 2>&1 || die "gh is required (./setup.sh --bash installs it)"
+    for cmd in ssh ssh-keygen; do command -v "$cmd" >/dev/null 2>&1 || die "$cmd is required"; done
+
+    target="$(profile_file "$ADD_NAME")"
+    [[ "$ADD_DEFAULT" != true ]] || target="$LOCAL_CONFIG"
+    # A rerun starts from what the last run recorded for this profile.
+    if [[ "$ADD_DEFAULT" != true || "$(cfg "$target" profile.name)" == "$ADD_NAME" ]]; then
+        ADD_HOST="${ADD_HOST:-$(cfg "$target" profile.host)}"
+        ADD_USER="${ADD_USER:-$(cfg "$target" profile.ghUser)}"
+        recorded_email="$(cfg "$target" user.email)"
+        if [[ -z "$spec" ]]; then
+            spec="$(expand_home "$(cfg "$target" user.signingkey)")"
+            [[ -f "$spec" ]] || spec=""
+        fi
+    fi
+    ADD_HOST="${ADD_HOST:-github.com}"
+    # Stored accounts only: a token in the environment would make gh act as
+    # whichever account it belongs to.
+    unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GH_HOST
+
+    log "Step 1: the GitHub account"
+    gh_account
+    log "Step 2: the account's identity"
+    GH_ACCOUNT_TOKEN="$(gh auth token --hostname "$ADD_HOST" --user "$ADD_USER")" \
+        || die "gh has no token for $ADD_USER on $ADD_HOST"
+    account="$(gh_api user --jq '[.login, (.name // "")] | @tsv')" || die "the GitHub API refused $ADD_USER's token"
+    [[ "${account%%$'\t'*}" == "$ADD_USER" ]] || die "gh's token for $ADD_USER belongs to ${account%%$'\t'*}"
+    account_name="${account#*$'\t'}"
+    emails="$(gh_api user/emails --jq '.[] | select(.verified) | .email')" \
+        || die "could not read $ADD_USER's emails (gh scope user:email)"
+    email="$(pick_email "$email" "$recorded_email" "$emails")" || exit 1
+    log "Email: $email"
+    log "Step 3: the key"
+    resolve_key "$spec" "$email"
+    log "Step 4: registering the key on $ADD_USER"
+    register_key user/keys "$(key_title "$ADD_NAME")" authentication
+    register_key user/ssh_signing_keys "$(key_title "$ADD_NAME")-signing" signing
+    if [[ "$REGISTERED" == true ]]; then
+        log "Step 5: if an organization enforces SAML SSO, authorize the key:"
+        log "  https://$ADD_HOST/settings/keys -> Configure SSO -> Authorize"
+        [[ ! -t 0 ]] || read -r -p "Press Enter to continue " _ || true
+    fi
+
+    log "Step 6: writing $(home_relative "$target")"
+    [[ "$ADD_DEFAULT" == true ]] || mkdir -p "$PROFILE_DIR"
+    set_config "$target" user.email "$email"
+    set_config "$target" user.signingkey "$(home_relative "$KEY_PUB")"
+    set_config "$target" gpg.format ssh
+    set_config "$target" commit.gpgsign true
+    set_config "$target" gpg.ssh.allowedSignersFile "$(home_relative "$ALLOWED_SIGNERS")"
+    if [[ "$ADD_DEFAULT" == true ]]; then
+        # useConfigOnly refuses commits without a name; setup no longer sets one.
+        [[ -n "$(git config --global --includes --get user.name 2>/dev/null || true)" ]] \
+            || set_config "$target" user.name "${account_name:-$ADD_USER}"
+    else
+        set_config "$target" core.sshCommand \
+            "ssh -i $(home_relative "$KEY_ID") -o IdentitiesOnly=yes -o ControlMaster=no -o ControlPath=none"
+    fi
+    set_config "$target" profile.name "$ADD_NAME"
+    set_config "$target" profile.ghUser "$ADD_USER"
+    set_config "$target" profile.host "$ADD_HOST"
+    if [[ "$ADD_DEFAULT" == true ]]; then
+        # Setup adds this include; without it the default identity is unused.
+        grep -Fxq -e "$LOCAL_CONFIG" -e "$(home_relative "$LOCAL_CONFIG")" \
+            <<< "$(git config --global --get-all include.path 2>/dev/null || true)" \
+            || warn "The global Git config does not include ~/.gitconfig.local; run ./setup.sh --config"
+        warn_overridden "$target" --global user.email user.signingkey gpg.format commit.gpgsign
+    fi
+
+    log "Step 7: allowed signers, for local verification"
+    mkdir -p "$(dirname "$ALLOWED_SIGNERS")"
+    profile_line="$email $KEY_BLOB"
+    if ! grep -Fxq -- "$profile_line" "$ALLOWED_SIGNERS" 2>/dev/null; then
+        drop_allowed_signer "$KEY_BLOB"
+        printf '%s\n' "$profile_line" >> "$ALLOWED_SIGNERS"
+    fi
+
+    log "Step 8: checking SSH"
+    verify_transport "$target" || exit 1
+    success "Profile $ADD_NAME: $email as $ADD_USER on $ADD_HOST"
+    if [[ "$ADD_DEFAULT" != true ]]; then
+        log "In a repository: git profile use $ADD_NAME; to clone: gcl -p $ADD_NAME URL"
+    fi
+}
+
+case "${1:-}" in
+    add) shift; cmd_add "$@" ;;
+    use) shift; cmd_use "$@" ;;
+    clone) shift; cmd_clone "$@" ;;
+    whoami) shift; cmd_whoami "$@" ;;
+    list|ls) shift; cmd_list "$@" ;;
+    remove|rm) shift; cmd_remove "$@" ;;
+    ""|-h|help) usage ;;
+    *) usage_error "unknown command: $1" ;;
+esac

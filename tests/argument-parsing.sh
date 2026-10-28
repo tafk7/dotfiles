@@ -45,8 +45,19 @@ reset_args; if parse_arguments --bash --only claude >/dev/null 2>&1; then fail "
 reset_args; parse_arguments --claude --only claude || fail "--only refused a selected AI CLI"
 
 reset_args
-if parse_arguments --git-name --dev >/dev/null 2>&1; then fail "missing --git-name value accepted"; fi
+if parse_arguments --only --dev >/dev/null 2>&1; then fail "missing --only value accepted"; fi
 [[ "$PARSE_ERROR" == true ]] || fail "missing value did not set parse error"
+
+# Setup sets no Git identity: the retired flags, with or without a value, fail
+# with a pointer to git profile, and their values are not taken for options.
+reset_args
+err="$(parse_arguments --git-name "CI Bot" --bash --git-email=ci@example.com --git-name 2>&1 >/dev/null)" \
+    && fail "retired identity flags were accepted"
+[[ "$err" == *"--git-name was removed; set a Git identity with: git profile add NAME --default"* \
+   && "$err" == *"--git-email was removed"* && "$err" != *"Unknown option"* ]] \
+    || fail "retired identity flags: $err"
+rc=0; "$ROOT/setup.sh" --bash --git-email ci@example.com >/dev/null 2>&1 || rc=$?
+assert_eq "$rc" 64 "retired --git-email option exit"
 
 rc=0; "$ROOT/setup.sh" --definitely-unknown >/dev/null 2>&1 || rc=$?
 assert_eq "$rc" 64 "unknown option exit"

@@ -12,13 +12,15 @@ source "$ROOT/lib/state.sh"
 
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
-    "$ROOT/setup.sh" --config --no-theme --no-hooks \
-    --git-name Fixture --git-email fixture@example.com >/dev/null
+    "$ROOT/setup.sh" --config --no-theme --no-hooks >/dev/null
 
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
-    "$ROOT/bin/verify" --tier config >/dev/null \
+    "$ROOT/bin/verify" --tier config > "$TEST_ROOT/config-verify.log" \
     || fail "config-only verification failed"
+# Setup sets no identity; its absence warns, pointing at git profile.
+grep -Fq 'user not configured; commits are refused (run: git profile add NAME --default)' \
+    "$TEST_ROOT/config-verify.log" || fail "a missing Git identity was not reported"
 
 # A cumulative tier includes the subset applicable to the current platform.
 # Native Ubuntu must not fail because the bash tier also registers a WSL-only
@@ -32,11 +34,13 @@ if grep -Fq 'wsl2-ssh-agent (requested capability is unsupported' "$TEST_ROOT/na
 fi
 
 # Delta settings are nested through the portable Git config, not written
-# directly into ~/.gitconfig. Verification must follow include chains.
+# directly into ~/.gitconfig, and identity through ~/.gitconfig.local.
+# Verification must follow include chains.
+git config --file "$HOME/.gitconfig.local" user.name Fixture
+git config --file "$HOME/.gitconfig.local" user.email fixture@example.com
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
-    "$ROOT/setup.sh" --config --theme --no-hooks \
-    --git-name Fixture --git-email fixture@example.com >/dev/null
+    "$ROOT/setup.sh" --config --theme --no-hooks >/dev/null
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
     "$ROOT/bin/verify" --tier config > "$TEST_ROOT/theme-verify.log" \

@@ -235,12 +235,14 @@ echo
 echo "Git"
 echo "─────────────────────────────────────"
 
+# The machine default identity. Identity is not setup's, so its absence warns
+# and never fails; with user.useConfigOnly, commits are refused until it is set.
 git_name=$(git config --global --includes --get user.name 2>/dev/null || true)
 git_email=$(git config --global --includes --get user.email 2>/dev/null || true)
 if [[ -n "$git_name" && -n "$git_email" ]]; then
     check_pass "user: $git_name <$git_email>"
 else
-    check_warn "user not configured"
+    check_warn "user not configured; commits are refused (run: git profile add NAME --default)"
 fi
 
 # Configuration is checked separately from binary availability.

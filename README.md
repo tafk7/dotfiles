@@ -56,7 +56,6 @@ Setup options:
   something else installed unless you reinstall them.
 - `--no-hooks` skips the repository's pre-commit hook.
 - `--no-git` skips `~/.gitconfig`.
-- `--git-name` and `--git-email` set your Git identity without a prompt.
 - `--no-theme` and `--no-agent-badge` turn those features off, and they stay
   off until you re-enable them with `--theme`, `--agent-badge`, or
   `bin/dotfiles-feature`.
@@ -84,7 +83,11 @@ component ledger changes the run made. Set `DOTFILES_SETUP_LOG=0` to skip it.
 After setup:
 
 1. Restart the shell and run `dotfiles verify`.
-2. Run `gh auth login` on each machine that needs GitHub access.
+2. Set your Git identity: `git profile add NAME --default` logs in with gh,
+   registers an SSH key for authentication and signing, and writes
+   `~/.gitconfig.local`. Setup sets no identity, and commits are refused until
+   one is set. A second account (work) is a profile that repositories opt
+   into; see [Git profiles](docs/customization.md#git-profiles).
 
 For `--work` host setup (KVM, `sbx login`, Tailscale enrollment, the pinned
 sbx and its kit builder), see [docs/work.md](docs/work.md). Generic sbx kits

@@ -10,7 +10,7 @@
 # Git shortcuts
 git│gs│Show working tree status and staged changes│git status
 git│gl│Show commit history as decorated graph│git log --oneline --decorate --graph
-git│gcl│Clone a repository│git clone
+git│gcl│Clone a repository; -p PROFILE clones as that git profile│gcl [-p PROFILE] URL [DIR]
 git│ga│Stage specific files for commit│git add
 git│gaa│Stage all changes in working directory│git add .
 git│gau│Stage all tracked files that have changes│git add -u
@@ -31,6 +31,7 @@ git│gst│Save working changes to temporary area│git stash
 git│gstp│Apply and remove most recent stash│git stash pop
 git│lg│Launch interactive terminal UI for git│lazygit
 git│gundo│Undo last commit but keep changes staged│git reset HEAD~1 --soft
+git│git profile│Per-repo identity: add an account, use it here, show who you are│git profile add|use|whoami|list|remove
 
 # Tmux shortcuts (prefix is Ctrl+a)
 # No-prefix bindings (instant, left-hand optimized)

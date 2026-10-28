@@ -19,7 +19,7 @@ export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
 
 setup_config() {
     local rc=0
-    SETUP_OUTPUT="$("$ROOT/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com "$@" 2>&1)" || rc=$?
+    SETUP_OUTPUT="$("$ROOT/setup.sh" --config --no-hooks --no-theme "$@" 2>&1)" || rc=$?
     SETUP_RC="$rc"
 }
 record() { deployed_line "$1" 2>/dev/null | cut -f2-4; }

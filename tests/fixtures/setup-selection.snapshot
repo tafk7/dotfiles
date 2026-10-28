@@ -77,8 +77,8 @@ OPTIONS:
     --overwrite-configs Replace configs that differ, keeping backups.
     --force             Both: --reinstall --overwrite-configs
     --no-hooks          Don't install dotfiles git hooks (pre-commit lint)
-    --no-git            Skip ~/.gitconfig (no identity prompt; leaves any existing
-                        one alone). Also skips the delta pager wiring.
+    --no-git            Skip ~/.gitconfig (leaves any existing one alone).
+                        Also skips the delta pager wiring.
     --upgrade           Also upgrade what is not pinned: the selection's APT
                         packages (only-upgrade, never removing; apt's simulated
                         transaction is shown first; held packages are skipped),
@@ -88,13 +88,9 @@ OPTIONS:
     --no-theme          Persistently disable tmux themes.
     --agent-badge       Enable agent-badge for supported AI CLIs (default with AI).
     --no-agent-badge    Install AI CLIs without registering agent-badge.
-    --git-name NAME     Set git user.name (for non-interactive installs)
-    --git-email EMAIL   Set git user.email (for non-interactive installs)
     --help              Show this help message
 
 ENVIRONMENT:
-    DOTFILES_GIT_NAME   Same as --git-name
-    DOTFILES_GIT_EMAIL  Same as --git-email
     DOTFILES_APT_LOCK_TIMEOUT
                         Seconds APT waits for another package operation (default: 120)
 
@@ -173,7 +169,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -223,7 +223,11 @@ Next Steps:
 2. Verify installation:
    dotfiles verify
 
-3. Switch theme (default: gruvbox):
+3. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+4. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -273,7 +277,11 @@ Next Steps:
 2. Verify installation:
    dotfiles verify
 
-3. Switch theme (default: gruvbox):
+3. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+4. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -327,7 +335,11 @@ Next Steps:
    sbx login
    dotfiles verify --smoke
 
-4. Switch theme (default: gruvbox):
+4. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+5. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -381,7 +393,11 @@ Next Steps:
    sbx login
    dotfiles verify --smoke
 
-4. Switch theme (default: gruvbox):
+4. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+5. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -427,7 +443,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -473,7 +493,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -519,7 +543,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -565,7 +593,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -611,7 +643,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -657,7 +693,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -703,7 +743,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -753,7 +797,11 @@ Next Steps:
 2. Connect to the RDP desktop:
    mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
 
-3. Switch theme (default: gruvbox):
+3. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+4. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -803,7 +851,11 @@ Next Steps:
 2. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up
 
-3. Switch theme (default: gruvbox):
+3. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+4. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -850,7 +902,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -897,7 +953,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -944,7 +1004,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -992,7 +1056,11 @@ Next Steps:
 1. Verify installation:
    dotfiles verify
 
-2. Switch theme (default: gruvbox):
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1051,7 +1119,11 @@ Next Steps:
 4. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up
 
-5. Switch theme (default: gruvbox):
+5. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+6. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1105,7 +1177,11 @@ Next Steps:
 3. Connect to the RDP desktop:
    mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
 
-4. Switch theme (default: gruvbox):
+4. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+5. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1163,7 +1239,11 @@ Next Steps:
 4. Enroll Tailscale with your intended routing/SSH policy:
    sudo tailscale up
 
-5. Switch theme (default: gruvbox):
+5. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+6. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1224,7 +1304,11 @@ Next Steps:
 4. Connect to the RDP desktop:
    mstsc -> host:3389  (keep behind VPN/Tailscale — never expose to the internet)
 
-5. Switch theme (default: gruvbox):
+5. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+6. Switch theme (default: gruvbox):
    ./bin/theme-switcher
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -37,8 +37,7 @@ run_setup() {
     HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
         XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
         DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" \
-        "$ROOT/setup.sh" --config --no-hooks --no-theme \
-        --git-name 'Fixture User' --git-email fixture@example.com >/dev/null
+        "$ROOT/setup.sh" --config --no-hooks --no-theme >/dev/null
 }
 
 run_setup
@@ -87,14 +86,12 @@ assert_eq "$(readlink -f "$HOME/.profile")" "$(readlink -f "$ROOT/entry/profile.
 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
     DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" \
-    "$ROOT/setup.sh" --config --theme --no-hooks \
-    --git-name 'Fixture User' --git-email fixture@example.com >/dev/null
+    "$ROOT/setup.sh" --config --theme --no-hooks >/dev/null
 themed_first="$(fixture_managed_snapshot)"
 run_setup_theme_output="$(HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
     XDG_STATE_HOME="$XDG_STATE_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
     DOTFILES_BACKUP_PREFIX="$DOTFILES_BACKUP_PREFIX" \
-    "$ROOT/setup.sh" --config --no-hooks \
-    --git-name 'Fixture User' --git-email fixture@example.com)"
+    "$ROOT/setup.sh" --config --no-hooks)"
 themed_second="$(fixture_managed_snapshot)"
 assert_eq "$themed_second" "$themed_first" "default-theme setup rerun was not idempotent"
 : "$run_setup_theme_output"

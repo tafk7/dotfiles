@@ -5,8 +5,18 @@
 alias gs='git status'
 alias gl='git log --oneline --decorate --graph'
 
-# Clone operations
-alias gcl='git clone'
+# Clone: git clone, or with -p PROFILE as that git profile (bin/git-profile);
+# git clone itself has no -p. A shell that defined gcl as an alias would expand
+# it inside the definition, so the alias goes first.
+unalias gcl 2>/dev/null
+gcl() {
+    if [[ "${1:-}" == -p ]]; then
+        shift
+        git profile clone "$@"
+    else
+        git clone "$@"
+    fi
+}
 
 # Staging and changes
 alias ga='git add'
