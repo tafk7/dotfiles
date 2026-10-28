@@ -87,7 +87,7 @@ class BumpTests(unittest.TestCase):
     def test_eget_tool_moves_tag_and_both_rows(self):
         assets = self.direnv_release('v2.99.0', days_ago(20))
         out = self.bump('direnv', 'v2.99.0')
-        self.assertIn('bumped direnv: v2.37.1 -> v2.99.0', out.stdout)
+        self.assertIn(f"bumped direnv: {self.original_row('direnv', 'x86_64')[2]} -> v2.99.0", out.stdout)
         self.assertIn('tag = "v2.99.0"', (self.repo / 'eget.toml').read_text())
         rows = self.lock()
         for arch, go in (('x86_64', 'amd64'), ('aarch64', 'arm64')):

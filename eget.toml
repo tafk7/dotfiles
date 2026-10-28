@@ -23,30 +23,30 @@ target = "~/.local/bin"
 upgrade_only = true
 
 ["starship/starship"]
-tag = "v1.24.2"
+tag = "v1.27.0"
 # aarch64 ships only a musl build; musl exists for x86_64 too.
 asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
 ["eza-community/eza"]
-tag = "v0.23.4"
+tag = "v0.23.5"
 # aarch64 also ships a gnu _no_libgit variant.
 asset_filters = ["gnu", ".tar.gz", "^no_libgit"]
 
 ["junegunn/fzf"]
-tag = "v0.67.0"
+tag = "v0.74.5"
 
 ["ajeetdsouza/zoxide"]
-tag = "v0.9.9"
+tag = "v0.10.0"
 
 ["dandavison/delta"]
-tag = "0.18.2"
+tag = "0.20.1"
 asset_filters = [".tar.gz", "gnu"]
 
 ["aristocratos/btop"]
-tag = "v1.4.6"
+tag = "v1.4.7"
 
 ["dundee/gdu"]
-tag = "v5.36.1"
+tag = "v5.38.0"
 # The release ships one archive per platform. Only amd64 has a _static build,
 # so exclude it and let native detection pick amd64 or arm64.
 asset_filters = ["gdu_linux_", ".tgz", "^_static"]
@@ -55,18 +55,18 @@ asset_filters = ["gdu_linux_", ".tgz", "^_static"]
 target = "~/.local/bin/gdu"
 
 ["charmbracelet/glow"]
-tag = "v2.1.1"
+tag = "v2.1.2"
 asset_filters = [".tar.gz", "^sbom"]
 
 ["jesseduffield/lazygit"]
-tag = "v0.59.0"
+tag = "v0.66.1"
 
 ["cli/cli"]
-tag = "v2.100.0"
+tag = "v2.102.0"
 asset_filters = ["linux_", ".tar.gz"]
 
 ["astral-sh/uv"]
-tag = "0.10.0"
+tag = "0.13.5"
 asset_filters = [".tar.gz", "gnu"]
 
 ["chmln/sd"]
@@ -78,7 +78,7 @@ tag = "v0.26.1"
 asset_filters = ["unknown-linux-gnu", ".tar.gz"]
 
 ["sharkdp/fd"]
-tag = "v10.4.2"
+tag = "v10.5.0"
 asset_filters = ["unknown-linux-gnu", ".tar.gz"]
 
 ["BurntSushi/ripgrep"]
@@ -87,7 +87,7 @@ tag = "15.2.0"
 asset_filters = ["unknown-linux-musl", ".tar.gz"]
 
 ["direnv/direnv"]
-tag = "v2.37.1"
+tag = "v2.38.2"
 # Release ships bare per-arch binaries (direnv.linux-amd64); a file-path
 # target renames it to plain `direnv` on install (same trick as gdu).
 asset_filters = ["direnv.linux-"]
@@ -106,7 +106,7 @@ asset_filters = ["harper-ls", "unknown-linux-musl"]
 
 # Installed on demand when a supported agent-badge CLI is selected.
 ["jqlang/jq"]
-tag = "jq-1.8.1"
+tag = "jq-1.8.2"
 asset_filters = ["jq-linux-"]
 target = "~/.local/bin/jq"
 

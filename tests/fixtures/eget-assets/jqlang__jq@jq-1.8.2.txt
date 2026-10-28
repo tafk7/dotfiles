@@ -1,6 +1,7 @@
-# jqlang/jq jq-1.8.1 (recorded by tests/eget-selection.py --refresh)
-jq-1.8.1.tar.gz
-jq-1.8.1.zip
+# jqlang/jq jq-1.8.2 (recorded by lib/lockgen.py)
+jq-1.8.2.tar.gz
+jq-1.8.2.zip
+jq-attestation.json
 jq-linux-amd64
 jq-linux-arm64
 jq-linux-armel
@@ -24,5 +25,6 @@ jq-macos-arm64
 jq-osx-amd64
 jq-win64.exe
 jq-windows-amd64.exe
+jq-windows-arm64.exe
 jq-windows-i386.exe
 sha256sum.txt

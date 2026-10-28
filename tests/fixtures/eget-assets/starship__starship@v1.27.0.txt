@@ -1,4 +1,4 @@
-# starship/starship v1.24.2 (recorded by tests/eget-selection.py --refresh)
+# starship/starship v1.27.0 (recorded by lib/lockgen.py)
 starship-aarch64-apple-darwin.tar.gz
 starship-aarch64-apple-darwin.tar.gz.sha256
 starship-aarch64-pc-windows-msvc.msi
@@ -15,6 +15,8 @@ starship-i686-pc-windows-msvc.zip
 starship-i686-pc-windows-msvc.zip.sha256
 starship-i686-unknown-linux-musl.tar.gz
 starship-i686-unknown-linux-musl.tar.gz.sha256
+starship-riscv64gc-unknown-linux-musl.tar.gz
+starship-riscv64gc-unknown-linux-musl.tar.gz.sha256
 starship-x86_64-apple-darwin.tar.gz
 starship-x86_64-apple-darwin.tar.gz.sha256
 starship-x86_64-pc-windows-msvc.msi

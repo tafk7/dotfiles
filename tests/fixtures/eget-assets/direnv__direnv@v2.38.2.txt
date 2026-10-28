@@ -1,4 +1,4 @@
-# direnv/direnv v2.37.1 (recorded by tests/eget-selection.py --refresh)
+# direnv/direnv v2.38.2 (recorded by lib/lockgen.py)
 direnv.darwin-amd64
 direnv.darwin-arm64
 direnv.freebsd-386
@@ -20,6 +20,6 @@ direnv.netbsd-amd64
 direnv.netbsd-arm
 direnv.openbsd-386
 direnv.openbsd-amd64
-direnv.windows-386
-direnv.windows-amd64
-direnv.windows-arm64
+direnv.windows-386.exe
+direnv.windows-amd64.exe
+direnv.windows-arm64.exe

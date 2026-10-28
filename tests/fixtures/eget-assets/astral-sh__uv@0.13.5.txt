@@ -1,4 +1,4 @@
-# astral-sh/uv 0.10.0 (recorded by tests/eget-selection.py --refresh)
+# astral-sh/uv 0.13.5 (recorded by lib/lockgen.py)
 dist-manifest.json
 sha256.sum
 source.tar.gz
@@ -29,6 +29,8 @@ uv-powerpc64le-unknown-linux-gnu.tar.gz
 uv-powerpc64le-unknown-linux-gnu.tar.gz.sha256
 uv-riscv64gc-unknown-linux-gnu.tar.gz
 uv-riscv64gc-unknown-linux-gnu.tar.gz.sha256
+uv-riscv64gc-unknown-linux-musl.tar.gz
+uv-riscv64gc-unknown-linux-musl.tar.gz.sha256
 uv-s390x-unknown-linux-gnu.tar.gz
 uv-s390x-unknown-linux-gnu.tar.gz.sha256
 uv-x86_64-apple-darwin.tar.gz
