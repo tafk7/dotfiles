@@ -1,13 +1,13 @@
 #!/bin/bash
 # The raw-key harness against the bindings it was built for: the Copy key in
-# copy-mode, in Claude, in Codex, and in a shell; the review key; the Pause key.
+# copy-mode, in Claude, in Codex, and in a shell; the review key; Break.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
 
 COPY='\e[2;5~'
 REVIEW='\e[15;2~'
-PAUSE='\e[17;2~'
+BREAK='\e[20;2~'
 
 tk_start
 
@@ -72,9 +72,10 @@ tk_raw "$REVIEW"
 tk_wait '#{pane_in_mode}' 0
 assert_eq "$(tk_input "$app_log")" 'x' "review key leaked to the app"
 
-# Pause stays in tmux (it toggles clipboard export).
-tk_raw "${PAUSE}y"
+# Break (Pause, as WezTerm sends it) reaches a program that isn't an agent as
+# Ctrl+C, not as its own sequence.
+tk_raw "${BREAK}y"
 tk_until grep -q y "$app_log" || fail "app stub got no input"
-assert_eq "$(tk_input "$app_log")" 'xy' "Pause key leaked to the app"
+assert_eq "$(tk_input "$app_log")" 'x^Cy' "Break in a program that isn't an agent"
 
 printf 'tmux-keys-selftest: ok\n'
