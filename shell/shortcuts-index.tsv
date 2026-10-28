@@ -113,7 +113,6 @@ tmux│Shift+mouse drag│Select natively in Windows Terminal│client-side sele
 tmux│Ctrl+a p│Paste from tmux buffer with bracketed-paste markers when supported│paste-buffer -p
 tmux│Ctrl+a y / Shift+Copy│Copy the agent's last reply (Claude: from its session file, draft untouched; Codex/OpenCode: their copy keys)│bin/tmux-last-reply
 tmux│Ctrl+a e│Export current tmux buffer to the client/Windows clipboard, even with export off│size-gated OSC 52 export
-tmux│Pause key / Ctrl+a E│Toggle automatic clipboard export; CLIP OFF shows while off│Shift+F6 (firmware F18) → @clipboard-export
 # Utility
 tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
 tmux│Ctrl+a R│Force current window to attached-client size and resume automatic sizing│resize-window -A; setw window-size latest; refresh-client
