@@ -369,9 +369,8 @@ lacks: line and block selection, text objects, and regular expressions.
 | Alt+Copy | Enter copy-mode, or copy the selection in it |
 | Paste (Shift+Insert) | Paste the Windows clipboard (WezTerm, bracketed) |
 | Alt+Paste, `C-a p` | Paste the tmux buffer, any size |
-| `C-a e` | Export the newest tmux buffer now, regardless of the toggle |
+| `C-a e` | Export the newest tmux buffer again |
 | `C-a y`, Shift+Copy ★ | Copy the agent's last reply. Claude: read from its session file into the tmux buffer, without touching the draft. Codex: send `Ctrl+O`. OpenCode: send `C-x y`. Codex and OpenCode copy to the Windows clipboard only |
-| Pause ★ (laptop: `C-a E`) | Toggle automatic export (`@clipboard-export`) |
 
 ---
 
@@ -387,10 +386,10 @@ lacks: line and block selection, text objects, and regular expressions.
 | `C-a y` | Claude ✓ | Claude ★ via the hook; Codex and OpenCode ✓ their own OSC 52 |
 | Compose sends | — (named buffer, deleted after paste) | — |
 
-- `@clipboard-export` (default `on`) replaces the `@clipboard-osc52` test flag.
-  Off stops only the ★ exports; the apps' own OSC 52 still goes through.
-  Disabling `allow-passthrough` would stop those too, at the cost of every
-  Codex and OpenCode copy.
+- Export is always on (2026-10-28, [intent keys](intent-keys.md)): the
+  `@clipboard-export` toggle, its Pause and `C-a E` keys and the `CLIP OFF`
+  marker are gone, since the size gate keeps exports from stalling the
+  terminal.
 - The hook skips loads with a `-b` name, so named buffers such as compose
   pastes never reach the Windows clipboard.
 - Exports run in the background and skip anything over `@clipboard-limit`
@@ -479,7 +478,7 @@ The step-by-step execution plan, with tests and adoption checks, is in
 
 | Phase | Delivers |
 |---|---|
-| 1 | Clipboard export: one copy path, the export hook, the Pause / `C-a E` toggle |
+| 1 | Clipboard export: one copy path, the export hook, the Pause / `C-a E` toggle (since removed) |
 | 2 | Claude fullscreen with mouse capture; trimmed keybindings; focus-only clicks |
 | 3 | Alt+E/S/D/F edge crossing, browse keys, review dispatch and key table, agent keymaps, prompt marks, `C-a y` |
 | 4 | harper-ls; the Alt+V compose pane and prose profile |

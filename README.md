@@ -124,9 +124,8 @@ yo <command>              # print output and copy it to the clipboard
 
 - **tmux:** `Alt+Copy` enters copy mode and copies the selection, and
   `Alt+Paste` pastes the tmux buffer. Every copy, including nvim yanks and
-  shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB).
-  Pause or `<prefix> E` turns that off (`CLIP OFF` shows in the status bar);
-  `<prefix> e` still sends the buffer. `<prefix> v` enters copy mode on
+  shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB);
+  `<prefix> e` sends the newest buffer again. `<prefix> v` enters copy mode on
   the screen as it is, and ScrollLock or `<prefix> f` reviews a
   pane in copy mode with the same keys everywhere: a shell's history in place,
   and the conversation of Claude, Codex, or OpenCode, as the agent exports it,
