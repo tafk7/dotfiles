@@ -15,8 +15,9 @@ delete_forward_word = "ctrl-delete"
 kill_line_start = "alt-backspace"
 kill_line_end = "alt-delete"
 
-# Shift+Tab steps the permission mode through tmux, which sends F7: Read Only,
-# Ask for approval, Approve for me (Full Access stays in /permissions). Effort
+# F7 steps the permission mode (Read Only, Ask for approval, Approve for me);
+# tmux's Alt+Shift+K and L press it to reach a mode while the prompt holds a
+# draft (bin/tmux-agent-mode). Shift+Tab stays Codex's own. Effort
 # is on Ctrl+PgUp/PgDn, as in the other agents, leaving Shift+Up/Down free.
 # Ctrl+G (the editor) and Ctrl+E (end of line) keep Codex's defaults.
 [tui.keymap.chat]

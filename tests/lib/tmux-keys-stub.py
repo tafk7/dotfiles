@@ -28,6 +28,16 @@ LOG.box after each edit.
 --modes imitates Claude's permission-mode footer: a comma-separated cycle of
 mode names ("accept edits", "plan mode"; an empty name shows no mode, as in
 manual mode), the first shown at start; each Shift+Tab shows the next.
+
+--codex-modes imitates Codex's permission modes: its prompt (the placeholder
+dimmed when empty), /permissions and the picker it opens (numbered rows, the
+current one marked, Full Access asking once more), and F7, which opens the
+picker on its first press and after that steps Read Only, Ask for approval,
+Approve for me, each step noted in the transcript.
+
+--opencode-modes imitates OpenCode's one permission switch: Ctrl+P's command
+list, its Permissions entry, the setting Left and Right flip, and the footer
+that reads "Build auto" while it accepts everything.
 """
 
 import argparse
@@ -51,6 +61,8 @@ parser.add_argument("--opencode", action="store_true", help="answer the export k
 parser.add_argument("--editor", nargs="?", const="claude", choices=["claude", "codex", "opencode"],
                     help="keep a prompt box and run $VISUAL on it like that agent")
 parser.add_argument("--modes", help="cycle these footer modes on Shift+Tab, like Claude")
+parser.add_argument("--codex-modes", action="store_true", help="switch permission modes like Codex")
+parser.add_argument("--opencode-modes", action="store_true", help="switch permissions like OpenCode")
 args = parser.parse_args()
 
 fd = sys.stdin.fileno()
@@ -138,10 +150,114 @@ def show_mode():
     write(f"\x1b[999;1H\x1b[2K{label}")
 
 
-if args.alt or args.claude or args.opencode or modes:
+# One key per item: an escape sequence, a lone Esc, or a byte.
+KEYS = re.compile(rb"\x1b\[[0-9;]*[~A-Za-z]|\x1bO.|\x1b|.", re.DOTALL)
+CODEX_MODES = ["Ask for approval", "Approve for me", "Full Access", "Read Only"]
+CODEX_CYCLE = {"Read Only": "Ask for approval", "Ask for approval": "Approve for me",
+               "Approve for me": "Read Only", "Full Access": "Read Only"}
+agent = {"mode": "Ask for approval", "first_f7": True, "dialog": None, "box": "", "notes": [],
+         "auto": False, "search": ""}
+
+
+def draw(lines):
+    write("\x1b[H\x1b[2J" + "".join(f"\x1b[{row};1H{line}" for row, line in lines))
+
+
+def codex_draw():
+    """The transcript, then the prompt, or a dialog in its place, as Codex has it."""
+    lines = [(row + 1, note) for row, note in enumerate(agent["notes"][-20:])]
+    if agent["dialog"] == "picker":
+        lines.append((32, "  Update Model Permissions"))
+        for n, name in enumerate(CODEX_MODES, 1):
+            current = " (current)" if name == agent["mode"] else ""
+            lines.append((32 + n, f"{'›' if current else ' '} {n}. {name}{current}  what it allows"))
+        lines.append((38, "  enter select · esc back"))
+    elif agent["dialog"] == "confirm":
+        lines += [(35, "› 1. Yes, continue anyway  Apply full access for this session"),
+                  (36, "  2. Cancel                Go back without enabling full access"),
+                  (38, "  enter select · esc back")]
+    else:
+        box = agent["box"] or "\x1b[2mAsk Codex to do anything\x1b[0m"
+        lines += [(36, f"\x1b[1m›\x1b[0m {box}"), (38, "  Context 0% used · 0 out · stub")]
+    draw(lines)
+
+
+def codex_set(mode):
+    agent["mode"] = mode
+    agent["notes"].append(f"• Permission selection requested: {mode}")
+    agent["dialog"] = None
+
+
+def codex_key(key):
+    dialog = agent["dialog"]
+    if key == b"\x1b":
+        agent["dialog"] = None
+    elif dialog == "picker" and key in (b"1", b"2", b"3", b"4"):
+        mode = CODEX_MODES[int(key) - 1]
+        if mode == "Full Access":
+            agent["dialog"] = "confirm"
+        else:
+            codex_set(mode)
+    elif dialog == "confirm" and key == b"1":
+        codex_set("Full Access")
+    elif dialog == "confirm" and key == b"2":
+        agent["dialog"] = None
+    elif key == b"\x1b[18~":
+        if agent["first_f7"]:
+            agent["dialog"] = "picker"
+        else:
+            codex_set(CODEX_CYCLE[agent["mode"]])
+        agent["first_f7"] = False
+    elif key == b"\r":
+        if agent["box"] == "/permissions":
+            agent["dialog"] = "picker"
+        elif agent["box"]:
+            agent["notes"].append(f"› {agent['box']}")
+        agent["box"] = ""
+    elif not key.startswith(b"\x1b") and key >= b" ":
+        agent["box"] += key.decode(errors="replace")
+    codex_draw()
+
+
+def opencode_draw():
+    lines = []
+    if agent["dialog"] == "commands":
+        lines += [(5, "  Commands                esc"), (6, f"  {agent['search']}")]
+        if "permis" in agent["search"].lower():
+            lines.append((7, "  Permissions             Settings · Session"))
+    elif agent["dialog"] == "settings":
+        value = "auto accept" if agent["auto"] else "prompt"
+        lines += [(5, f"  ● Permissions           {value}"), (6, "  change ←/→")]
+    # A new session draws the prompt mid-screen.
+    lines += [(20, f"┃  {agent['box'] or 'Ask anything'}"),
+              (21, f"┃  Build{' auto' if agent['auto'] else ''} · Big Pickle OpenCode")]
+    draw(lines)
+
+
+def opencode_key(key):
+    dialog = agent["dialog"]
+    if key == b"\x1b":
+        agent["dialog"] = None
+    elif key == b"\x10":
+        agent.update(dialog="commands", search="")
+    elif dialog == "commands" and key == b"\r":
+        if "permis" in agent["search"].lower():
+            agent["dialog"] = "settings"
+    elif dialog == "settings" and key in (b"\x1b[C", b"\x1b[D"):
+        agent["auto"] = not agent["auto"]
+    elif not key.startswith(b"\x1b") and key >= b" ":
+        agent["search" if dialog == "commands" else "box"] += key.decode(errors="replace")
+    opencode_draw()
+
+
+if args.alt or args.claude or args.opencode or modes or args.codex_modes or args.opencode_modes:
     write(ALT_SCREEN)
 if modes:
     show_mode()
+if args.codex_modes:
+    codex_draw()
+if args.opencode_modes:
+    opencode_draw()
 if args.title:
     write(f"\x1b]2;{args.title}\x07")
 if args.mouse:
@@ -166,6 +282,9 @@ with open(args.log, "ab", buffering=0) as log:
         if args.claude:
             for byte in data:
                 claude_key(byte)
+        if args.codex_modes or args.opencode_modes:
+            for key in KEYS.findall(data):
+                (codex_key if args.codex_modes else opencode_key)(key)
         received += data
         if args.editor:
             type_into_box(data)

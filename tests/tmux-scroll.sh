@@ -41,7 +41,9 @@ wheel() {
 }
 
 # The agents: Claude and Codex scroll a line per wheel event, OpenCode three.
+# Claude at its bottom takes three more to let go of it.
 declare -A events=([claude]=3 [codex]=3 [opencode]=1)
+declare -A pinned=([claude]=3 [codex]=0 [opencode]=0)
 declare -A agent_pane
 for agent in claude codex opencode; do
     log="$TEST_ROOT/$agent.log"
@@ -50,7 +52,7 @@ for agent in claude codex opencode; do
     tk_ready "$log"
     tk_wait '#{mouse_sgr_flag}' 1 "$pane"
     tk_raw "$S_PGUP"
-    tk_expect "$(wheel "$pane" 64 "${events[$agent]}")" "Shift+PgUp in $agent" tk_input "$log"
+    tk_expect "$(wheel "$pane" 64 $((events[$agent] + pinned[$agent])))" "Shift+PgUp in $agent" tk_input "$log"
     : > "$log"
     tk_raw "$S_PGDN"
     tk_expect "$(wheel "$pane" 65 "${events[$agent]}")" "Shift+PgDn in $agent" tk_input "$log"
@@ -66,10 +68,20 @@ ti set -p -t "$compose" @compose_target "$claude"
 tk_ready "$compose_log"
 tk_wait '#{pane_id}' "$compose"
 tk_raw "${S_PGUP}x"
-tk_expect "$(wheel "$claude" 64 3)" "Shift+PgUp from a compose pane" tk_input "$TEST_ROOT/claude.log"
+tk_expect "$(wheel "$claude" 64 6)" "Shift+PgUp from a compose pane" tk_input "$TEST_ROOT/claude.log"
 tk_until grep -q x "$compose_log" || fail "compose stub got no input"
 assert_eq "$(tk_input "$compose_log")" x "the compose pane's own input"
 : > "$TEST_ROOT/claude.log"
+
+# A Claude scrolled up shows "Jump to bottom" and gets just the three.
+loose_log="$TEST_ROOT/loose.log"
+loose=$(ti new-window -t test -P -F '#{pane_id}' \
+    "printf 'Jump to bottom (ctrl+End)\\n'; $(tk_stub claude "$loose_log" --mouse --paste)")
+tk_ready "$loose_log"
+tk_wait '#{mouse_sgr_flag}' 1 "$loose"
+tk_raw "$S_PGUP"
+tk_expect "$(wheel "$loose" 64 3)" "Shift+PgUp in a Claude scrolled up" tk_input "$loose_log"
+ti kill-window -t "$loose"
 
 # Any other app gets the key, mouse-aware or not.
 for flags in "--alt --mouse" "--alt"; do
@@ -84,13 +96,13 @@ for flags in "--alt --mouse" "--alt"; do
     ti kill-window
 done
 
-# @scroll-lines sets the step: six lines are six Claude events, two OpenCode
-# ones, and six lines of a shell's history.
+# @scroll-lines sets the step: six lines are six Claude events (and the three
+# at its bottom), two OpenCode ones, and six lines of a shell's history.
 ti set -g @scroll-lines 6
 ti select-window -t "$claude"
 ti select-pane -t "$claude"
 tk_raw "$S_PGUP"
-tk_expect "$(wheel "$claude" 64 6)" "six lines in Claude" tk_input "$TEST_ROOT/claude.log"
+tk_expect "$(wheel "$claude" 64 9)" "six lines in Claude" tk_input "$TEST_ROOT/claude.log"
 ti select-window -t "${agent_pane[opencode]}"
 tk_raw "$S_PGUP"
 tk_expect "$(wheel "${agent_pane[opencode]}" 64 2)" "six lines in OpenCode" tk_input "$TEST_ROOT/opencode.log"

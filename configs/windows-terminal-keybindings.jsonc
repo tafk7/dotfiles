@@ -49,7 +49,7 @@
         },
 
         // Ctrl+Shift+E/D/F likewise (tmux review: select by prompt or word), and
-        // Ctrl+Shift+Tab (tmux hands an agent a plain Shift+Tab).
+        // Ctrl+Shift+Tab (for the program in the pane).
         {
             "command":
             {

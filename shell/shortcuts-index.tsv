@@ -52,8 +52,9 @@ tmux│Alt+Shift+V│Edit the prompt in Neovim in the program's place (with no c
 tmux│Ctrl+S (compose)│Paste the draft into the agent and submit without interrupting it│Claude/OpenCode Ctrl+X Enter, Codex Tab; shells: paste only
 tmux│Ctrl+Shift+S / ,s (compose)│Paste the draft into the agent without submitting│bin/tmux-compose stage
 tmux│PgUp / PgDn / Ctrl+Home / Ctrl+End (compose)│Scroll the agent's conversation from the compose pane│bin/tmux-compose forward
-tmux│Shift+Tab (Claude, Codex)│Next permission mode: Claude accept edits → bypass → auto; Codex Read Only → Ask → Approve for me│bin/tmux-agent-mode / F7 (next_permission_mode)
-tmux│Ctrl+Shift+Tab (Claude, Codex, OpenCode)│The agent's own Shift+Tab, one step: plan mode, ask, OpenCode's plan agent│send-keys BTab
+tmux│Alt+Shift+J (Claude, Codex, OpenCode)│Yolo: Claude bypass permissions, Codex Full Access (from an empty prompt), OpenCode auto accept (saved for every session)│tmux-agent-mode yolo
+tmux│Alt+Shift+K (Claude, Codex)│Auto permission mode: Claude auto mode, Codex Approve for me│tmux-agent-mode auto
+tmux│Alt+Shift+L (Claude, Codex, OpenCode)│Edits only: Claude accept edits, Codex Ask for approval, OpenCode prompt│tmux-agent-mode edits
 tmux│Queue key (Shift+F8)│Queue a message for after the turn; in a compose pane, send the draft│Claude/OpenCode Ctrl+X Enter, Codex Tab, pi Alt+Enter
 tmux│Break (Pause key)│Stop whatever runs: Esc to an agent, Ctrl+C to anything else│WezTerm raw:19 → Shift+F9
 tmux│Ctrl+Z (Claude)│Undo typing│send-keys C-_ (chat:undo)
@@ -271,7 +272,7 @@ claude│Ctrl+PgUp / Ctrl+PgDn│More / less effort (Shift+Up/Down unbound)│co
 # Codex
 shell│cx│Start new Codex session│codex
 codex│Ctrl+G│Open composer in external editor (Codex default; compose pulls the box)│tui.keymap.global.open_external_editor
-codex│Shift+Tab│Next permission mode (Read Only, Ask, Approve for me; never Full Access); tmux sends F7│tui.keymap.chat.next_permission_mode
+codex│F7│Next permission mode (Read Only, Ask, Approve for me; never Full Access); Alt+Shift+K and L press it│tui.keymap.chat.next_permission_mode
 codex│Ctrl+PgUp / Ctrl+PgDn│More / less reasoning effort│tui.keymap.chat.increase/decrease_reasoning_effort
 shell│cxr│Resume Codex session (picker)│codex resume
 shell│cxc│Continue last Codex session│codex resume --last
@@ -283,7 +284,7 @@ shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex res
 shell│cxhp│One-off Codex prompt (alt dir)│CODEX_HOME=~/.codex-alt codex exec
 shell│oc│Launch opencode TUI (new session)│opencode
 opencode│Ctrl+Home / Ctrl+End│First / last message of the session│cli.json keybinds session.first/session.last
-opencode│Ctrl+Tab│Next session tab; Ctrl+Shift+Tab and Alt+Up, its previous-tab keys, belong to tmux│session.tab.next
+opencode│Ctrl+Tab│Next session tab; Ctrl+Shift+Tab is its previous (Alt+Up belongs to tmux)│session.tab.next
 opencode│Alt+M│Model list│cli.json keybinds model.list
 opencode│Ctrl+PgUp / Ctrl+PgDn│Cycle the model's effort variants│cli.json keybinds variant.cycle
 opencode│Ctrl+Z│Undo typing (instead of suspending)│cli.json keybinds input.undo

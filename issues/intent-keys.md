@@ -7,6 +7,13 @@ rounds; this records what was decided. Tested in private tmux servers (3.4,
 the real Claude 2.1.312. The [To check](#to-check) items need the laptop or
 the real agents.
 
+**Revised (2026-10-28), branch `mode-keys`:** Shift+Tab stepping through only
+three modes felt janky, so Shift+Tab is each agent's own cycle again and three
+keys on the home row jump to one mode each, a dial from most access to least:
+Alt+Shift+J yolo, Alt+Shift+K auto, Alt+Shift+L edits only
+([Permission modes](#permission-modes)). Checked against the
+real Claude 2.1.312, Codex 0.165.0 and OpenCode 2.1.4.
+
 ## Goals
 
 From the request that started it:
@@ -28,9 +35,9 @@ From the request that started it:
 |---|---|---|
 | Ctrl | the program in the pane | Ctrl+R history, Ctrl+PgUp/PgDn effort, Ctrl+Z undo, Ctrl+B background, Ctrl+D exit |
 | Alt | tmux, and readline's line edits | Alt+E/S/D/F panes, Alt+1…0 windows, Alt+V compose, Alt+Bksp/Del |
-| Alt+Shift | tmux's bigger moves | first and last window, new window, picker, full-pane compose |
+| Alt+Shift | tmux's bigger moves | first and last window, new window, picker, full-pane compose, permission modes |
 | Ctrl+Shift | WezTerm and the clipboard | tabs, copy, paste, font size, fullscreen, copy last reply |
-| Shift + a non-letter | the agent's dials, and selection | Shift+Tab mode, Shift+Enter new line, Shift+PgUp a few lines, Shift+arrows select |
+| Shift + a non-letter | the agent's dials, and selection | Shift+Tab mode cycle, Shift+Enter new line, Shift+PgUp a few lines, Shift+arrows select |
 | Symbols layer | movement | E/S/D/F arrows; with Ctrl, word jumps |
 | Win | Windows | dictation, desktops |
 | Thumb keys | one-tap intents | New line, Queue, Image |
@@ -73,8 +80,8 @@ share the left pinky).
 | Compose box | Alt+V | tmux (unchanged) |
 | Compose, full pane | Alt+Shift+V | tmux; with no box, it presses the program's own editor key: Claude, Codex and pi Ctrl+G, OpenCode Ctrl+X E, bash Ctrl+X Ctrl+E. Replaces Ctrl+Shift+G |
 | History search | Ctrl+R | native (Claude, Codex, bash) |
-| Permission mode | Shift+Tab | Claude: `bin/tmux-agent-mode` taps Shift+Tab until the footer shows accept edits, bypass permissions or auto mode, skipping plan and ask. Codex: tmux sends F7, its `next_permission_mode` (Read Only, Ask, Approve for me; Full Access stays in `/permissions`). OpenCode keeps its agent cycle |
-| The agent's own Shift+Tab | Ctrl+Shift+Tab | tmux sends one plain Shift+Tab to Claude, Codex or OpenCode: plan mode and ask, when wanted |
+| Mode cycle | Shift+Tab | native: Claude's permission modes, Codex's plan mode, OpenCode's agents |
+| Yolo / auto / edits only | Alt+Shift+J / K / L | tmux, `bin/tmux-agent-mode`; see [Permission modes](#permission-modes) |
 | Reasoning effort | Ctrl+PgUp / Ctrl+PgDn | agent configs; Shift+↑↓ freed, so Shift+arrows only ever select. Claude Code and pi keep the prompt cache across an effort change on current models (the effort goes in as a message at the turn where it changes); other providers may rebuild it |
 | Pick a model | Alt+M | agent configs (Codex has no key; `/model`) |
 | Stop | Break, or Esc in agents | tmux sends Esc to an agent and Ctrl+C to anything else. A plain Ctrl+C would exit OpenCode and clear pi's prompt |
@@ -107,6 +114,8 @@ share the left pinky).
 | pi | New keybindings file, deployed by `bin/ai-config`: thinking level, model, TAFK delete keys, Ctrl+Z undo | done (`9ceb032`) |
 | keymap | Thumb pairs rated by feel; raw keys; intents and known issues to match | done |
 | Windows Terminal | The same Ctrl+Shift keys and fullscreen in `configs/windows-terminal-keybindings.jsonc`; ScrLk and Pause there need the firmware fallback. Font size keeps its defaults | done |
+| tmux, Codex | Shift+Tab native again; Alt+Shift+J/K/L permission modes; Ctrl+Shift+Tab goes on to the program | branch `mode-keys` |
+| tmux | Shift+PgUp in Claude adds three wheel-ups when Claude is at its bottom, which 2.1.312 holds against the first three | branch `mode-keys` |
 | Defy | The four thumb keys, in Bazecor | yours to do; re-export the backup over `configs/keyboard/dygma-defy.json` |
 
 Applying it to this machine is `bin/ai-config` (Claude, Codex, OpenCode, pi),
@@ -114,13 +123,44 @@ a tmux reload, and copying `configs/wezterm.lua` to Windows. The live
 `~/.claude/keybindings.json` still has the retired Shift+Up/Down line scroll;
 `bin/ai-config claude` replaces it.
 
+## Permission modes
+
+Three modes are in use, named the same in every agent. The keys are a dial on
+the right hand's home row, access falling from J to L. Each goes straight to
+its mode from wherever the agent is, and says what it did in tmux's message
+line. Alt+Shift+N/M/Y were tried first; Y sat beside Alt+Shift+T (new window),
+one slip from yolo, and M was one Shift from Alt+M (model picker).
+
+| Key | Mode | Claude | Codex | OpenCode |
+|---|---|---|---|---|
+| Alt+Shift+J | yolo | bypass permissions | Full Access | auto accept |
+| Alt+Shift+K | auto | auto mode | Approve for me | none (it has two states) |
+| Alt+Shift+L | edits only | accept edits | Ask for approval | prompt |
+
+How each agent gets there, since none has a key per mode:
+
+- **Claude** has only its cycle, so the script presses Shift+Tab until the
+  footer names the mode. Plan and ask flash by on the way. If the cycle comes
+  back round, Claude wasn't started with that mode (bypass needs
+  `--allow-dangerously-skip-permissions`), and the mode is left as it was.
+- **Codex** picks from `/permissions` when the prompt is empty and no turn is
+  running, confirming Full Access. With a draft or mid-turn it presses F7
+  (`next_permission_mode`) instead, which opens the same picker on a session's
+  first press and after that steps Read Only, Ask, Approve for me. Full Access
+  isn't in that cycle, so Alt+Shift+J with a draft says to empty the prompt
+  rather than typing over it. Each switch leaves a "Permission selection
+  requested" line in Codex's transcript.
+- **OpenCode** has one switch, a setting: Ctrl+P, Permissions, flip. It's
+  saved to its `cli.json`, so it applies to every OpenCode session.
+- **pi** never asks, so the keys only say so.
+
 ## To check
 
 1. On the laptop: set `debug_key_events = true` in WezTerm and press ScrLk and
    Pause. A `RawKeyEvent` line with `raw_code: 145` or `19` means the raw
    bindings work; none means the firmware fallback.
-2. `tmux-agent-mode` against real Claude: all five modes, with bypass
-   available and without.
+2. ~~`tmux-agent-mode` against real Claude~~: done for the jump keys, with
+   bypass available; without it is covered by the stub test.
 3. Whether Codex, OpenCode and pi attach a pasted image path the way Claude
    does.
-4. OpenCode's permission dialog keys.
+4. ~~OpenCode's permission dialog keys~~: the setting is reached by Ctrl+P.
