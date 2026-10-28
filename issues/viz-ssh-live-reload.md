@@ -1,8 +1,9 @@
 # Secure terminal-only visualization viewer with live reload
 
-**Status:** first implementation on branch `viz-ssh`, 2026-10-28. Not yet
-tried from the Windows laptop: see [still to verify](#still-to-verify). Created
-2026-10-26 as an idea note; this revision records the decided design.
+**Status:** first implementation on branch `viz-ssh`, 2026-10-28, revised
+after an independent security review. Not yet tried from the Windows laptop:
+see [still to verify](#still-to-verify). Created 2026-10-26 as an idea note;
+this revision records the decided design.
 
 ## User need
 
@@ -26,13 +27,14 @@ polling recovers on reconnect.
 ```text
 Windows browser --HTTP--> 127.0.0.1:PORT --ssh -L--> /run/user/UID/viz/http.sock --> bin/viz
                  cookie                 (Windows      (0700 dir, 0600 socket,        (stdlib Python)
-                 viz-PORT               OpenSSH)       no TCP listener on Linux)
+                 viz-PORT-HOST          OpenSSH)       no TCP listener on Linux)
 ```
 
 **Transport: a Unix socket, no TCP on Linux.** The server listens on
 `$XDG_RUNTIME_DIR/viz/http.sock`. Without `XDG_RUNTIME_DIR` it uses
-`/run/user/UID/viz`, and failing that `/tmp/viz-UID`, checked for owner and
-mode the way tmux checks `/tmp/tmux-UID`. The directory is 0700. The socket is
+`/run/user/UID/viz`, and failing that `~/.local/state/viz/run`, not `/tmp`,
+where another account could create the directory first. Owner and mode are
+checked either way. The directory is 0700. The socket is
 created under umask 0177, so it is 0600 from the moment it exists. The kernel
 then refuses every other account (except root) at `connect()`. sshd runs the
 forward as the user, so the user's own forward gets through. Nothing listens on
@@ -41,37 +43,53 @@ a TCP port, so there is no port for two Linux accounts to collide on or squat.
 **A browser secret as well.** The forwarded port on the laptop is open to every
 process there, and the browser runs pages from other sites. The socket alone
 cannot tell the user's browser from those. The server keeps one secret per
-account in `~/.local/state/viz/token` (0600). It reaches a browser only as a
-cookie:
+account in `~/.local/state/viz/token` (0600). The secret never leaves the
+Linux host. The CLI shows it to the server as a bearer token over the socket,
+and browsers get derived credentials:
 
-- `viz login` asks the running server (over the socket, with the secret as a
-  bearer token) for a single-use code, valid for 10 minutes, and prints
-  `http://127.0.0.1:PORT/__viz/login?code=...`.
-- Opening the link sets `viz-PORT=<secret>`: HttpOnly, SameSite=Lax, 400 days,
-  then 303s to the gallery. The name carries the port because browsers share
-  cookies across ports. Two forwards (two hosts) then keep separate sign-ins.
-  This is Jupyter's `username-localhost-8888` pattern.
-- The secret itself is never printed. `viz open` and `viz status` print nothing
-  secret, so agent transcripts carry no credential. `viz login --reset` writes a
-  new secret and restarts the server, which signs every browser out.
+- `viz login` asks the running server for a single-use code, valid for 10
+  minutes, and prints `http://127.0.0.1:PORT/__viz/login?code=...`.
+- Opening the link sets the sign-in cookie, then 303s to the gallery. The
+  cookie is HttpOnly and SameSite=Lax, and its value is
+  `<issued>.<HMAC(secret, "browser:<issued>")>`. The server refuses it after
+  30 days whatever the browser keeps, and it can't stand in for the secret:
+  for example, it can't mint codes.
+- The cookie is named `viz-PORT-HOSTTAG`. Browsers send 127.0.0.1's cookies to
+  every port, so the name carries the port and a hash of the host name. Two
+  forwards, or one port reused for another host, then keep separate sign-ins.
+  This is Jupyter's `username-localhost-8888` pattern, extended.
+- Reload polls don't carry the cookie (`credentials: 'omit'`). Each served page
+  embeds a poll token, `HMAC(secret, "poll:<path>")`, good only for that page's
+  version. An open tab polls every second. If the tunnel drops and another
+  laptop process takes the port, the tab hands it nothing reusable.
+- `viz open` and `viz status` print nothing secret, so agent transcripts carry
+  no credential. `viz login --reset` writes a new secret, and the server rereads
+  it at once: every cookie and poll token stops working. A truncated or short
+  secret file is replaced, never trusted.
 
 **Checks on every request, in order:**
 
 1. The Host header is `localhost`, `127.0.0.1` or `[::1]` with any port, else
    421. This stops DNS rebinding.
-2. `/__viz/login?code=` is the only unauthenticated route. Everything else
-   needs the cookie or the bearer secret, else 403 with sign-in instructions.
-3. For browser requests, Fetch Metadata: `Sec-Fetch-Site` must be
+2. Requests carrying a `Service-Worker` header are refused, so a served
+   script can't install a worker that would outlive its file and a sign-out.
+3. `/__viz/login?code=` needs only the code, and `/__viz/version` only the
+   page's poll token. Everything else needs the cookie or the bearer secret,
+   else 403 with sign-in instructions.
+4. For browser requests, Fetch Metadata: `Sec-Fetch-Site` must be
    `same-origin` or `none`, or the request must be a top-level `GET`
    navigation. Other origins, including other localhost ports, which count as
    same-site and get the Lax cookie, cannot load a viz file as a script, image,
    iframe or fetch.
-4. Path: URL components are percent-decoded first, then any component starting
+5. Path: URL components are percent-decoded first, then any component starting
    with `.` is refused (`..`, `.git`, `.ff-profile`, `.env`). The realpath must
    lie under VIZ_DIR or a linked directory, and a hidden component below that
    root is refused even when a symlink leads there. GET, HEAD and the version
-   endpoint share this code.
-5. Response headers: `X-Content-Type-Options: nosniff`,
+   endpoint share this code. After opening a file, the check is repeated on
+   what was opened (`/proc/self/fd`), so a symlink swapped in meanwhile can't
+   escape. The file must belong to the user and be writable by no other
+   account: another account's file is never shown as the user's page.
+6. Response headers: `X-Content-Type-Options: nosniff`,
    `Cross-Origin-Resource-Policy: same-origin`,
    `Cross-Origin-Opener-Policy: same-origin`, `X-Frame-Options: SAMEORIGIN`,
    `Referrer-Policy: same-origin` and `Cache-Control: no-store`. viz's own pages
@@ -84,11 +102,13 @@ cookie:
 published by linking its directory into `VIZ_DIR/linked/`, so relative links
 and reload on rebuild keep working. It is tightened:
 
-- A linked directory is never `$HOME` or above it, the temp root, or a
-  repository root. `viz open` refuses, and the server ignores such links if made
-  by hand.
+- A linked directory is never `$HOME` or above it, the temp root, a
+  repository root, hidden, or owned or writable by another account (group
+  writes by the user's own group are allowed). `viz open` refuses, and the
+  server ignores such links if made by hand.
 - Linked directories are not listed. Directory listings exist only inside
-  VIZ_DIR, and the old SimpleHTTPRequestHandler auto-index is gone.
+  VIZ_DIR, and the old SimpleHTTPRequestHandler auto-index is gone. The version
+  endpoint answers for a linked directory only through its index page.
 - The gallery lists linked files only after they have been opened (recorded in
   `~/.local/state/viz/opened`), not their siblings.
 - Without VS Code, `viz open` also serves images.
@@ -104,11 +124,15 @@ because the asset list starts empty.
 **Lifetime.** `viz open`, `viz start` and `viz login` start a detached server
 on demand, as before:
 
-- An flock serializes check-and-bind, so a second `viz serve` exits.
-- A stale socket from a crash is replaced, after checking it is a socket.
+- The server holds an flock on `serve.lock` for its whole life, so a second
+  `viz serve` exits at once.
+- A stale socket from a crash is replaced, after checking it is a socket, and
+  only by whoever holds the lock.
 - The server exits when its socket disappears or is replaced, for example when
   logind removes `/run/user/UID` at the last logout.
-- `viz stop` signals only a process whose command line is `viz serve`.
+- `viz stop` signals only while the lock is held, and only a process of this
+  uid whose command line is `viz serve`. A stale pid file can't aim it at
+  anything else.
 - `viz stop` also ends the old 127.0.0.1 TCP server, through its pid file in
   `~/.local/state/viz/`. `viz status` warns while that server still runs.
 
@@ -135,7 +159,7 @@ on demand, as before:
 weaker on a shared host:
 
 - Anyone can bind `127.0.0.1:PORT` while viz is down. The user's VS Code or
-  browser then sends the cookie to that impostor.
+  browser then sends its cookie to that impostor.
 - Two accounts with the same `uid % 10000` collide.
 - Every coworker's process can probe the server.
 
@@ -183,14 +207,16 @@ the secret, and the ability to open VS Code diffs.
 | Who | Can they... | Defense | Residual |
 |---|---|---|---|
 | Another account on the Linux host (coworker) | connect to the server? | 0700 directory and 0600 socket; no TCP listener; secret file 0600 | root and admins can read everything, as with any file of yours |
-| Another account on the Linux host | squat the socket or `/tmp/viz-UID`? | runtime dir is per-user (systemd); the `/tmp` fallback is refused unless owned by you and 0700 | a squatter of `/tmp/viz-UID` can deny service (viz refuses to run) |
-| Another local user or process on the laptop | read pages through the forwarded port? | every request needs the secret; the forward binds 127.0.0.1, never the LAN | admins and malware running as you; the login link sits in the browser history but is single-use and expires |
-| Another laptop account racing for the port | impersonate viz and collect the cookie? | `127.0.0.1` binding (no IPv6 sibling); ssh prints `Address already in use`; the strict variant below exits instead | with the default config a warning can be missed; HTTPS would be needed to authenticate the server |
+| Another account on the Linux host | squat the socket directory, or race the lock, pid or token files? | runtime dir is per-user (systemd); the fallback lives in your state dir, not `/tmp`; owner and mode checked; token created exclusive 0600 and fsynced | none known |
+| Another account on the Linux host | plant a page in a linked directory, or swap a symlink in? | directories others own or can write are never linked; only files you own that no one else can write are served, checked on the opened descriptor | none known |
+| Another account on the Linux host | spoof VS Code's IPC socket (it falls back to `/tmp`)? | only sockets owned by your uid are used | none known |
+| Another local user or process on the laptop | read pages through the forwarded port? | every request needs a sign-in cookie; the forward binds 127.0.0.1, never the LAN | admins and malware running as you; the login link sits in the browser history but is single-use and expires |
+| Another laptop account taking the port while the tunnel is down | impersonate viz and collect the cookie? | open tabs poll with per-page tokens, never the cookie; the cookie is not the secret and dies after 30 days; `127.0.0.1` binding (no IPv6 sibling); ssh prints `Address already in use`; the strict variant exits instead | a user-initiated reload or click while the port is held sends the cookie to the impostor, which can then read pages through the real forward for up to 30 days, or until `viz login --reset`. Only HTTPS with a pinned certificate would authenticate the server. After an `Address already in use` you didn't expect, run `viz login --reset` |
 | LAN | reach the forward? | `LocalForward 127.0.0.1:PORT` (GatewayPorts off by default) | none known |
 | A website in the user's browser | rebind DNS to read viz? | Host allowlist (421) | none known |
 | A website or another localhost port | embed, frame or script viz files, or read them? | Fetch Metadata check, CORP, `frame-ancestors`, X-Frame-Options; cookie is Lax and HttpOnly | browsers without Fetch Metadata or CORP rely on the cookie and same-origin policy alone |
 | A website or another localhost port | make viz do something (CSRF)? | no state-changing GET; diff needs POST, cookie, exact Origin, `X-Viz` | none known |
-| A page served by viz | read other viz pages, request diffs? | **not defended: by design.** Pages are the user's and agents' output, trusted like their code | don't open untrusted or downloaded HTML through viz |
+| A page served by viz | read other viz pages, request diffs? | **not defended: by design.** Pages are the user's and agents' output, trusted like their code. Service workers are refused, so a page can't outlive itself | don't open untrusted or downloaded HTML through viz |
 | Any request | escape the served roots? | traversal (plain and encoded), symlink escape and hidden paths refused for GET, HEAD and version | siblings of an opened file in a linked directory are fetchable by the signed-in browser (needed for relative links) |
 
 Also residual:
@@ -198,7 +224,7 @@ Also residual:
 - The server trusts that whatever reaches its socket came through the user's
   own ssh. That is true by filesystem permission, but every process running as
   the user (agents included) can also talk to it, and to VS Code.
-- The secret persists across reboots on purpose, so the bookmark keeps working.
+- The secret persists across reboots on purpose, so sign-ins survive them.
   Rotate it with `viz login --reset`.
 - No HTTPS. Loopback HTTP between the browser and ssh is visible only to
   privileged software on the laptop.
@@ -285,11 +311,11 @@ unprivileged `sshd` on a random loopback port with scratch keys and
   `connect to /…/http.sock port -2 failed`. Restarting viz restores service
   without reconnecting ssh.
 
-**Headless Chromium 153** (Playwright 1.64.1) through that tunnel passed 13 of
-13 checks:
+**Headless Chromium 153** (Playwright 1.64.1) through that tunnel passed 14 of
+14 checks:
 
 - Before sign-in: an unsigned page gets 403; the login link lands on the
-  gallery; the cookie is `viz-P`, HttpOnly and Lax.
+  gallery; the cookie is `viz-P-HOSTTAG`, HttpOnly and Lax.
 - Reload: a stylesheet edit and a page edit each reload the page.
 - Diff: a `/__viz/diff` link becomes a same-origin POST that passes every
   check. It got 409 because no VS Code was connected.
@@ -298,6 +324,25 @@ unprivileged `sshd` on a random loopback port with scratch keys and
   gets an empty iframe.
 - With the tunnel killed, the page stays. After reconnecting, an edit reloads
   it.
+- With the browser's cookies cleared, an edit is still noticed (the reload then
+  shows the sign-in page). Polls don't depend on the cookie.
+
+**Independent review.** A separate agent audited `bin/viz` against this threat
+model with its own repro scripts. Fixed in response:
+
+- The cookie had been the secret itself, with no server-side expiry.
+- Polls had carried the cookie.
+- Other accounts' files in linked directories could be served, and a symlink
+  could be swapped in between check and open.
+- An empty token file had turned authentication off.
+- `viz stop` had trusted a stale pid file, and `--reset` had needed a restart.
+- A hidden directory could be linked.
+- The version endpoint had walked linked directories and counted dotfiles.
+- Exceptions on odd paths were unhandled, and `serve.log` was 0664.
+- Service workers were accepted, and VS Code IPC sockets were trusted without
+  an owner check.
+- The no-runtime-dir fallback in `/tmp` could be squatted.
+- A refused POST raced the client's body write.
 
 **Windows OpenSSH: source review, not run.**
 
@@ -326,21 +371,26 @@ the listening end is TCP on Windows, and viz replaces its own stale socket.
 
 - the socket directory is 0700 and the socket 0600, owned by the user, with
   nothing on the TCP port;
-- requests are refused without the secret, with a wrong cookie, with another
-  port's cookie or with a wrong bearer, for GET, HEAD, version, ping and login
-  mint;
+- requests are refused without a credential, with a wrong cookie, the secret
+  as a cookie, another port's cookie, an expired but correctly signed cookie, or
+  a wrong bearer, for GET, HEAD, version, ping and login mint;
+- the cookie can't mint codes; poll tokens work only for their own page's
+  version; a truncated secret is replaced; service workers are refused; files
+  others can write are not served;
 - bad Host headers get 421;
 - sign-in: one code, used once, never shown in `viz status`;
 - containment: traversal (plain, encoded, through a symlinked directory),
   symlink escape and hidden paths, for GET, HEAD and version;
 - Fetch Metadata outcomes;
 - reload on page and asset changes;
-- linked-directory rules: no listing, the gallery shows only opened files, and
-  home and repository roots are refused;
+- linked-directory rules: no listing, no version walk, the gallery shows only
+  opened files, and home, repository roots, hidden directories and
+  world-writable directories are refused;
 - the diff endpoint's refusals;
-- lifetime: single server, VIZ_DIR mismatch, `stop` sparing unrelated PIDs,
-  crash recovery, exit when the socket is removed, the `/tmp` fallback refused
-  when not private, and `login --reset`.
+- lifetime: single server, VIZ_DIR mismatch, `stop` sparing unrelated PIDs and
+  a viz lookalike when no server holds the lock, crash recovery, exit when the
+  socket is removed, a non-private runtime directory refused, and
+  `login --reset` taking effect without a restart.
 
 ### Still to verify
 
