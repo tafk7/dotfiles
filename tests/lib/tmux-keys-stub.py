@@ -31,9 +31,10 @@ manual mode), the first shown at start; each Shift+Tab shows the next.
 
 --codex-modes imitates Codex's permission modes: its prompt (the placeholder
 dimmed when empty), /permissions and the picker it opens (numbered rows, the
-current one marked, Full Access asking once more), and F7, which opens the
-picker on its first press and after that steps Read Only, Ask for approval,
-Approve for me, each step noted in the transcript.
+current one marked, Full Access asking once more; a number within half a
+second of a dialog opening only moves the highlight, which Enter chooses), and
+F7, which opens the picker on its first press and after that steps Read Only,
+Ask for approval, Approve for me, each step noted in the transcript.
 
 --opencode-modes imitates OpenCode's one permission switch: Ctrl+P's command
 list, its Permissions entry, the setting Left and Right flip, and the footer
@@ -156,7 +157,7 @@ CODEX_MODES = ["Ask for approval", "Approve for me", "Full Access", "Read Only"]
 CODEX_CYCLE = {"Read Only": "Ask for approval", "Ask for approval": "Approve for me",
                "Approve for me": "Read Only", "Full Access": "Read Only"}
 agent = {"mode": "Ask for approval", "first_f7": True, "dialog": None, "box": "", "notes": [],
-         "auto": False, "search": ""}
+         "auto": False, "search": "", "opened": 0.0, "highlight": 0}
 
 
 def draw(lines):
@@ -170,12 +171,16 @@ def codex_draw():
         lines.append((32, "  Update Model Permissions"))
         for n, name in enumerate(CODEX_MODES, 1):
             current = " (current)" if name == agent["mode"] else ""
-            lines.append((32 + n, f"{'›' if current else ' '} {n}. {name}{current}  what it allows"))
+            mark = "›" if n - 1 == agent["highlight"] else " "
+            lines.append((32 + n, f"{mark} {n}. {name}{current}  what it allows"))
         lines.append((38, "  enter select · esc back"))
     elif agent["dialog"] == "confirm":
-        lines += [(35, "› 1. Yes, continue anyway  Apply full access for this session"),
-                  (36, "  2. Cancel                Go back without enabling full access"),
-                  (38, "  enter select · esc back")]
+        # Codex keeps the prompt under this one, so it sits 17 lines up.
+        marks = ["›" if n == agent["highlight"] else " " for n in range(2)]
+        lines += [(23, f"{marks[0]} 1. Yes, continue anyway  Apply full access for this session"),
+                  (24, f"{marks[1]} 2. Cancel                Go back without enabling full access"),
+                  (25, "  enter select · esc back"),
+                  (36, "\x1b[1m›\x1b[0m\x1b[48;2;65;65;65m \x1b[2mAsk Codex to do anything\x1b[0m\x1b[49m")]
     else:
         box = agent["box"] or "\x1b[2mAsk Codex to do anything\x1b[0m"
         # The prompt line has a themed background, as the real one does.
@@ -189,29 +194,45 @@ def codex_set(mode):
     agent["dialog"] = None
 
 
+def codex_open(dialog):
+    agent.update(dialog=dialog, opened=time.monotonic(),
+                 highlight=CODEX_MODES.index(agent["mode"]) if dialog == "picker" else 0)
+
+
+def codex_pick(index):
+    """The picker or confirmation row at INDEX chosen."""
+    if agent["dialog"] == "confirm":
+        if index == 0:
+            codex_set("Full Access")
+        else:
+            agent["dialog"] = None
+    elif CODEX_MODES[index] == "Full Access":
+        codex_open("confirm")
+    else:
+        codex_set(CODEX_MODES[index])
+
+
 def codex_key(key):
     dialog = agent["dialog"]
+    rows = {"picker": 4, "confirm": 2}.get(dialog, 0)
     if key == b"\x1b":
         agent["dialog"] = None
-    elif dialog == "picker" and key in (b"1", b"2", b"3", b"4"):
-        mode = CODEX_MODES[int(key) - 1]
-        if mode == "Full Access":
-            agent["dialog"] = "confirm"
+    elif rows and key.isdigit() and 1 <= int(key) <= rows:
+        if time.monotonic() - agent["opened"] < 0.5:
+            agent["highlight"] = int(key) - 1
         else:
-            codex_set(mode)
-    elif dialog == "confirm" and key == b"1":
-        codex_set("Full Access")
-    elif dialog == "confirm" and key == b"2":
-        agent["dialog"] = None
+            codex_pick(int(key) - 1)
+    elif rows and key == b"\r":
+        codex_pick(agent["highlight"])
     elif key == b"\x1b[18~":
         if agent["first_f7"]:
-            agent["dialog"] = "picker"
+            codex_open("picker")
         else:
             codex_set(CODEX_CYCLE[agent["mode"]])
         agent["first_f7"] = False
     elif key == b"\r":
         if agent["box"] == "/permissions":
-            agent["dialog"] = "picker"
+            codex_open("picker")
         elif agent["box"]:
             agent["notes"].append(f"› {agent['box']}")
         agent["box"] = ""
