@@ -45,12 +45,17 @@ tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
 tmux│Alt+Shift+T│Insert new window after current (inherits current path)│new-window -a -c #{pane_current_path}
 tmux│Alt+V│Open a compose pane (Neovim) under this pane, or switch focus between them│bin/tmux-compose toggle
-tmux│Ctrl+G (Claude) / Ctrl+E (Codex) / Ctrl+X E (OpenCode)│Move the prompt box into the compose pane, opening it if needed│$VISUAL is bin/compose-editor → tmux-compose editor
+tmux│Ctrl+G (Claude, Codex) / Ctrl+X E (OpenCode)│Move the prompt box into the compose pane, opening it if needed│$VISUAL is bin/compose-editor → tmux-compose editor
 tmux│:q / :wq / :cq (compose on an agent)│Put the draft back in the agent's prompt box / keep it in the draft│tmux-compose return through the agent's editor key
-tmux│Ctrl+Shift+G (Claude, Codex, OpenCode)│Edit the prompt in Neovim in the agent's place│tmux-compose fullscreen
+tmux│Alt+Shift+V│Edit the prompt in Neovim in the program's place (with no compose-editor, its own editor: pi Ctrl+G, a shell Ctrl+X Ctrl+E)│tmux-compose fullscreen
 tmux│Ctrl+S (compose)│Paste the draft into the agent and submit without interrupting it│Claude/OpenCode Ctrl+X Enter, Codex Tab; shells: paste only
 tmux│Ctrl+Shift+S / ,s (compose)│Paste the draft into the agent without submitting│bin/tmux-compose stage
 tmux│PgUp / PgDn / Ctrl+Home / Ctrl+End (compose)│Scroll the agent's conversation from the compose pane│bin/tmux-compose forward
+tmux│Shift+Tab (Claude, Codex)│Next permission mode: Claude accept edits → bypass → auto; Codex Read Only → Ask → Approve for me│bin/tmux-agent-mode / F7 (next_permission_mode)
+tmux│Ctrl+Shift+Tab (Claude, Codex, OpenCode)│The agent's own Shift+Tab, one step: plan mode, ask, OpenCode's plan agent│send-keys BTab
+tmux│Queue key (Shift+F8)│Queue a message for after the turn; in a compose pane, send the draft│Claude/OpenCode Ctrl+X Enter, Codex Tab, pi Alt+Enter
+tmux│Break (Pause key)│Stop whatever runs: Esc to an agent, Ctrl+C to anything else│WezTerm raw:19 → Shift+F9
+tmux│Ctrl+Z (Claude)│Undo typing│send-keys C-_ (chat:undo)
 tmux│Ctrl+L (compose, insert)│Fix the last spelling or grammar mark before the cursor│Harper's suggestion, else Vim's first spelling suggestion
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
@@ -83,8 +88,8 @@ tmux│Ctrl+a ) / (│Next/previous session│switch-client -n/-p
 tmux│Ctrl+a $│Rename current session│command-prompt rename-session
 # Review (copy mode, vi keys)
 tmux│Ctrl+a v│Copy mode on what the pane shows now (in an agent: the live screen and prompt)│copy-mode / cancel
-tmux│ScrollLock key / Ctrl+a f│Review the pane in copy mode: a shell's history in place; an agent's conversation (Claude, Codex, OpenCode) in a review pane zoomed over it│Shift+F5 (firmware F17) → bin/tmux-review toggle
-tmux│Ctrl+a /│Review the pane and search upward at once│bin/tmux-review search
+tmux│ScrollLock / Ctrl+a f│Review the pane in copy mode: a shell's history in place; an agent's conversation (Claude, Codex, OpenCode) in a review pane zoomed over it│Shift+F5 (firmware F17) → bin/tmux-review toggle
+tmux│Shift+ScrollLock / Ctrl+a /│Review the pane and search upward at once│bin/tmux-review search
 tmux│Ctrl+a o│Open the agent's conversation or the pane's history read-only in an nvim popup with review's keys (q closes)│bin/tmux-review edit
 tmux│e / s / d / f (and arrows)│Review: move up / left / down / right; drops a selection Shift started│cursor-up/-left/-down/-right
 tmux│E / S / D / F (and Shift+arrows)│Review: select as you move, as Shift does in a Windows text box│begin-selection; cursor-*
@@ -97,6 +102,7 @@ tmux│Ctrl+Home / Ctrl+End│Review: top / bottom of history│history-top / hi
 tmux│/ and ? then n / N│Review: incremental search up / down, then next / previous result│search-backward-incremental / search-forward-incremental
 tmux│o│Review: open what review shows read-only in an nvim popup at this line, with review's keys (q closes)│bin/tmux-review open
 tmux│h│Review: toggle a selection that plain moves extend; h or Esc ends it│begin-selection / clear-selection (@select-toggle)
+tmux│Click (review)│Put the copy-mode cursor where you click, ready for Shift+E/S/D/F│send -X clear-selection
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
 tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude and Codex, their own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C, Codex the key itself
@@ -112,12 +118,15 @@ tmux│Alt+triple-click│Copy clicked line to the tmux buffer and clipboard│s
 tmux│Shift+mouse drag│Select natively in Windows Terminal│client-side selection
 tmux│Ctrl+a p│Paste from tmux buffer with bracketed-paste markers when supported│paste-buffer -p
 tmux│Ctrl+a y / Shift+Copy│Copy the agent's last reply (Claude: from its session file, draft untouched; Codex/OpenCode: their copy keys)│bin/tmux-last-reply
-tmux│Ctrl+a e│Export current tmux buffer to the client/Windows clipboard, even with export off│size-gated OSC 52 export
+tmux│Ctrl+a e│Export the newest tmux buffer to the client/Windows clipboard again│size-gated OSC 52 export
 # Utility
 tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
 tmux│Ctrl+a R│Force current window to attached-client size and resume automatic sizing│resize-window -A; setw window-size latest; refresh-client
 tmux│Ctrl+a Ctrl+l│Clear screen and scrollback history│send-keys C-l; clear-history
 tmux│Ctrl+a ?│List all keybindings│list-keys
+wezterm│Ctrl+Shift+Enter│Fullscreen (F11 on other keyboards)│ToggleFullScreen
+wezterm│Ctrl+Shift+= / Ctrl+Shift+- / Ctrl+Shift+0│Font size up / down / reset│Increase/Decrease/ResetFontSize
+wezterm│Image key (Ctrl+Alt+V)│Upload the Windows clipboard image to the tab's SSH host and paste its path│paste_clipboard_image
 
 # Vim shortcuts (leader is comma)
 # File navigation (FZF)
@@ -202,7 +211,7 @@ shell│psg│Search running processes by name│ps aux | grep
 shell│fkill│Fuzzy-find and kill a process│FZF process selector + kill
 shell│killport│Kill process on a port (--force to skip confirm)│killport <port>
 shell│keymap open│Map every key across the Defy, Windows, WezTerm, tmux and the pane programs│bin/keymap build, then viz open
-shell│keymap why│Trace one chord through every layer, e.g. keymap why ctrl+shift+g│bin/keymap why <chord> [program...]
+shell│keymap why│Trace one chord through every layer, e.g. keymap why shift+tab│bin/keymap why <chord> [program...]
 shell│keymap free│Chords the keyboard sends that nothing binds, e.g. keymap free alt│bin/keymap free <mods>
 # Archive
 shell│extract│Extract any archive format (.tar.gz, .zip, etc.)│extract <file>
@@ -252,12 +261,14 @@ shell│clp│Run one-off Claude prompt│claude --print
 shell│cll│Claude local (no global settings)│claude --setting-sources project,local
 shell│cllc│Continue Claude local session│claude --setting-sources project,local --continue
 shell│cllp│One-off Claude local prompt│claude --setting-sources project,local --print
+claude│Alt+M│Pick a model (Alt+P unbound)│configs/ai/claude/keybindings.json chat:modelPicker
+claude│Ctrl+PgUp / Ctrl+PgDn│More / less effort (Shift+Up/Down unbound)│configs/ai/claude/keybindings.json chat:increaseEffort/decreaseEffort
 
 # Codex
 shell│cx│Start new Codex session│codex
-codex│Ctrl+E│Open composer in external editor│tui.keymap.global.open_external_editor
-codex│Ctrl+G│Next permission mode (Read Only, Ask, Approve for me; never Full Access)│tui.keymap.chat.next_permission_mode
-codex│End│Move to end of composer line│tui.keymap.editor.move_line_end
+codex│Ctrl+G│Open composer in external editor (Codex default; compose pulls the box)│tui.keymap.global.open_external_editor
+codex│Shift+Tab│Next permission mode (Read Only, Ask, Approve for me; never Full Access); tmux sends F7│tui.keymap.chat.next_permission_mode
+codex│Ctrl+PgUp / Ctrl+PgDn│More / less reasoning effort│tui.keymap.chat.increase/decrease_reasoning_effort
 shell│cxr│Resume Codex session (picker)│codex resume
 shell│cxc│Continue last Codex session│codex resume --last
 shell│cxp│Run one-off Codex prompt│codex exec
@@ -267,12 +278,18 @@ shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex res
 shell│cxhp│One-off Codex prompt (alt dir)│CODEX_HOME=~/.codex-alt codex exec
 shell│oc│Launch opencode TUI (new session)│opencode
 opencode│Ctrl+Home / Ctrl+End│First / last message of the session│cli.json keybinds session.first/session.last
-opencode│Ctrl+Tab / Ctrl+Shift+Tab│Next / previous session tab (opencode default)│session.tab.next/previous
+opencode│Ctrl+Tab│Next session tab; Ctrl+Shift+Tab and Alt+Up, its previous-tab keys, belong to tmux│session.tab.next
+opencode│Alt+M│Model list│cli.json keybinds model.list
+opencode│Ctrl+PgUp / Ctrl+PgDn│Cycle the model's effort variants│cli.json keybinds variant.cycle
+opencode│Ctrl+Z│Undo typing (instead of suspending)│cli.json keybinds input.undo
 shell│ocr│Run one-off opencode prompt│opencode run
 shell│ocrc│Run one-off opencode prompt, continuing last│opencode run --continue
 shell│pi│Start new Pi session│pi
 shell│pic│Continue most recent Pi session│pi -c
 shell│pir│Browse and select a past Pi session│pi -r
+pi│Alt+M│Pick a model│configs/ai/pi/keybindings.json app.model.select
+pi│Ctrl+PgUp / Ctrl+PgDn│Cycle the thinking level│configs/ai/pi/keybindings.json app.thinking.cycle
+pi│Ctrl+Z│Undo typing (instead of suspending)│configs/ai/pi/keybindings.json tui.editor.undo
 
 # Docker shortcuts
 docker│dps│List running containers│docker ps

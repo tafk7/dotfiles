@@ -420,8 +420,8 @@ lacks: line and block selection, text objects, and regular expressions.
 | `,s` | compose, normal mode | Stage: paste without submitting |
 | PgUp/PgDn, Ctrl+Home/End | compose | Sent to the target, so the conversation scrolls without leaving the editor |
 | `:q`, `ZZ` | compose | Close the pane; the draft is kept. On a Claude, Codex, or OpenCode target, the draft goes back to the agent's prompt box instead; `:cq` keeps it |
-| Ctrl+G, Ctrl+E, Ctrl+X E | Claude, Codex, OpenCode | The agent's external editor, which is `bin/compose-editor`: the prompt box moves to the end of the draft and the compose pane opens or takes focus. Alt+V in the agent does the same ([compose-agent-box.md](compose-agent-box.md)) |
-| Ctrl+Shift+G | Claude, OpenCode | The prompt in nvim with the prose profile, in the agent's place |
+| Ctrl+G, Ctrl+G, Ctrl+X E | Claude, Codex, OpenCode | The agent's external editor, which is `bin/compose-editor`: the prompt box moves to the end of the draft and the compose pane opens or takes focus. Alt+V in the agent does the same ([compose-agent-box.md](compose-agent-box.md)) |
+| Alt+Shift+V | Claude, Codex, OpenCode | The prompt in nvim with the prose profile, in the agent's place; elsewhere the program's own editor key |
 
 | Target (`pane_current_command`) | Submit |
 |---|---|
@@ -529,10 +529,13 @@ transcript outgrows the history limit or an export key changes.
 
 ## 8. Open questions
 
-1. **ScrollLock and Pause never reach WezTerm** (its key-event log shows
-   nothing). The keyboard firmware sends F17/F18 from those positions instead;
-   `configs/wezterm.lua` maps them to Shift+F5/F6, and tmux binds those.
-   Pending: the firmware change, and whether Windows Terminal binds F17/F18.
+1. **ScrollLock and Pause** never became key events in WezTerm: its Windows
+   key table has no names for them. It does offer every key to its bindings
+   by Windows key code first, so `configs/wezterm.lua` binds `raw:145`
+   (ScrollLock: review, with Shift review and search) and `raw:19` (Pause:
+   Break, stop). Pending: a check on the laptop that Windows delivers them
+   ([intent keys](intent-keys.md), To check); otherwise the firmware sends
+   Shift+F5 and Shift+F9 from those positions. The F17/F18 plan is gone.
 2. **Claude's Shift+Up/Down line scroll is gone** (decided 2026-10-27):
    Shift+PgUp/PgDn scroll a few lines in every pane, so
    `configs/ai/claude/keybindings.json` keeps no overrides, and Shift+arrows

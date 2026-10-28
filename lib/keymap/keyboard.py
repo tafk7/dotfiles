@@ -78,6 +78,13 @@ FINGER = ['pinky', 'pinky', 'ring', 'middle', 'index', 'index', 'index']
 ABSENT = {57}  # listed in the right half's table, but the Defy has no key there
 
 
+# Two keys under one thumb, by how they feel on the Defy rather than by distance:
+# Ctrl and Symbols take one thumb laid across both (an easy press), Ctrl and Alt
+# a squeeze (a stretch). Mirrored for a right-hand Ctrl beside right Symbols.
+THUMB_FEEL = {frozenset({68, 69}): 'lay', frozenset({74, 75}): 'lay',
+              frozenset({69, 70}): 'squeeze', frozenset({73, 74}): 'squeeze'}
+
+
 def geometry(left_rows, right_rows):
     keys = {}
     for side, rows in (('left', left_rows), ('right', right_rows)):
@@ -178,14 +185,18 @@ class Keyboard:
         return best[0], best[1], best[2], layer
 
     def _cost(self, keys):
-        """Keys pressed, plus a penalty when one thumb or finger must hold two keys."""
+        """Keys pressed, plus a penalty when one thumb or finger must hold two keys (see THUMB_FEEL)."""
         fingers = {}
         for p, _ in keys:
             g = self.geo[p]
             fingers.setdefault((g['side'], g['finger']), []).append(p)
         clash = [ps for ps in fingers.values() if len(ps) > 1]
+        feel = [THUMB_FEEL.get(frozenset(ps)) for ps in clash]
+        clash = [ps for ps, f in zip(clash, feel) if f != 'lay']
         sides = {self.geo[p]['side'] for p, _ in keys}
-        if clash:
+        if 'squeeze' in feel:
+            rating = 'stretch'
+        elif clash:
             tight = len(clash) == 1 and len(clash[0]) == 2 and self.geo[clash[0][0]]['finger'] == 'thumb' \
                 and self._adjacent(*clash[0])
             rating = 'tight' if tight else 'stretch'

@@ -155,12 +155,21 @@ yo <command>              # print output and copy it to the clipboard
   focus; the draft survives closing the pane.
   In testing ([issues/compose-agent-box.md](issues/compose-agent-box.md)): in
   Claude, Codex, and OpenCode, `Alt+V` and the agent's own editor key (Claude
-  `Ctrl+G`, Codex `Ctrl+E`, OpenCode `Ctrl+X E`) move what is in the prompt
-  box into the compose pane, and quitting it (`:q`, `:wq`) puts the draft back
-  in the box; `:cq` keeps it in the draft instead. `Ctrl+Shift+G` opens the
-  prompt in Neovim in Claude's, Codex's or OpenCode's place. This works for
+  and Codex `Ctrl+G`, OpenCode `Ctrl+X E`) move what is in the prompt box into
+  the compose pane, and quitting it (`:q`, `:wq`) puts the draft back in the
+  box; `:cq` keeps it in the draft instead. `Alt+Shift+V` opens the prompt in
+  Neovim in Claude's, Codex's or OpenCode's place (elsewhere, the program's own
+  editor: pi's, or the shell's Ctrl+X Ctrl+E). This works for
   agents started from a shell with these dotfiles, where `VISUAL` is
   `bin/compose-editor`.
+- **Intent keys** ([issues/intent-keys.md](issues/intent-keys.md)): one key per
+  intent in every agent. Shift+Tab steps the permission mode through the three
+  in use (Claude: accept edits, bypass, auto; Codex: its three presets), and
+  Ctrl+Shift+Tab is the agent's own Shift+Tab. Alt+M picks a model,
+  Ctrl+PgUp/PgDn change the effort, Ctrl+Z undoes typing, and Break (Pause)
+  stops whatever runs. On the Defy, thumb keys queue a message (Shift+F8),
+  start a new line (Ctrl+J) and paste a screenshot (Ctrl+Alt+V). WezTerm's
+  fullscreen is Ctrl+Shift+Enter and its font size Ctrl+Shift+=/-/0.
 - **Key map:** `keymap open` maps every key across the Defy, Windows,
   WezTerm, tmux and the pane programs: who takes each chord, what it costs to
   press, and where sibling programs disagree. `keymap why CHORD` traces one

@@ -84,6 +84,8 @@ class Defy(unittest.TestCase):
         self.assertEqual({p for p, _ in keys}, {19, 70, 75})  # E, left Alt, right Symbols thumb
         self.assertEqual(self.kb.presses('ctrl+shift+g')[0][1], 'one hand')
         self.assertEqual(self.kb.presses('ctrl+alt+insert')[0][1], 'stretch')
+        self.assertEqual(self.kb.presses('ctrl+alt+k')[0][1], 'stretch')  # Ctrl and Alt: a squeeze
+        self.assertEqual(self.kb._cost([(19, 'key'), (69, 'ctrl'), (68, 'layer')])[1], 'one hand')  # laid across
         self.assertEqual(self.kb.presses('f11'), [])
         self.assertEqual(self.kb.presses('ctrl+_')[0][3], 1)
 

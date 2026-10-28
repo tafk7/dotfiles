@@ -395,9 +395,9 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
   // ---- Keyboard -------------------------------------------------------------------------------
   const MODSETS = [['', 'None'], ['shift', 'Shift'], ['ctrl', 'Ctrl'], ['alt', 'Alt'], ['ctrl+shift', 'Ctrl+Shift'],
     ['alt+shift', 'Alt+Shift'], ['ctrl+alt', 'Ctrl+Alt'], ['prefix', 'Ctrl+A, then']];
-  let state = { mods: 'alt', fw: 0, chord: 'ctrl+shift+g', app: '' };
+  let state = { mods: 'alt', fw: 0, chord: 'shift+tab', app: '' };
   try { const s = JSON.parse(localStorage.getItem('keyroutes') || 'null'); if (s && s.mods !== undefined) state = Object.assign(state, s); } catch (e) {}
-  // #app=codex&mods=ctrl&layer=1&key=ctrl+shift+g opens the page in that view
+  // #app=codex&mods=ctrl&layer=1&key=shift+tab opens the page in that view
   for (const [k, val] of new URLSearchParams(location.hash.slice(1))) {
     if (k === 'app' && (val === '' || APP[val])) state.app = val;
     if (k === 'mods' && MODSETS.some(m => m[0] === val)) state.mods = val;
@@ -434,7 +434,7 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     [/^SpawnTab/, () => 'new tab'], [/^SpawnWindow/, () => 'new window'], [/^CopyTo/, () => 'copy'], [/^PasteFrom/, () => 'paste'],
     [/^ActivateCommandPalette/, () => 'palette'], [/^Search/, () => 'find'], [/^ToggleFullScreen/, () => 'fullscreen'],
     [/^IncreaseFontSize/, () => 'font +'], [/^DecreaseFontSize/, () => 'font −'], [/^ResetFontSize/, () => 'font 0'],
-    [/^upload clipboard image/, () => 'image up'], [/^toggle clipboard export/, () => 'clip export'],
+    [/^upload clipboard image/, () => 'image up'], [/^review and search/, () => 'review /'], [/^next permission mode/, () => 'mode'],
     [/^sends (.*)/, m => '→ ' + fmt(m[1].replace(/ \(.*/, ''))], [/^Win-key/, () => 'Windows'],
     [/^switch windows back/, () => 'win switch'], [/^switch windows/, () => 'win switch'], [/^cycle windows/, () => 'win cycle'],
     [/^close the window/, () => 'close'], [/^Start menu/, () => 'Start'], [/^Task Manager/, () => 'Task Mgr'],
@@ -689,15 +689,10 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 
   // ---- Findings -----------------------------------------------------------------------------------
   const FIX = {
-    'codex ctrl+shift+g': 'Make the tmux <span class="k">C-S-G</span> fallback pass the key through (<span class="k">send-keys C-S-g</span>) instead of sending Ctrl+G, and set <span class="k">extended-keys-format csi-u</span> so Codex can hear it.',
-    'pi ctrl+shift+g': 'Same tmux fallback as Codex: passing <span class="k">C-S-g</span> through fixes both.',
-    'codex shift+enter': 'Set <span class="k">extended-keys-format csi-u</span>; Codex then asks for full key reporting. Until then Ctrl+J is its only newline.',
+    'codex shift+enter': 'Set <span class="k">extended-keys-format csi-u</span>; Codex then asks for full key reporting. Until then Ctrl+J, the New line thumb key, is its newline.',
     'opencode ctrl+shift+d': 'OpenCode only hears Ctrl+Shift+letter outside tmux. Rebind <span class="k">input.delete.line</span> in <span class="k">cli.json</span>, and consider dropping Ctrl+D from <span class="k">app.exit</span>.',
     'opencode ctrl+shift+e': 'Rebind <span class="k">input.select.line.end</span> (and its Ctrl+Shift+A twin) to a chord OpenCode hears in tmux.',
-    'opencode ctrl+backspace': 'Add OpenCode to the tmux <span class="k">C-BSpace</span> rule, or add <span class="k">ctrl+h</span> to <span class="k">input.delete.word.backward</span>.',
-    'wezterm f17': 'The Defy sends ScrollLock from that key, not F17, and WezTerm never receives ScrollLock. Set the key to F17 in Bazecor; until then review is <span class="k">Ctrl+A f</span>.',
-    'wezterm f18': 'The Defy sends Pause from that key, not F18. Set it to F18 in Bazecor; until then clipboard export toggles with <span class="k">Ctrl+A E</span>.',
-    'wezterm f11': 'The Defy has no F11 (the Symbols layer stops at F10), so Alt+Enter is the only fullscreen key, and it hides the agents\' Alt+Enter. Put F11 on a spare thumb key, or move fullscreen to Ctrl+Shift+Enter.',
+    'wezterm f11': 'The Defy has no F11 (the Symbols layer stops at F10); on it fullscreen is <span class="k">Ctrl+Shift+Enter</span>. F11 stays for other keyboards.',
   };
   function card(f, color) {
     const fix = FIX[(f.app || f.layer) + ' ' + f.chord];
@@ -747,8 +742,8 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     $('#defy-facts').innerHTML =
       `<p>${esc(KB.name)}. Modifiers: ${esc(mods.join('; '))}. There is no right-hand Ctrl, Alt or Shift, so every Ctrl, Alt and Shift chord starts on the left hand.</p>` +
       `<p>The ${esc(KB.layerNames['1'])} layer is held on the big key under each thumb (${esc(holds.join(', '))}); it carries the arrows on E S D F, F1 to F10 and the symbols. There is no F11 or F12, and Insert only comes from the Copy and Paste keys (Ctrl+Ins, Shift+Ins).</p>` +
-      `<p>${spare.length} keys are unassigned on the Home layer (${esc(spare.map(where).join(', '))}). They're the natural home for review, clipboard export or fullscreen.</p>` +
-      (winKeys.length ? `<p>${winKeys.length} keys send Win chords that Windows keeps (Ctrl+Win+←/→ switch virtual desktops), and ScrollLock and Pause never reach WezTerm.</p>` : '');
+      (spare.length ? `<p>${spare.length} keys are unassigned on the Home layer (${esc(spare.map(where).join(', '))}). issues/intent-keys.md gives them a right Ctrl and the New line, Queue and Image keys.</p>` : '') +
+      `<p>${winKeys.length ? `${winKeys.length} keys send Win chords that Windows keeps (Ctrl+Win+←/→ switch virtual desktops). ` : ''}WezTerm has no names for ScrollLock and Pause and reads them by Windows key code (raw:145, raw:19).</p>`;
   }
   $('#notes').textContent = D.notes.length ? 'Skipped on this run: ' + D.notes.join('; ') + '.' : '';
   $('#footer').textContent = `Defaults: Claude Code ${v.claude}, Codex ${v.codex}, OpenCode ${v.opencode}, pi ${v.pi}. Rebuild with bin/keymap build.`;

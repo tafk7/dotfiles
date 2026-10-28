@@ -48,14 +48,39 @@
             "id": "User.CtrlShiftS"
         },
 
-        // Ctrl+Shift+G likewise (Claude: the prompt in nvim in Claude's place).
+        // Ctrl+Shift+E/D/F likewise (tmux review: select by prompt or word), and
+        // Ctrl+Shift+Tab (tmux hands an agent a plain Shift+Tab).
         {
             "command":
             {
                 "action": "sendInput",
-                "input": "\u001b[27;6;71~"
+                "input": "\u001b[27;6;69~"
             },
-            "id": "User.CtrlShiftG"
+            "id": "User.CtrlShiftE"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[27;6;68~"
+            },
+            "id": "User.CtrlShiftD"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[27;6;70~"
+            },
+            "id": "User.CtrlShiftF"
+        },
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u001b[27;6;9~"
+            },
+            "id": "User.CtrlShiftTab"
         },
 
         // Shift-cut chords use F13-F16 escape sequences as a reliable,
@@ -93,24 +118,12 @@
             "id": "User.TmuxCutForwardLine"
         },
 
-        // The keyboard firmware sends F17/F18 from the ScrollLock and Pause
-        // positions. They travel as Shift+F5/F6 (tmux review and the clipboard
-        // export toggle), clear of the Shift+F1-F4 cut transport above.
+        // ScrollLock and Pause: WezTerm binds them by key code; here, set the
+        // Defy to send Shift+F5 and Shift+F9 from those positions instead
+        // (issues/intent-keys.md), which need no binding.
         {
-            "command":
-            {
-                "action": "sendInput",
-                "input": "\u001b[15;2~"
-            },
-            "id": "User.TmuxReview"
-        },
-        {
-            "command":
-            {
-                "action": "sendInput",
-                "input": "\u001b[17;2~"
-            },
-            "id": "User.TmuxClipboardToggle"
+            "command": "toggleFullscreen",
+            "id": "User.Fullscreen"
         }
     ],
 
@@ -152,8 +165,30 @@
             "keys": "ctrl+shift+s"
         },
         {
-            "id": "User.CtrlShiftG",
-            "keys": "ctrl+shift+g"
+            "id": "User.CtrlShiftE",
+            "keys": "ctrl+shift+e"
+        },
+        {
+            "id": "User.CtrlShiftD",
+            "keys": "ctrl+shift+d"
+        },
+        {
+            "id": "User.CtrlShiftF",
+            "keys": "ctrl+shift+f"
+        },
+        {
+            "id": "User.CtrlShiftTab",
+            "keys": "ctrl+shift+tab"
+        },
+
+        // Fullscreen on Ctrl+Shift+Enter, so Alt+Enter reaches the programs.
+        {
+            "id": "User.Fullscreen",
+            "keys": "ctrl+shift+enter"
+        },
+        {
+            "id": "unbound",
+            "keys": "alt+enter"
         },
 
         // Shift publishes the removed word/line range to tmux's shared buffer.
@@ -174,16 +209,6 @@
             "keys": "alt+shift+delete"
         },
 
-        // ScrollLock and Pause positions (firmware F17/F18).
-        {
-            "id": "User.TmuxReview",
-            "keys": "f17"
-        },
-        {
-            "id": "User.TmuxClipboardToggle",
-            "keys": "f18"
-        },
-
         // Ctrl+C must remain interrupt/cancel and Ctrl+V must reach Vim/TUIs.
         // Native Windows clipboard shortcuts remain Ctrl+Insert/Shift+Insert
         // and Ctrl+Shift+C/Ctrl+Shift+V.
@@ -200,10 +225,6 @@
         {
             "id": "unbound",
             "keys": "ctrl+tab"
-        },
-        {
-            "id": "unbound",
-            "keys": "ctrl+shift+tab"
         },
         {
             "id": "unbound",
