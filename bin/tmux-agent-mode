@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Shift+Tab in Claude (configs/tmux.conf): step the permission mode through the
+# three in use, accept edits, bypass permissions and auto mode. Claude's own
+# cycle also stops at ask (manual mode) and plan mode, and its keybindings can't
+# leave them out, so this presses Shift+Tab until the mode Claude names in its
+# footer is one of the three and not the one it started on. Bypass and auto are
+# in the cycle only when Claude was started with them; without them it lands on
+# the next of the three that Claude has. If the footer doesn't change, it stops
+# after one press, a plain Shift+Tab. Ctrl+Shift+Tab sends Claude one plain
+# Shift+Tab, to reach plan mode or ask.
+#
+# Usage: tmux-agent-mode PANE
+
+set -uo pipefail
+
+pane=${1:?usage: tmux-agent-mode PANE}
+
+# The mode on Claude's last lines ("accept edits on"); nothing in manual mode.
+mode() {
+    tmux capture-pane -p -t "$pane" 2>/dev/null | tail -n 4 |
+        grep -o -E "(accept edits|plan mode|bypass permissions|auto mode|manual mode|don't ask) on" | tail -n 1
+}
+
+# One run at a time per pane: a Shift+Tab pressed while one runs waits its turn
+# and then steps on from where that one landed.
+exec 9>"${TMPDIR:-/tmp}/tmux-agent-mode-$(id -u)-${pane#%}.lock" || exit 1
+flock -w 10 9 || exit 0
+
+start=$(mode)
+current=$start
+for _ in 1 2 3 4 5 6; do
+    tmux send-keys -t "$pane" BTab
+    next=$current
+    for _ in {1..40}; do # up to 2 s for Claude to redraw
+        sleep 0.05
+        next=$(mode)
+        [[ "$next" != "$current" ]] && break
+    done
+    [[ "$next" == "$current" ]] && exit 0 # no change seen: one plain press
+    current=$next
+    [[ "$current" == "$start" ]] && exit 0 # a whole cycle: no other stop
+    case "$current" in
+        "accept edits on" | "bypass permissions on" | "auto mode on") exit 0 ;;
+    esac
+done
