@@ -50,6 +50,7 @@ alias clean-claude-snapshots='rm -rf ~/.claude/shell-snapshots/ ~/.zcompdump* &&
 alias cl='claude'                # New session
 alias clc='claude --continue'    # Continue last session
 alias clp='claude --print'       # One-off command (non-interactive)
+alias cla='claude agents'        # Agent view: background sessions
 
 # Claude local-only (no global settings)
 alias cll='claude --setting-sources project,local'
