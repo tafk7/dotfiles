@@ -1,9 +1,11 @@
 # Intent keys: one key per intent, fitted to the Defy
 
-**Status:** building (2026-10-28), on branch `keymap`. The proposal page was
-reviewed through four rounds; this records what was decided. Built so far:
-review's selection keys and WezTerm's search (commit `db657a1`). The rest is
-listed under [Build](#build) with its state.
+**Status:** built (2026-10-28) on branch `keymap`, except the Defy's thumb
+keys, which are set in Bazecor. The proposal page was reviewed through four
+rounds; this records what was decided. Tested in private tmux servers (3.4,
+3.7, 3.8) with stub agents; Shift+Tab's mode steps were also checked against
+the real Claude 2.1.312. The [To check](#to-check) items need the laptop or
+the real agents.
 
 ## Goals
 
@@ -96,15 +98,21 @@ share the left pinky).
 |---|---|---|
 | tmux, nvim | Review: Shift selects, `h` toggles, `v` goes | done (`db657a1`) |
 | WezTerm | Search goes; Ctrl+Shift+E/D/F reach tmux | done (`db657a1`) |
-| tmux | Clipboard export toggle goes | |
-| WezTerm | Fullscreen on Ctrl+Shift+Enter; font size on Ctrl+Shift; Ctrl+Shift+G pass-through goes; ScrLk and Pause by raw code; F17/F18 rules go | |
-| tmux | Shift+F7 review and search; Shift+F9 stop; Shift+F8 queue; Alt+Shift+V full-pane compose; Ctrl+Shift+Tab; Shift+Tab with `tmux-agent-mode`; Ctrl+Z in Claude; a click in copy-mode places the cursor | |
-| Claude | Alt+M model; Ctrl+PgUp/PgDn effort; Shift+↑↓ and Alt+P unbound | |
-| Codex | Editor and end of line back to its defaults (Ctrl+G, Ctrl+E); `next_permission_mode` on F7; effort on Ctrl+PgUp/PgDn | |
-| OpenCode | Alt+M model list; Ctrl+PgUp/PgDn effort variants; TAFK delete keys; Ctrl+Z undo | |
-| pi | New keybindings file, deployed by `bin/ai-config`: thinking level, model, TAFK delete keys, Ctrl+Z undo | |
-| keymap | Thumb pairs rated by feel; raw keys; intents and known issues to match | |
+| tmux | Clipboard export toggle goes | done (`d29d1f0`) |
+| WezTerm | Fullscreen on Ctrl+Shift+Enter; font size on Ctrl+Shift; Ctrl+Shift+G pass-through goes; ScrLk and Pause by raw code; F17/F18 rules go | done (`979d6d6`) |
+| tmux | Shift+F7 review and search; Shift+F9 stop; Shift+F8 queue; Alt+Shift+V full-pane compose; Ctrl+Shift+Tab; Shift+Tab with `tmux-agent-mode`; Ctrl+Z in Claude; a click in copy-mode places the cursor | done (`979d6d6`) |
+| Codex | Editor and end of line back to its defaults (Ctrl+G, Ctrl+E); `next_permission_mode` on F7; effort on Ctrl+PgUp/PgDn | done (`979d6d6`) |
+| Claude | Alt+M model; Ctrl+PgUp/PgDn effort; Shift+↑↓ and Alt+P unbound | done (`9ceb032`) |
+| OpenCode | Alt+M model list; Ctrl+PgUp/PgDn effort variants; TAFK delete keys; Ctrl+Z undo | done (`9ceb032`) |
+| pi | New keybindings file, deployed by `bin/ai-config`: thinking level, model, TAFK delete keys, Ctrl+Z undo | done (`9ceb032`) |
+| keymap | Thumb pairs rated by feel; raw keys; intents and known issues to match | done |
+| Windows Terminal | The same Ctrl+Shift keys and fullscreen in `configs/windows-terminal-keybindings.jsonc`; ScrLk and Pause there need the firmware fallback. Font size keeps its defaults | done |
 | Defy | The four thumb keys, in Bazecor | yours to do; re-export the backup over `configs/keyboard/dygma-defy.json` |
+
+Applying it to this machine is `bin/ai-config` (Claude, Codex, OpenCode, pi),
+a tmux reload, and copying `configs/wezterm.lua` to Windows. The live
+`~/.claude/keybindings.json` still has the retired Shift+Up/Down line scroll;
+`bin/ai-config claude` replaces it.
 
 ## To check
 

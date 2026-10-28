@@ -5,7 +5,9 @@
 was driven against the real agents (Claude 2.1.311, Codex 0.164.0, OpenCode
 2.1.4) in a private tmux server, four bugs were fixed (below), and it was
 extended to Codex and OpenCode. Follows
-[scrollback, copy, and compose](scrollback-copy-compose.md) §5.
+[scrollback, copy, and compose](scrollback-copy-compose.md) §5. On 2026-10-28
+([intent keys](intent-keys.md)) Codex's editor key went back to its default,
+Ctrl+G, and the full-pane key moved from Ctrl+Shift+G to Alt+Shift+V.
 
 ## What it does
 
@@ -14,11 +16,11 @@ the agent's prompt box.
 
 | Key | Effect |
 |---|---|
-| The agent's editor key (Claude Ctrl+G, Codex Ctrl+E, OpenCode Ctrl+X E), or Alt+V | The box text moves to the end of the compose draft, the box empties, and the compose pane opens or takes focus with the cursor after the pulled text. The agent stays live above it |
+| The agent's editor key (Claude and Codex Ctrl+G, OpenCode Ctrl+X E), or Alt+V | The box text moves to the end of the compose draft, the box empties, and the compose pane opens or takes focus with the cursor after the pulled text. The agent stays live above it |
 | Ctrl+S in compose | Sends and keeps the pane open (unchanged) |
 | `:q`, `:wq`, `ZZ` in compose | nvim quits at once, and the draft goes back into the box, exactly as written, followed by anything typed into the box meanwhile; the draft empties. If the agent doesn't take it within 3 s (a dialog or its transcript view has the key), the draft stays in the draft and tmux says so |
 | `:cq` in compose | The box is left alone; the draft is kept for next time |
-| Ctrl+Shift+G in Claude, Codex or OpenCode | The prompt in nvim with the prose profile, in the agent's place |
+| Alt+Shift+V in Claude, Codex or OpenCode | The prompt in nvim with the prose profile, in the agent's place |
 
 ## How
 
@@ -28,7 +30,7 @@ direct child, and takes the file back on exit 0:
 | Agent | Key | File | An empty file |
 |---|---|---|---|
 | Claude 2.1.311 | Ctrl+G (`chat:externalEditor`) | `$TMPDIR/claude-prompt-UUID.md` | clears the box |
-| Codex 0.164.0 | Ctrl+E here (`open_external_editor`, set by `configs/codex.defaults.toml`) | `~/.codex/editor/.tmpXXXXXX.md` | clears the box; trailing whitespace is trimmed |
+| Codex 0.164.0 | Ctrl+G (`open_external_editor`, its default) | `~/.codex/editor/.tmpXXXXXX.md` | clears the box; trailing whitespace is trimmed |
 | OpenCode 2.1.4 | Ctrl+X E (`prompt.editor`) | `$TMPDIR/EPOCH_MS.md` | leaves the box as it was; a lone newline clears it |
 
 The agents blank or suspend their screen while the editor runs, so the editor
@@ -39,7 +41,7 @@ file, calls `tmux-compose editor` and returns at once:
 - no request: pull the box into the draft and open or focus the pane;
 - `@compose-editor push` (asked by `tmux-compose return` when the compose
   nvim quits): the box becomes the draft's text, and the draft empties;
-- `@compose-editor fullscreen` (asked by Ctrl+Shift+G): nvim in the agent's
+- `@compose-editor fullscreen` (asked by Alt+Shift+V): nvim in the agent's
   place.
 
 A request is made one way: set the pane option, press the agent's key, and
@@ -87,12 +89,10 @@ Claude and OpenCode, and Ctrl+S sends to Codex and OpenCode.
 - Open new shells, then start the agents in them: an agent started before
   keeps its old `VISUAL` and gets the plain compose pane (no pull; the draft
   stays parked on quit).
-- Ctrl+Shift+G needs the current `configs/wezterm.lua` (or the Windows
-  Terminal keybindings), which send it as `\e[27;6;71~`.
-- Codex's key is fixed at Ctrl+E in `bin/tmux-compose` (`editor_key`), as
-  `configs/codex.defaults.toml` binds it. If it is rebound in Codex
-  (`/keymap`), Ctrl+E there no longer pulls, Alt+V opens the pane after a
-  second without the box, and a returned draft is kept.
+- Codex's key is fixed at Ctrl+G in `bin/tmux-compose` (`editor_key`), its
+  default. If it is rebound in Codex (`/keymap`), Ctrl+G there no longer
+  pulls, Alt+V opens the pane after a second without the box, and a returned
+  draft is kept.
 
 ## Open questions and checks
 
@@ -101,11 +101,8 @@ Claude and OpenCode, and Ctrl+S sends to Codex and OpenCode.
 - **Images.** An attached image shows as `[Image #1]` in Claude's box; the
   placeholder moves through the draft as text. Untested whether Claude keeps
   the image when the text comes back.
-- **No fullscreen key in Codex.** Its Ctrl+Shift+G is a permission-mode key
-  (previous mode), which reaches it as Ctrl+G (next mode) through tmux 3.4.
-- **Ctrl+Shift+G outside these agents** reaches the program as plain Ctrl+G,
-  because tmux 3.4 can't send the extended key to a pane that hasn't asked
-  for it.
+- **Alt+Shift+V outside these agents** presses the program's own editor key:
+  pi's Ctrl+G, a shell's Ctrl+X Ctrl+E; other programs get nothing.
 
 ## Tests
 
@@ -114,14 +111,14 @@ Claude and OpenCode, and Ctrl+S sends to Codex and OpenCode.
 file):
 
 - in Claude: pull into a new and an open pane, Alt+V, return with and without
-  text typed meanwhile, Ctrl+Shift+G;
+  text typed meanwhile, Alt+Shift+V;
 - Claude's transcript, a plan, and `CLAUDE.md`, Codex's other files, and
   files outside an agent going to `$EDITOR` with the draft untouched;
 - a Claude that doesn't run its editor: `return` doesn't wait, the request is
   withdrawn after 3 s with a message, nothing is pasted, and the draft is
   kept; Alt+V still opens the pane;
-- a Claude without `compose-editor`, and Ctrl+Shift+G outside the agents;
-- Codex and OpenCode: pull, Alt+V, return, and Ctrl+Shift+G;
+- a Claude without `compose-editor`, and Alt+Shift+V outside the agents;
+- Codex and OpenCode: pull, Alt+V, return, and Alt+Shift+V;
 - with real nvim: `:q`, `:cq`, and a pull into an open pane, typing on after
   the pulled text.
 
