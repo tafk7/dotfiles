@@ -185,11 +185,12 @@ rc=0; "$ROOT/installers/install-rust.sh" >/dev/null || rc=$?
 assert_eq "$rc" 2 "a pinned default toolchain"
 
 # --- AWS CLI: a download that is not the locked archive never reaches the
-# signature check or the installer.
+# signature check or the installer. --force, because a runner image may already
+# have the pinned release in /usr/local/aws-cli, and the download is the point.
 printf '#!/bin/sh\necho "sudo $*" >> "%s/sudo.log"\n' "$TEST_ROOT" > "$TEST_ROOT/bin/sudo"
 printf '#!/bin/bash\nwhile (( $# )); do [[ "$1" == --output ]] && dest="$2"; shift; done\necho tampered > "$dest"\n' > "$TEST_ROOT/bin/curl"
 chmod +x "$TEST_ROOT/bin/sudo" "$TEST_ROOT/bin/curl"
-rc=0; PATH="$TEST_ROOT/bin:$PATH" "$ROOT/installers/install-aws-cli.sh" > "$TEST_ROOT/aws-out" 2>&1 || rc=$?
+rc=0; PATH="$TEST_ROOT/bin:$PATH" "$ROOT/installers/install-aws-cli.sh" --force > "$TEST_ROOT/aws-out" 2>&1 || rc=$?
 assert_eq "$rc" 1 "an AWS CLI archive off the lock"
 [[ "$(<"$TEST_ROOT/aws-out")" == *"Checksum mismatch"* ]] || fail "the AWS CLI checksum was not checked: $(<"$TEST_ROOT/aws-out")"
 grep -q "aws/install" "$TEST_ROOT/sudo.log" && fail "the AWS CLI installer ran on an archive off the lock"
