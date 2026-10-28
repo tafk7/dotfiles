@@ -2,6 +2,8 @@
 """bin/viz: path layout, private socket, sign-in, Host and cross-site checks, containment, reload, lifetime."""
 from pathlib import Path
 import datetime
+import hashlib
+import hmac
 import http.client
 import os
 import re
@@ -52,6 +54,7 @@ with tempfile.TemporaryDirectory() as tmp:
     tmp = Path(tmp)
     port = free_port()   # the client port printed in URLs; nothing should listen on it here
     host = f'127.0.0.1:{port}'
+    name = f"viz-{port}-{hashlib.sha256(socket.gethostname().encode()).hexdigest()[:6]}"   # the cookie
     project = tmp / 'project'
     env = dict(os.environ, HOME=str(tmp / 'home'), VIZ_DIR=str(tmp / 'viz'), VIZ_PORT=str(port),
                XDG_STATE_HOME=str(tmp / 'state'), XDG_RUNTIME_DIR=str(tmp / 'run'),
@@ -71,7 +74,7 @@ with tempfile.TemporaryDirectory() as tmp:
         conn = UnixHTTP(str(sock))
         sent = {'Host': host}
         if cookie:
-            sent['Cookie'] = f'viz-{port}={cookie}'
+            sent['Cookie'] = cookie
         sent.update(headers or {})
         try:
             conn.request(method, path, body=body, headers=sent)
@@ -122,15 +125,9 @@ with tempfile.TemporaryDirectory() as tmp:
                              ('POST', '/__viz/login')):
             status, _, body = request(method, path)
             check(status == 403 and 'chart-marker' not in body, f'auth: {method} {path} without token gave {status}')
-        check(request('GET', '/', cookie='wrong')[0] == 403, 'auth: wrong cookie accepted')
-        check(request('GET', '/', headers={'Cookie': f'viz-1={secret}'})[0] == 403,
-              "auth: another port's cookie accepted")
+        check(request('GET', '/', cookie=f'{name}=wrong')[0] == 403, 'auth: wrong cookie accepted')
+        check(request('GET', '/', cookie=f'{name}={secret}')[0] == 403, 'auth: the secret works as a cookie')
         check(request('GET', '/', headers={'Authorization': 'Bearer wrong'})[0] == 403, 'auth: wrong bearer accepted')
-
-        # DNS rebinding: the right secret under a foreign Host is refused.
-        for bad in ('evil.example', f'evil.example:{port}', f'localhost.evil.example:{port}', ''):
-            status, _, body = request('GET', f'/{today}/chart.html', headers={'Host': bad}, cookie=secret)
-            check(status == 421 and 'chart-marker' not in body, f'host: {bad!r} gave {status}')
 
         # Sign-in: a single-use code from `viz login` becomes the cookie.
         out = run('login').stdout
@@ -139,29 +136,59 @@ with tempfile.TemporaryDirectory() as tmp:
         if match:
             status, headers, _ = request('GET', match.group(1))
             cookie = headers.get('set-cookie', '')
-            check(status == 303 and cookie.startswith(f'viz-{port}={secret};') and 'HttpOnly' in cookie
+            check(status == 303 and cookie.startswith(f'{name}=') and secret not in cookie and 'HttpOnly' in cookie
                   and 'SameSite=Lax' in cookie, f'login: {status} {cookie!r}')
             check(request('GET', match.group(1))[0] == 403, 'login: code worked twice')
+        session = cookie.split(';')[0]
+        check(request('GET', '/', cookie=session.replace(f'viz-{port}-', 'viz-1-'))[0] == 403,
+              "auth: another port's cookie accepted")
+
+        # The cookie is not the secret: it mints no codes, and the server ends it after 30 days.
+        check(request('POST', '/__viz/login', headers={'Authorization': f'Bearer {session.partition("=")[2]}'})[0]
+              == 403, 'cookie: minted a sign-in code')
+        old = int(time.time()) - 31 * 86400
+        stale = f'{name}={old}.' + hmac.new(secret.encode(), f'browser:{old}'.encode(), hashlib.sha256).hexdigest()
+        check(request('GET', '/', cookie=stale)[0] == 403, 'cookie: expired sign-in accepted')
+
+        # DNS rebinding: a valid cookie under a foreign Host is refused.
+        for bad in ('evil.example', f'evil.example:{port}', f'localhost.evil.example:{port}', ''):
+            status, _, body = request('GET', f'/{today}/chart.html', headers={'Host': bad}, cookie=session)
+            check(status == 421 and 'chart-marker' not in body, f'host: {bad!r} gave {status}')
         status, headers, _ = request('GET', '/__viz/login?code=guess')
         check(status == 403 and 'set-cookie' not in headers, 'login: guessed code accepted')
         out = run('status').stdout
         check(f'LocalForward 127.0.0.1:{port} {sock}' in out and secret not in out, f'status: {out!r}')
 
         # Signed in: pages, headers, gallery.
-        status, headers, body = request('GET', f'/{today}/chart.html', cookie=secret)
+        status, headers, body = request('GET', f'/{today}/chart.html', cookie=session)
         check(status == 200 and body.index('/__viz/reload.js') < body.index('</body>'),
               'serve: reload script not injected before </body>')
         check(headers.get('x-content-type-options') == 'nosniff'
               and "frame-ancestors 'self'" in headers.get('content-security-policy', '')
               and headers.get('cross-origin-resource-policy') == 'same-origin',
               f'serve: security headers missing {headers}')
-        status, _, body = request('GET', '/__viz/reload.js', cookie=secret)
+        status, _, body = request('GET', '/__viz/reload.js', cookie=session)
         check(status == 200 and '/__viz/version' in body, 'serve: reload script missing')
-        status, headers, body = request('GET', '/', cookie=secret)
+
+        # Reload polls carry a token good only for their own page's version, never the cookie.
+        poll = re.search(r'data-viz-poll="(\w+)"', request('GET', f'/{today}/chart.html', cookie=session)[2])
+        poll = poll.group(1) if poll else ''
+        check(request('GET', f'/__viz/version?path=/{today}/chart.html&poll={poll}')[0] == 200,
+              'poll: page token refused')
+        for path in (f'/__viz/version?path=/{today}/chart.html&poll=wrong',
+                     f'/__viz/version?path=/{today}/other.html&poll={poll}', f'/{today}/chart.html?poll={poll}'):
+            check(request('GET', path)[0] == 403, f'poll: {path} accepted')
+        check(request('GET', '/__viz/reload.js', cookie=session, headers={'Service-Worker': 'script'})[0] == 403,
+              'serve: accepted a service worker')
+        shared = chart.with_name('shared.html')
+        shared.write_text('<p>planted</p>')
+        shared.chmod(0o666)
+        check(request('GET', f'/{today}/shared.html', cookie=session)[0] == 404, 'serve: a file others can write')
+        status, headers, body = request('GET', '/', cookie=session)
         check(status == 200 and 'chart.html' in body, 'serve: gallery missing file')
         check("default-src 'none'" in headers.get('content-security-policy', ''), 'serve: gallery CSP missing')
         check('.ff-profile' not in body and 'link.txt' not in body, 'serve: gallery shows hidden or escaping files')
-        status, _, body = request('GET', f'/{today}/', cookie=secret)
+        status, _, body = request('GET', f'/{today}/', cookie=session)
         check(status == 200 and 'chart.html' in body, 'serve: no listing of a directory in VIZ_DIR')
 
         # Containment: traversal, encoded traversal, symlink escapes, hidden paths.
@@ -169,9 +196,9 @@ with tempfile.TemporaryDirectory() as tmp:
                      '/%2e%2e%2fsecret.txt', '/escape/../../secret.txt', '/.ff-profile/prefs.js',
                      '/%2eff-profile/prefs.js', '/.ff-profile/'):
             for method in ('GET', 'HEAD'):
-                status, _, body = request(method, path, cookie=secret)
+                status, _, body = request(method, path, cookie=session)
                 check(status == 404 and 'secret' not in body, f'contain: {method} {path} gave {status}')
-        check(request('GET', '/__viz/version?path=/.ff-profile/prefs.js', cookie=secret)[2] == 'missing',
+        check(request('GET', '/__viz/version?path=/.ff-profile/prefs.js', cookie=session)[2] == 'missing',
               'contain: version of a hidden file')
 
         # Other sites may navigate to a page but not load, frame or script it.
@@ -180,21 +207,24 @@ with tempfile.TemporaryDirectory() as tmp:
                                        ('cross-site', 'navigate', 'iframe', 403),
                                        ('cross-site', 'navigate', 'document', 200),
                                        ('same-origin', 'cors', 'empty', 200), ('none', 'navigate', 'document', 200)):
-            status = request('GET', page, cookie=secret, headers={
+            status = request('GET', page, cookie=session, headers={
                 'Sec-Fetch-Site': site, 'Sec-Fetch-Mode': mode, 'Sec-Fetch-Dest': dest})[0]
             check(status == want, f'fetch metadata: {site}/{mode}/{dest} gave {status}, want {want}')
 
         # Live reload: the page's version follows the page and the assets it loaded.
         def version(path):
-            return request('GET', f'/__viz/version?path={path}', cookie=secret)[2]
+            return request('GET', f'/__viz/version?path={path}', cookie=session)[2]
 
         before = version(page)
         check(before == version(page) and before != 'missing', 'reload: version unstable')
+        listing = version(f'/{today}/')
+        chart.with_name('.swap').write_text('x')
+        check(version(f'/{today}/') == listing, 'reload: a dotfile changed a directory version')
         os.utime(chart, ns=(0, 10**18))
         check(version(page) != before, 'reload: version unchanged after the page changed')
         style = chart.with_name('style.css')
         style.write_text('p {}')
-        request('GET', f'/{today}/style.css', cookie=secret, headers={'Referer': f'http://{host}{page}'})
+        request('GET', f'/{today}/style.css', cookie=session, headers={'Referer': f'http://{host}{page}'})
         before = version(page)
         os.utime(style, ns=(0, 10**18))
         check(version(page) != before, 'reload: version unchanged after an asset changed')
@@ -208,20 +238,27 @@ with tempfile.TemporaryDirectory() as tmp:
         check(f'http://127.0.0.1:{port}/linked/project/plot.svg' in out, f'open: outside file not linked {out!r}')
         check('/linked/project/plot.svg' in run('open', str(project / 'plot.svg')).stdout
               and len(list((tmp / 'viz' / 'linked').iterdir())) == 1, 'open: relinked the same directory')
-        check(request('GET', '/linked/project/other.html', cookie=secret)[0] == 200,
+        check(request('GET', '/linked/project/other.html', cookie=session)[0] == 200,
               'serve: sibling in linked directory (relative links)')
-        body = request('GET', '/', cookie=secret)[2]
+        body = request('GET', '/', cookie=session)[2]
         check('linked/project/plot.svg' in body and 'other.html' not in body,
               'serve: gallery should list opened linked files only')
-        check(request('GET', '/linked/project/', cookie=secret)[0] == 404, 'serve: listed a linked directory')
+        check(request('GET', '/linked/project/', cookie=session)[0] == 404, 'serve: listed a linked directory')
+        check(version('/linked/project/') == 'missing', 'serve: version of a linked directory without index')
         for path in ('/linked/project/.env', '/linked/project/../secret.txt', '/linked/project/%2e%2e/secret.txt'):
-            status, _, body = request('GET', path, cookie=secret)
+            status, _, body = request('GET', path, cookie=session)
             check(status == 404 and 'secret' not in body, f'contain: {path} gave {status}')
         (tmp / 'home' / 'report.html').write_text('<p>r</p>')
         check(run('open', str(tmp / 'home' / 'report.html')).returncode != 0, 'open: linked all of home')
         (tmp / 'repo' / '.git').mkdir(parents=True)
         (tmp / 'repo' / 'index.html').write_text('<p>r</p>')
         check(run('open', str(tmp / 'repo' / 'index.html')).returncode != 0, 'open: linked a repository root')
+        for directory, mode in ((tmp / 'open-to-all', 0o777), (tmp / '.hidden', 0o755)):
+            directory.mkdir()
+            directory.chmod(mode)
+            (directory / 'r.html').write_text('<p>r</p>')
+            result = run('open', str(directory / 'r.html'))
+            check(result.returncode != 0 and 'refusing' in result.stderr, f'open: linked {directory.name}')
         check('opened' not in run('open', str(project / 'plot.svg'), '--vscode').stdout, 'open: claimed VS Code')
         png = chart.with_name('pic.png')
         png.write_bytes(b'\x89PNG\r\n\x1a\n')
@@ -231,16 +268,16 @@ with tempfile.TemporaryDirectory() as tmp:
         form = {'Content-Type': 'application/x-www-form-urlencoded'}
         body = f'left={project}/plot.svg&right={project}/other.html'
         origin = {'Origin': f'http://{host}', 'X-Viz': '1', **form}
-        check(request('GET', f'/__viz/diff?{body}', cookie=secret)[0] == 405, 'diff: GET accepted')
+        check(request('GET', f'/__viz/diff?{body}', cookie=session)[0] == 405, 'diff: GET accepted')
         for name, headers in (('no Origin', {'X-Viz': '1', **form}),
                               ('another port', {**origin, 'Origin': 'http://127.0.0.1:1'}),
                               ('no X-Viz', {'Origin': f'http://{host}', **form}),
                               ('cross-site', {**origin, 'Sec-Fetch-Site': 'same-site'})):
-            check(request('POST', '/__viz/diff', headers, body, cookie=secret)[0] == 403, f'diff: {name} accepted')
+            check(request('POST', '/__viz/diff', headers, body, cookie=session)[0] == 403, f'diff: {name} accepted')
         check(request('POST', '/__viz/diff', origin, body)[0] == 403, 'diff: accepted without cookie')
         outside = f'left={tmp}/secret.txt&right={project}/other.html'
-        check(request('POST', '/__viz/diff', origin, outside, cookie=secret)[0] == 403, 'diff: file outside roots')
-        check(request('POST', '/__viz/diff', origin, body, cookie=secret)[0] == 409,
+        check(request('POST', '/__viz/diff', origin, outside, cookie=session)[0] == 403, 'diff: file outside roots')
+        check(request('POST', '/__viz/diff', origin, body, cookie=session)[0] == 409,
               'diff: a valid request should reach VS Code (409 without one)')
 
         # Lifetime: one server per socket, another VIZ_DIR is refused, stop kills only viz.
@@ -254,6 +291,12 @@ with tempfile.TemporaryDirectory() as tmp:
         run('stop')
         check(sleeper.poll() is None, 'stop: killed a process that is not viz')
         check(not sock.exists(), 'stop: socket left behind')
+        # A stale PID file naming something that looks like viz: no server holds the lock, so no kill.
+        lookalike = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)', 'viz', 'serve'])
+        stray.append(lookalike)
+        (rundir / 'serve.pid').write_text(str(lookalike.pid))
+        run('stop')
+        check(lookalike.poll() is None, 'stop: killed a lookalike with no server running')
 
         # A crashed server leaves its socket; the next command replaces it.
         run('start')
@@ -280,10 +323,21 @@ with tempfile.TemporaryDirectory() as tmp:
         result = run('status', XDG_RUNTIME_DIR=str(tmp / 'run2'))
         check(result.returncode != 0 and 'private' in result.stderr, f'runtime: accepted a 0755 directory {result.stderr!r}')
 
-        # --reset signs every browser out.
+        # A truncated secret is replaced, never trusted as empty.
+        run('start')
+        token_file.write_text('\n')
+        for headers in ({'Authorization': 'Bearer '}, {'Cookie': f'{name}='}, {'Cookie': session}):
+            check(request('GET', '/', headers=headers)[0] == 403, f'token: empty secret accepted {headers}')
+        check(len(token_file.read_text().strip()) >= 32, 'token: truncated secret not replaced')
+
+        # --reset signs every browser out, without restarting the server.
+        out = run('login').stdout
+        match = re.search(r'(/__viz/login\?code=[\w-]+)', out)
+        fresh = request('GET', match.group(1))[1].get('set-cookie', '').split(';')[0] if match else ''
+        pid = server_pid()
         out = run('login', '--reset').stdout
-        check(request('GET', '/', cookie=secret)[0] == 403, 'login --reset: old cookie still works')
-        check('/__viz/login?code=' in out, 'login --reset: no new link')
+        check(fresh and request('GET', '/', cookie=fresh)[0] == 403, 'login --reset: old cookie still works')
+        check('/__viz/login?code=' in out and server_pid() == pid, 'login --reset: no new link, or restarted')
     finally:
         run('stop')
         for p in stray:

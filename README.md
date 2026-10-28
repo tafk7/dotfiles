@@ -202,7 +202,7 @@ Host devbox
 
 The first `ssh devbox` owns the forward. Later sessions to the same host warn
 `Address already in use` and carry on. Open `http://127.0.0.1:21001/` and sign
-in once with `viz login`. The cookie is good for this port until
+in once with `viz login`. The sign-in lasts 30 days, or until
 `viz login --reset`. Recopy `configs/wezterm.lua`, so image paste doesn't
 compete for the forward.
 

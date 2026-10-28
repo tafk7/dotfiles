@@ -80,8 +80,10 @@ uv run --no-project --with jupyter --with plotly jupyter nbconvert --to notebook
 - HTML/SVG/PDF outside `~/viz` (a project's own `viz/` or `reports/`
   directory, say) can be opened in place: `viz open` links the file's
   directory into `~/viz/linked/`, so relative links between its pages work and
-  pages reload when a build rewrites them. Hidden files are never served, and
-  viz refuses to link a home directory, the temp root or a repository root;
-  write such a file to a subdirectory or to `viz path` instead.
+  pages reload when a build rewrites them. Hidden files, and files another
+  account owns or can write, are never served. viz refuses to link a home
+  directory, the temp root, a repository root, a hidden directory or one other
+  accounts can write to; write such a file to a subdirectory of your own or to
+  `viz path` instead.
 - A page can ask the connected VS Code for a side-by-side diff with a link to
   `/__viz/diff?left=PATH&right=PATH` (files under `~/projects` or `~/ref`).
