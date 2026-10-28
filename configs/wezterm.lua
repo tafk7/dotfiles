@@ -114,8 +114,10 @@ local function paste_clipboard_image(window, pane)
   end
 
   -- Private upload dir; prune old pastes; print the absolute path to paste.
+  -- ClearAllForwardings: the host's LocalForward (viz) belongs to the tab's
+  -- session, not to this command (scp clears forwards by itself).
   local ok, remote_dir, err = wezterm.run_child_process {
-    'ssh', '-o', 'BatchMode=yes', host,
+    'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host,
     string.format(
       'umask 077 && mkdir -p %s && find %s -type f -mtime +%d -delete && cd %s && pwd',
       PASTE_REMOTE_DIR, PASTE_REMOTE_DIR, PASTE_KEEP_DAYS, PASTE_REMOTE_DIR

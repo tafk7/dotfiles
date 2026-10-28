@@ -1,71 +1,141 @@
 #!/usr/bin/env python3
-# Show charts, diagrams and HTML reports from a remote shell in the connected VS Code.
-"""Show visualizations written on this machine in the VS Code window connected to it.
+# Show charts, diagrams and HTML reports from a remote shell in the ssh client's browser.
+"""Show visualizations written on this machine in the browser of the ssh client.
 
-Agents running in tmux over ssh cannot draw on the client screen, but VS Code
-Remote-SSH leaves an IPC socket per connected window. `viz open` finds a live
-one and drives that window with the server's remote CLI:
+Agents running in tmux over ssh cannot draw on the client screen. viz serves
+VIZ_DIR over HTTP on a Unix socket in this account's private runtime directory,
+which no other account can open, and the client forwards a local port to it:
 
-- HTML, SVG and PDF are served from VIZ_DIR by a localhost server that reloads
-  pages when their file changes. `code --openExternal` opens the URL in the
-  client's browser, and VS Code forwards the port on the way.
-- Everything else (PNG, notebooks, Markdown with mermaid, ...) opens as a VS Code
-  tab, which renders those natively.
+    ssh -L 127.0.0.1:PORT:/run/user/UID/viz/http.sock HOST
 
-A served page may ask the connected VS Code to open a side-by-side diff of two
-files (``/__viz/diff?left=PATH&right=PATH``, as ``viz diff LEFT RIGHT`` does): a
-page beside code links each file to its counterpart. Only existing files under
-VIZ_DIFF_ROOTS are opened; the server never runs anything else for a page.
+`viz status` prints the forward for this machine. HTML, SVG and PDF are served
+(and images, when no VS Code window is connected); a page reloads when it or an
+asset it loaded changes.
 
-Browser files outside VIZ_DIR are served through a link to their directory in
-VIZ_DIR/linked, so relative links between pages and reload on rebuild keep
-working. The server serves nothing outside VIZ_DIR and the linked directories.
-It binds 127.0.0.1 only, but other accounts on a shared host can reach it, so
-keep secrets out of what it serves.
+Anything on the client can open the forwarded port, so the server also wants a
+secret: a browser signs in with the single-use link `viz login` prints and
+keeps a cookie for 30 days (an HMAC of the account's secret, never the secret).
+Every request needs that cookie and a localhost Host header (against DNS
+rebinding), and only top-level navigation may come from another site: other
+origins cannot embed, frame or script the pages. Reload polls carry a per-page
+token instead of the cookie. Hidden paths, anything outside VIZ_DIR and its
+linked directories, and files another account owns or can write are never
+served.
+
+A browser file outside VIZ_DIR is served through a link to its directory in
+VIZ_DIR/linked, so relative links and reload on rebuild keep working. Home, the
+directories above it, the temp root, repository roots, hidden directories and
+directories other accounts can write are never linked.
+
+With a VS Code Remote-SSH window connected, other files (PNG, notebooks,
+Markdown with mermaid, ...) open in it as tabs, and `viz diff` or a page (a link
+to ``/__viz/diff?left=PATH&right=PATH``, which viz turns into a same-origin POST)
+opens a side-by-side diff of two existing files under VIZ_DIFF_ROOTS.
 
 Environment:
     VIZ_DIR    served root and home of `viz path` output (default ~/viz)
-    VIZ_PORT   server port (default 20000 + uid % 10000, stable per account)
+    VIZ_PORT   client port in printed URLs and forwards
+               (default 20000 + uid % 10000, stable per account)
     VIZ_DIFF_ROOTS  colon-separated directories whose files a page may diff
                (default ~/projects:~/ref)
 """
 import argparse
 import datetime
+import fcntl
 import glob
+import hashlib
+import hmac
 import html
+import http.client
+import json
+import mimetypes
 import os
 import re
+import secrets
+import shutil
 import signal
 import socket
+import socketserver
+import stat
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 import urllib.parse
-import urllib.request
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 ROOT = Path(os.environ.get('VIZ_DIR') or '~/viz').expanduser().resolve()
 PORT = int(os.environ.get('VIZ_PORT') or 20000 + os.getuid() % 10000)
 STATE = Path(os.environ.get('XDG_STATE_HOME') or '~/.local/state').expanduser() / 'viz'
+TOKEN = STATE / 'token'      # the account's secret, 0600; never printed or sent to a browser
+OPENED = STATE / 'opened'    # files opened from linked directories, for the gallery
 BROWSER_SUFFIXES = {'.html', '.htm', '.svg', '.pdf'}
 IMAGE_SUFFIXES = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'}
 LINKED = ROOT / 'linked'
-PING = f'viz {ROOT}'
 DIFF_ROOTS = [Path(p).expanduser().resolve()
               for p in (os.environ.get('VIZ_DIFF_ROOTS') or '~/projects:~/ref').split(':') if p]
+# The client end of the forward. 127.0.0.1 rather than localhost, so the browser
+# cannot reach an IPv6 listener on [::1] that someone else bound first.
+URL_HOST = '127.0.0.1'
+CODE_TTL = 600               # seconds a `viz login` link stays valid
+COOKIE_AGE = 30 * 86400      # a sign-in lasts this long; the server enforces it
+# Browsers send 127.0.0.1's cookies to every port, so the cookie is named after
+# the port and this host: forwards to two hosts keep separate sign-ins.
+HOST_TAG = hashlib.sha256(socket.gethostname().encode()).hexdigest()[:6]
 
-RELOAD_SCRIPT = """<script>(() => {
+RELOAD_SCRIPT = """(() => {
+  // Reload when this page or an asset it loaded changes. Errors (tunnel down,
+  // server restarting, signed out) are skipped, so polling recovers by itself.
+  // Polls carry the page's own token instead of the cookie: if the tunnel drops
+  // and something else takes the port, an open tab hands it nothing reusable.
+  const token = document.currentScript && document.currentScript.dataset.vizPoll;
   let seen = null;
-  setInterval(async () => {
+  const poll = async () => {
     try {
-      const r = await fetch('/__viz/version?path=' + encodeURIComponent(location.pathname), {cache: 'no-store'});
-      const v = await r.text();
-      if (seen !== null && v !== seen) location.reload();
-      seen = v;
+      const r = await fetch('/__viz/version?path=' + encodeURIComponent(location.pathname) + '&poll=' + token,
+                            {cache: 'no-store', credentials: 'omit'});
+      if (r.ok) {
+        const v = await r.text();
+        if (seen !== null && v !== seen) return location.reload();
+        seen = v;
+      }
     } catch (e) {}
-  }, 1000);
-})();</script>"""
+    setTimeout(poll, 1000);
+  };
+  // Start once the page's assets have loaded, so the first version covers them.
+  if (document.readyState === 'complete') poll(); else addEventListener('load', poll);
+  // A /__viz/diff?left=..&right=.. link asks the connected VS Code for a diff.
+  // The server takes only same-origin POSTs, so send the link's query as one.
+  document.addEventListener('click', async (event) => {
+    const link = event.target.closest && event.target.closest('a[href]');
+    if (!link) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || url.pathname !== '/__viz/diff') return;
+    event.preventDefault();
+    const r = await fetch('/__viz/diff', {method: 'POST', headers: {'X-Viz': '1'}, body: url.searchParams});
+    if (!r.ok) alert('viz diff: ' + await r.text());
+  });
+})();
+"""
+
+# Sent with every response. CORP keeps other origins from loading a file as an
+# image or script; the referrer stays on this origin, so CDNs never see paths.
+COMMON_HEADERS = (
+    ('Cache-Control', 'no-store'),
+    ('X-Content-Type-Options', 'nosniff'),
+    ('Referrer-Policy', 'same-origin'),
+    ('Cross-Origin-Resource-Policy', 'same-origin'),
+    ('Cross-Origin-Opener-Policy', 'same-origin'),
+    ('X-Frame-Options', 'SAMEORIGIN'),
+)
+# viz's own pages run nothing but the reload script. Served files are the user's
+# and agents' pages, trusted like their code: they keep inline scripts and CDNs,
+# and are only kept out of other origins' frames.
+PAGE_CSP = ("default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self'; "
+            "style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
+FILE_CSP = "frame-ancestors 'self'"
 
 
 def die(message):
@@ -89,15 +159,23 @@ def _socket_live(path):
         s.close()
 
 
+def _own_socket_live(path):
+    """A live socket of this account (VS Code falls back to /tmp, where anyone can make one)."""
+    try:
+        return os.stat(path).st_uid == os.getuid() and _socket_live(path)
+    except OSError:
+        return False
+
+
 def vscode_socket():
     """Newest IPC socket with a window behind it; most on disk are stale."""
     current = os.environ.get('VSCODE_IPC_HOOK_CLI')
-    if current and _socket_live(current):
+    if current and _own_socket_live(current):
         return current
     runtime = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
     candidates = glob.glob(os.path.join(runtime, 'vscode-ipc-*.sock'))
     for path in sorted(candidates, key=_mtime, reverse=True):
-        if _socket_live(path):
+        if _own_socket_live(path):
             return path
     return None
 
@@ -133,13 +211,17 @@ def vscode(*args):
 
 
 def diffable(path):
-    """``path`` resolved, if it is an existing file under DIFF_ROOTS; else None."""
-    local = Path(os.path.realpath(path))
-    if not local.is_file():
+    """``path`` resolved, if it is an existing, unhidden file under DIFF_ROOTS; else None."""
+    try:
+        local = Path(os.path.realpath(path))
+        if not local.is_file():
+            return None
+    except (OSError, ValueError):   # NUL bytes, names too long
         return None
-    if not any(local == root or root in local.parents for root in DIFF_ROOTS):
-        return None
-    return local
+    for root in DIFF_ROOTS:
+        if root in local.parents and not any(p.startswith('.') for p in local.relative_to(root).parts):
+            return local
+    return None
 
 
 def _mtime(path):
@@ -149,40 +231,123 @@ def _mtime(path):
         return 0
 
 
+def _mtime_ns(path):
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return -1
+
+
 # ---------------------------------------------------------------------------
-# Server
+# What is served
 # ---------------------------------------------------------------------------
 
+def url_parts(path):
+    """Components of a URL path; None if any is hidden ('.', '..', dotfiles)."""
+    parts = [p for p in urllib.parse.unquote(path).split('/') if p]
+    if any(p.startswith('.') or '\0' in p for p in parts):
+        return None
+    return parts
+
+
+def others_can_write(info):
+    """True if another account could replace what INFO describes: world-writable,
+    or group-writable by a group other than this account's own."""
+    return bool(info.st_mode & 0o002 or (info.st_mode & 0o020 and info.st_gid != os.getgid()))
+
+
+def link_refusal(directory):
+    """Why DIRECTORY may not be linked whole, or None. Home and above it, the temp
+    root and repository roots are too broad; a hidden directory or one another
+    account owns or can write into could hand the browser someone else's page."""
+    home = Path.home().resolve()
+    if directory == home or directory in home.parents:
+        return 'it is your home or above it'
+    if directory == Path(tempfile.gettempdir()).resolve():
+        return 'it is the temp directory'
+    if (directory / '.git').exists():
+        return 'it is a repository root'
+    if any(p.startswith('.') for p in directory.parts):
+        return 'it is hidden'
+    try:
+        info = os.stat(directory)
+    except OSError:
+        return 'it is unreadable'
+    if info.st_uid != os.getuid() or others_can_write(info):
+        return 'another account owns it or can write to it'
+    return None
+
+
+def linked_dirs():
+    return [p for p in LINKED.iterdir() if p.is_symlink() and p.is_dir()] if LINKED.is_dir() else []
+
+
+def served_roots():
+    roots = [str(ROOT)]
+    for link in linked_dirs():
+        target = os.path.realpath(link)
+        if link_refusal(Path(target)) is None:
+            roots.append(target)
+    return roots
+
+
+def contained(local):
+    """LOCAL (a real path) as a Path if it is served; a hidden component below its
+    root counts even when a symlink leads there. Else None."""
+    for root in served_roots():
+        if local == root or local.startswith(root + os.sep):
+            if any(p.startswith('.') for p in local[len(root):].split(os.sep)):
+                return None
+            return Path(local)
+    return None
+
+
+def resolve(parts):
+    """Real path of the served file or directory at URL PARTS; None if it is not served."""
+    if parts is None:
+        return None
+    return contained(os.path.realpath(ROOT.joinpath(*parts)))
+
+
+def url_path(path):
+    """URL path of PATH, a path under ROOT (linked files through their link)."""
+    return '/' + urllib.parse.quote(path.relative_to(ROOT).as_posix())
+
+
+def opened_files():
+    try:
+        return [ROOT / line for line in OPENED.read_text().splitlines() if line]
+    except FileNotFoundError:
+        return []
+
+
+def remember(path):
+    """Note a file opened from a linked directory, so the gallery lists it but not its siblings."""
+    rel = path.relative_to(ROOT).as_posix()
+    if ROOT / rel not in opened_files():
+        STATE.mkdir(parents=True, exist_ok=True)
+        with open(OPENED, 'a') as f:
+            f.write(rel + '\n')
+
+
 def tree_version(directory):
-    count, newest = 0, 0
+    count, newest = 0, _mtime_ns(OPENED) if directory == ROOT else 0
     for dirpath, dirnames, filenames in os.walk(directory):
         dirnames[:] = [d for d in dirnames if not d.startswith('.')]
         for name in filenames:
-            count += 1
-            try:
-                newest = max(newest, os.stat(os.path.join(dirpath, name)).st_mtime_ns)
-            except OSError:
-                continue
+            if not name.startswith('.'):
+                count += 1
+                newest = max(newest, _mtime_ns(os.path.join(dirpath, name)))
     return f'{count}:{newest}'
 
 
-def gallery():
-    files = []
-    for dirpath, dirnames, filenames in os.walk(ROOT):
-        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
-        files += [Path(dirpath, n) for n in filenames if not n.startswith('.')]
-    for link in linked_dirs():
-        files += [f for f in link.iterdir() if f.is_file() and f.suffix.lower() in BROWSER_SUFFIXES]
-    files.sort(key=_mtime, reverse=True)
-    rows = []
-    for path in files:
-        rel = path.relative_to(ROOT).as_posix()
-        url = '/' + urllib.parse.quote(rel)
-        when = datetime.datetime.fromtimestamp(_mtime(path)).strftime('%Y-%m-%d %H:%M')
-        thumb = f'<img src="{url}" loading="lazy">' if path.suffix.lower() in IMAGE_SUFFIXES else ''
-        rows.append(f'<tr><td>{when}</td><td><a href="{url}">{html.escape(rel)}</a></td><td>{thumb}</td></tr>')
-    body = '\n'.join(rows) or '<tr><td colspan="3">Nothing yet. Write files with <code>viz path NAME</code>.</td></tr>'
-    return f"""<!doctype html><html><head><meta charset="utf-8"><title>viz</title>
+def reload_tag(poll):
+    return f'<script src="/__viz/reload.js" data-viz-poll="{poll}"></script>'
+
+
+def page(title, body, poll=None):
+    script = reload_tag(poll) if poll else ''
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>{html.escape(title)}</title>
 <style>
   :root {{ color-scheme: light dark; font: 14px system-ui, sans-serif; }}
   body {{ margin: 2rem; }}
@@ -190,71 +355,666 @@ def gallery():
   td:first-child {{ opacity: .6; white-space: nowrap; }}
   img {{ max-height: 60px; max-width: 160px; background: white; }}
 </style></head><body>
-<h1>{html.escape(str(ROOT))}</h1>
-<table>{body}</table>
-{RELOAD_SCRIPT}</body></html>"""
+{body}
+{script}</body></html>"""
 
 
-class Handler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(ROOT), **kwargs)
+def gallery(directory, poll):
+    """Every served file under DIRECTORY (under ROOT), newest first, plus opened linked files at the top."""
+    files = []
+    for dirpath, dirnames, filenames in os.walk(directory):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        files += [Path(dirpath, n) for n in filenames if not n.startswith('.')]
+    if directory == ROOT:
+        files += opened_files()
+    served = [(f, local) for f in files
+              if (local := resolve(list(f.relative_to(ROOT).parts))) and local.is_file()]
+    served.sort(key=lambda pair: _mtime(pair[1]), reverse=True)
+    rows = []
+    for path, local in served:
+        url = url_path(path)
+        when = datetime.datetime.fromtimestamp(_mtime(local)).strftime('%Y-%m-%d %H:%M')
+        thumb = f'<img src="{url}" loading="lazy">' if path.suffix.lower() in IMAGE_SUFFIXES else ''
+        rel = html.escape(path.relative_to(ROOT).as_posix())
+        rows.append(f'<tr><td>{when}</td><td><a href="{url}">{rel}</a></td><td>{thumb}</td></tr>')
+    body = '\n'.join(rows) or '<tr><td colspan="3">Nothing yet. Write files with <code>viz path NAME</code>.</td></tr>'
+    return page('viz', f'<h1>{html.escape(str(directory))}</h1>\n<table>{body}</table>', poll)
+
+
+def inject(data, poll):
+    """HTML DATA with the reload script before its last </body>."""
+    match = None
+    for match in re.finditer(rb'</body\s*>', data, re.IGNORECASE):
+        pass
+    cut = match.start() if match else len(data)
+    return data[:cut] + reload_tag(poll).encode() + data[cut:]
+
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+
+class Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+    daemon_threads = True
+
+    def __init__(self, path):
+        self.codes = {}          # single-use sign-in code -> expiry
+        self.assets = {}         # page URL parts -> real paths it loaded
+        self.browser_seen = None
+        self.lock = threading.Lock()
+        self._secret = None, b''
+        super().__init__(path, Handler)
+
+    def secret(self):
+        """The account's secret, reread when the file changes (`viz login --reset`)."""
+        key = _file_key(TOKEN)
+        if key is None or key != self._secret[0]:
+            value = token().encode()
+            self._secret = _file_key(TOKEN), value
+        return self._secret[1]
+
+    def mac(self, purpose):
+        return hmac.new(self.secret(), purpose.encode(), hashlib.sha256).hexdigest()
+
+    def cookie_value(self, issued):
+        """A browser's credential: when it signed in, and an HMAC of that. Not the secret,
+        so a leaked cookie cannot mint sign-in codes, and it expires."""
+        return f'{issued}.{self.mac(f"browser:{issued}")}'
+
+    def poll_token(self, parts):
+        """What a page's reload script shows instead of the cookie: good only for that page's version."""
+        return self.mac('poll:' + '/'.join(parts))[:32]
+
+    def mint(self):
+        code = secrets.token_urlsafe(16)
+        with self.lock:
+            now = time.time()
+            self.codes = {c: t for c, t in self.codes.items() if t > now}
+            self.codes[code] = now + CODE_TTL
+        return code
+
+    def redeem(self, code):
+        with self.lock:
+            return self.codes.pop(code, 0) > time.time()
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = 'viz'
+    sys_version = ''
+    timeout = 30
 
     def do_GET(self):
+        self._handle()
+
+    def do_HEAD(self):
+        self._handle()
+
+    def do_POST(self):
+        self._handle()
+
+    def _handle(self):
+        try:
+            self._route()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except (OSError, ValueError):   # odd paths: NUL bytes, names too long
+            self._text(400, 'bad request')
+
+    def _route(self):
         url = urllib.parse.urlsplit(self.path)
-        if url.path == '/__viz/ping':
-            return self._send(PING, 'text/plain')
-        if url.path == '/__viz/version':
-            target = urllib.parse.parse_qs(url.query).get('path', ['/'])[0]
-            local = Path(self.translate_path(target))
-            if local.is_dir():
-                return self._send(tree_version(local), 'text/plain')
-            return self._send(str(local.stat().st_mtime_ns) if local.exists() else 'missing', 'text/plain')
-        if url.path == '/__viz/diff':
+        self.body = b''
+        if self.command == 'POST':
+            # Read the body before any answer, so a refusal doesn't break the client's write.
+            length = int(self.headers.get('Content-Length') or 0)
+            if not 0 <= length <= 65536:
+                return self._text(413, 'too large')
+            self.body = self.rfile.read(length)
+        # The browser's Host names the client end of the tunnel; anything else
+        # is a rebinding page under a borrowed name.
+        match = re.fullmatch(r'(?:localhost|127\.0\.0\.1|\[::1\])(?::(\d{1,5}))?',
+                             self.headers.get('Host', ''), re.IGNORECASE)
+        if not match:
+            return self._text(421, 'viz answers to localhost and 127.0.0.1 only')
+        self.cookie = f'viz-{match.group(1) or 80}-{HOST_TAG}'
+        if self.headers.get('Service-Worker'):
+            # A worker would outlive the file that registered it, and a sign-out.
+            return self._text(403, 'refused: service workers')
+        if url.path == '/__viz/login' and self.command == 'GET':
+            return self._login(url.query)
+        if url.path == '/__viz/version' and self.command == 'GET':
             query = urllib.parse.parse_qs(url.query)
-            left, right = (diffable(query.get(k, [''])[0]) for k in ('left', 'right'))
-            if left is None or right is None:
-                return self._send('refused: two existing files under VIZ_DIFF_ROOTS', 'text/plain', 403)
-            if not vscode('--reuse-window', '--diff', str(left), str(right)):
-                return self._send('no connected VS Code window', 'text/plain', 409)
-            return self._send('opened', 'text/plain')
-        if url.path == '/':
-            return self._send(gallery(), 'text/html')
-        local = Path(self.translate_path(url.path))
-        if local.is_file() and local.suffix.lower() in ('.html', '.htm'):
-            page = local.read_text(errors='replace')
-            match = None
-            for match in re.finditer(r'</body\s*>', page, re.IGNORECASE):
-                pass
-            cut = match.start() if match else len(page)
-            return self._send(page[:cut] + RELOAD_SCRIPT + page[cut:], 'text/html')
-        return super().do_GET()
+            path = query.get('path', ['/'])[0]
+            parts = url_parts(path)
+            if parts is not None and hmac.compare_digest(query.get('poll', [''])[0].encode(),
+                                                         self.server.poll_token(parts).encode()):
+                self.server.browser_seen = time.time()
+                return self._text(200, self._version(parts))
+        who = self._who()
+        if who is None:
+            return self._page(403, page('viz: sign in', SIGN_IN))
+        if who == 'browser':
+            self.server.browser_seen = time.time()
+            if not self._fetch_allowed():
+                return self._text(403, 'refused: request from another site')
+        if self.command == 'POST':
+            if url.path == '/__viz/login' and who == 'cli':
+                return self._text(200, self.server.mint())
+            if url.path == '/__viz/diff':
+                return self._diff()
+            return self._text(405, 'method not allowed')
+        if url.path == '/__viz/ping':
+            seen = self.server.browser_seen
+            info = {'root': str(ROOT), 'pid': os.getpid(), 'browser': seen and time.time() - seen}
+            return self._text(200, json.dumps(info), 'application/json')
+        if url.path == '/__viz/version':
+            return self._text(200, self._version(url_parts(urllib.parse.parse_qs(url.query).get('path', ['/'])[0])))
+        if url.path == '/__viz/reload.js':
+            return self._text(200, RELOAD_SCRIPT, 'text/javascript')
+        if url.path == '/__viz/diff':
+            # Never acts on GET: a link from another site must not open anything.
+            return self._text(405, 'POST only: a viz page sends this link as a POST once it has loaded')
+        if url.path.startswith('/__viz/'):
+            return self._text(404, 'not found')
+        parts = url_parts(url.path)
+        local = resolve(parts)
+        if local is None or not local.exists():
+            return self._text(404, 'not found')
+        if local.is_dir():
+            if not url.path.endswith('/'):
+                # Rebuilt from the checked parts, so it can't become //other.host/.
+                location = '/' + ''.join(urllib.parse.quote(p) + '/' for p in parts)
+                return self._redirect(location + (f'?{url.query}' if url.query else ''))
+            index = index_of(parts)
+            if index is None:
+                if local == ROOT or ROOT in local.parents:
+                    return self._page(200, gallery(local, self.server.poll_token(parts)))
+                return self._text(404, 'not found: linked directories are not listed')
+            local = index
+        self._note_asset(parts, local)
+        return self._file(local, parts)
 
-    def translate_path(self, path):
-        # Resolve symlinks and '..' before deciding what may be served.
-        local = os.path.realpath(super().translate_path(path))
-        allowed = [str(ROOT)] + [os.path.realpath(link) for link in linked_dirs()]
-        if not any(local == a or local.startswith(a + os.sep) for a in allowed):
-            return str(ROOT / '.viz-outside-root')
-        return local
+    def _who(self):
+        """'cli' for the secret as a bearer token, 'browser' for a live sign-in cookie, else None."""
+        auth = self.headers.get('Authorization', '')
+        if auth.startswith('Bearer ') and hmac.compare_digest(auth[7:].encode(), self.server.secret()):
+            return 'cli'
+        for pair in self.headers.get('Cookie', '').split(';'):
+            name, _, value = pair.strip().partition('=')
+            issued = value.partition('.')[0]
+            if (name == self.cookie and issued.isdigit() and 0 <= time.time() - int(issued) < COOKIE_AGE
+                    and hmac.compare_digest(value.encode(), self.server.cookie_value(int(issued)).encode())):
+                return 'browser'
+        return None
 
-    def _send(self, text, content_type, status=200):
-        data = text.encode()
-        self.send_response(status)
-        self.send_header('Content-Type', f'{content_type}; charset=utf-8')
-        self.send_header('Content-Length', str(len(data)))
+    def _fetch_allowed(self):
+        """Same-origin requests and top-level navigation, by the browser's fetch metadata."""
+        site = self.headers.get('Sec-Fetch-Site')
+        if site in (None, 'same-origin', 'none'):
+            return True
+        return (self.command == 'GET' and self.headers.get('Sec-Fetch-Mode') == 'navigate'
+                and self.headers.get('Sec-Fetch-Dest') == 'document')
+
+    def _login(self, query):
+        code = urllib.parse.parse_qs(query).get('code', [''])[0]
+        if not self.server.redeem(code):
+            return self._page(403, page('viz: sign in', SIGN_IN_AGAIN))
+        value = self.server.cookie_value(int(time.time()))
+        self.send_response(303)
+        self.send_header('Set-Cookie', f'{self.cookie}={value}; Max-Age={COOKIE_AGE}; Path=/; HttpOnly; SameSite=Lax')
+        self.send_header('Location', '/')
+        self.send_header('Content-Length', '0')
         self.end_headers()
-        self.wfile.write(data)
+
+    def _diff(self):
+        # A page asks for this; nothing on another origin may. Origin is exact
+        # (scheme, host and port), and the custom header makes a cross-origin
+        # fetch need a preflight, which this server never grants.
+        if (self.headers.get('Origin') != f'http://{self.headers["Host"]}'
+                or self.headers.get('Sec-Fetch-Site', 'same-origin') != 'same-origin'
+                or self.headers.get('X-Viz') != '1'):
+            return self._text(403, 'refused: diffs are requested by viz pages only')
+        query = urllib.parse.parse_qs(self.body.decode(errors='replace'))
+        left, right = (diffable(query.get(k, [''])[0]) for k in ('left', 'right'))
+        if left is None or right is None:
+            return self._text(403, 'refused: two existing files under VIZ_DIFF_ROOTS')
+        if not vscode('--reuse-window', '--diff', str(left), str(right)):
+            return self._text(409, 'no connected VS Code window')
+        return self._text(200, 'opened')
+
+    def _note_asset(self, parts, local):
+        """Remember what a page loads, so its version covers its CSS, scripts, images and data."""
+        referer = urllib.parse.urlsplit(self.headers.get('Referer', ''))
+        page_parts = url_parts(referer.path)
+        if referer.netloc != self.headers['Host'] or not page_parts or page_parts == parts:
+            return
+        with self.server.lock:
+            loaded = self.server.assets.setdefault(tuple(page_parts), set())
+            if len(loaded) < 1000:
+                loaded.add(local)
+
+    def _version(self, parts):
+        local = resolve(parts)
+        if local is not None and local.is_dir():
+            if local == ROOT or ROOT in local.parents:
+                return tree_version(local)
+            local = index_of(parts)   # a linked directory shows only its index page
+        if local is None or not local.is_file():
+            return 'missing'
+        with self.server.lock:
+            assets = sorted(self.server.assets.get(tuple(parts), ()))
+        stamp = ':'.join(str(_mtime_ns(p)) for p in [local, *assets])
+        return hashlib.sha256(stamp.encode()).hexdigest()[:16]
+
+    def _file(self, local, parts):
+        ctype = mimetypes.guess_type(local.name)[0] or 'application/octet-stream'
+        if ctype.startswith('text/') or ctype in ('application/json', 'image/svg+xml'):
+            ctype += '; charset=utf-8'
+        try:
+            f = open(local, 'rb')
+        except OSError:
+            return self._text(404, 'not found')
+        with f:
+            # Check what was opened, not the path: a symlink swapped in since
+            # resolve() must still land inside, and another account's file (or
+            # one it can rewrite) is never shown as the user's page.
+            info = os.fstat(f.fileno())
+            if (contained(os.readlink(f'/proc/self/fd/{f.fileno()}')) is None
+                    or info.st_uid != os.getuid() or others_can_write(info)):
+                return self._text(404, 'not found')
+            if local.suffix.lower() in ('.html', '.htm'):
+                return self._send(200, inject(f.read(), self.server.poll_token(parts)), ctype, FILE_CSP)
+            self.send_response(200)
+            self.send_header('Content-Type', ctype)
+            self.send_header('Content-Length', str(info.st_size))
+            self.send_header('Content-Security-Policy', FILE_CSP)
+            self.end_headers()
+            if self.command != 'HEAD':
+                shutil.copyfileobj(f, self.wfile)
+
+    def _send(self, status, data, ctype, csp=PAGE_CSP):
+        self.send_response(status)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Content-Security-Policy', csp)
+        self.end_headers()
+        if self.command != 'HEAD':
+            self.wfile.write(data)
+
+    def _text(self, status, text, ctype='text/plain'):
+        self._send(status, text.encode(), f'{ctype}; charset=utf-8')
+
+    def _page(self, status, text):
+        self._send(status, text.encode(), 'text/html; charset=utf-8')
+
+    def _redirect(self, location):
+        self.send_response(301)
+        self.send_header('Location', location)
+        self.send_header('Content-Length', '0')
+        self.end_headers()
 
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-store')
+        for name, value in COMMON_HEADERS:
+            self.send_header(name, value)
         super().end_headers()
 
     def log_message(self, *args):
         pass
 
 
-def linked_dirs():
-    return [p for p in LINKED.iterdir() if p.is_symlink() and p.is_dir()] if LINKED.is_dir() else []
+def index_of(parts):
+    """The served index.html (or .htm) of the directory at PARTS, or None."""
+    return next((i for i in (resolve(parts + [n]) for n in ('index.html', 'index.htm'))
+                 if i and i.is_file()), None)
+
+
+def _file_key(path):
+    try:
+        info = os.stat(path)
+        return info.st_ino, info.st_mtime_ns, info.st_size
+    except OSError:
+        return None
+
+
+SIGN_IN = ('<h1>viz: sign in</h1><p>In your ssh session on this machine, run <code>viz login</code> '
+           'and open the link it prints. The browser then stays signed in to this port.</p>')
+SIGN_IN_AGAIN = ('<h1>viz: sign in</h1><p>This sign-in link is used or expired. '
+                 'Run <code>viz login</code> for a new one.</p>')
+
+
+# ---------------------------------------------------------------------------
+# Socket, secret and server lifetime
+# ---------------------------------------------------------------------------
+
+def runtime_dir():
+    """This account's private socket directory, created 0700 on first use.
+
+    $XDG_RUNTIME_DIR/viz, or /run/user/UID/viz; else STATE/run, not /tmp, where
+    another account could create the directory first. Ownership and mode are
+    checked either way.
+    """
+    uid = os.getuid()
+    for base in (os.environ.get('XDG_RUNTIME_DIR'), f'/run/user/{uid}'):
+        if base and os.path.isdir(base) and os.stat(base).st_uid == uid:
+            path = Path(base) / 'viz'
+            break
+    else:
+        STATE.mkdir(parents=True, exist_ok=True)
+        path = STATE / 'run'
+    try:
+        path.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    info = os.lstat(path)
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid or info.st_mode & 0o077:
+        die(f'{path} is not a directory private to this account; remove it and retry')
+    return path
+
+
+def socket_path():
+    path = runtime_dir() / 'http.sock'
+    if len(os.fsencode(path)) > 107:
+        die(f'socket path too long for a Unix socket: {path}')
+    return path
+
+
+def token():
+    """The account's secret, created on first use; a truncated one is replaced, never trusted."""
+    try:
+        if TOKEN.stat().st_mode & 0o077:
+            TOKEN.chmod(0o600)
+        value = TOKEN.read_text().strip()
+    except FileNotFoundError:
+        return new_token(replace=False)
+    return value if len(value) >= 32 else new_token(replace=True)
+
+
+def new_token(replace):
+    STATE.mkdir(parents=True, exist_ok=True)
+    tmp = STATE / f'.token.{os.getpid()}'
+    with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as f:
+        f.write(secrets.token_urlsafe(32))
+        f.flush()
+        os.fsync(f.fileno())   # never a zero-length secret after a crash
+    try:
+        if replace:
+            tmp.replace(TOKEN)
+        else:
+            os.link(tmp, TOKEN)   # refuses to replace: a concurrent first use wins
+    except FileExistsError:
+        pass
+    finally:
+        tmp.unlink(missing_ok=True)
+    return TOKEN.read_text().strip()
+
+
+class _UnixHTTP(http.client.HTTPConnection):
+    def __init__(self, path):
+        super().__init__('localhost', timeout=2)
+        self.unix_path = str(path)
+
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX)
+        self.sock.settimeout(self.timeout)
+        self.sock.connect(self.unix_path)
+
+
+def ask(method, path):
+    """(status, body) from the server on our socket; None when nothing answers."""
+    conn = _UnixHTTP(socket_path())
+    try:
+        conn.request(method, path, headers={'Authorization': f'Bearer {token()}'})
+        r = conn.getresponse()
+        return r.status, r.read().decode()
+    except (OSError, http.client.HTTPException):
+        return None
+    finally:
+        conn.close()
+
+
+def server_state():
+    """('ours', ping info), ('other', None) for a server with another VIZ_DIR or secret, or ('down', None)."""
+    reply = ask('GET', '/__viz/ping')
+    if reply is None:
+        return 'down', None
+    status, body = reply
+    if status != 200:
+        return 'other', None
+    info = json.loads(body)
+    return ('ours' if info.get('root') == str(ROOT) else 'other'), info
+
+
+def ensure_server():
+    """Ping info of the running server, started in the background if need be."""
+    state, info = server_state()
+    if state == 'other':
+        die('the running server has another VIZ_DIR or secret; run viz stop')
+    if state == 'ours':
+        return info
+    token()   # before the server reads it
+    STATE.mkdir(parents=True, exist_ok=True)
+    log_path = STATE / 'serve.log'
+    with open(os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), 'ab') as log:
+        os.fchmod(log.fileno(), 0o600)
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), 'serve'],
+                         stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                         start_new_session=True)
+    for _ in range(30):
+        time.sleep(0.1)
+        state, info = server_state()
+        if state == 'ours':
+            return info
+    die(f'server did not start; see {STATE / "serve.log"}')
+
+
+def _inode(path):
+    try:
+        return os.stat(path).st_ino
+    except OSError:
+        return None
+
+
+def _watch(server, path, inode):
+    """Stop once our socket is gone or replaced (logout removed the runtime directory, say)."""
+    while _inode(path) == inode:
+        time.sleep(2)
+    server.shutdown()
+
+
+def server_pid(pidfile):
+    """The PID in PIDFILE if that process is still this account's viz server; else None."""
+    try:
+        pid = int(pidfile.read_text())
+        owner = os.stat(f'/proc/{pid}').st_uid
+        with open(f'/proc/{pid}/cmdline', 'rb') as f:
+            argv = f.read().split(b'\0')
+    except (OSError, ValueError):
+        return None
+    if owner != os.getuid() or b'serve' not in argv or not any(os.path.basename(a) == b'viz' for a in argv):
+        return None
+    return pid
+
+
+def lock_held(lockfile):
+    """True while a server holds LOCKFILE, which it does for its whole life."""
+    try:
+        with open(lockfile, 'a') as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return False
+    except BlockingIOError:
+        return True
+
+
+def stop(pidfile, lockfile=None):
+    """Stop the server in PIDFILE and wait for it; its PID, or None if none ran.
+    With LOCKFILE, only while a server holds it: a stale PID may name another process."""
+    pid = server_pid(pidfile)
+    if pid is None or (lockfile and not lock_held(lockfile)):
+        return None
+    os.kill(pid, signal.SIGTERM)
+    for _ in range(30):
+        if not os.path.exists(f'/proc/{pid}'):
+            break
+        time.sleep(0.1)
+    return pid
+
+
+def url_for(path):
+    return f'http://{URL_HOST}:{PORT}' + url_path(path) + ('/' if path.is_dir() else '')
+
+
+def connect_hint(info):
+    if info.get('browser') is None:
+        print('no browser has reached viz yet: `viz status` shows the ssh forward, `viz login` signs in')
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+def cmd_path(args):
+    name = Path(args.name)
+    if name.is_absolute() or '..' in name.parts:
+        die('NAME must be a relative path without ..')
+    path = ROOT / datetime.date.today().isoformat() / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    print(path)
+
+
+def cmd_open(args):
+    info = None
+    for arg in args.files:
+        path = Path(arg).expanduser().resolve()
+        if not path.exists():
+            die(f'no such file: {arg}')
+        suffix = path.suffix.lower()
+        browser = args.browser or (not args.vscode and suffix in BROWSER_SUFFIXES)
+        if not browser:
+            if vscode('--reuse-window', str(path)):
+                print(f'opened in VS Code: {path}')
+                continue
+            if args.vscode or suffix not in IMAGE_SUFFIXES:
+                print(f'no connected VS Code window; open {path} yourself')
+                continue
+            # Without VS Code, the browser shows images too.
+        if path != ROOT and ROOT not in path.parents:
+            directory = path if path.is_dir() else path.parent
+            refusal = link_refusal(directory)
+            if refusal:
+                die(f'refusing to serve all of {directory}: {refusal}; write the file under a subdirectory '
+                    'of your own, or to `viz path`')
+            if path.is_dir() and not any((path / n).is_file() for n in ('index.html', 'index.htm')):
+                die(f'{path} has no index.html; open a file in it (linked directories are not listed)')
+            link = link_dir(directory)
+            print(f'serving {directory} as {link}')
+            path = link if path.is_dir() else link / path.name
+            if not path.is_dir():
+                remember(path)
+        info = ensure_server()
+        print(url_for(path))
+    if info:
+        connect_hint(info)
+
+
+def cmd_diff(args):
+    left, right = Path(args.left).expanduser().resolve(), Path(args.right).expanduser().resolve()
+    for path in (left, right):
+        if not path.is_file():
+            die(f'no such file: {path}')
+    if vscode('--reuse-window', '--diff', str(left), str(right)):
+        print(f'opened in VS Code: {left} <> {right}')
+    else:
+        print(f'no connected VS Code window; run: code --diff {left} {right}')
+
+
+def cmd_login(args):
+    if args.reset:
+        new_token(replace=True)   # the server rereads it: every cookie stops working
+    ensure_server()
+    reply = ask('POST', '/__viz/login')
+    if not reply or reply[0] != 200:
+        die('the server gave no sign-in code; see `viz status`')
+    print(f'http://{URL_HOST}:{PORT}/__viz/login?code={reply[1]}')
+    print(f'single use within {CODE_TTL // 60} minutes; the browser then stays signed in to port {PORT}')
+
+
+def cmd_start(args):
+    info = ensure_server()
+    print(f'http://{URL_HOST}:{PORT}/')
+    connect_hint(info)
+
+
+def cmd_serve(args):
+    ROOT.mkdir(parents=True, exist_ok=True)
+    path = socket_path()
+    os.chdir('/')
+    # Held until exit: one server per socket, and `viz stop` can tell a live
+    # server from a stale PID file. Whoever holds it owns the socket path.
+    lock = open(path.parent / 'serve.lock', 'a')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        die(f'already serving on {path}')
+    if os.path.lexists(path):
+        if not stat.S_ISSOCK(os.lstat(path).st_mode):
+            die(f'{path} exists and is not a socket; remove it')
+        path.unlink()   # left by a server that died
+    token()
+    old = os.umask(0o177)   # the socket is 0600 from the moment it exists
+    try:
+        server = Server(str(path))
+    finally:
+        os.umask(old)
+    inode = _inode(path)
+    pidfile = path.parent / 'serve.pid'
+    pidfile.write_text(str(os.getpid()))
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    threading.Thread(target=_watch, args=(server, path, inode), daemon=True).start()
+    print(f'serving {ROOT} on {path}', flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        if _inode(path) == inode:
+            path.unlink()
+        if server_pid(pidfile) == os.getpid():
+            pidfile.unlink()
+
+
+def cmd_stop(args):
+    stopped = False
+    # The second is the 127.0.0.1 TCP server of viz before the socket.
+    rundir = runtime_dir()
+    for pidfile, lockfile, what in ((rundir / 'serve.pid', rundir / 'serve.lock', 'server'),
+                                    (STATE / 'serve.pid', None, 'old TCP server')):
+        pid = stop(pidfile, lockfile)
+        if pid:
+            print(f'stopped {what} (pid {pid})')
+            stopped = True
+    if not stopped:
+        print('server not running')
+
+
+def cmd_status(args):
+    path = socket_path()
+    state, info = server_state()
+    print(f'dir:      {ROOT}')
+    if state == 'ours':
+        seen = info['browser']
+        print(f'server:   running (pid {info["pid"]}) on {path}')
+        print('browser:  ' + ('no request yet' if seen is None else f'last request {seen:.0f}s ago'))
+    elif state == 'other':
+        print(f'server:   {path} answers for another VIZ_DIR or secret; run viz stop')
+    else:
+        print(f'server:   stopped (viz start, viz open or viz login starts it on {path})')
+    print(f'url:      http://{URL_HOST}:{PORT}/')
+    print(f'forward:  ssh -o ExitOnForwardFailure=yes -L {URL_HOST}:{PORT}:{path} {socket.gethostname()}')
+    print(f'          or, in the client\'s ssh config: LocalForward {URL_HOST}:{PORT} {path}')
+    print('sign in:  run `viz login` yourself and open its single-use link')
+    legacy = server_pid(STATE / 'serve.pid')
+    if legacy:
+        print(f'old:      a TCP server from an earlier viz still runs (pid {legacy}); viz stop ends it')
+    sock, cli = vscode_socket(), vscode_cli()
+    print('vscode:   ' + ('connected' if sock and cli else
+                          'no VS Code server installed' if not cli else 'no connected window'))
 
 
 def link_dir(directory):
@@ -272,119 +1032,6 @@ def link_dir(directory):
     return link
 
 
-def server_state():
-    """'ours', 'other' (port taken by something else) or 'down'."""
-    try:
-        with urllib.request.urlopen(f'http://127.0.0.1:{PORT}/__viz/ping', timeout=1) as r:
-            return 'ours' if r.read().decode() == PING else 'other'
-    except OSError:
-        return 'down'
-
-
-def ensure_server():
-    state = server_state()
-    if state == 'other':
-        die(f'port {PORT} is taken by another server; set VIZ_PORT')
-    if state == 'ours':
-        return
-    STATE.mkdir(parents=True, exist_ok=True)
-    with open(STATE / 'serve.log', 'ab') as log:
-        subprocess.Popen([sys.executable, os.path.abspath(__file__), 'serve'],
-                         stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                         start_new_session=True)
-    for _ in range(30):
-        time.sleep(0.1)
-        if server_state() == 'ours':
-            return
-    die(f'server did not start; see {STATE / "serve.log"}')
-
-
-def url_for(path):
-    return f'http://localhost:{PORT}/' + urllib.parse.quote(path.relative_to(ROOT).as_posix())
-
-
-# ---------------------------------------------------------------------------
-# Commands
-# ---------------------------------------------------------------------------
-
-def cmd_path(args):
-    name = Path(args.name)
-    if name.is_absolute() or '..' in name.parts:
-        die('NAME must be a relative path without ..')
-    path = ROOT / datetime.date.today().isoformat() / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    print(path)
-
-
-def cmd_open(args):
-    for arg in args.files:
-        path = Path(arg).expanduser().resolve()
-        if not path.exists():
-            die(f'no such file: {arg}')
-        browser = args.browser or (not args.vscode and path.suffix.lower() in BROWSER_SUFFIXES)
-        if not browser:
-            if vscode('--reuse-window', str(path)):
-                print(f'opened in VS Code: {path}')
-            else:
-                print(f'no connected VS Code window; open {path} yourself')
-            continue
-        if path != ROOT and ROOT not in path.parents:
-            directory = path if path.is_dir() else path.parent
-            link = link_dir(directory)
-            print(f'serving {directory} as {link}')
-            path = link if path.is_dir() else link / path.name
-        ensure_server()
-        url = url_for(path)
-        if vscode('--openExternal', url):
-            print(f'opened in browser: {url}')
-        else:
-            print(f'no connected VS Code window; forward port {PORT} and open {url}')
-
-
-def cmd_diff(args):
-    left, right = Path(args.left).expanduser().resolve(), Path(args.right).expanduser().resolve()
-    for path in (left, right):
-        if not path.is_file():
-            die(f'no such file: {path}')
-    if vscode('--reuse-window', '--diff', str(left), str(right)):
-        print(f'opened in VS Code: {left} <> {right}')
-    else:
-        print(f'no connected VS Code window; run: code --diff {left} {right}')
-
-
-def cmd_serve(args):
-    ROOT.mkdir(parents=True, exist_ok=True)
-    STATE.mkdir(parents=True, exist_ok=True)
-    server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
-    (STATE / 'serve.pid').write_text(str(os.getpid()))
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    print(f'serving {ROOT} at http://localhost:{PORT}/', flush=True)
-    try:
-        server.serve_forever()
-    finally:
-        (STATE / 'serve.pid').unlink(missing_ok=True)
-
-
-def cmd_stop(args):
-    try:
-        pid = int((STATE / 'serve.pid').read_text())
-        os.kill(pid, signal.SIGTERM)
-        print(f'stopped server (pid {pid})')
-    except (OSError, ValueError):
-        print('server not running')
-
-
-def cmd_status(args):
-    state = server_state()
-    print(f'dir:     {ROOT}')
-    print(f'server:  ' + {'ours': f'http://localhost:{PORT}/',
-                          'other': f'port {PORT} taken by another server',
-                          'down': f'stopped (starts on demand, port {PORT})'}[state])
-    sock, cli = vscode_socket(), vscode_cli()
-    print('vscode:  ' + ('connected' if sock and cli else
-                         'no VS Code server installed' if not cli else 'no connected window'))
-
-
 def main():
     parser = argparse.ArgumentParser(
         prog='viz', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -392,9 +1039,9 @@ def main():
     p = sub.add_parser('path', help="print (and create the directory of) today's path for NAME")
     p.add_argument('name')
     p.set_defaults(func=cmd_path)
-    p = sub.add_parser('open', help='show files in the connected VS Code or its browser')
+    p = sub.add_parser('open', help='print the browser URL of files, or open them in the connected VS Code')
     target = p.add_mutually_exclusive_group()
-    target.add_argument('--browser', action='store_true', help='always serve and open in the browser')
+    target.add_argument('--browser', action='store_true', help='always serve to the browser')
     target.add_argument('--vscode', action='store_true', help='always open as a VS Code tab')
     p.add_argument('files', nargs='+')
     p.set_defaults(func=cmd_open)
@@ -402,9 +1049,13 @@ def main():
     p.add_argument('left')
     p.add_argument('right')
     p.set_defaults(func=cmd_diff)
+    p = sub.add_parser('login', help='print a single-use link that signs a browser in')
+    p.add_argument('--reset', action='store_true', help='new secret first: signs every browser out')
+    p.set_defaults(func=cmd_login)
+    sub.add_parser('start', help='start the background server').set_defaults(func=cmd_start)
     sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
     sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
-    sub.add_parser('status', help='show server and VS Code connection state').set_defaults(func=cmd_status)
+    sub.add_parser('status', help='show the server, how to forward to it, and VS Code').set_defaults(func=cmd_status)
     args = parser.parse_args()
     args.func(args)
 

@@ -1,7 +1,7 @@
 {
   "name": "viz",
-  "version": "1.0.0",
-  "description": "Skill that tells Claude where to write charts and diagrams and how to show them through bin/viz (dotfiles' VS Code viewer).",
+  "version": "1.1.0",
+  "description": "Skill that tells Claude where to write charts and diagrams and how to show them through bin/viz (dotfiles' browser viewer over an ssh forward).",
   "author": { "name": "tkeller", "url": "https://github.com/tafk7" },
   "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/viz-claude",
   "repository": "https://github.com/tafk7/dotfiles",

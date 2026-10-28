@@ -26,7 +26,7 @@
     },
     {
       "name": "viz",
-      "description": "Skill for showing charts and diagrams through bin/viz (VS Code viewer).",
+      "description": "Skill for showing charts and diagrams through bin/viz (browser viewer over ssh).",
       "author": {
         "name": "tkeller"
       },
