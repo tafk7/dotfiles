@@ -92,6 +92,49 @@ output="$(nvim_run '+if &termguicolors | cquit 42 | endif')" || fail "theme --nv
 output="$(nvim_run '+if maparg("e", "n") !=# "" | cquit 43 | endif')" || fail "review mappings leaked into plain nvim: $output"
 output="$(NVIM_REVIEW=1 nvim_run '+if maparg("e", "n") !=# "k" || maparg("q", "n") !~# "qall" | cquit 44 | endif')" \
     || fail "review profile did not load: $output"
+# Its keys are tmux review's: Shift+PgUp/PgDn scroll three lines, / searches
+# upward, y copies and closes, Esc closes, Ctrl+E/D jump between prompts.
+output="$(NVIM_REVIEW=1 nvim_run \
+    '+if maparg("<S-PageUp>", "n") !=# "3<C-Y>" || maparg("<S-PageDown>", "x") !=# "3<C-E>" | cquit 50 | endif' \
+    '+if maparg("/", "n") !=# "?" || maparg("y", "x") !~# "+y.*qall" || maparg("<Esc>", "n") !~# "qall" | cquit 46 | endif')" \
+    || fail "review keys: $output"
+printf 'start\n## User\nalpha\n## User\nbeta\n' > "$TEST_ROOT/review.md"
+output="$(NVIM_REVIEW=1 NVIM_REVIEW_PROMPT='^## User' nvim_run "$TEST_ROOT/review.md" '+normal! G' \
+    "+call feedkeys(\"\\<C-e>\", 'xt')" '+if line(".") != 4 | cquit 47 | endif' \
+    "+call feedkeys(\"\\<C-e>\", 'xt')" '+if line(".") != 2 | cquit 48 | endif' \
+    "+call feedkeys(\"\\<C-d>\", 'xt')" '+if line(".") != 4 | cquit 49 | endif')" \
+    || fail "review prompt jumps: $output"
+# Shift selects as it moves and a plain move drops the selection; h starts one
+# that plain moves extend, until h. Each scenario runs in one feedkeys call,
+# whose end leaves Visual mode; P() records mode, line and column on the way.
+printf 'start\n## User\nalpha beta gamma\n## User\nbeta\nlast line here\n' > "$TEST_ROOT/select.md"
+cat > "$TEST_ROOT/select.vim" <<'VIM'
+let g:seen = []
+function! P() abort
+  call add(g:seen, mode() . line('.') . ':' . col('.'))
+  return ''
+endfunction
+let s:fail = []
+function! s:run(name, line, col, keys, want) abort
+  let g:seen = []
+  call cursor(a:line, a:col)
+  call feedkeys(substitute(a:keys, '|', "\<Cmd>call P()\<CR>", 'g'), 'xt')
+  if g:seen !=# a:want
+    call add(s:fail, a:name . ': got ' . string(g:seen) . ' want ' . string(a:want))
+  endif
+  execute "normal! \<Esc>"
+endfunction
+call s:run('Shift selects, plain drops', 3, 1, "F|F|d|", ['v3:2', 'v3:3', 'n4:3'])
+call s:run('h toggles', 3, 1, "h|ff|d|h|", ['v3:1', 'v3:3', 'v4:3', 'n4:3'])
+call s:run('Shift+arrow, then arrow', 3, 1, "\<S-Right>|\<Right>|", ['v3:2', 'n3:3'])
+call s:run('Ctrl+Shift prompt jumps', 5, 1, "\<C-S-e>|\<C-S-e>|\<C-d>|", ['v4:1', 'v2:1', 'n4:1'])
+call s:run('Ctrl+Shift word, Esc, Shift+End', 3, 1, "\<C-S-f>|\<Esc>|\<S-End>|", ['v3:5', 'n3:5', 'v3:16'])
+call s:run('s and e move', 3, 5, "s|e|", ['n3:4', 'n2:4'])
+call s:run('Ctrl+Shift+End', 3, 1, "\<C-S-End>|", ['v6:1'])
+if !empty(s:fail) | call writefile(s:fail, '/dev/stderr') | cquit 51 | endif
+VIM
+output="$(NVIM_REVIEW=1 NVIM_REVIEW_PROMPT='^## User' nvim_run "$TEST_ROOT/select.md" "+source $TEST_ROOT/select.vim")" \
+    || fail "review selection keys: $output"
 
 # Alt+Backspace / Alt+Delete delete to the line's start / end in insert mode;
 # Ctrl+U undoes in insert, normal, and visual mode.

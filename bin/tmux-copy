@@ -10,18 +10,13 @@
 # buffer is always set, so prefix+p pastes at any size.
 #
 # Usage:
-#     tmux-copy [--always]          copy-mode copies (tmux copy-command; stdin)
+#     tmux-copy                     copy-mode copies (tmux copy-command; stdin)
 #     tmux-copy --hook NAME         buffers loaded from outside (after-load-buffer)
 #     tmux-copy --buffer [--notify] export the newest buffer now (prefix+e)
 #
 # The hook passes the load's -b name and exports only automatic buffers (no
-# name), so named ones, such as compose pastes, stay in tmux. The first two
-# modes do nothing while @clipboard-export is off (Pause / prefix+E); --always
-# and --buffer ignore it.
-#
-# Turning export off is a latency switch, not a security boundary: tmux has
-# allow-passthrough on, so any program in a pane can already set the clipboard
-# with a passthrough-wrapped OSC 52, which is how Codex and OpenCode copy.
+# name), so named ones, such as compose pastes, stay in tmux. --always is
+# accepted and ignored: shells started while export had an off switch pass it.
 #
 # Limit is @clipboard-limit (bytes of raw text, before base64). Retune live:
 #     tmux set -g @clipboard-limit 32768
@@ -33,12 +28,11 @@ set -uo pipefail
 DEFAULT_LIMIT=65536
 
 mode=stdin
-always=false
 notify=false
 hook_buffer=
 while (($#)); do
     case "$1" in
-        --always) always=true ;;
+        --always) ;;
         --buffer) mode=buffer ;;
         --notify) notify=true ;;
         --hook)
@@ -54,22 +48,12 @@ while (($#)); do
     shift
 done
 
-export_enabled() {
-    [[ "$always" == true || "$mode" == buffer ]] && return 0
-    [[ "$(tmux show -gv @clipboard-export 2>/dev/null)" != off ]]
-}
-
 case "$mode" in
     stdin)
-        if ! export_enabled; then
-            cat >/dev/null
-            exit 0
-        fi
         payload=$(cat)
         ;;
     hook)
         [[ -z "$hook_buffer" ]] || exit 0
-        export_enabled || exit 0
         payload=$(tmux show-buffer 2>/dev/null) || exit 0
         ;;
     buffer)

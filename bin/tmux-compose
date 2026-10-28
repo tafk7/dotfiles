@@ -9,7 +9,7 @@
 #     tmux-compose return TARGET FILE   put the draft FILE back in the agent's box
 #     tmux-compose editor AGENT PANE FILE   an agent's $VISUAL, through
 #                                       compose-editor
-#     tmux-compose fullscreen PANE      the prompt in nvim in the agent's place
+#     tmux-compose fullscreen PANE      the prompt in nvim in the program's place
 #     tmux-compose forward TARGET KEY   send a scroll key (PPage, NPage, C-Home,
 #                                       C-End) to TARGET
 #
@@ -39,7 +39,7 @@
 #   push          the box becomes the draft's text, followed by anything typed
 #                 into the box meanwhile, and the draft empties; `return` asks
 #   fullscreen    nvim with the prose profile in the agent's place
-#                 (Ctrl+Shift+G; Claude and OpenCode)
+#                 (Alt+Shift+V)
 # The agents blank or suspend their screen while the editor runs, so the editor
 # never waits on the compose pane: while compose is open the prompt lives there,
 # otherwise in the box. A request the agent doesn't take, because a dialog or
@@ -95,14 +95,14 @@ joined_agent() {
     return 1
 }
 
-# The key that opens AGENT's external editor on its prompt box: Claude's
-# chat:externalEditor, Codex's open_external_editor as configs/codex.defaults.toml
-# sets it, and OpenCode's prompt.editor (leader e).
+# The key that opens a program's external editor on its prompt: Claude's
+# chat:externalEditor, Codex's open_external_editor, OpenCode's prompt.editor
+# (leader e), pi's app.editor.external, and readline's edit-and-execute-command.
 editor_key() {
     case "$1" in
-        claude) echo C-g ;;
-        codex) echo C-e ;;
+        claude | codex | pi) echo C-g ;;
         opencode) echo C-x e ;;
+        bash | zsh) echo C-x C-e ;;
     esac
 }
 
@@ -244,18 +244,17 @@ confirm() {
         || tmux display-message "compose: $2 didn't take the draft (a dialog open?); it's kept, Alt+V reopens it"
 }
 
-# Ctrl+Shift+G: nvim in Claude's or OpenCode's place. An agent without
-# compose-editor gets its own editor key, so that its own editor opens; a Codex
-# gets Ctrl+G, since its Ctrl+Shift+G is a permission-mode key.
+# Alt+Shift+V: nvim in the agent's place. Any other program, or an agent
+# without compose-editor, gets its own editor key, so that its own editor opens.
 fullscreen() {
-    local pane="$1" agent
-    if agent=$(joined_agent "$pane") && [[ "$agent" != codex ]]; then
+    local pane="$1" agent key
+    if agent=$(joined_agent "$pane"); then
         ask "$pane" "$agent" fullscreen 20 || true
-    elif [[ "$(tmux display-message -p -t "$pane" '#{pane_current_command}')" == opencode ]]; then
-        tmux send-keys -t "$pane" C-x e
-    else
-        tmux send-keys -t "$pane" C-g
+        return
     fi
+    key=$(editor_key "$(tmux display-message -p -t "$pane" '#{pane_current_command}')")
+    # shellcheck disable=SC2086  # one argument per key
+    [[ -z "$key" ]] || tmux send-keys -t "$pane" $key
 }
 
 paste() {

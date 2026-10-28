@@ -85,6 +85,17 @@ custom_binding = "ctrl-k"
         self.assertEqual((self.home / '.claude/keybindings.json').read_bytes(),
                          (ROOT / 'configs/ai/claude/keybindings.json').read_bytes())
 
+    def test_pi_gets_keybindings_and_keeps_its_settings(self):
+        settings = self.put('.pi/agent/settings.json', '{"enableInstallTelemetry": true}')
+        self.run_config('pi')
+        self.assertEqual((self.home / '.pi/agent/keybindings.json').read_bytes(),
+                         (ROOT / 'configs/ai/pi/keybindings.json').read_bytes())
+        self.assertEqual(settings.read_text(), '{"enableInstallTelemetry": true}')
+        self.run_config('pi', '--check')
+        (self.home / '.pi/agent/keybindings.json').write_text('{}')
+        result = self.run_config('pi', '--check', ok=False)
+        self.assertIn('CHECK: ' + str(self.home / '.pi/agent/keybindings.json'), result.stdout)
+
     def record_entry(self, component, target):
         record_path = self.home / f'.local/state/dotfiles/ai/{component}.json'
         record = json.loads(record_path.read_text())

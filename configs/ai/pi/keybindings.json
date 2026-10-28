@@ -1,0 +1,12 @@
+{
+  "app.thinking.cycle": ["ctrl+pageUp", "ctrl+pageDown"],
+  "tui.editor.pageUp": ["pageUp"],
+  "tui.editor.pageDown": ["pageDown"],
+  "app.model.select": ["alt+m"],
+  "tui.editor.deleteWordBackward": ["ctrl+backspace", "ctrl+h", "ctrl+w"],
+  "tui.editor.deleteWordForward": ["ctrl+delete"],
+  "tui.editor.deleteToLineStart": ["alt+backspace", "ctrl+u"],
+  "tui.editor.deleteToLineEnd": ["alt+delete", "ctrl+k"],
+  "tui.editor.undo": ["ctrl+z", "ctrl+-"],
+  "app.suspend": []
+}

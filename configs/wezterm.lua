@@ -220,12 +220,31 @@ config.keys = {
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;83~',
   },
-  -- Ctrl+Shift+G likewise: in Claude, tmux opens the prompt in nvim in
-  -- Claude's place rather than the compose pane (Ctrl+G).
+  -- Ctrl+Shift+E/D/F likewise: in tmux review, Ctrl+Shift+E/S/D/F extend the
+  -- selection by a prompt or a word. WezTerm's own search is gone from
+  -- Ctrl+Shift+F: under tmux it sees only the screen, and review searches the
+  -- whole conversation.
   {
-    key = 'g',
+    key = 'e',
     mods = 'CTRL|SHIFT',
-    action = act.SendString '\x1b[27;6;71~',
+    action = act.SendString '\x1b[27;6;69~',
+  },
+  {
+    key = 'd',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;68~',
+  },
+  {
+    key = 'f',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;70~',
+  },
+  -- Ctrl+Shift+Tab likewise: tmux hands an agent a plain Shift+Tab, its own
+  -- mode cycle, while Shift+Tab steps only through the modes you use.
+  {
+    key = 'Tab',
+    mods = 'CTRL|SHIFT',
+    action = act.SendString '\x1b[27;6;9~',
   },
 
   -- Shift + Copy: tmux copies the agent's last reply (prefix+y).
@@ -270,18 +289,25 @@ config.keys = {
     action = act.SendString '\x1b[1;2S',
   },
 
-  -- Review and clipboard-export keys. WezTerm never receives ScrollLock or
-  -- Pause, so the keyboard firmware sends F17/F18 from those positions. They
-  -- travel as Shift+F5/F6, clear of the Shift+F1-F4 cut transport above.
+  -- ScrollLock and Pause, by Windows key code: WezTerm has no names for them,
+  -- but offers every key to its bindings by code before it names it.
+  -- ScrollLock reviews the pane (Shift+F5 to tmux), with Shift reviews and
+  -- searches (Shift+F7); Pause, the Break key, stops whatever runs (Shift+F9).
+  -- Shift+F keys, clear of the Shift+F1-F4 cut transport above.
   {
-    key = 'F17',
+    key = 'raw:145',
     mods = 'NONE',
     action = act.SendString '\x1b[15;2~',
   },
   {
-    key = 'F18',
+    key = 'raw:145',
+    mods = 'SHIFT',
+    action = act.SendString '\x1b[18;2~',
+  },
+  {
+    key = 'raw:19',
     mods = 'NONE',
-    action = act.SendString '\x1b[17;2~',
+    action = act.SendString '\x1b[20;2~',
   },
 
   -- Client utilities retained from the Windows Terminal surface.
@@ -291,38 +317,31 @@ config.keys = {
     action = act.ActivateCommandPalette,
   },
   {
-    key = 'f',
-    mods = 'CTRL|SHIFT',
-    action = act.Search 'CurrentSelectionOrEmptyString',
-  },
-  {
     key = 'F11',
     mods = 'NONE',
     action = act.ToggleFullScreen,
   },
+  -- Fullscreen and font size on Ctrl+Shift, WezTerm's modifier, so Alt+Enter,
+  -- Ctrl+- and Ctrl+0 reach the programs. Physical keys, so Shift keeps the
+  -- digit and the punctuation from turning into ) _ +.
   {
     key = 'Enter',
-    mods = 'ALT',
+    mods = 'CTRL|SHIFT',
     action = act.ToggleFullScreen,
   },
   {
-    key = '=',
-    mods = 'CTRL',
-    action = act.IncreaseFontSize,
-  },
-  {
-    key = '+',
+    key = 'phys:Equal',
     mods = 'CTRL|SHIFT',
     action = act.IncreaseFontSize,
   },
   {
-    key = '-',
-    mods = 'CTRL',
+    key = 'phys:Minus',
+    mods = 'CTRL|SHIFT',
     action = act.DecreaseFontSize,
   },
   {
-    key = '0',
-    mods = 'CTRL',
+    key = 'phys:0',
+    mods = 'CTRL|SHIFT',
     action = act.ResetFontSize,
   },
 }
