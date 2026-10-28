@@ -1,6 +1,14 @@
 {
   "keybinds": {
     "session.first": "ctrl+home,ctrl+g,home,alt+home",
-    "session.last": "ctrl+end,ctrl+alt+g,end"
+    "session.last": "ctrl+end,ctrl+alt+g,end",
+    "model.list": "alt+m,<leader>m",
+    "variant.cycle": "ctrl+pageup,ctrl+pagedown",
+    "input.undo": "ctrl+z,ctrl+-,super+z",
+    "terminal.suspend": "none",
+    "input.delete.word.backward": "ctrl+backspace,ctrl+h,ctrl+w",
+    "input.delete.word.forward": "ctrl+delete",
+    "input.delete.to.line.start": "alt+backspace,ctrl+u",
+    "input.delete.to.line.end": "alt+delete,ctrl+k"
   }
 }

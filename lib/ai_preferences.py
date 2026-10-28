@@ -159,7 +159,12 @@ def desired(component, home, record=None):
     record = record or {}
     directory = home / ('.' + component)
     extra, settings = [], []
-    if component == 'codex':
+    if component == 'pi':
+        # Only files: pi's settings.json is the user's (lib/configure.sh
+        # provisions it once).
+        default = home / '.pi/agent'
+        directory = Path(os.environ.get('PI_CODING_AGENT_DIR', default)) if home == Path.home() else default
+    elif component == 'codex':
         directory = Path(os.environ.get('CODEX_HOME', directory)) if home == Path.home() else directory
         target = directory / 'config.toml'
         check_target(target)
@@ -211,7 +216,7 @@ def desired(component, home, record=None):
             document = Settings(target, original, overlay, record.get(str(target), {}), 'json',
                                 released=released(component, target), defaults=defaults)
         settings.insert(0, document)
-    outputs = [(settings[0].target, settings[0].text.encode(), 0o600), *extra]
+    outputs = [(settings[0].target, settings[0].text.encode(), 0o600), *extra] if settings else []
     assets = ROOT / 'configs/ai' / component
     for source in sorted(assets.rglob('*')):
         if source.is_file() and '__pycache__' not in source.parts:
@@ -296,7 +301,7 @@ def check_plugin(component, directory):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('component', choices=['codex', 'claude', 'opencode', 'all'], nargs='?', default='all')
+    parser.add_argument('component', choices=['codex', 'claude', 'opencode', 'pi', 'all'], nargs='?', default='all')
     parser.add_argument('--home', type=Path, default=Path.home())
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--check', action='store_true')
@@ -309,7 +314,7 @@ def main():
         return 0 if check_plugin(args.component, desired(args.component, args.home)[0]) else 1
     # Validate every document and target before writing any of them.
     plans = []
-    for c in (['codex', 'claude', 'opencode'] if args.component == 'all' else [args.component]):
+    for c in (['codex', 'claude', 'opencode', 'pi'] if args.component == 'all' else [args.component]):
         record = load_record(c, args.home)
         plans.append((c, record, *desired(c, args.home, record)))
     ok = True
@@ -350,7 +355,7 @@ def main():
                 with os.fdopen(fd, 'w') as handle:
                     handle.write(text)
                 os.replace(staged, path)
-        if args.check and args.plugins and component != 'opencode':
+        if args.check and args.plugins and component in ('claude', 'codex'):
             ok = check_plugin(component, directory) and ok
         if component == 'claude':
             env = load_json(ROOT / 'configs/claude-settings.json').get('env', {})
