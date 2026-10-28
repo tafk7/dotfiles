@@ -177,17 +177,34 @@ Settings not listed are left alone. See
 ./bin/ai-update opencode          # opencode only notifies about new releases
 ```
 
-`bin/viz` shows an agent's charts and diagrams through the VS Code window
-connected over Remote-SSH, since agents in tmux cannot draw on the client
-screen. `viz open` sends HTML, SVG and PDF to the client browser through a
-localhost server that reloads pages on change, and opens other files as VS Code
-tabs. Claude's `viz` skill tells it where to write output and how to render it.
+`bin/viz` shows an agent's charts, diagrams and HTML reports in your laptop's
+browser, since agents in tmux cannot draw on the client screen. It serves
+`~/viz` over a Unix socket that only your account can open. You forward a local
+port to that socket with ssh, and pages reload when they or their assets
+change. `viz open` prints a page's URL. It also opens other files as tabs in a
+connected VS Code Remote-SSH window. Claude's `viz` skill tells it where to
+write output and how to render it.
 
 ```bash
 viz path report.html              # ~/viz/<today>/report.html
-viz open ~/viz/2026-09-28/report.html
-viz status                        # server and VS Code connection
+viz open ~/viz/2026-09-28/report.html   # prints http://127.0.0.1:PORT/2026-09-28/report.html
+viz status                        # server, the ssh forward for this machine, VS Code
+viz login                         # single-use link that signs a browser in (run it yourself)
 ```
+
+On Windows, add the forward that `viz status` prints to the host's block in
+`%USERPROFILE%\.ssh\config`, which these dotfiles don't manage:
+
+```
+Host devbox
+    LocalForward 127.0.0.1:21001 /run/user/1001/viz/http.sock
+```
+
+The first `ssh devbox` owns the forward. Later sessions to the same host warn
+`Address already in use` and carry on. Open `http://127.0.0.1:21001/` and sign
+in once with `viz login`. The cookie is good for this port until
+`viz login --reset`. Recopy `configs/wezterm.lua`, so image paste doesn't
+compete for the forward.
 
 ### Themes
 
