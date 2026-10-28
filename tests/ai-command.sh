@@ -244,8 +244,9 @@ bash_plain=$(PATH="$SHELL_PATH" bash --noprofile --norc -c 'for f in claude code
     '"$ai_definitions"'declare -f claude codex opencode pi')
 assert_eq "$(head -n 2 <<< "$bash_interactive" | tr '\n' ' ')" "2 1 " "bash bindings and hook"
 assert_eq "$(tail -n +3 <<< "$bash_interactive")" "$bash_plain" "bash AI wrappers"
-assert_eq "$(env -u SSH_CONNECTION HOME="$HOME" PATH="$SHELL_PATH" bash -i -c 'bind -X | grep _ai_command' 2>/dev/null)" \
-    $'"\\eI": "_ai_command_reset_widget"\n"\\ei": "_ai_command_widget"' "bash key sequences"
+# bash 5.2's bind -X puts a colon after the key sequence; 5.1's doesn't.
+assert_eq "$(env -u SSH_CONNECTION HOME="$HOME" PATH="$SHELL_PATH" bash -i -c 'bind -X | grep _ai_command' 2>/dev/null | sed 's/": "/" "/')" \
+    $'"\\eI" "_ai_command_reset_widget"\n"\\ei" "_ai_command_widget"' "bash key sequences"
 zsh_interactive=$(env -u SSH_CONNECTION HOME="$HOME" PATH="$SHELL_PATH" zsh -i -c '
     reload --soft
     bindkey -M emacs "^[i"; bindkey -M emacs "^[I"
