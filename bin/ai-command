@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+# Draft a shell command from a request with Claude, for the Alt+I widget; never runs it.
+"""Draft a shell command with an AI CLI: the backend of the Alt+I widget.
+
+    ai-command [--session UUID [--resume]] [--shell SHELL] [--cwd DIR]
+               [--candidate TEXT [--edited]] REQUEST
+    ai-command --stdin [OPTIONS]    read REQUEST, NUL, CANDIDATE from stdin
+
+Prints the drafted command on stdout and nothing else; nothing is run. With
+--session, the conversation is created under that UUID, or with --resume
+continued; without it, nothing is kept. REQUEST is the request, or with
+CANDIDATE (the command line as it now reads) a correction to it. Errors are
+one line on stderr, exit status 1 (2 for usage errors); an interrupt exits 130.
+
+shell/tools/ai-command.sh passes its input on stdin, so it doesn't show in the
+process list. Configuration (exported):
+
+  AI_COMMAND_BACKEND   claude (the only backend so far)
+  AI_COMMAND_MODEL     model alias or name (default haiku; empty: Claude's own)
+  AI_COMMAND_EFFORT    reasoning effort (default low; empty: Claude's own)
+  AI_COMMAND_TIMEOUT   seconds before giving up (default 60)
+"""
+
+import argparse
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+
+SYSTEM_PROMPT = """\
+You draft shell commands for someone working at an interactive shell prompt. \
+Your answer replaces what they typed on their command line. They read it, may \
+edit it, and decide whether to run it; you never run anything and have no tools.
+
+Each conversation starts with the user's shell, system, and working directory. \
+They describe the user's machine. Any other environment details you are shown \
+describe this helper's own process, not the user: ignore them.
+
+Put only the command in the "command" field:
+- one command, pipeline, or short script for that shell and system;
+- no Markdown fences, no prompt characters, and no explanation unless the user \
+asks for one, and then only as shell comments;
+- standard tools a typical Linux system has, or tools the user names; never \
+invented utilities or options;
+- paths, variables, and patterns quoted correctly; relative paths resolve \
+against the working directory;
+- the clear, safe form, with no destructive step the user did not ask for;
+- several lines only when the task needs them, such as a loop or a here-document.
+
+A correction comes with the command line as it now reads, which may include \
+the user's own edits. Keep those edits and the intent of earlier requests, and \
+change what the correction asks for.
+
+If the request is not something a shell command can do, or is too unclear to \
+attempt, answer with one shell comment (a line starting with #) that says what \
+is missing."""
+
+SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {"command": {"type": "string", "description": "The command, exactly as it should appear on the command line."}},
+    "required": ["command"],
+    "additionalProperties": False,
+}, separators=(",", ":"))
+
+
+class Failure(Exception):
+    """A one-line error for the user."""
+
+
+def system_description():
+    """'Ubuntu 24.04.1 LTS (WSL2), x86_64' from os-release and the kernel."""
+    fields = {}
+    try:
+        with open(os.environ.get("DOTFILES_OS_RELEASE") or "/etc/os-release") as release:
+            for line in release:
+                key, _, value = line.strip().partition("=")
+                fields[key] = value.strip('"')
+    except OSError:
+        pass
+    name = fields.get("PRETTY_NAME") or " ".join(
+        filter(None, [fields.get("NAME") or fields.get("ID"), fields.get("VERSION_ID")])) or platform.system()
+    try:
+        if "microsoft" in Path("/proc/sys/kernel/osrelease").read_text().lower():
+            name += " (WSL2)"
+    except OSError:
+        pass
+    return f"{name}, {platform.machine()}"
+
+
+def compose(args):
+    """The user turn: context first, then the request or the correction."""
+    lines = [] if args.resume else [f"Shell: {args.shell}", f"System: {system_description()}"]
+    lines.append(f"Working directory: {args.cwd}")
+    if args.candidate is None:
+        lines += ["", f"Request: {args.request}"]
+    else:
+        if not args.resume:
+            intro = "The command line reads:"
+        elif args.edited:
+            intro = "I edited your last command. The command line now reads:"
+        else:
+            intro = "The command line still reads:"
+        lines += ["", intro, "<command-line>", args.candidate, "</command-line>", "",
+                  f"Correction: {args.request}"]
+    return "\n".join(lines) + "\n"
+
+
+def clean(command):
+    """The command as buffer text, or a Failure if it isn't usable."""
+    command = command.replace("\r\n", "\n").strip()
+    lines = command.split("\n")
+    # Fences despite the instructions: keep what they enclose.
+    if len(lines) > 1 and lines[0].startswith("```"):
+        lines = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+        command = "\n".join(lines).strip()
+    if not command:
+        raise Failure("the backend returned an empty command")
+    # The buffer is drawn on the terminal: refuse escape sequences.
+    if any((ord(c) < 32 and c not in "\t\n") or ord(c) == 127 for c in command):
+        raise Failure("the backend returned control characters; refusing it")
+    return command
+
+
+def claude_argv(args, exe):
+    """Print mode with no tools and no customizations, kept to this request.
+
+    --safe-mode drops CLAUDE.md, plugins, hooks, MCP servers, skills, and
+    custom commands and agents but keeps the login; --bare would, too, but
+    reads only ANTHROPIC_API_KEY, never an OAuth login. User settings still
+    load, so their env (telemetry switches) and auth helpers apply.
+    """
+    argv = [exe, "-p", "--safe-mode", "--setting-sources", "user", "--strict-mcp-config",
+            "--tools", "", "--permission-mode", "dontAsk",
+            "--system-prompt", SYSTEM_PROMPT,
+            "--output-format", "json", "--json-schema", SCHEMA]
+    if args.session is None:
+        argv.append("--no-session-persistence")
+    else:
+        argv += ["--resume" if args.resume else "--session-id", args.session]
+    model = os.environ.get("AI_COMMAND_MODEL", "haiku")
+    effort = os.environ.get("AI_COMMAND_EFFORT", "low")
+    if model:
+        argv += ["--model", model]
+    if effort:
+        argv += ["--effort", effort]
+    return argv
+
+
+def claude_workdir():
+    """Claude runs from its own directory: sessions are filed by directory,
+    and `claude --continue` in a project must never pick up one of these."""
+    cache = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    workdir = Path(cache) / "dotfiles" / "ai-command"
+    workdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return workdir
+
+
+def claude(args):
+    exe = shutil.which("claude")
+    if not exe:
+        raise Failure("Claude Code not found. Install with: ./setup.sh --ai")
+    timeout = float(os.environ.get("AI_COMMAND_TIMEOUT") or 60)
+    try:
+        proc = subprocess.run(claude_argv(args, exe), input=compose(args), capture_output=True,
+                              text=True, timeout=timeout, cwd=claude_workdir())
+    except subprocess.TimeoutExpired:
+        raise Failure(f"claude did not answer within {timeout:g}s") from None
+    try:
+        result = json.loads(proc.stdout)
+    except ValueError:
+        result = None
+    if isinstance(result, dict) and result.get("is_error"):
+        # Login and API errors arrive as an error result.
+        raise Failure(f"claude: {result.get('result') or result.get('subtype') or 'error'}")
+    if proc.returncode != 0:
+        detail = [line for line in proc.stderr.splitlines() if line.strip()]
+        raise Failure(f"claude failed: {detail[-1].strip() if detail else f'exit status {proc.returncode}'}")
+    if not isinstance(result, dict) or result.get("type") != "result":
+        raise Failure("claude returned malformed output")
+    if args.session is not None and result.get("session_id", args.session) != args.session:
+        raise Failure("claude answered in another session")
+    structured = result.get("structured_output")
+    if not isinstance(structured, dict):
+        try:
+            structured = json.loads(result.get("result") or "")
+        except (TypeError, ValueError):
+            structured = None
+    if not isinstance(structured, dict) or not isinstance(structured.get("command"), str):
+        raise Failure("claude returned malformed output")
+    return structured["command"]
+
+
+# A backend takes the parsed arguments and returns the raw command text. It
+# owns its own session handling; the widget only supplies the UUID.
+BACKENDS = {"claude": claude}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--session", help="UUID of the conversation to create or resume")
+    parser.add_argument("--resume", action="store_true", help="continue the --session conversation")
+    parser.add_argument("--shell", default=Path(os.environ.get("SHELL") or "sh").name,
+                        help="the user's shell and version (default: the name in $SHELL)")
+    parser.add_argument("--cwd", default=os.getcwd(), help="the user's working directory")
+    parser.add_argument("--candidate", help="the command line as it now reads")
+    parser.add_argument("--edited", action="store_true", help="the user changed the last command")
+    parser.add_argument("--stdin", action="store_true", help="read REQUEST, NUL, CANDIDATE from stdin")
+    parser.add_argument("request", nargs="?", help="the request, or with --candidate a correction")
+    args = parser.parse_args()
+    if args.stdin:
+        if args.request is not None or args.candidate is not None:
+            parser.error("--stdin takes the request and the candidate from stdin")
+        request, _, candidate = sys.stdin.read().partition("\0")
+        args.request, args.candidate = request, candidate.rstrip("\0") or None
+    if args.session is not None:
+        try:
+            args.session = str(uuid.UUID(args.session))
+        except ValueError:
+            parser.error(f"--session is not a UUID: {args.session}")
+    elif args.resume:
+        parser.error("--resume needs --session")
+    if not (args.request or "").strip():
+        parser.error("type a request first")
+    args.request = args.request.strip()
+    return args
+
+
+def main():
+    try:
+        args = parse_args()
+        name = os.environ.get("AI_COMMAND_BACKEND") or "claude"
+        backend = BACKENDS.get(name)
+        if backend is None:
+            raise Failure(f"unknown AI_COMMAND_BACKEND {name!r} (supported: {', '.join(BACKENDS)})")
+        print(clean(backend(args)))
+    except Failure as failure:
+        print(f"ai-command: {failure}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("ai-command: cancelled", file=sys.stderr)
+        return 130
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

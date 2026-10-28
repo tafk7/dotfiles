@@ -246,6 +246,92 @@ That block pins the default key. A second account on the same host needs a
 [profile](#git-profiles), not another block: GitHub takes the first key it
 accepts as the account, whatever the repository.
 
+## AI command drafting (Alt+I)
+
+For the commands you don't remember and the ones you would otherwise assemble
+from man pages, `shell/tools/ai-command.sh` drafts a command from a plain
+request at the prompt, in Bash and Zsh. `bin/ai-command` asks Claude.
+
+1. Type the request where the command would go and press `Alt+I`.
+   `find every JSON file changed in the last week` becomes
+   `find . -type f -name '*.json' -mtime -7`, with the cursor at the end.
+2. Read it, edit it if you like, and press Enter to run it. A drafted command
+   is only text in the command line: it never runs, and is never evaluated,
+   until you press Enter. A multiline command, such as a loop, arrives whole.
+3. To change it, press `Alt+I` again and answer `refine>` with a correction,
+   such as `use absolute paths and exclude node_modules`. The correction and
+   the command line as it now reads, your edits included, go to the same
+   conversation, and the answer replaces the command line again.
+
+Zsh shows `refine>` under the command line. Bash shows the command dimmed with
+`refine>` under it, and erases both once you answer. Ctrl+C or an empty answer
+at `refine>`, and Ctrl+C while Claude is working, leave the command line as it
+was; so does a failure, which prints one line saying why. A correction that
+fails, or that you interrupt while Claude is working, is not resumed: the next
+`Alt+I` asks for the correction again and starts a new conversation from the
+command line.
+
+A conversation ends at the next prompt (you ran the command, or pressed Ctrl+C
+on the line), when you change directory, and with `Alt+Shift+I`. The next
+`Alt+I` then takes the command line as a new request. Every shell, and so every
+tmux pane, has its own conversation. Inside and outside tmux the keys are the
+same: neither tmux nor the tracked WezTerm and Windows Terminal configurations
+bind `Alt+I` or `Alt+Shift+I`.
+
+`bin/ai-command` reads these at each request; export them, for example from
+`~/.shell.local`:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AI_COMMAND_BACKEND` | `claude` | The AI CLI; Claude is the only backend so far |
+| `AI_COMMAND_MODEL` | `haiku` | Model alias or name; empty uses Claude's configured model |
+| `AI_COMMAND_EFFORT` | `low` | Reasoning effort; empty uses Claude's configured effort |
+| `AI_COMMAND_TIMEOUT` | `60` | Seconds to wait for an answer |
+
+`CLAUDE_FLAGS` does not apply: it can enable tools, skip permission checks, or
+load plugins, none of which belong in this helper.
+
+What runs, and what is sent:
+
+- `claude -p`, with your existing login, `--safe-mode` (no CLAUDE.md, plugins,
+  hooks, MCP servers, skills, or custom commands and agents), `--tools ""` (no
+  tools, so it cannot run, read, or write anything), `--setting-sources user`,
+  `--strict-mcp-config`, `--permission-mode dontAsk`, its own
+  `--system-prompt`, and structured output (`--output-format json
+  --json-schema`). `--bare` would isolate it further, but it accepts only
+  `ANTHROPIC_API_KEY`, never a claude.ai login. User settings still load, so
+  their `env` (telemetry switches) and any `apiKeyHelper` apply.
+- The request carries your shell and its version, the OS release and
+  architecture, the working directory, and the request or correction; a
+  correction also carries the command line. Not your history, environment, or
+  files. Claude Code adds its own summary of its process (working directory,
+  `$SHELL`, kernel version) and account context, as it does for any session.
+  The text goes over stdin, so it never shows in the process list.
+- An empty answer, one with control characters, or anything that isn't a
+  single command string is rejected, and the command line is left alone.
+- Each conversation is a Claude session with a fresh UUID: created with
+  `--session-id`, continued with `--resume` and that UUID, never `--continue`.
+  Claude runs from `~/.cache/dotfiles/ai-command`, so these sessions are filed
+  apart from your projects': `claude --continue` in a project never picks one
+  up. Claude Code removes them with its other transcripts (`cleanupPeriodDays`,
+  30 days by default).
+
+To move or turn off the keys, rebind in `~/.shell.local`. The bindings are in
+the emacs keymap; vi-mode users bind the same widgets in vi insert mode
+(`bindkey -M viins`, `bind -m vi-insert -x`).
+
+```bash
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    bindkey -M emacs -r '^[i' '^[I'                  # off
+    bindkey -M emacs '^Xa' ai-command                # Ctrl+X a drafts or corrects
+    bindkey -M emacs '^XA' ai-command-reset          # Ctrl+X A starts over
+else
+    bind -r '\ei'; bind -r '\eI'                     # off
+    bind -x '"\C-xa": _ai_command_widget'            # Ctrl+X a drafts or corrects
+    bind -x '"\C-xA": _ai_command_reset_widget'      # Ctrl+X A starts over
+fi
+```
+
 ## Adding a theme
 
 See [adding a theme](theme-system.md#adding-a-theme).

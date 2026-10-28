@@ -8,7 +8,9 @@ real backups, or register plugins in a real CLI profile. Host-mutating commands
 tmux binding tests use `tests/lib/tmux-keys.sh`: an isolated server loaded
 with `configs/tmux.conf`, a client attached through `script` inside a second
 server, raw key sequences typed as WezTerm sends them, and a logging stub that
-stands in for Claude, Codex, or OpenCode by name.
+stands in for Claude, Codex, or OpenCode by name. `tests/ai-command.sh` drives
+`claude -p` through `tests/lib/claude-stub.py`, which records each call and
+answers in Claude's JSON format; no test calls a model.
 
 Run the suite (CI runs the same set, discovering every `tests/*.sh`):
 
