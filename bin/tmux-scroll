@@ -10,7 +10,10 @@
 #                                3; measured on 2.1.311, 0.164.0, 2.1.4), as many
 #                                as make the lines. Codex has no keyboard key
 #                                for a small scroll, so the wheel is what all
-#                                three share
+#                                three share. Claude (2.1.312) holds its view
+#                                at the bottom against the first three
+#                                wheel-ups, so those come first; it shows
+#                                "Jump to bottom" once it has let go
 #   a compose pane               its agent, as PgUp is forwarded
 #   a shell                      copy-mode that many lines up, which exits at
 #                                the bottom; down at the bottom does nothing
@@ -50,6 +53,10 @@ if ((step)) && [[ "$mouse" == 1 && "$sgr" == 1 ]]; then
     x=$((width < 10 ? width : 10))
     y=$((height / 3 > 0 ? height / 3 : 1))
     events=$(((lines + step - 1) / step))
+    if [[ "$command" == claude && "$dir" == up ]] &&
+        ! tmux capture-pane -p -t "$pane" | grep -q -F 'Jump to bottom'; then
+        events=$((events + 3))
+    fi
     hex=$(printf '\e[<%d;%d;%dM' "$button" "$x" "$y" | od -An -tx1 -v | tr -s ' \n' ' ')
     keys=()
     for ((i = 0; i < events; i++)); do

@@ -239,8 +239,8 @@ config.keys = {
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;70~',
   },
-  -- Ctrl+Shift+Tab likewise: tmux hands an agent a plain Shift+Tab, its own
-  -- mode cycle, while Shift+Tab steps only through the modes you use.
+  -- Ctrl+Shift+Tab likewise, for the program in the pane (OpenCode's previous
+  -- session tab), not WezTerm's tabs.
   {
     key = 'Tab',
     mods = 'CTRL|SHIFT',

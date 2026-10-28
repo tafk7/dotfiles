@@ -168,7 +168,7 @@ FRIENDLY = [  # first match wins
     (r'tmux-last-reply', 'last-reply', 'copy last reply'),
     (r'tmux-review" search', 'review-search', 'review and search'),
     (r'tmux-review', 'review', 'review transcript'),
-    (r'tmux-agent-mode', 'agent-mode', 'next permission mode: accept edits, bypass, auto'),
+    (r'tmux-agent-mode" (\w+)', 'mode', '{0} permission mode'),
     (r'tmux-copy', 'export', 'buffer to clipboard'),
     (r'send -X cancel', 'copy-toggle', 'copy mode on/off'),
     (r'select-pane -U', 'focus-up', 'focus pane above'),

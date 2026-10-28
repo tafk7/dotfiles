@@ -1,45 +1,176 @@
 #!/usr/bin/env bash
-# Shift+Tab in Claude (configs/tmux.conf): step the permission mode through the
-# three in use, accept edits, bypass permissions and auto mode. Claude's own
-# cycle also stops at ask (manual mode) and plan mode, and its keybindings can't
-# leave them out, so this presses Shift+Tab until the mode Claude names in its
-# footer is one of the three and not the one it started on. Bypass and auto are
-# in the cycle only when Claude was started with them; without them it lands on
-# the next of the three that Claude has. If the footer doesn't change, it stops
-# after one press, a plain Shift+Tab. Ctrl+Shift+Tab sends Claude one plain
-# Shift+Tab, to reach plan mode or ask.
+# Alt+Shift+J, K and L (configs/tmux.conf): put the agent in PANE straight into
+# one permission mode, whatever mode it is in now. Shift+Tab keeps each agent's
+# own cycle; these jump to the three in use, a dial from most access to least:
 #
-# Usage: tmux-agent-mode PANE
+#   yolo    Claude bypass permissions, Codex Full Access, OpenCode auto accept
+#   auto    Claude auto mode, Codex Approve for me (OpenCode has none)
+#   edits   Claude accept edits, Codex Ask for approval, OpenCode prompt
+#
+# Claude has no key for a mode, only its cycle, so this presses Shift+Tab until
+# its footer names the mode; a whole cycle back to the start means Claude
+# wasn't started with that mode. Codex picks from /permissions when its prompt
+# is empty and idle; otherwise F7 (next_permission_mode, configs/codex.defaults.toml)
+# steps its cycle, which opens the same picker on a session's first press and
+# never reaches Full Access. OpenCode's one switch is a setting (Ctrl+P,
+# Permissions), saved for every session. pi never asks.
+#
+# Usage: tmux-agent-mode yolo|auto|edits PANE
 
 set -uo pipefail
 
-pane=${1:?usage: tmux-agent-mode PANE}
+usage="usage: tmux-agent-mode yolo|auto|edits PANE"
+target=${1:?$usage}
+pane=${2:?$usage}
+[[ "$target" =~ ^(yolo|auto|edits)$ ]] || { echo "$usage" >&2; exit 2; }
 
-# The mode on Claude's last lines ("accept edits on"); nothing in manual mode.
-mode() {
-    tmux capture-pane -p -t "$pane" 2>/dev/null | tail -n 4 |
-        grep -o -E "(accept edits|plan mode|bypass permissions|auto mode|manual mode|don't ask) on" | tail -n 1
+screen() { tmux capture-pane -p -t "$pane" 2>/dev/null; }
+bottom() { screen | tail -n "${1:-4}"; }
+has() { screen | grep -q -F -- "$1"; }
+say() { tmux display-message -t "$pane" "$1"; }
+# Run COMMAND until it succeeds, for up to two seconds.
+until_ok() {
+    local _
+    for _ in {1..40}; do
+        "$@" && return 0
+        sleep 0.05
+    done
+    return 1
 }
 
-# One run at a time per pane: a Shift+Tab pressed while one runs waits its turn
-# and then steps on from where that one landed.
+# The mode on Claude's last lines ("accept edits on"); nothing in manual mode.
+claude_mode() {
+    bottom | grep -o -E "(accept edits|plan mode|bypass permissions|auto mode|manual mode|don't ask) on" | tail -n 1
+}
+claude_moved() { [[ "$(claude_mode)" != "$current" ]]; }
+
+claude() {
+    local want start current
+    case "$target" in
+        edits) want="accept edits on" ;;
+        auto) want="auto mode on" ;;
+        yolo) want="bypass permissions on" ;;
+    esac
+    start=$(claude_mode)
+    current=$start
+    for _ in 1 2 3 4 5 6; do
+        [[ "$current" == "$want" ]] && { say "Claude: ${want% on}"; return; }
+        tmux send-keys -t "$pane" BTab
+        until_ok claude_moved || { say "Claude: the mode didn't change"; return; }
+        current=$(claude_mode)
+        [[ "$current" == "$start" ]] && break
+    done
+    say "Claude has no ${want% on} in this session"
+}
+
+# The last mode Codex reported switching to, from its transcript.
+codex_requested() { screen | grep -o -E 'Permission selection requested: .*' | tail -n 1; }
+# The picker row labelled $1 ("› 2. Approve for me (current)  Only ask ...").
+codex_row() { bottom 12 | grep -E "^ *(› )?[0-9]\. $1( |$)" | tail -n 1; }
+codex_picker() { [[ -n "$(codex_row 'Ask for approval')" ]]; }
+codex_moved() { codex_picker || [[ "$(codex_requested)" != "$before" ]]; }
+
+# Press the number of the picker row labelled $1, or Esc if it is current.
+codex_choose() {
+    local row
+    row=$(codex_row "$1")
+    [[ -n "$row" ]] || return 1
+    if [[ "$row" == *"(current)"* ]]; then
+        tmux send-keys -t "$pane" Escape
+        return 2
+    fi
+    tmux send-keys -t "$pane" "$(grep -o -E '[0-9]\.' <<<"$row" | head -n 1 | tr -d .)"
+}
+
+codex() {
+    local want before
+    case "$target" in
+        edits) want="Ask for approval" ;;
+        auto) want="Approve for me" ;;
+        yolo) want="Full Access" ;;
+    esac
+    before=$(codex_requested)
+    # An empty prompt shows its placeholder dimmed after the › marker.
+    if ! bottom 6 | grep -q 'esc to interrupt' &&
+        tmux capture-pane -e -p -t "$pane" | tail -n 6 | grep -q $'›\e\\[0m \e\\[2m'; then
+        # Codex takes keys that come in a burst as a paste, Enter included,
+        # so Enter waits until the command shows and a moment after.
+        tmux send-keys -t "$pane" -l /permissions
+        until_ok eval 'bottom 12 | grep -q "^› /permissions"'
+        sleep 0.3
+        tmux send-keys -t "$pane" Enter
+    elif [[ "$target" == yolo ]]; then
+        say "Codex: Full Access is only in /permissions; empty the prompt first"
+        return
+    else
+        tmux send-keys -t "$pane" F7
+    fi
+    for _ in 1 2 3; do
+        until_ok codex_moved || { say "Codex: the mode didn't change"; return; }
+        if codex_picker; then
+            codex_choose "$want"
+            case $? in
+                1) say "Codex: no $want in its picker" ;;
+                2) say "Codex: $want" ;;
+                *)
+                    # Full Access asks once more.
+                    [[ "$want" == "Full Access" ]] && until_ok codex_row "Yes, continue anyway" >/dev/null &&
+                        codex_choose "Yes, continue anyway"
+                    say "Codex: $want"
+                    ;;
+            esac
+            return
+        fi
+        [[ "$(codex_requested)" == *": $want" ]] && { say "Codex: $want"; return; }
+        before=$(codex_requested)
+        tmux send-keys -t "$pane" F7
+    done
+    say "Codex: couldn't reach $want"
+}
+
+# OpenCode's footer under the prompt reads "Build auto · model" while it accepts
+# everything; a new session draws the prompt mid-screen.
+opencode_auto() { screen | grep -E '┃ +[A-Z][^·]* · ' | tail -n 1 | grep -q -E ' auto · '; }
+opencode_is() { if [[ "$1" == prompt ]]; then ! opencode_auto; else opencode_auto; fi; }
+
+opencode() {
+    local want
+    case "$target" in
+        edits) want=prompt ;;
+        yolo) want="auto accept" ;;
+        auto)
+            say "OpenCode has no auto mode: Alt+Shift+L asks, Alt+Shift+J accepts everything"
+            return
+            ;;
+    esac
+    opencode_is "$want" && { say "OpenCode: $want"; return; }
+    tmux send-keys -t "$pane" C-p
+    until_ok has Commands || { say "OpenCode: its command list didn't open"; return; }
+    tmux send-keys -t "$pane" -l Permissions
+    if ! until_ok has "Settings · Session"; then
+        tmux send-keys -t "$pane" Escape
+        say "OpenCode: no Permissions setting"
+        return
+    fi
+    tmux send-keys -t "$pane" Enter
+    until_ok has "change ←/→" || { say "OpenCode: its settings didn't open"; return; }
+    # Two values, and Right wraps: one press flips it.
+    tmux send-keys -t "$pane" Right
+    tmux send-keys -t "$pane" Escape
+    if until_ok opencode_is "$want"; then
+        say "OpenCode: $want, in every session"
+    else
+        say "OpenCode: the setting didn't change"
+    fi
+}
+
+# One run at a time per pane: a key pressed while one runs waits its turn.
 exec 9>"${TMPDIR:-/tmp}/tmux-agent-mode-$(id -u)-${pane#%}.lock" || exit 1
 flock -w 10 9 || exit 0
 
-start=$(mode)
-current=$start
-for _ in 1 2 3 4 5 6; do
-    tmux send-keys -t "$pane" BTab
-    next=$current
-    for _ in {1..40}; do # up to 2 s for Claude to redraw
-        sleep 0.05
-        next=$(mode)
-        [[ "$next" != "$current" ]] && break
-    done
-    [[ "$next" == "$current" ]] && exit 0 # no change seen: one plain press
-    current=$next
-    [[ "$current" == "$start" ]] && exit 0 # a whole cycle: no other stop
-    case "$current" in
-        "accept edits on" | "bypass permissions on" | "auto mode on") exit 0 ;;
-    esac
-done
+case "$(tmux display-message -p -t "$pane" '#{pane_current_command}')" in
+    claude) claude ;;
+    codex) codex ;;
+    opencode) opencode ;;
+    pi) say "pi runs everything without asking" ;;
+esac

@@ -166,13 +166,13 @@ yo <command>              # print output and copy it to the clipboard
   agents started from a shell with these dotfiles, where `VISUAL` is
   `bin/compose-editor`.
 - **Intent keys** ([issues/intent-keys.md](issues/intent-keys.md)): one key per
-  intent in every agent. Shift+Tab steps the permission mode through the three
-  in use (Claude: accept edits, bypass, auto; Codex: its three presets), and
-  Ctrl+Shift+Tab is the agent's own Shift+Tab. Alt+M picks a model,
-  Ctrl+PgUp/PgDn change the effort, Ctrl+Z undoes typing, and Break (Pause)
-  stops whatever runs. On the Defy, thumb keys queue a message (Shift+F8),
-  start a new line (Ctrl+J) and paste a screenshot (Ctrl+Alt+V). WezTerm's
-  fullscreen is Ctrl+Shift+Enter and its font size Ctrl+Shift+=/-/0.
+  intent in every agent. Shift+Tab is each agent's own mode cycle, and
+  Alt+Shift+J, K and L are a dial from most access to least: yolo (bypass
+  permissions), auto and edits only, in Claude, Codex and OpenCode. Alt+M
+  picks a model, Ctrl+PgUp/PgDn change the effort, Ctrl+Z undoes typing, and
+  Break (Pause) stops whatever runs. On the Defy, thumb keys queue a message
+  (Shift+F8), start a new line (Ctrl+J) and paste a screenshot (Ctrl+Alt+V).
+  WezTerm's fullscreen is Ctrl+Shift+Enter and its font size Ctrl+Shift+=/-/0.
 - **Key map:** `keymap open` maps every key across the Defy, Windows,
   WezTerm, tmux and the pane programs: who takes each chord, what it costs to
   press, and where sibling programs disagree. `keymap why CHORD` traces one

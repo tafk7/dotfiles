@@ -1,7 +1,7 @@
 #!/bin/bash
 # The intent keys tmux translates for each agent (issues/intent-keys.md):
-# Shift+Tab steps the permission mode through the three in use, Ctrl+Shift+Tab
-# hands the agent a plain Shift+Tab, the Queue key queues a message, Break
+# Alt+Shift+J, K and L put it in yolo, auto or edits-only mode (Shift+Tab
+# stays its own), the Queue key queues a message, Break
 # stops whatever runs, Ctrl+Z undoes typing, and Alt+Shift+V opens a program's
 # own editor.
 set -euo pipefail
@@ -9,7 +9,9 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
 
 SHIFT_TAB='\e[Z'
-CTRL_SHIFT_TAB='\e[27;6;9~'
+YOLO='\eJ'
+AUTO='\eK'
+EDITS='\eL'
 QUEUE='\e[19;2~'
 BREAK='\e[20;2~'
 ALT_SHIFT_V='\eV'
@@ -25,47 +27,99 @@ stub() {
     tk_wait '#{pane_current_command}' "$name" "$pane"
     printf '%s' "$pane"
 }
-footer() { tk_until tk_screen_has "$1 on" "$2" || fail "footer never showed '$1 on': $(ti capture-pane -p -t "$2" | tail -n 1)"; }
-presses() { tk_input "$1" | grep -o '\^\[\[Z' | wc -l; }
+on_screen() { tk_until tk_screen_has "$1" "$2" || fail "$3 never showed '$1': $(ti capture-pane -p -t "$2" | grep . | tail -n 3)"; }
+footer() { on_screen "$1 on" "$2" "Claude's footer"; }
+count() { tk_input "$2" | grep -o -F -- "$1" | wc -l; }
+presses() { count '^[[Z' "$1"; }
+# Whether Codex's transcript notes switching to $2 $1 times.
+codex_switched() { [[ "$(ti capture-pane -p -t "$codex" | grep -c -F "requested: $2")" == "$1" ]]; }
+switched() { tk_until codex_switched "$1" "$2" || fail "Codex never switched to $2 $1 times"; }
+said() { tk_until tk_contains "$1" ti show-messages || fail "tmux never said '$1'"; }
 
-# Claude: Shift+Tab goes accept edits, bypass, auto, skipping plan and manual
-# mode; Ctrl+Shift+Tab is one plain step.
+# Claude: Shift+Tab is its own cycle, one step a press; Alt+Shift+J, K and L
+# step it to bypass permissions, auto mode and accept edits.
 claude_log="$TEST_ROOT/claude.log"
 claude=$(stub claude "$claude_log" --modes ',accept edits,plan mode,bypass permissions,auto mode')
 tk_raw "$SHIFT_TAB"
 footer 'accept edits' "$claude"
 tk_raw "$SHIFT_TAB"
-footer 'bypass permissions' "$claude"
-tk_raw "$SHIFT_TAB"
-footer 'auto mode' "$claude"
-tk_raw "$SHIFT_TAB"
-footer 'accept edits' "$claude"
-sleep 0.3
-assert_eq "$(presses "$claude_log")" 6 "Shift+Tab presses sent to Claude"
-tk_raw "$CTRL_SHIFT_TAB"
 footer 'plan mode' "$claude"
-sleep 0.3
-assert_eq "$(presses "$claude_log")" 7 "Ctrl+Shift+Tab sent more than one Shift+Tab"
+assert_eq "$(presses "$claude_log")" 2 "Shift+Tab presses sent to Claude"
+tk_raw "$YOLO"
+footer 'bypass permissions' "$claude"
+tk_raw "$AUTO"
+footer 'auto mode' "$claude"
+tk_raw "$EDITS"
+footer 'accept edits' "$claude"
+said 'Claude: accept edits'
+assert_eq "$(presses "$claude_log")" 6 "Shift+Tab presses for bypass, auto, then accept edits"
+tk_raw "$EDITS"
+sleep 0.5
+assert_eq "$(presses "$claude_log")" 6 "Alt+Shift+L pressed Shift+Tab in accept edits"
 
-# Without bypass or auto, a whole cycle comes back to accept edits.
+# Without bypass, Alt+Shift+J goes round once and leaves the mode as it was.
 lean_log="$TEST_ROOT/lean.log"
 lean=$(stub claude "$lean_log" --modes 'accept edits,plan mode,')
-tk_raw "$SHIFT_TAB"
-sleep 1
+tk_raw "$YOLO"
+said 'Claude has no bypass permissions in this session'
 footer 'accept edits' "$lean"
-assert_eq "$(presses "$lean_log")" 3 "Shift+Tab presses in a Claude without bypass or auto"
+assert_eq "$(presses "$lean_log")" 3 "Shift+Tab presses in a Claude without bypass"
 
-# Codex gets F7, its next_permission_mode; anything else the key as it is.
+# Codex with an empty prompt: /permissions and its picker, Full Access
+# confirmed.
 codex_log="$TEST_ROOT/codex.log"
-codex=$(stub codex "$codex_log")
+codex=$(stub codex "$codex_log" --codex-modes)
+tk_raw "$AUTO"
+switched 1 'Approve for me'
+tk_raw "$YOLO"
+switched 1 'Full Access'
+said 'Codex: Full Access'
+tk_raw "$YOLO"
+typed() { [[ "$(count /permissions "$codex_log")" == 3 ]]; }
+tk_until typed || fail "Alt+Shift+J in Full Access never opened /permissions"
+sleep 0.5
+switched 1 'Full Access'
+on_screen 'Ask Codex to do anything' "$codex" Codex
+# With a draft, F7 instead: the picker on its first press, then its cycle;
+# Full Access isn't in the cycle, so Alt+Shift+J leaves it alone.
+tk_raw 'draft'
+on_screen '› draft' "$codex" Codex
+tk_raw "$EDITS"
+switched 1 'Ask for approval'
+tk_raw "$AUTO"
+switched 2 'Approve for me'
+assert_eq "$(count '^[[18~' "$codex_log")" 2 "F7 presses in Codex"
+tk_raw "$YOLO"
+said 'Codex: Full Access is only in /permissions; empty the prompt first'
+on_screen '› draft' "$codex" Codex
+assert_eq "$(count '/permissions' "$codex_log")" 3 "/permissions typed with a draft"
 tk_raw "$SHIFT_TAB"
-tk_expect '^[[18~' "Shift+Tab in Codex" tk_input "$codex_log"
-tk_raw "$CTRL_SHIFT_TAB"
-tk_expect '^[[18~^[[Z' "Ctrl+Shift+Tab in Codex" tk_input "$codex_log"
+tk_until tk_contains '^[[Z' tk_input "$codex_log" || fail "Shift+Tab never reached Codex"
+
+# OpenCode: Ctrl+P, Permissions, one flip, and only when it differs.
+opencode_log="$TEST_ROOT/opencode.log"
+opencode=$(stub opencode "$opencode_log" --opencode-modes)
+tk_raw "$YOLO"
+on_screen 'Build auto · ' "$opencode" OpenCode
+said 'OpenCode: auto accept, in every session'
+tk_raw "$YOLO"
+said 'OpenCode: auto accept'
+tk_raw "$AUTO"
+said 'OpenCode has no auto mode'
+tk_raw "$EDITS"
+on_screen 'Build · ' "$opencode" OpenCode
+assert_eq "$(count '^P' "$opencode_log")" 2 "Ctrl+P presses in OpenCode"
+
+# pi gets nothing; anything else gets the keys as they are.
+pi_mode_log="$TEST_ROOT/pi-mode.log"
+stub pi "$pi_mode_log" >/dev/null
+tk_raw "$YOLO"
+said 'pi runs everything without asking'
+assert_eq "$(tk_input "$pi_mode_log")" '' "keys sent to pi"
 app_log="$TEST_ROOT/app.log"
 app=$(stub app "$app_log")
-tk_raw "$SHIFT_TAB"
-tk_expect '^[[Z' "Shift+Tab in another program" tk_input "$app_log"
+tk_raw "$SHIFT_TAB$YOLO$AUTO$EDITS"
+tk_expect '^[[Z^[J^[K^[L' "Shift+Tab and Alt+Shift+J, K, L in another program" tk_input "$app_log"
 
 # Queue: each agent's key for a message after the turn; nothing elsewhere.
 for agent in claude codex opencode pi; do
