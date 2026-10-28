@@ -9,17 +9,17 @@
 # TAFK line-editing semantics for the Codex composer. Windows Terminal often
 # encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
 [tui.keymap.editor]
-move_line_end = "end"
 delete_backward = "backspace"
 delete_backward_word = ["ctrl-backspace", "ctrl-h"]
 delete_forward_word = "ctrl-delete"
 kill_line_start = "alt-backspace"
 kill_line_end = "alt-delete"
 
-# Ctrl stays application-local; Alt remains available for tmux navigation.
-[tui.keymap.global]
-open_external_editor = "ctrl-e"
-
+# Shift+Tab steps the permission mode through tmux, which sends F7: Read Only,
+# Ask for approval, Approve for me (Full Access stays in /permissions). Effort
+# is on Ctrl+PgUp/PgDn, as in the other agents, leaving Shift+Up/Down free.
+# Ctrl+G (the editor) and Ctrl+E (end of line) keep Codex's defaults.
 [tui.keymap.chat]
-next_permission_mode = "ctrl-g"
-previous_permission_mode = "ctrl-shift-g"
+next_permission_mode = "f7"
+increase_reasoning_effort = "ctrl-page-up"
+decrease_reasoning_effort = "ctrl-page-down"

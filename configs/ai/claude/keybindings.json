@@ -3,10 +3,14 @@
   "$docs": "https://code.claude.com/docs/en/keybindings",
   "bindings": [
     {
-      "context": "Scroll",
+      "context": "Chat",
       "bindings": {
-        "shift+up": "scroll:lineUp",
-        "shift+down": "scroll:lineDown"
+        "meta+p": null,
+        "meta+m": "chat:modelPicker",
+        "shift+up": null,
+        "shift+down": null,
+        "ctrl+pageup": "chat:increaseEffort",
+        "ctrl+pagedown": "chat:decreaseEffort"
       }
     }
   ]

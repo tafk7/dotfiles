@@ -127,16 +127,23 @@ yo <command>              # print output and copy it to the clipboard
 
 - **tmux:** `Alt+Copy` enters copy mode and copies the selection, and
   `Alt+Paste` pastes the tmux buffer. Every copy, including nvim yanks and
-  shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB).
-  Pause or `<prefix> E` turns that off (`CLIP OFF` shows in the status bar);
-  `<prefix> e` still sends the buffer. `<prefix> v` enters copy mode on
+  shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB);
+  `<prefix> e` sends the newest buffer again. `<prefix> v` enters copy mode on
   the screen as it is, and ScrollLock or `<prefix> f` reviews a
-  pane: copy mode for shells and Claude's transcript, transcript search in
-  Codex, the exported session in an nvim popup for OpenCode. In review,
-  E/S/D/F move, Shift selects, `/` searches upward, and `o` opens the history
-  in nvim. `<prefix> y` or Shift+Copy copies the agent's last reply.
+  pane in copy mode with the same keys everywhere: a shell's history in place,
+  and the conversation of Claude, Codex, or OpenCode, as the agent exports it,
+  in a pane zoomed over the agent, which keeps working. In review, E/S/D/F
+  move, Shift selects as it does in a Windows text box, `h` toggles a
+  selection, Ctrl+E/D jump between prompts, `/` searches upward, `y` copies,
+  and `o` opens the text in nvim with the same keys. `<prefix> /`
+  reviews and searches at once; `<prefix> o` opens the conversation in nvim.
+  Codex panes name their session once Codex runs with the `terminal_title`
+  from `configs/codex.defaults.toml`. `<prefix> y` or Shift+Copy copies the
+  agent's last reply.
   The wheel and PgUp/PgDn page less (`glow -p`, `md`, bat, Git) and Claude's
-  transcript; in Claude, Shift+Up/Down scroll it a line at a time.
+  transcript. Shift+PgUp/PgDn scroll three lines everywhere: a shell (in
+  copy-mode), review and its nvim popup, and Claude, Codex, and OpenCode,
+  also from their compose pane (`@scroll-lines` sets the step).
   In Claude, `Ctrl+C` sends Esc, so it can't stop every background agent;
   `<prefix> Ctrl+C` sends the real key. Ctrl+Backspace/Delete delete a word
   and Alt+Backspace/Delete to the line's start or end there too, as in the
@@ -146,17 +153,31 @@ yo <command>              # print output and copy it to the clipboard
   installed harper-ls, grammar marks. `Ctrl+S` pastes the prompt and submits
   it without interrupting a running turn; `Ctrl+Shift+S` (or `,s`) pastes
   without submitting;
-  PgUp/PgDn and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
+  PgUp/PgDn, Shift+PgUp/PgDn, and Ctrl+Home/End scroll the agent. `Ctrl+L` in insert mode fixes
   the last spelling or grammar mark before the cursor. `Alt+V` again switches
   focus; the draft survives closing the pane.
   In testing ([issues/compose-agent-box.md](issues/compose-agent-box.md)): in
   Claude, Codex, and OpenCode, `Alt+V` and the agent's own editor key (Claude
-  `Ctrl+G`, Codex `Ctrl+E`, OpenCode `Ctrl+X E`) move what is in the prompt
-  box into the compose pane, and quitting it (`:q`, `:wq`) puts the draft back
-  in the box; `:cq` keeps it in the draft instead. `Ctrl+Shift+G` opens the
-  prompt in Neovim in Claude's or OpenCode's place. This works for agents
-  started from a shell with these dotfiles, where `VISUAL` is
+  and Codex `Ctrl+G`, OpenCode `Ctrl+X E`) move what is in the prompt box into
+  the compose pane, and quitting it (`:q`, `:wq`) puts the draft back in the
+  box; `:cq` keeps it in the draft instead. `Alt+Shift+V` opens the prompt in
+  Neovim in Claude's, Codex's or OpenCode's place (elsewhere, the program's own
+  editor: pi's, or the shell's Ctrl+X Ctrl+E). This works for
+  agents started from a shell with these dotfiles, where `VISUAL` is
   `bin/compose-editor`.
+- **Intent keys** ([issues/intent-keys.md](issues/intent-keys.md)): one key per
+  intent in every agent. Shift+Tab steps the permission mode through the three
+  in use (Claude: accept edits, bypass, auto; Codex: its three presets), and
+  Ctrl+Shift+Tab is the agent's own Shift+Tab. Alt+M picks a model,
+  Ctrl+PgUp/PgDn change the effort, Ctrl+Z undoes typing, and Break (Pause)
+  stops whatever runs. On the Defy, thumb keys queue a message (Shift+F8),
+  start a new line (Ctrl+J) and paste a screenshot (Ctrl+Alt+V). WezTerm's
+  fullscreen is Ctrl+Shift+Enter and its font size Ctrl+Shift+=/-/0.
+- **Key map:** `keymap open` maps every key across the Defy, Windows,
+  WezTerm, tmux and the pane programs: who takes each chord, what it costs to
+  press, and where sibling programs disagree. `keymap why CHORD` traces one
+  chord, and `keymap check` (run in CI) catches new broken keys. See
+  [docs/keybindings.md](docs/keybindings.md).
 - **Windows Terminal:** merge
   [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
   into `settings.json`.

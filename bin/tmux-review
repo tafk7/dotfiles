@@ -1,136 +1,242 @@
 #!/usr/bin/env bash
 # Review a pane: a frozen, searchable, selectable view of its conversation or
-# history (ScrollLock, prefix+f). See issues/scrollback-copy-compose.md §3.3.
+# history, with the same keys in every pane. See
+# issues/scrollback-copy-compose.md §3.3.
 #
-#     tmux-review toggle PANE [CLIENT]
-#                               open review, or close it if the pane is in a mode
-#     tmux-review open PANE [CLIENT]
-#                               the pane's history in a read-only nvim popup (`o`)
+#     tmux-review toggle PANE [CLIENT]   review (ScrollLock, prefix+f), or leave it
+#     tmux-review search PANE [CLIENT]   review and search upward (prefix+/)
+#     tmux-review edit PANE [CLIENT]     the conversation or history read-only in
+#                                        an nvim popup (prefix+o)
+#     tmux-review open PANE [CLIENT]     the pane's history in that popup, at the
+#                                        line being viewed (o in review)
+#     tmux-review close PANE             remove a review pane that left copy-mode
+#                                        (the pane-mode-changed hook)
+#     tmux-review show DIR PROMPT CHANNEL    the review pane's program
 #
-# Where review opens depends on the program in the pane:
-#   claude    Claude draws on the alternate screen, which tmux history never
-#             sees. Clear the history, have Claude write its transcript into it
-#             (Ctrl+O [), wait for the text to settle, then open copy-mode at
-#             the bottom. Leaving copy-mode sends Esc (the pane-mode-changed hook
-#             in tmux.conf), which returns Claude to fullscreen. Clearing first
-#             keeps exactly one copy of the conversation in history.
-#   codex     its transcript search (F3). Fullscreen Codex has no separate
-#             transcript viewer: Ctrl+T only expands output in place.
-#   opencode  OpenCode V2 has no viewer or search either. Its export dialog
-#             (Ctrl+X x) writes the session as Markdown to a temporary file;
-#             drive it (Tab to Export, Enter), take the file, close the dialog,
-#             and open the file in the review popup.
-#   anything else: tmux copy-mode
+# A shell, or any program whose output is in tmux history, is reviewed in place
+# in tmux copy-mode. An agent draws its conversation on the alternate screen,
+# which tmux history never sees, so review asks the agent for the conversation
+# as text and shows it in copy-mode in a review pane, zoomed over the agent's
+# window. The agent keeps running underneath; leaving copy-mode removes the
+# pane and gives the window back. The text comes from each agent's own export:
+#   claude    Ctrl+O v: Claude writes its transcript as drawn and runs $VISUAL,
+#             bin/compose-editor, on it. Asked through the pane option
+#             @review-file, compose-editor moves the file there and returns at
+#             once, since Claude stops while its editor runs; Ctrl+O then leaves
+#             Claude's transcript view. Without compose-editor as its VISUAL,
+#             Claude's own transcript view opens instead.
+#   codex     its session file, as Markdown (bin/codex-transcript); the pane
+#             title names the thread when tui.terminal_title has thread-id.
+#   opencode  its export dialog (Ctrl+X x, Shift+Tab to Export, Enter): Markdown
+#             in a temporary directory. Esc closes the "Session exported"
+#             notice once it shows; on its own, Esc interrupts a running turn.
+# The review pane marks each prompt line with OSC 133, so Ctrl+E/D move between
+# prompts as they do in a shell.
 #
-# @review-timeout (seconds, default 10) bounds the wait for Claude's transcript.
+# @review-timeout (seconds, default 10) bounds the wait for an agent's text.
 
 set -uo pipefail
+umask 077
 
+self=$(readlink -f "${BASH_SOURCE[0]}")
 action=${1:-}
 pane=${2:-}
 client=${3:-}
-[[ -n "$pane" ]] || { echo "usage: tmux-review toggle|open PANE [CLIENT]" >&2; exit 2; }
+usage() { echo "usage: tmux-review toggle|search|edit|open|close PANE [CLIENT]" >&2; exit 2; }
 
 pane_format() { tmux display-message -p -t "$pane" "$1"; }
 
-# Claude leaves the alternate screen at once, then prepares the dump before any
-# of it reaches history (0.5 s for a 34 MB session). So once it is off the
-# alternate screen, wait for history to grow and then hold still for 0.3 s. A
-# transcript that fits on the screen never grows history; after 2 s without
-# growth, take the screen as it is.
-await_transcript() {
-    local timeout polls=0 off=-1 grew=-1 last=0 size
-    timeout=$(tmux show -gv @review-timeout 2>/dev/null)
-    [[ "$timeout" =~ ^[0-9]+$ ]] || timeout=10
-    while (( polls < timeout * 10 )); do
-        sleep 0.1
-        ((polls++))
-        if (( off < 0 )); then
-            [[ "$(pane_format '#{alternate_on}')" == 0 ]] && off=$polls
-            continue
-        fi
-        size=$(pane_format '#{history_size}')
-        if (( size != last )); then
-            last=$size
-            grew=$polls
-        elif (( grew >= 0 ? polls - grew >= 3 : polls - off >= 20 )); then
-            return 0
-        fi
-    done
-    return 1
+message() { tmux display-message -t "$pane" "review: $1"; }
+
+pane_in_mode() { [[ "$(pane_format '#{pane_in_mode}')" == 1 ]]; }
+
+timeout_tenths() {
+    local seconds
+    seconds=$(tmux show -gv @review-timeout 2>/dev/null)
+    [[ "$seconds" =~ ^[0-9]+$ ]] || seconds=10
+    printf '%s' $((seconds * 10))
 }
 
-review_claude() {
-    tmux set -p -t "$pane" @review claude
-    tmux clear-history -t "$pane"
-    tmux send-keys -t "$pane" C-o '['
-    tmux display-message -t "$pane" "loading transcript…"
-    if await_transcript; then
-        tmux copy-mode -t "$pane"
-    else
-        tmux display-message -t "$pane" "review: Claude's transcript did not load"
-        tmux set -pu -t "$pane" @review
-        tmux send-keys -t "$pane" Escape
+# The process on the pane's terminal whose argv[0] is NAME, and a variable from
+# its environment.
+agent_pid() {
+    local tty
+    tty=$(pane_format '#{pane_tty}')
+    ps -t "${tty#/dev/}" -o pid=,args= 2>/dev/null \
+        | awk -v name="$1" '{ command = $2; sub(/.*\//, "", command) } command == name { print $1; exit }'
+}
+agent_env() {
+    [[ -n "$1" ]] || return 0
+    tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | sed -n "s/^$2=//p" | head -n 1
+}
+
+claude_transcript_view() { tmux capture-pane -p -t "$pane" | tail -n 3 | grep -q 'Showing detailed transcript'; }
+
+claude_transcript() {
+    local file="$work/transcript" pid visual was_open=false polls=0 limit
+    pid=$(agent_pid claude)
+    visual=$(agent_env "$pid" VISUAL)
+    claude_transcript_view && was_open=true
+    # Any other editor, or a compose-editor from before the hand-over, would
+    # run in Claude's place for Ctrl+O v and stop Claude until it exits.
+    if [[ "${visual##*/}" != compose-editor ]] || ! grep -q '@review-file' "$visual" 2>/dev/null; then
+        [[ "$was_open" == true ]] || tmux send-keys -t "$pane" C-o
+        message "Claude's VISUAL can't hand over its transcript, so its own transcript view is open (/ searches)"
+        return 1
+    fi
+    tmux set -p -t "$pane" @review-file "$file"
+    [[ "$was_open" == true ]] || tmux send-keys -t "$pane" C-o
+    tmux send-keys -t "$pane" v
+    limit=$(timeout_tenths)
+    while [[ ! -e "$file" ]] && ((polls++ < limit)); do sleep 0.1; done
+    tmux set -pu -t "$pane" @review-file
+    if [[ ! -e "$file" ]]; then
+        message "Claude did not hand over its transcript"
+        return 1
+    fi
+    [[ "$was_open" == true ]] || tmux send-keys -t "$pane" C-o
+}
+
+codex_transcript() {
+    local home
+    home=$(agent_env "$(agent_pid codex)" CODEX_HOME)
+    if ! "$(dirname "$self")/codex-transcript" --home "${home:-$HOME/.codex}" \
+        --title "$(pane_format '#{pane_title}')" --cwd "$(pane_format '#{pane_current_path}')" \
+        > "$work/transcript" 2> "$work/error"; then
+        message "$(head -n 1 "$work/error")"
+        return 1
     fi
 }
 
-toggle() {
-    if [[ "$(pane_format '#{pane_in_mode}')" == 1 ]]; then
-        tmux send-keys -X -t "$pane" cancel
-        return
-    fi
-    case "$(pane_format '#{pane_current_command}')" in
-        claude)
-            if [[ "$(pane_format '#{alternate_on}')" == 1 ]]; then
-                review_claude
-            else
-                tmux copy-mode -t "$pane"
-            fi
-            ;;
-        codex) tmux send-keys -t "$pane" F3 ;;
-        opencode) review_opencode ;;
-        *) tmux copy-mode -t "$pane" ;;
-    esac
-}
-
-review_opencode() {
-    local dir marker file review _
+opencode_transcript() {
+    local dir file _
     dir=$(pane_format '#{pane_current_path}')
-    marker=$(mktemp "${TMPDIR:-/tmp}/tmux-review.XXXXXX") || return
-    tmux send-keys -t "$pane" C-x x Tab Tab Tab Tab Tab Enter
+    : > "$work/marker"
+    tmux send-keys -t "$pane" C-x x BTab Enter
     file=
     for _ in {1..50}; do
-        file=$(find "${TMPDIR:-/tmp}" /tmp "$dir" -maxdepth 1 -name 'session-*.md' -newer "$marker" \
+        file=$(find "${TMPDIR:-/tmp}" /tmp "$dir" -maxdepth 1 -name 'session-*.md' -newer "$work/marker" \
             -print -quit 2>/dev/null)
         [[ -n "$file" ]] && break
         sleep 0.1
     done
-    rm -f -- "$marker"
     if [[ -z "$file" ]]; then
-        tmux display-message -t "$pane" "review: OpenCode did not export the session"
-        return
+        message "OpenCode did not export the session"
+        return 1
     fi
-    # Esc closes the "Session exported" dialog; sent only once it shows, since
-    # Esc on its own interrupts a running turn.
-    for _ in {1..20}; do
-        if tmux capture-pane -p -t "$pane" | grep -q 'Session exported'; then
-            tmux send-keys -t "$pane" Escape
-            break
-        fi
+    # The notice takes Esc only once it has settled, a moment after it shows;
+    # Esc is sent again only while the notice is still there a second later.
+    for _ in 1 2 3; do
+        notice_shows 20 || break
+        sleep 0.3
+        tmux send-keys -t "$pane" Escape
+        notice_gone 10 && break
+    done
+    mv -f -- "$file" "$work/transcript"
+}
+
+notice_shows() {
+    local i
+    for ((i = 0; i < $1; i++)); do
+        tmux capture-pane -p -t "$pane" | grep -q 'Session exported' && return 0
         sleep 0.1
     done
-    review=$(mktemp "${TMPDIR:-/tmp}/tmux-review.XXXXXX.md") || return
-    mv -f -- "$file" "$review"
-    chmod 600 "$review"
-    popup "$review" ''
+    return 1
+}
+
+notice_gone() {
+    local i
+    for ((i = 0; i < $1; i++)); do
+        tmux capture-pane -p -t "$pane" | grep -q 'Session exported' || return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+# Get the agent's conversation into $work/transcript and set its prompt pattern
+# and name. Fails with status 2 for a pane that is reviewed in place.
+agent_transcript() {
+    [[ "$(pane_format '#{alternate_on}')" == 1 ]] || return 2
+    case "$(pane_format '#{pane_current_command}')" in
+        claude) prompt='^❯ ' label=Claude ;;
+        codex) prompt='^## User' label=Codex ;;
+        opencode) prompt='^## User' label=OpenCode ;;
+        *) return 2 ;;
+    esac
+    work=$(mktemp -d "${TMPDIR:-/tmp}/tmux-review.XXXXXX") || return 1
+    "${label,,}_transcript" && return 0
+    rm -rf -- "$work"
+    return 1
+}
+
+# Show $work/transcript in copy-mode in a review pane zoomed over the agent.
+review_pane() {
+    local review channel="tmux-review-$$"
+    if ! review=$(tmux split-window -Z -t "$pane" -c "$(pane_format '#{pane_current_path}')" -P -F '#{pane_id}' \
+        "$(printf '%q ' "$self" show "$work" "$prompt" "$channel")" 2>&1); then
+        message "no review pane: $review"
+        rm -rf -- "$work"
+        return 1
+    fi
+    tmux set -p -t "$review" @review-pane "$pane"
+    tmux set -p -t "$review" @review-zoomed "$zoomed"
+    tmux set -p -t "$review" @review-prompt "$prompt"
+    tmux select-pane -t "$review" -T "review: $label"
+    timeout 10 tmux wait-for "$channel"
+    tmux copy-mode -t "$review"
+}
+
+review() {
+    local zoomed status
+    zoomed=$(pane_format '#{window_zoomed_flag}')
+    agent_transcript
+    status=$?
+    if ((status == 2)); then
+        tmux copy-mode -t "$pane"
+    elif ((status == 0)); then
+        review_pane
+    else
+        return 1
+    fi
+}
+
+toggle() {
+    if pane_in_mode; then
+        tmux send-keys -X -t "$pane" cancel
+        return
+    fi
+    review
+}
+
+search() {
+    pane_in_mode || review || return
+    tmux command-prompt ${client:+-t "$client"} -i -T search -p '(search up)' \
+        'send -X search-backward-incremental "%%"'
 }
 
 # Show FILE read-only in nvim at LINE (empty: the end), then delete it.
 popup() {
-    local file="$1" line="$2"
+    local file="$1" line="$2" prompt="${3:-}"
     tmux display-popup -E -w 90% -h 90% ${client:+-c "$client"} -d "$(pane_format '#{pane_current_path}')" \
-        "NVIM_REVIEW=1 nvim -R +$line -- $(printf '%q' "$file"); rm -f -- $(printf '%q' "$file")"
+        "NVIM_REVIEW=1 NVIM_REVIEW_PROMPT=$(printf '%q' "$prompt") nvim -R +$line -- $(printf '%q' "$file"); rm -f -- $(printf '%q' "$file")"
     rm -f -- "$file"
+}
+
+edit() {
+    local status
+    if [[ -n "$(tmux show -pqv -t "$pane" @review-pane)" ]] || pane_in_mode; then
+        open_history
+        return
+    fi
+    agent_transcript
+    status=$?
+    if ((status == 2)); then
+        open_history
+    elif ((status == 0)); then
+        mv -f -- "$work/transcript" "$work.md"
+        rmdir -- "$work"
+        popup "$work.md" '' "$prompt"
+    fi
 }
 
 # Open the pane's history in nvim at the line being viewed. -J joins lines that
@@ -141,14 +247,14 @@ open_history() {
     file=$(mktemp "${TMPDIR:-/tmp}/tmux-review.XXXXXX") || exit 1
     chmod 600 "$file"
     tmux capture-pane -p -J -S - -E - -t "$pane" > "$file"
-    if [[ "$(pane_format '#{pane_in_mode}')" == 1 ]]; then
+    if pane_in_mode; then
         line=$(pane_format '#{e|+:#{e|-:#{history_size},#{scroll_position}},#{e|+:#{copy_cursor_y},1}}')
         cursor=$(pane_format '#{copy_cursor_line}')
     else
         line=$(pane_format '#{e|+:#{history_size},#{e|+:#{cursor_y},1}}')
         cursor=
     fi
-    popup "$file" "$(nearest_line "$file" "$line" "$cursor")"
+    popup "$file" "$(nearest_line "$file" "$line" "$cursor")" "$(tmux show -pqv -t "$pane" @review-prompt)"
 }
 
 nearest_line() {
@@ -164,8 +270,43 @@ nearest_line() {
     ' "$file"
 }
 
+# PANE is a review pane that left copy-mode: remove it, and give focus (and
+# zoom, if the window had it) back to the pane it reviewed.
+close() {
+    local target zoomed
+    target=$(tmux show -pqv -t "$pane" @review-pane)
+    zoomed=$(tmux show -pqv -t "$pane" @review-zoomed)
+    tmux kill-pane -t "$pane"
+    [[ -n "$target" ]] && tmux display-message -p -t "$target" '' >/dev/null 2>&1 || return 0
+    tmux select-pane -t "$target"
+    [[ "$zoomed" != 1 ]] || tmux resize-pane -Z -t "$target"
+}
+
+# The review pane: print the transcript, with control characters (escape
+# sequences from tool output) removed and an OSC 133 prompt mark before each
+# line matching PROMPT, remove it, and stay until the pane is closed.
+show_transcript() {
+    local dir="$1" prompt="$2" channel="$3"
+    tr -d '\000-\010\013-\037\177' < "$dir/transcript" | LC_ALL=C PROMPT="$prompt" awk '
+        ENVIRON["PROMPT"] != "" && $0 ~ ENVIRON["PROMPT"] { printf "\033]133;A\033\\" }
+        { print }
+    '
+    [[ "$dir" == */tmux-review.* ]] && rm -rf -- "$dir"
+    tmux wait-for -S "$channel"
+    exec sleep infinity
+}
+
 case "$action" in
-    toggle) toggle ;;
-    open) open_history ;;
-    *) echo "usage: tmux-review toggle|open PANE [CLIENT]" >&2; exit 2 ;;
+    show) show_transcript "$2" "$3" "$4" ;;
+    toggle | search | edit | open | close)
+        [[ -n "$pane" ]] || usage
+        # Failures have shown their own message; a non-zero status would make
+        # run-shell cover the pane with another.
+        case "$action" in
+            open) open_history ;;
+            *) "$action" ;;
+        esac
+        exit 0
+        ;;
+    *) usage ;;
 esac

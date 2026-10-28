@@ -119,8 +119,8 @@ grep -qx '\[projects\."/tmp/example"\]' "$HOME/.codex/config.toml" \
     || fail "ordinary rerun discarded local Codex state"
 python3 -c 'import pathlib, tomllib; tomllib.loads(pathlib.Path("'$HOME'/.codex/config.toml").read_text())' \
     || fail "ordinary rerun produced invalid TOML"
-[[ "$(grep -cx '\[tui.keymap.global\]' "$HOME/.codex/config.toml")" == 1 ]] \
-    || fail "ordinary rerun duplicated tui.keymap.global"
+[[ "$(grep -cx '\[tui.keymap.editor\]' "$HOME/.codex/config.toml")" == 1 ]] \
+    || fail "ordinary rerun duplicated tui.keymap.editor"
 [[ "$(grep -cx '\[tui.keymap.chat\]' "$HOME/.codex/config.toml")" == 1 ]] \
     || fail "ordinary rerun duplicated tui.keymap.chat"
 # --force invokes repair/update while leaving the launcher present for the
