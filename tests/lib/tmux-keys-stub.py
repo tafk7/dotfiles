@@ -178,7 +178,8 @@ def codex_draw():
                   (38, "  enter select · esc back")]
     else:
         box = agent["box"] or "\x1b[2mAsk Codex to do anything\x1b[0m"
-        lines += [(36, f"\x1b[1m›\x1b[0m {box}"), (38, "  Context 0% used · 0 out · stub")]
+        # The prompt line has a themed background, as the real one does.
+        lines += [(36, f"\x1b[1m›\x1b[0m\x1b[48;2;65;65;65m {box}\x1b[49m"), (38, "  Context 0% used · 0 out · stub")]
     draw(lines)
 
 
