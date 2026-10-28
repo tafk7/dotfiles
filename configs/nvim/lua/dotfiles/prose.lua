@@ -119,9 +119,12 @@ end
 
 vim.keymap.set('i', '<C-l>', '<C-g>u<Cmd>lua require("dotfiles.prose").fix_last()<CR><C-g>u')
 
--- Grammar through the built-in LSP client (Neovim 0.11+).
+-- Grammar through the built-in LSP client (Neovim 0.11+). harper-ls runs in
+-- its own session, and left by a Neovim that quits without waiting it can
+-- linger for good (2.12.0): on quit Neovim waits up to half a second for it,
+-- then stops it.
 if vim.fn.executable('harper-ls') == 1 and vim.lsp.config and vim.lsp.enable then
-  vim.lsp.config('harper_ls', { cmd = { 'harper-ls', '--stdio' }, filetypes = { 'markdown' } })
+  vim.lsp.config('harper_ls', { cmd = { 'harper-ls', '--stdio' }, filetypes = { 'markdown' }, exit_timeout = 500 })
   vim.lsp.enable('harper_ls')
 end
 
@@ -139,6 +142,16 @@ local function deliver(action)
   end
   vim.api.nvim_buf_set_lines(0, 0, -1, false, {})
   vim.cmd('silent write')
+end
+
+-- A pull from the agent's prompt box (tmux-compose, through the --listen
+-- socket) appended to the draft on disk: reread it and continue after the
+-- pulled text.
+function M.reread()
+  vim.cmd('silent! checktime')
+  local last = vim.api.nvim_buf_line_count(0)
+  vim.api.nvim_win_set_cursor(0, { last, #vim.api.nvim_buf_get_lines(0, last - 1, last, false)[1] })
+  return ''
 end
 
 local function forward(key)
@@ -174,7 +187,7 @@ local function compose_keys(buf)
   })
 end
 
--- Quitting (:q, :wq, ZZ) puts the draft back in Claude's prompt box; :cq
+-- Quitting (:q, :wq, ZZ) puts the draft back in the agent's prompt box; :cq
 -- keeps it here for next time.
 if target and target ~= '' then
   vim.api.nvim_create_autocmd('VimLeavePre', {

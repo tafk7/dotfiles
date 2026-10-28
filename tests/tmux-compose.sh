@@ -30,17 +30,21 @@ claude=$(ti new-window -t test -P -F '#{pane_id}' "$(tk_stub claude "$claude_log
 tk_ready "$claude_log"
 
 # Alt+V splits below and pairs the panes; the draft is named by the server's
-# start time and the pane, under XDG state, private.
+# start time and the pane, under XDG state, private; nvim listens under the
+# runtime directory.
 tk_raw "$ALT_V"
 tk_until test -s "$nvim_log" || fail "Alt+V opened no compose pane"
 draft="$XDG_STATE_HOME/dotfiles/compose/$(ti display-message -p '#{start_time}')-${claude#%}.md"
 grep -qx 'prose=1' "$nvim_log" || fail "NVIM_PROSE: $(cat "$nvim_log")"
 grep -qx "target=$claude" "$nvim_log" || fail "compose target: $(cat "$nvim_log")"
 grep -qx "draft=$draft" "$nvim_log" || fail "draft path: $(cat "$nvim_log")"
-grep -qx "args=--listen $draft.sock -- $draft" "$nvim_log" || fail "nvim arguments: $(cat "$nvim_log")"
+socket="$XDG_RUNTIME_DIR/dotfiles-compose/${draft##*/}.sock"
+grep -qx "args=--listen $socket -- $draft" "$nvim_log" || fail "nvim arguments: $(cat "$nvim_log")"
 assert_eq "$(stat -c %a "$draft")" 600 "draft mode"
 pane=$(ti show -pqv -t "$claude" @compose_pane)
 assert_eq "$(ti show -pqv -t "$pane" @compose_target)" "$claude" "@compose_target"
+assert_eq "$(ti show -pqv -t "$pane" @compose_socket)" "$socket" "@compose_socket"
+assert_eq "$(stat -c %a "${socket%/*}")" 700 "socket directory mode"
 tk_wait '#{pane_id}' "$pane"
 assert_eq "$(ti display-message -p -t "$pane" '#{pane_at_bottom}')" 1 "compose pane is below"
 
