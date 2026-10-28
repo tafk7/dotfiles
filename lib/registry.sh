@@ -141,7 +141,7 @@ opencode   policy                 vendor
 opencode   configure              configure_opencode_settings
 pi         policy                 vendor
 pi         needs                  node
-pi         configure              configure_pi_settings
+pi         configure              configure_pi_settings configure_ai_settings
 xrdp       install                function:install_rdp_packages
 tailscale  configure              configure_tailscaled
 gh         eget-repo              cli/cli
