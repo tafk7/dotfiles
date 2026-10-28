@@ -1,6 +1,7 @@
 # Inline conversational AI shell-command generator
 
-**Status:** proposed.
+**Status:** first implementation on branch `ai-command`, not merged
+(2026-10-27). See [First implementation](#first-implementation-2026-10-27).
 
 ## User motivation and use case
 
@@ -341,3 +342,105 @@ Update the README or appropriate customization documentation with:
 - Validate behavior in both Bash and Zsh.
 - At completion, summarize the files changed, the resulting UX, test results,
   and any remaining limitations.
+
+## First implementation (2026-10-27)
+
+Built on branch `ai-command`; user documentation is in
+[customization](../docs/customization.md#ai-command-drafting-alti).
+
+- `shell/tools/ai-command.sh`: the Bash (`bind -x`) and Zsh (ZLE) widgets and
+  their per-shell state. A fresh prompt (Bash `PROMPT_COMMAND`, Zsh `precmd`)
+  and `Alt+Shift+I` end the conversation; a correction after a `cd`, or after
+  a failed turn, starts a new conversation that carries the command line.
+  Bindings and hooks are installed only in interactive shells, once, also
+  after `reload --soft`.
+- `bin/ai-command` (Python): builds the turn (shell and version, OS release,
+  working directory, request or correction, command line), runs the backend,
+  and checks the answer: one non-empty command string, no control
+  characters, fences dropped. Backends are a table; only `claude` exists.
+- `tests/ai-command.sh` with `tests/lib/claude-stub.py`: every case in the
+  Testing section, plus both shells driven with raw keys through a client of
+  a tmux server running `configs/tmux.conf`.
+
+Refinement input: a nested `read -e` inside a Bash `bind -x` widget is not
+safe. Readline is not re-entrant: the inner Enter also accepts the outer
+line, so the outer line, the drafted command, ran (seen in a prototype on
+Bash 5.2.21). Bash reads the
+correction with `read -e` in a child Bash instead, showing the command dimmed
+above `refine>` and erasing both afterwards. Zsh uses `read-from-minibuffer`.
+Neither needs fzf or takes over the screen.
+
+Ctrl+C: untrapped, it ends the widget and discards the line in both shells.
+The widgets trap INT while they wait and record the interrupt, since Ctrl+C
+during Python's startup can end the backend with exit status 1 rather
+than 130.
+
+### Claude flags verified (Claude Code 2.1.311)
+
+```text
+claude -p --safe-mode --setting-sources user --strict-mcp-config --tools "" \
+    --permission-mode dontAsk --system-prompt TEXT \
+    --output-format json --json-schema SCHEMA \
+    --session-id UUID | --resume UUID  --model haiku --effort low   (prompt on stdin)
+```
+
+The model and effort come from `AI_COMMAND_MODEL` and `AI_COMMAND_EFFORT`;
+set empty, they are left out and Claude's own settings apply.
+
+- `--bare` fails with an OAuth (claude.ai) login: "Not logged in · Please run
+  /login". It reads only `ANTHROPIC_API_KEY` or an `apiKeyHelper`.
+  `--safe-mode` keeps the login and drops CLAUDE.md, plugins (agent-badge
+  included), hooks, MCP servers, skills, and custom commands and agents.
+  `--restricted` was not used: it ignores user settings, whose `env` carries
+  the telemetry switches.
+- `--session-id UUID` creates the session under that UUID; `--resume UUID`
+  continues it and answers with the same `session_id`, which the backend
+  checks. Resuming an unknown UUID exits 1 with "No conversation found with
+  session ID: ...".
+- With `--json-schema`, the result carries `structured_output` and
+  `num_turns` 2; the only tool offered is Claude's internal
+  `StructuredOutput`. A login error is a result with `is_error: true` and
+  `subtype: "success"`, so the backend checks `is_error`, not `subtype`.
+- `--system-prompt` replaces the default prompt, but Claude still attaches
+  its environment snapshot (its working directory, `$SHELL`, kernel version),
+  model identity, date, and account context. Claude runs from
+  `~/.cache/dotfiles/ai-command`, so that snapshot never names a project, and
+  `claude --continue` in a project never finds these sessions.
+- `--effort low` is accepted with Haiku.
+
+Ten live calls (Haiku unless noted, from temporary directories; their
+transcripts were deleted afterwards): `--bare` (refused, as above), a new
+session and its exact resume, an unknown resume, the backend's new
+conversation and correction, one call with `AI_COMMAND_MODEL` empty (so
+Claude's configured model, `opus` in this machine's settings) at low effort,
+and the real widgets in tmux (Bash: draft and correction;
+Zsh: draft). "find every JSON file changed in the last week" became
+`find . -type f -name '*.json' -mtime -7 -print`; "use absolute paths and
+exclude node_modules" then became
+`find "$PWD" -name node_modules -prune -o -type f -name '*.json' -mtime -7 -print`.
+Haiku answered in 1.7 to 2.1 s at first, and in 4 to 7.5 s later while other
+test suites kept the load average at 8 to 12; the configured-model call took
+4.7 s in that period. The backend adds about 60 ms.
+
+### Not done, and limits
+
+- No Codex adapter: `codex exec` cannot be given a session id for a new
+  conversation (it reports its own thread id in `--json` events, so the
+  backend would need a mapping), and it has no switch that removes its shell
+  tool; `-s read-only` still runs commands. Pi was not attempted.
+- Bindings are in the emacs keymaps only; vi-mode users bind the widgets
+  themselves (documented).
+- Typing a new request over a drafted command on the same prompt opens
+  `refine>`; `Alt+Shift+I` first makes it a new request.
+- Bash erases the dimmed command and `refine>` by counting rows; tabs and
+  wide characters count one column, so a line can be left behind (never too
+  much erased).
+- Automated tests run the shells in tmux panes only. The widgets have no
+  tmux-specific code, and outside tmux the shell receives the same bytes
+  (`\ei`, `\eI` from WezTerm and Windows Terminal with the tracked
+  configurations, which bind neither key), but no real terminal was tested.
+- Sessions stay in `~/.claude/projects/` (under the cache directory's name)
+  until Claude's `cleanupPeriodDays`; `--no-session-persistence` is used only
+  for a one-off `bin/ai-command REQUEST` without `--session`.
+- The default model stays `haiku` at low effort (the owner's decision,
+  2026-10-27). Open: whether the keys should be on by default.
