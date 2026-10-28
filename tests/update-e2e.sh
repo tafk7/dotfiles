@@ -58,7 +58,7 @@ ledger_record eget yes dotfiles installed "$EGET_VERSION" "$HOME/.local/bin/eget
 git -C "$seed" init -q -b main && git -C "$seed" add -A && git -C "$seed" commit -qm seed
 git clone -q --bare "$seed" "$remote"
 git clone -q "$remote" "$checkout"
-"$checkout/setup.sh" --bash --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >"$TEST_ROOT/setup.out" 2>&1 \
+"$checkout/setup.sh" --bash --no-hooks --no-theme >"$TEST_ROOT/setup.out" 2>&1 \
     || fail "fixture setup failed: $(tail -20 "$TEST_ROOT/setup.out")"
 
 # Running: a tmux server, and a shell that loaded before the upstream change.

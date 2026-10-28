@@ -174,7 +174,7 @@ jobs:
           su - test <<'EOSU'
           set -euo pipefail
           cd ~/dev/dotfiles
-          ./setup.sh --bash --force --git-name "CI Bot" --git-email ci@example.com
+          ./setup.sh --bash --force
           EOSU
 
       - name: Assert configs linked and shell-tier tools on PATH
@@ -230,7 +230,7 @@ jobs:
 
       - name: Re-run setup and verify bash profile
         run: |
-          su - test -c 'cd ~/dev/dotfiles && ./setup.sh --bash --git-name "CI Bot" --git-email ci@example.com'
+          su - test -c 'cd ~/dev/dotfiles && ./setup.sh --bash'
           su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash'
 
   startup-benchmark:

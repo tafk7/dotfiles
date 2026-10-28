@@ -122,7 +122,9 @@ lazily only when real user data is displaced.
 Portable Git behavior is rendered to
 `${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/gitconfig` and included by the
 user's existing `~/.gitconfig`. Identity and machine-local overrides stay in
-`~/.gitconfig.local`.
+`~/.gitconfig.local`. Setup writes no identity: `bin/git-profile` writes the
+machine default there, and other accounts as profiles under
+`~/.config/git/profiles/` that a repository includes from its own config.
 
 ## Component registry
 

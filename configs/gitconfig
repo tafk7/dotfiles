@@ -1,6 +1,11 @@
 # Portable Git behavior included from the user's ~/.gitconfig. Machine identity
 # remains in ~/.gitconfig.local and is never overwritten by reconciliation.
 
+[user]
+    # No identity guessed from username@hostname: a repository without one
+    # refuses to commit (set one with: git profile add NAME --default).
+    useConfigOnly = true
+
 [core]
     editor = nvim
     whitespace = fix,-indent-with-non-tab,trailing-space,cr-at-eol

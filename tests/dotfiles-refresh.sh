@@ -13,7 +13,7 @@ export DOTFILES_TEST_SYSTEMD_RUNNING=0
 printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/bin/dpkg-query"
 chmod +x "$TEST_ROOT/bin/dpkg-query"
 export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
-"$ROOT/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1 \
+"$ROOT/setup.sh" --config --no-hooks --no-theme >/dev/null 2>&1 \
     || fail "fixture setup failed"
 run() { local rc=0; OUTPUT="$("$ROOT/bin/dotfiles" "$@" 2>&1)" || rc=$?; RC=$rc; REFRESHES="$(grep -c 'Refreshing running processes' <<< "$OUTPUT" || true)"; }
 

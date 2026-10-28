@@ -34,7 +34,7 @@ assert_eq "$(profile_setup_args | paste -sd ' ')" "--dev --gcloud --claude --cod
 
 # --- setup merges its flags after validation; previews and refusals never write.
 run_setup() {
-    "$ROOT/setup.sh" "$@" --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1
+    "$ROOT/setup.sh" "$@" --no-hooks --no-theme >/dev/null 2>&1
 }
 run_setup --config --dry-run
 profile_exists && fail "a preview wrote the profile"
@@ -43,7 +43,7 @@ DOTFILES_OS_RELEASE="$TEST_ROOT/os-release" DOTFILES_TEST_OS_VERSION=26.04 run_s
 profile_exists && fail "a refused request wrote the profile"
 run_setup --config --no-git
 assert_eq "$(profile_value tier)/$(profile_value opt-outs)" "config/no-git,no-hooks" "setup --config created the profile"
-"$ROOT/setup.sh" --config --no-hooks --no-theme --git-name Fixture --git-email fixture@example.com >/dev/null 2>&1
+"$ROOT/setup.sh" --config --no-hooks --no-theme >/dev/null 2>&1
 assert_eq "$(profile_value opt-outs)" "no-git,no-hooks" "a later run without an opt-out removed it"
 
 # --- dotfiles profile: show, add, remove, tier. The editor-plugins key, from
