@@ -211,7 +211,7 @@ toggle() {
 search() {
     pane_in_mode || review || return
     tmux command-prompt ${client:+-t "$client"} -i -T search -p '(search up)' \
-        'send -X search-backward-incremental "%%"'
+        'send -X search-backward-incremental "%1"'
 }
 
 # Show FILE read-only in nvim at LINE (empty: the end), then delete it.
