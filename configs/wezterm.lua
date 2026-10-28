@@ -15,6 +15,12 @@ local config = wezterm.config_builder()
 
 config.term = 'xterm-256color'
 config.default_prog = { 'powershell.exe', '-NoLogo' } -- instead of cmd.exe
+-- The new-tab menu (right-click +) lists domains, where a tab runs (local,
+-- WSL, SSH hosts); PowerShell is what the local one starts, so it gets an
+-- entry of its own there.
+config.launch_menu = {
+  { label = 'PowerShell', args = { 'powershell.exe', '-NoLogo' } },
+}
 config.automatically_reload_config = true
 config.scrollback_lines = 5000 -- tmux keeps the long 50k-line history
 config.enable_scroll_bar = false
@@ -168,7 +174,8 @@ config.keys = {
   {
     key = 't',
     mods = 'CTRL|SHIFT',
-    action = act.SpawnTab 'CurrentPaneDomain',
+    -- Always a local PowerShell tab, even from a tab opened on an SSH domain.
+    action = act.SpawnTab 'DefaultDomain',
   },
   {
     key = 'n',
