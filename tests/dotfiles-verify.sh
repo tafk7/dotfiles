@@ -28,6 +28,52 @@ assert_eq "$VERIFY_RC" 0 "a converged config-tier machine: $VERIFY_OUTPUT"
 [[ "$VERIFY_OUTPUT" != *"  ok "* ]] || fail "passing checks shown without -v"
 verify -v
 [[ "$VERIFY_OUTPUT" == *$'Configs\n'*"  ok   $HOME/.bashrc"* ]] || fail "-v did not list passing checks: $VERIFY_OUTPUT"
+# The checks bin/verify used to make on its own: identity (a note), the hook
+# (skipped under no-hooks), EDITOR's single source, and the agent shell.
+[[ "$VERIFY_OUTPUT" == *$'Git\n'"  note user: not configured; commits are refused (run: git profile add NAME --default)"$'\n'"  ok   pre-commit hook: skipped (no-hooks)"* ]] \
+    || fail "Git section: $VERIFY_OUTPUT"
+[[ "$VERIFY_OUTPUT" == *"  ok   EDITOR: set only in shell/env.sh"* ]] || fail "EDITOR check: $VERIFY_OUTPUT"
+[[ "$VERIFY_OUTPUT" == *$'Agent shell\n'"  ok   functions: "*"  ok   aliases: none"*"  ok   BASH_ENV: unset"*"  ok   PATH: "* ]] \
+    || fail "Agent shell section: $VERIFY_OUTPUT"
+
+# --tier checks a tier's components in place of the profile's, and an unknown
+# tier or option is a usage error before any check runs.
+verify --tier bash
+assert_eq "$VERIFY_RC" 1 "the bash tier on a config-tier machine"
+[[ "$VERIFY_OUTPUT" == *"fix  ripgrep: missing"* ]] || fail "--tier bash did not expect its tools: $VERIFY_OUTPUT"
+[[ "$VERIFY_OUTPUT" != *wsl2-ssh-agent* ]] || fail "--tier bash on native Ubuntu expected the WSL-only bridge: $VERIFY_OUTPUT"
+verify --tier=config
+assert_eq "$VERIFY_RC" 0 "--tier=config: $VERIFY_OUTPUT"
+for bad in "--tier bogus" "--tier" "--bogus" "--editor-plugins"; do
+    # shellcheck disable=SC2086
+    verify $bad
+    assert_eq "$VERIFY_RC" 64 "verify $bad"
+done
+
+# A capability option expects its components; one that cannot apply here
+# needs the operator. Azure's CLI has no Ubuntu 26.04 packages.
+DOTFILES_TEST_OS_VERSION=26.04 verify
+[[ "$VERIFY_OUTPUT" != *azure* ]] || fail "azure-cli checked without being asked for: $VERIFY_OUTPUT"
+DOTFILES_TEST_OS_VERSION=26.04 verify --azure
+assert_eq "$VERIFY_RC" 2 "an inapplicable requested capability: $VERIFY_OUTPUT"
+[[ "$VERIFY_OUTPUT" == *"warn azure-cli: requested, but it cannot apply here"* ]] || fail "--azure: $VERIFY_OUTPUT"
+
+# --all also looks at what the profile does not select: missing ones are
+# notes, not work for setup.
+verify --all
+[[ "$VERIFY_RC" != 1 ]] || fail "--all made unselected components setup's work: $VERIFY_OUTPUT"
+[[ "$VERIFY_OUTPUT" == *"note bat: not installed (not selected here)"* ]] || fail "--all: $VERIFY_OUTPUT"
+
+# On WSL, the clipboard commands setup installs are checked.
+WSL_DISTRO_NAME=Ubuntu verify
+assert_eq "$VERIFY_RC" 1 "WSL without clipboard commands"
+[[ "$VERIFY_OUTPUT" == *$'WSL\n'"  fix  clipboard: "* ]] || fail "WSL clipboard: $VERIFY_OUTPUT"
+mkdir -p "$HOME/.local/bin"
+printf '#!/bin/sh\n' > "$HOME/.local/bin/pbcopy"
+chmod +x "$HOME/.local/bin/pbcopy"
+WSL_DISTRO_NAME=Ubuntu verify
+assert_eq "$VERIFY_RC" 0 "WSL with clipboard commands: $VERIFY_OUTPUT"
+rm "$HOME/.local/bin/pbcopy"
 
 # A missing config is work for setup: exit 1.
 rm "$HOME/.editorconfig"

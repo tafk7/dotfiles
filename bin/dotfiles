@@ -6,7 +6,8 @@
 #                       [--overwrite-configs] [--force] [--upgrade] [--no-refresh]
 #        dotfiles refresh [-v]
 #        dotfiles bump TOOL [VERSION] [--security] | --refresh
-#        dotfiles verify [-v] [--latest] [--smoke]
+#        dotfiles verify [-v] [--latest] [--smoke] [--diagnose]
+#                        [--tier T] [--all] [--CAPABILITY]...
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
 set -euo pipefail
@@ -76,6 +77,15 @@ Commands:
     -v                  List every check, passing ones included.
     --latest            Also look up newer releases of pinned tools (network).
     --smoke             Also create, run, and remove one local sbx sandbox.
+    --diagnose          With the local sandbox checks, also run sbx's bounded
+                        local diagnostics (never uploads).
+    --tier T            Check tier T's components (config, bash, dev, work)
+                        in place of the profile's selection.
+    --all               Also check every other component that applies here;
+                        one that is not installed is a note.
+    --tail, --rdp, --azure, --gcloud, --aws, --ai
+                        Also expect a capability's components (--ai: every AI
+                        CLI). One that cannot apply here needs you.
   profile               Show this machine's profile: what dotfiles manages here.
   profile --add X       Manage X: a capability (rdp, tail, azure, gcloud, aws),
                         ai (every AI CLI) or one AI CLI, or an opt-out
@@ -328,18 +338,35 @@ cmd_profile() {
     esac
 }
 
+# verify: every check against the profile (or the options' selection; see
+# lib/verify.sh). Exit 1: setup has work to do; 3: a check could not be made;
+# 2: something needs you; 0: healthy.
 cmd_verify() {
     local verbose=false latest=false smoke=false records rc i
     while (( $# )); do
         case "$1" in
             -v|--verbose) verbose=true ;;
             --latest) latest=true ;;
-            --smoke) smoke=true ;;
+            --smoke) smoke=true VERIFY_SMOKE=true ;;
+            --diagnose) export WORK_DIAGNOSE=true ;;
+            --tier) [[ -n "${2:-}" ]] || { error "--tier requires a value"; return 64; }; VERIFY_TIER="$2"; shift ;;
+            --tier=*) VERIFY_TIER="${1#--tier=}"; [[ -n "$VERIFY_TIER" ]] || { error "--tier requires a value"; return 64; } ;;
+            --all) VERIFY_ALL=true ;;
             --help|-h) usage; return 0 ;;
-            *) error "Unknown option: $1"; usage >&2; return 64 ;;
+            *)
+                if [[ "$1" == --ai ]] || { [[ "$1" == --?* ]] && is_capability "${1#--}"; }; then
+                    VERIFY_CAPABILITIES="$(_profile_list_add "$VERIFY_CAPABILITIES" "${1#--}")"
+                else
+                    error "Unknown option: $1"; usage >&2; return 64
+                fi
+                ;;
         esac
         shift
     done
+    if [[ -n "$VERIFY_TIER" ]] && ! _profile_tier_rank "$VERIFY_TIER" >/dev/null; then
+        error "Unknown tier: $VERIFY_TIER (config, bash, dev, work)"
+        return 64
+    fi
     # The smoke test creates a sandbox, so it runs as an operation.
     [[ "$smoke" != true ]] || operation_begin "$SCRIPT_DIR/dotfiles" verify "${ORIGINAL_ARGS[@]}"
     records="$(
@@ -356,7 +383,10 @@ cmd_verify() {
         verify_editor_plugins
         verify_ai
         verify_host
+        verify_git
+        verify_wsl
         verify_environment
+        verify_agent_shell
         verify_wezterm
         staleness_report
         [[ "$latest" != true ]] || verify_upstream

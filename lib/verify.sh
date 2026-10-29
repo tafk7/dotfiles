@@ -2,17 +2,55 @@
 # Checks behind `dotfiles verify`. Each prints outcome records
 # (lib/outcomes.sh) and changes nothing; the command renders them and exits on
 # their classes. Sections: checkout, state, profile, components, configs,
-# editor plugins, AI, Docker, local sandboxes, Tailscale, environment, the
-# WezTerm copy on Windows, running (lib/staleness.sh), and upstream (--latest).
+# editor plugins, AI, Docker, local sandboxes, Tailscale, Git, WSL,
+# environment, agent shell, the WezTerm copy on Windows, running
+# (lib/staleness.sh), and upstream (--latest).
 
 [[ -n "${_DOTFILES_VERIFY_LOADED:-}" ]] && return 0
 _DOTFILES_VERIFY_LOADED=1
 
+# What verify checks against, from the command's options. By default, the
+# profile's selection (the ledger's components without a profile). --tier
+# checks that tier's components instead; each capability option adds its
+# components, which must then apply here; --all also looks at every other
+# component that applies here. --smoke checks Docker's and the sandboxes'
+# readiness wherever they apply, since the smoke test needs both.
+VERIFY_TIER=""
+VERIFY_CAPABILITIES=""
+VERIFY_ALL=false
+VERIFY_SMOKE=false
+
+# The components the capability options ask for, one per line.
+verify_requested_components() {
+    local capability
+    for capability in ${VERIFY_CAPABILITIES//,/ }; do
+        tools_for_capability "$capability"
+    done
+}
+
+verify_requested() {
+    local requested
+    requested="$(verify_requested_components)"
+    grep -Fxq -- "$1" <<< "$requested"
+}
+
 # The components this machine should have: the profile's selection when there
-# is one, else what the ledger records as installed.
+# is one, else what the ledger records as installed; or --tier's components;
+# plus what the capability options ask for.
 verify_expected_components() {
+    {
+        _verify_selected_components
+        verify_requested_components
+    } | LC_ALL=C sort -u
+}
+
+_verify_selected_components() {
     local name capability status selected
-    if profile_exists && profile_load 2>/dev/null; then
+    if [[ -n "$VERIFY_TIER" ]]; then
+        for name in "${!TOOL_BINARY[@]}"; do
+            tool_in_cumulative_tier "$name" "$VERIFY_TIER" && printf '%s\n' "$name"
+        done
+    elif profile_exists && profile_load 2>/dev/null; then
         local ai_tools
         ai_tools=",$(profile_ai_tools | paste -sd, -),"
         for name in $(printf '%s\n' "${!TOOL_BINARY[@]}" | LC_ALL=C sort); do
@@ -29,8 +67,9 @@ verify_expected_components() {
         while IFS=$'\t' read -r name _ _ status _; do
             [[ -n "${TOOL_BINARY[$name]:-}" && "$status" != removed && "$status" != not-applicable ]] || continue
             printf '%s\n' "$name"
-        done < <(tail -n +2 "$DOTFILES_LEDGER_FILE") | LC_ALL=C sort
+        done < <(tail -n +2 "$DOTFILES_LEDGER_FILE")
     fi
+    return 0
 }
 
 # verify_expects NAME: whether NAME is among the expected components. Reads
@@ -42,9 +81,12 @@ verify_expects() {
     grep -Fxq -- "$1" <<< "$expected"
 }
 
+# verify_component NAME [optional]: one component's records. An optional one
+# (--all, outside the selection) that is not installed is only a note.
 verify_component() {
-    local name="$1" section=Components obs rc=0
+    local name="$1" optional="${2:-}" section=Components obs rc=0
     local applicable path owner identity want runnable companions ready ready_reason
+    local recorded_owner="" recorded_status=""
     obs="$(observe_component "$name" 2>/dev/null)" || rc=$?
     if (( rc != 0 && rc != 3 )); then
         outcome incomplete "$section" "$name" "observation failed"; return
@@ -63,13 +105,22 @@ verify_component() {
         return
     fi
     if [[ "$applicable" == no ]]; then
-        outcome ok "$section" "$name" "not applicable here ($(observation_field reason <<< "$obs"))"
+        if verify_requested "$name"; then
+            outcome health "$section" "$name" "requested, but it cannot apply here ($(observation_field reason <<< "$obs"))"
+        else
+            outcome ok "$section" "$name" "not applicable here ($(observation_field reason <<< "$obs"))"
+        fi
         return
     fi
     if [[ -z "$path" ]]; then
-        outcome convergence "$section" "$name" "missing"
+        if [[ -n "$optional" ]]; then
+            outcome advisory "$section" "$name" "not installed (not selected here)"
+        else
+            outcome convergence "$section" "$name" "missing"
+        fi
         return
     fi
+    IFS=$'\t' read -r _ _ recorded_owner recorded_status _ < <(ledger_line "$name" 2>/dev/null || true) || true
     case "$owner" in
         dotfiles)
             if [[ "$runnable" != yes ]]; then
@@ -92,21 +143,33 @@ verify_component() {
         *)
             if [[ "$runnable" == no ]]; then
                 outcome health "$section" "$name" "an external install at $path does not run"
+            elif [[ "$recorded_owner" == unknown ]]; then
+                # Present before the ledger: kept as found, and not pinned.
+                outcome advisory "$section" "$name" "at $path from before the ledger; not pinned until adopted (dotfiles apply --only $name --reinstall=$name)"
             else
                 outcome advisory "$section" "$name" "satisfied by an external install at $path"
             fi
             ;;
     esac
+    if [[ "$recorded_status" == update-failed ]]; then
+        outcome advisory "$section" "$name" "its last update failed; the earlier install is still in place"
+    fi
     if [[ "$ready" == no && "$runnable" == yes ]]; then
         outcome health "$section" "$name" "not ready: $ready_reason"
     fi
 }
 
 verify_components() {
-    local name
+    local name expected
+    expected="$(verify_expected_components)"
     while IFS= read -r name; do
-        verify_component "$name"
-    done < <(verify_expected_components)
+        [[ -z "$name" ]] || verify_component "$name"
+    done <<< "$expected"
+    if [[ "$VERIFY_ALL" == true ]]; then
+        while IFS= read -r name; do
+            grep -Fxq -- "$name" <<< "$expected" || verify_component "$name" optional
+        done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | LC_ALL=C sort)
+    fi
     # sbx is the one pinned APT package: setup holds it, and moves only the
     # holds it placed or was told to adopt.
     local package="${TOOL_APT_PACKAGE[sbx]}"
@@ -269,10 +332,10 @@ check_fail() { outcome health "$_verify_host_section" "$1"; }
 verify_host() {
     local expected
     expected="$(verify_expected_components)"
-    if grep -Fxq docker <<< "$expected" && tool_applicable docker; then
+    if { grep -Fxq docker <<< "$expected" || [[ "$VERIFY_SMOKE" == true ]]; } && tool_applicable docker; then
         _verify_host_section=Docker docker_verify_checks true
     fi
-    if grep -Fxq sbx <<< "$expected" && tool_applicable sbx; then
+    if { grep -Fxq sbx <<< "$expected" || [[ "$VERIFY_SMOKE" == true ]]; } && tool_applicable sbx; then
         _verify_host_section="Local sandboxes" work_verify_checks true
     fi
     if grep -Fxq tailscale <<< "$expected"; then
@@ -301,8 +364,53 @@ verify_wezterm() {
     fi
 }
 
+# The machine's default Git identity and this checkout's pre-commit hook.
+# Identity is not setup's (git profile sets it), and the hook is a convenience
+# for working on the checkout, so neither fails verify.
+verify_git() {
+    local section=Git name email common hook resolved
+    name="$(git config --global --includes --get user.name 2>/dev/null || true)"
+    email="$(git config --global --includes --get user.email 2>/dev/null || true)"
+    if [[ -n "$name" && -n "$email" ]]; then
+        outcome ok "$section" user "$name <$email>"
+    else
+        # With user.useConfigOnly, commits are refused until it is set.
+        outcome advisory "$section" user "not configured; commits are refused (run: git profile add NAME --default)"
+    fi
+    if profile_exists && profile_load 2>/dev/null && _profile_in_list "${PROFILE[opt-outs]}" no-hooks; then
+        outcome ok "$section" "pre-commit hook" "skipped (no-hooks)"
+        return
+    fi
+    common="$(git -C "$DOTFILES_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+    hook="${common:-$DOTFILES_DIR/.git}/hooks/pre-commit"
+    if [[ -L "$hook" ]]; then
+        resolved="$(readlink -f "$hook" 2>/dev/null || true)"
+        if [[ "$resolved" == "$DOTFILES_DIR/hooks/"* ]]; then
+            outcome ok "$section" "pre-commit hook" "installed (links to hooks/pre-commit)"
+        else
+            outcome advisory "$section" "pre-commit hook" "present, but not this checkout's"
+        fi
+    elif [[ -f "$hook" ]] && head -n4 "$hook" 2>/dev/null | grep -q "Installed by bin/install-git-hooks"; then
+        outcome ok "$section" "pre-commit hook" "installed (a copy)"
+    elif [[ -f "$hook" ]]; then
+        outcome advisory "$section" "pre-commit hook" "present, but not this checkout's"
+    else
+        outcome advisory "$section" "pre-commit hook" "not installed (run: bin/install-git-hooks)"
+    fi
+}
+
+# WSL's clipboard commands, which setup installs on WSL.
+verify_wsl() {
+    is_wsl || return 0
+    if [[ -x "$HOME/.local/bin/pbcopy" ]]; then
+        outcome ok WSL clipboard "pbcopy and pbpaste"
+    else
+        outcome convergence WSL clipboard "pbcopy and pbpaste are not installed; setup installs them"
+    fi
+}
+
 verify_environment() {
-    local section=Environment
+    local section=Environment theme tmux_version file editor_files=""
     if [[ -f "$HOME/.gitconfig" ]]; then
         if [[ "$(git config --global --includes --get delta.syntax-theme 2>/dev/null || true)" == ansi ]]; then
             outcome ok "$section" delta "palette-based colors"
@@ -310,14 +418,65 @@ verify_environment() {
             outcome convergence "$section" delta "the Git config lacks the palette-based delta settings"
         fi
     fi
-    local agent_path total unique
-    agent_path="$(bash -lc 'printf %s "$PATH"' 2>/dev/null </dev/null || true)"
+    # An invalid theme state is reported with the rest of the state files.
+    if feature_enabled theme; then
+        theme="$("$DOTFILES_DIR/bin/theme-switcher" --current 2>/dev/null | sed -n 's/^global: //p' || true)"
+        outcome ok "$section" theme "${theme:-unknown}"
+        tmux_version="$(tmux -V 2>/dev/null | awk '{print $2}' | sed 's/[^0-9.].*$//' || true)"
+        if [[ -n "$tmux_version" ]] && ! version_gte "$tmux_version" 3.3; then
+            outcome advisory "$section" theme "tmux $tmux_version: themes color tmux itself, but programs keep the terminal palette (needs 3.3+)"
+        fi
+    else
+        outcome ok "$section" theme "feature disabled"
+    fi
+    # EDITOR has one source, shell/env.sh; a tool file that sets it competes.
+    for file in "$DOTFILES_DIR"/shell/tools/*.sh; do
+        [[ -f "$file" ]] || continue
+        grep -v '^[[:space:]]*#' "$file" 2>/dev/null | grep -q '^[[:space:]]*export EDITOR' \
+            && editor_files+=" ${file##*/}"
+    done
+    if [[ -z "$editor_files" ]]; then
+        outcome ok "$section" EDITOR "set only in shell/env.sh"
+    else
+        outcome advisory "$section" EDITOR "also set in${editor_files}; only shell/env.sh should set it"
+    fi
+}
+
+# What an agent's non-interactive login shell carries: no dotfiles
+# interactive or private functions, no aliases, no BASH_ENV, and a PATH
+# without duplicates. This checks our boundary, not any harness's snapshot:
+# functions from other profiles are left alone, since their presence alone
+# costs nothing measurable per command. One login shell answers all four.
+verify_agent_shell() {
+    local section="Agent shell" report bash_env agent_path aliases leaked count total unique
+    report="$(bash -lc 'printf "%s\n%s\n" "${BASH_ENV:-}" "$PATH"; alias | wc -l; compgen -A function' \
+        2>/dev/null </dev/null || true)"
+    bash_env="$(sed -n 1p <<< "$report")"
+    agent_path="$(sed -n 2p <<< "$report")"
+    aliases="$(sed -n '3s/[^0-9]//gp' <<< "$report")"
+    leaked="$(tail -n +4 <<< "$report" | grep -E '^(_dotfiles_|reload$|proj$|theme$|fmt$|lint$|lintf$)' || true)"
+    if [[ -z "$leaked" ]]; then
+        outcome ok "$section" functions "no dotfiles interactive or private functions"
+    else
+        count="$(wc -l <<< "$leaked")"
+        outcome advisory "$section" functions "$count dotfiles interactive or private function(s): $(paste -sd' ' - <<< "$leaked")"
+    fi
+    if (( ${aliases:-0} == 0 )); then
+        outcome ok "$section" aliases "none"
+    else
+        outcome advisory "$section" aliases "$aliases alias(es)"
+    fi
+    if [[ -z "$bash_env" ]]; then
+        outcome ok "$section" BASH_ENV "unset (a bare bash -c stays free)"
+    else
+        outcome advisory "$section" BASH_ENV "set to $bash_env: every bash -c sources it, taxing every harness"
+    fi
     total="$(tr ':' '\n' <<< "$agent_path" | grep -c . || true)"
     unique="$(tr ':' '\n' <<< "$agent_path" | grep . | sort -u | wc -l)"
     if (( total == unique )); then
-        outcome ok "$section" "agent PATH" "$total entries, no duplicates"
+        outcome ok "$section" PATH "$total entries, no duplicates"
     else
-        outcome advisory "$section" "agent PATH" "$total entries, $unique unique"
+        outcome advisory "$section" PATH "$total entries, $unique unique"
     fi
 }
 
