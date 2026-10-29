@@ -148,6 +148,15 @@ line_after 7 'i\<M-Del>\<Esc>' 'hello '
 line_after 1 'A typed\<C-u>\<Esc>' 'hello brave world'
 line_after 1 'A one\<Esc>A two\<Esc>\<C-u>' 'hello brave world one'
 line_after 1 'A one\<Esc>v\<C-u>' 'hello brave world'
+# Ctrl+Backspace (Ctrl+H through tmux) and Ctrl+Delete delete a word, to the
+# word's end as the shells' kill-word does.
+line_after 7 'i\<C-h>\<Esc>' 'brave world'
+line_after 7 'i\<C-BS>\<Esc>' 'brave world'
+line_after 7 'i\<C-Del>\<Esc>' 'hello  world'
+line_after 11 'i\<C-Del>\<Esc>' 'hello brav world'
+# Shift+PgUp/PgDn scroll three lines outside tmux, as in review.
+output="$(nvim_run '+if maparg("<S-PageUp>", "n") !~# "ScrollLines" || maparg("<S-Up>", "n") !=# "" | cquit 61 | endif')" \
+    || fail "Shift+PgUp scroll: $output"
 
 # The prose profile loads only in the compose pane; its send keys only with a
 # target pane; grammar only when harper-ls is installed and nvim has

@@ -212,15 +212,49 @@ inoremap <C-u> <C-g>u<Cmd>undo<CR>
 nnoremap <C-u> u
 xnoremap <C-u> <Esc>u
 
+" Word deletes match them too: Ctrl+Backspace and Ctrl+Delete take a word.
+" tmux hands Ctrl+Backspace on as Ctrl+H, which Neovim would read as one
+" Backspace; the Backspace key itself sends DEL, so Ctrl+H is free to take
+" (auto-pairs would map it as Backspace otherwise). Ctrl+Delete deletes to the
+" end of the word, as the shells' kill-word does; with no word left on the
+" line it deletes one character, joining the next line at the end.
+let g:AutoPairsMapCh = 0
+function! s:DeleteWordForward() abort
+    let l:end = searchpos('\k\>', 'cnW', line('.'))[1]
+    if l:end == 0
+        return "\<Del>"
+    endif
+    return "\<C-g>u" . repeat("\<Del>", strchars(getline('.')[col('.') - 1 : l:end - 1]))
+endfunction
+inoremap <C-BS> <C-g>u<C-w>
+inoremap <C-h> <C-g>u<C-w>
+inoremap <expr> <C-Del> <SID>DeleteWordForward()
+cnoremap <C-BS> <C-w>
+cnoremap <C-h> <C-w>
+
 " Window navigation with Ctrl+ESDF
 nnoremap <C-e> <C-w>k
 nnoremap <C-s> <C-w>h
 nnoremap <C-d> <C-w>j
 nnoremap <C-f> <C-w>l
 
-" Half-page scrolling with Shift+arrows
-nnoremap <S-Up> <C-u>
-nnoremap <S-Down> <C-d>
+" Shift+PgUp/PgDn scroll a few lines, as in tmux and its review: tmux's
+" @scroll-lines, default 3. Shift+arrows keep Neovim's own meaning.
+" Read on the first press, so starting Neovim doesn't wait on tmux.
+function! s:ScrollLines() abort
+    if !exists('s:scroll_lines')
+        let s:scroll_lines = 0
+        if executable('tmux')
+            let s:scroll_lines = str2nr(trim(system(['tmux', 'show', '-gqv', '@scroll-lines'])))
+        endif
+        let s:scroll_lines = s:scroll_lines > 0 ? s:scroll_lines : 3
+    endif
+    return s:scroll_lines
+endfunction
+nnoremap <expr> <S-PageUp> <SID>ScrollLines() . "\<C-y>"
+xnoremap <expr> <S-PageUp> <SID>ScrollLines() . "\<C-y>"
+nnoremap <expr> <S-PageDown> <SID>ScrollLines() . "\<C-e>"
+xnoremap <expr> <S-PageDown> <SID>ScrollLines() . "\<C-e>"
 
 " Search clearing
 nnoremap <silent> <Space> :nohlsearch<CR>

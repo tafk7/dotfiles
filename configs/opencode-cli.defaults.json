@@ -6,6 +6,8 @@
     "variant.cycle": "ctrl+pageup,ctrl+pagedown",
     "input.undo": "ctrl+z,ctrl+-,super+z",
     "terminal.suspend": "none",
+    "app.exit": "ctrl+d,<leader>q",
+    "session.rename": "none",
     "input.delete.word.backward": "ctrl+backspace,ctrl+h,ctrl+w",
     "input.delete.word.forward": "ctrl+delete",
     "input.delete.to.line.start": "alt+backspace,ctrl+u",
