@@ -5,8 +5,8 @@
 #
 # SC1090 — "ShellCheck can't follow non-constant source." Most of our `source`
 #          calls use $DOTFILES_DIR or runtime paths that shellcheck can't
-#          resolve statically. The real targets exist (verified by bin/verify
-#          and CI). Per-file `# shellcheck source=...` directives are added
+#          resolve statically. The real targets exist (verified by dotfiles
+#          verify and CI). Per-file `# shellcheck source=...` directives are added
 #          where the path *is* statically knowable and we want to keep the
 #          benefit of cross-file checking.
 #
