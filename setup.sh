@@ -268,9 +268,15 @@ package_set_selected() {
 # Validate, save, then apply: once the system check accepts this run's flags,
 # they join the machine profile before anything is installed. Flags only add
 # (lib/profile.sh); a preview never writes the profile. An unreadable profile
-# is reported and left alone, without stopping setup.
+# is reported and left alone, without stopping setup. A one-off run
+# (dotfiles upgrade sets DOTFILES_KEEP_PROFILE) does what its flags say
+# without making them the machine's intent.
 setup_save_profile() {
     [[ "$DRY_RUN" == true ]] && return 0
+    if [[ -n "${DOTFILES_KEEP_PROFILE:-}" ]]; then
+        log "Machine profile left as it is (a one-off run)"
+        return 0
+    fi
     if ! profile_load; then
         warn "Machine profile not updated; repair or remove $DOTFILES_PROFILE_FILE"
         return 0

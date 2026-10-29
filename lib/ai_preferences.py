@@ -359,10 +359,10 @@ def main():
             ok = check_plugin(component, directory) and ok
         if component == 'claude':
             env = load_json(ROOT / 'configs/claude-settings.json').get('env', {})
-            print('info: Claude nonessential traffic disabled; updates are explicit (bin/ai-update claude).'
+            print('info: Claude nonessential traffic disabled; updates are explicit (dotfiles upgrade claude).'
                   if env.get('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC') == '1' else 'info: Claude updater follows its runtime environment.')
         if component == 'opencode':
-            print('info: opencode notifies about updates; install them with bin/ai-update opencode.'
+            print('info: opencode notifies about updates; install them with dotfiles upgrade opencode.'
                   if load_json(ROOT / 'configs/opencode.json').get('update') == 'notify' else 'info: opencode updater follows its configuration.')
     return 0 if ok else 1
 

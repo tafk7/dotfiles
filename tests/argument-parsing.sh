@@ -75,6 +75,26 @@ DOTFILES_OS_RELEASE="$TEST_ROOT/os-release" DOTFILES_TEST_PLATFORM=ubuntu DOTFIL
     "$ROOT/setup.sh" --work --dry-run --no-hooks --no-git >/dev/null 2>&1 || rc=$?
 [[ $rc -eq 0 ]] || fail "Ubuntu 22.04 work tier was refused instead of skipping sbx"
 
+# The front door's usage errors exit 64 before anything runs; the older names
+# take what they always took (and ai-update now pi).
+for args in "upgrade" "upgrade --bogus" "upgrade claude,bat" "verify --tier" "verify --tier=" "verify --tier=ai" "verify --nope"; do
+    rc=0
+    # shellcheck disable=SC2086
+    "$ROOT/bin/dotfiles" $args >/dev/null 2>&1 || rc=$?
+    assert_eq "$rc" 64 "dotfiles $args"
+done
+for args in "ai-update" "ai-update bat" "verify --tier" "verify --tier bogus" "verify --unknown"; do
+    rc=0
+    # shellcheck disable=SC2086
+    "$ROOT/bin/"$args >/dev/null 2>&1 || rc=$?
+    assert_eq "$rc" 64 "bin/$args"
+done
+for command in "dotfiles upgrade --help" "ai-update --help" "verify --help"; do
+    # shellcheck disable=SC2086
+    "$ROOT/bin/"$command >/dev/null || fail "bin/$command"
+done
+"$ROOT/bin/ai-update" --help | grep -Fq 'claude|codex|opencode|pi' || fail "ai-update does not name pi"
+
 reset_args
 DOTFILES_TEST_WSL_VERSION=1 WSL_DISTRO_NAME=Ubuntu INSTALL_TIER=bash DRY_RUN=true \
     phase_verify_system >/dev/null 2>&1 && fail "WSL1 was accepted"
