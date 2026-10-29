@@ -148,6 +148,8 @@ vim│,hu│Undo git hunk under cursor│:GitGutterUndoHunk
 # Editing
 vim│jk│Exit insert mode│imap jk <Esc>
 vim│Alt+Backspace / Alt+Delete│Insert and command line: delete to the start / end of the line, as in the shells│<C-u> / setline
+vim│Ctrl+Backspace / Ctrl+Delete│Insert mode: delete a word back / forward, as in the shells and agents│<C-w> / kill-word
+vim│Shift+PgUp / Shift+PgDn│Scroll a few lines (tmux @scroll-lines, default 3), as in tmux and review│<C-y> / <C-e>
 vim│Ctrl+U│Undo in insert, normal, and visual mode (visual leaves the selection)│u
 vim│,/│Toggle comment on line/selection│:Commentary
 vim│gc│Comment out motion (e.g. gcap for paragraph)│gc{motion}
@@ -288,6 +290,8 @@ opencode│Ctrl+Tab│Next session tab; Ctrl+Shift+Tab is its previous (Alt+Up b
 opencode│Alt+M│Model list│cli.json keybinds model.list
 opencode│Ctrl+PgUp / Ctrl+PgDn│Cycle the model's effort variants│cli.json keybinds variant.cycle
 opencode│Ctrl+Z│Undo typing (instead of suspending)│cli.json keybinds input.undo
+opencode│Ctrl+C│Clear the prompt; never exits (Ctrl+D or Ctrl+X Q do)│cli.json keybinds app.exit
+opencode│Ctrl+R│Unbound, where the other agents search history (rename is in Ctrl+P)│cli.json keybinds session.rename none
 shell│ocr│Run one-off opencode prompt│opencode run
 shell│ocrc│Run one-off opencode prompt, continuing last│opencode run --continue
 shell│pi│Start new Pi session│pi
