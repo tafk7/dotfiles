@@ -4,6 +4,7 @@
 # Usage: dotfiles update [--dry-run] [--upgrade]
 #        dotfiles apply [--dry-run] [--only X,Y] [--reinstall[=X,Y]]
 #                       [--overwrite-configs] [--force] [--upgrade] [--no-refresh]
+#        dotfiles upgrade CLI[,CLI] [--dry-run]
 #        dotfiles refresh [-v]
 #        dotfiles bump TOOL [VERSION] [--security] | --refresh
 #        dotfiles verify [-v] [--latest] [--smoke] [--diagnose]
@@ -58,6 +59,13 @@ Commands:
                         packages (apt's simulated transaction first; held ones
                         skipped), the AI CLIs and Pi, and rustup itself.
     --no-refresh        Skip the refresh that ends every apply.
+  upgrade CLI[,CLI]     Update installed AI CLIs (claude, codex, opencode, pi)
+                        now, through their official updaters, then run their
+                        configure steps. A one-off: the profile is left as it
+                        is, so this never makes dotfiles manage a CLI (profile
+                        --add does). A CLI that is not installed is refused.
+                        apply --upgrade updates the ones the profile selects.
+    --dry-run           Show what would run.
   refresh               Bring running processes up to date with the disk: the
                         tmux server's environment, config, badge, and theme.
                         Lists shells and programs that predate a change and
@@ -257,6 +265,47 @@ cmd_apply() {
     fi
     (( rc == 0 )) || return 1
     return "$refresh_rc"
+}
+
+# upgrade: a one-off update of installed AI CLIs, through setup with --only
+# and --upgrade: each CLI's updater, then its configure steps. Unlike a setup
+# run, it leaves the profile alone, so updating a CLI does not make dotfiles
+# manage it. Exit 1 when a CLI is not installed or setup failed.
+cmd_upgrade() {
+    local dry_run=false name path rc=0
+    local -a names=() flags=() requested
+    while (( $# )); do
+        case "$1" in
+            --dry-run) dry_run=true ;;
+            --help|-h) usage; return 0 ;;
+            -*) error "Unknown option: $1"; usage >&2; return 64 ;;
+            *) IFS=, read -ra requested <<< "$1"; names+=("${requested[@]}") ;;
+        esac
+        shift
+    done
+    if (( ${#names[@]} == 0 )); then
+        error "Name the AI CLIs to upgrade: $(profile_ai_tool_names | paste -sd' ' -)"
+        return 64
+    fi
+    for name in "${names[@]}"; do
+        is_ai_tool "$name" || { error "Not an AI CLI: $name (upgrade takes $(profile_ai_tool_names | paste -sd' ' -))"; return 64; }
+    done
+    [[ "$dry_run" == true ]] || operation_begin "$SCRIPT_DIR/dotfiles" upgrade "${ORIGINAL_ARGS[@]}"
+    for name in "${names[@]}"; do
+        tool_applicable "$name" || { error "$name is not supported on this platform"; return 1; }
+        # A CLI that is not here is installed by managing it, not by an upgrade.
+        path="$(observe_component "$name" 2>/dev/null | observation_field path || true)"
+        if [[ -z "$path" ]]; then
+            error "$name is not installed; to install it and have dotfiles manage it: dotfiles profile --add $name"
+            return 1
+        fi
+        flags+=("--$name")
+    done
+    [[ "$dry_run" != true ]] || flags+=(--dry-run)
+    DOTFILES_KEEP_PROFILE=1 "$DOTFILES_DIR/setup.sh" "${flags[@]}" \
+        --only "$(IFS=,; printf '%s' "${names[*]}")" --upgrade || rc=$?
+    (( rc != 64 )) || return 64
+    (( rc == 0 )) || return 1
 }
 
 cmd_profile() {
@@ -530,6 +579,7 @@ ORIGINAL_ARGS=("$@")
 case "${1:-}" in
     update) shift; ORIGINAL_ARGS=("$@"); cmd_update "$@" ;;
     apply) shift; ORIGINAL_ARGS=("$@"); cmd_apply "$@" ;;
+    upgrade) shift; ORIGINAL_ARGS=("$@"); cmd_upgrade "$@" ;;
     refresh) shift; ORIGINAL_ARGS=("$@"); cmd_refresh "$@" ;;
     bump) shift; exec python3 "$DOTFILES_DIR/lib/bump.py" "$@" ;;
     verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;

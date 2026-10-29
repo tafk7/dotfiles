@@ -1,8 +1,8 @@
 #!/bin/bash
 # Install Claude Code via the official native installer (claude.ai/install.sh).
 #
-# Ensure the native binary exists. bin/ai-update claude explicitly updates it
-# using --force; automatic updates may be disabled by the configured traffic policy.
+# Ensure the native binary exists. dotfiles upgrade claude explicitly updates it
+# (--update); automatic updates may be disabled by the configured traffic policy.
 # Settings and the agent-badge plugin are configure steps (lib/configure.sh),
 # which setup runs whether or not this installed anything.
 set -euo pipefail
@@ -24,7 +24,7 @@ FORCE=false
 CLAUDE_BIN="$HOME/.local/bin/claude"
 
 if [[ "$FORCE" != true && -x "$CLAUDE_BIN" ]] && "$CLAUDE_BIN" --version >/dev/null 2>&1; then
-    success "Claude Code already installed ($("$CLAUDE_BIN" --version 2>/dev/null | head -n1)); updates follow its traffic policy; use bin/ai-update claude."
+    success "Claude Code already installed ($("$CLAUDE_BIN" --version 2>/dev/null | head -n1)); updates follow its traffic policy; use dotfiles upgrade claude."
     exit 2
 fi
 

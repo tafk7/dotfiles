@@ -1,10 +1,11 @@
 #!/bin/bash
 # Explicit native CLI update/repair; does not change the traffic policy.
-# setup --upgrade for one AI CLI: its updater, then its configure steps.
+# The older name for `dotfiles upgrade CLI`: its updater, then its configure
+# steps, leaving the machine profile as it is.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
-    -h|--help) echo "Usage: ai-update claude|codex|opencode"; exit 0 ;;
-    claude|codex|opencode) exec "$ROOT/setup.sh" "--$1" --only "$1" --upgrade ;;
-    *) echo 'Usage: ai-update claude|codex|opencode' >&2; exit 64 ;;
+    -h|--help) echo "Usage: ai-update claude|codex|opencode|pi  (runs: dotfiles upgrade CLI)"; exit 0 ;;
+    claude|codex|opencode|pi) exec "$ROOT/bin/dotfiles" upgrade "$1" ;;
+    *) echo 'Usage: ai-update claude|codex|opencode|pi' >&2; exit 64 ;;
 esac

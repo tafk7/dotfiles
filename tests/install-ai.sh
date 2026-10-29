@@ -24,6 +24,55 @@ chmod +x "$claude_installer"
 DOTFILES_CLAUDE_INSTALLER_SCRIPT="$claude_installer" "$ROOT/installers/install-claude.sh" >/dev/null
 "$HOME/.local/bin/claude" --version >/dev/null || fail "Claude installer output"
 
+# dotfiles upgrade (and bin/ai-update, its older name) updates an installed AI
+# CLI through setup and leaves the machine profile alone: Claude is installed
+# here but not in the profile, and an update must not make dotfiles manage it.
+(
+    unset DOTFILES_OPERATION
+    export NO_COLOR=1 DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_OS_VERSION=24.04
+    profile="$XDG_STATE_HOME/dotfiles/profile"
+    updates="$TEST_ROOT/claude-updates"
+    printf '#!/bin/sh\necho run >> "%s"\nexec sh "%s"\n' "$updates" "$claude_installer" > "$TEST_ROOT/claude-update.sh"
+    export DOTFILES_CLAUDE_INSTALLER_SCRIPT="$TEST_ROOT/claude-update.sh"
+    "$ROOT/setup.sh" --config --no-hooks --no-theme >/dev/null 2>&1 || fail "fixture setup failed"
+    before="$(<"$profile")"
+    runs() { if [[ -f "$updates" ]]; then wc -l < "$updates"; else echo 0; fi; }
+
+    "$ROOT/bin/dotfiles" upgrade claude > "$TEST_ROOT/upgrade.log" 2>&1 \
+        || { cat "$TEST_ROOT/upgrade.log" >&2; fail "dotfiles upgrade claude failed"; }
+    assert_eq "$(runs)" 1 "the updater did not run once"
+    grep -Fq 'Machine profile left as it is' "$TEST_ROOT/upgrade.log" || fail "the one-off was not said"
+    assert_eq "$(<"$profile")" "$before" "dotfiles upgrade changed the profile"
+    "$ROOT/bin/ai-update" claude >/dev/null 2>&1 || fail "ai-update claude failed"
+    assert_eq "$(runs)" 2 "ai-update did not run the updater"
+    assert_eq "$(<"$profile")" "$before" "ai-update changed the profile"
+
+    "$ROOT/bin/dotfiles" upgrade --dry-run claude >/dev/null 2>&1 || fail "the dry run failed"
+    assert_eq "$(runs)" 2 "a dry run ran the updater"
+
+    # A CLI that is not installed is refused, not installed unmanaged; pi is
+    # one of the CLIs ai-update takes now.
+    rc=0; out="$("$ROOT/bin/dotfiles" upgrade codex 2>&1)" || rc=$?
+    assert_eq "$rc" 1 "upgrading a missing CLI"
+    [[ "$out" == *"codex is not installed"*"dotfiles profile --add codex"* ]] || fail "missing CLI: $out"
+    [[ ! -e "$HOME/.local/bin/codex" ]] || fail "upgrade installed codex"
+    rc=0; "$ROOT/bin/ai-update" pi >/dev/null 2>&1 || rc=$?
+    assert_eq "$rc" 1 "ai-update pi (not installed)"
+    rc=0; "$ROOT/bin/dotfiles" upgrade bat >/dev/null 2>&1 || rc=$?
+    assert_eq "$rc" 64 "upgrade accepted a component that is not an AI CLI"
+    assert_eq "$(<"$profile")" "$before" "a refused upgrade changed the profile"
+
+    # Without a profile, none is created.
+    rm "$profile"
+    "$ROOT/bin/dotfiles" upgrade claude >/dev/null 2>&1 || fail "upgrade without a profile failed"
+    [[ ! -e "$profile" ]] || fail "upgrade created a profile: $(<"$profile")"
+
+    # The setup run ai-update used to make is what added the CLI.
+    printf '%s\n' "$before" > "$profile"
+    "$ROOT/setup.sh" --claude --only claude --upgrade >/dev/null 2>&1 || fail "setup --upgrade failed"
+    grep -q $'^ai\tclaude$' "$profile" || fail "the contrast run did not add claude: $(<"$profile")"
+)
+
 opencode_installer="$TEST_ROOT/opencode-install.sh"
 cat > "$opencode_installer" <<'EOF'
 #!/bin/sh

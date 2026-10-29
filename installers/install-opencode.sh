@@ -32,7 +32,7 @@ fi
 if [[ "$FORCE" != true ]] && v2_version "$OPENCODE_REAL"; then
     mkdir -p "$HOME/.local/bin"
     ln -sfn "$OPENCODE_REAL" "$OPENCODE_LINK"
-    success "OpenCode V2 already installed; update with bin/ai-update opencode."
+    success "OpenCode V2 already installed; update with dotfiles upgrade opencode."
     exit 2
 fi
 
