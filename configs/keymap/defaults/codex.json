@@ -1,7 +1,7 @@
 {
   "tool": "Codex",
-  "version": "0.164.0",
-  "source": "codex-rs/tui/src/keymap.rs built_in_defaults() at rust-v0.164.0",
+  "version": "0.165.0",
+  "source": "codex-rs/tui/src/keymap.rs built_in_defaults() at rust-v0.165.0",
   "bindings": {
     "global": {
       "open_agents": [],

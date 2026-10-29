@@ -355,8 +355,10 @@ class Model:
             if app in self.app_bindings:
                 action = b.action
                 if app == 'copy':
-                    m = re.search(r'send-keys -X (\S+)', b.action)
-                    action = m.group(1) if m else b.action[:60]
+                    # The last copy command is the key's own: a move first drops any
+                    # selection (send -X clear-selection), then moves.
+                    found = re.findall(r'send-keys -X (\S+)', b.action)
+                    action = found[-1] if found else b.action[:60]
                 if 'super' in b.chord.split(' ')[0] or 'wheel' in b.chord:
                     continue
                 self.app_bindings[app].setdefault(b.chord, []).append(
