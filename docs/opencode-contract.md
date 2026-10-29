@@ -2,7 +2,7 @@
 
 Dotfiles installs stable OpenCode V2 through `https://opencode.ai/v2/install`.
 The executable remains `~/.opencode/bin/opencode`, linked from `~/.local/bin`.
-`bin/ai-update opencode` updates deliberately; portable preferences select
+`dotfiles upgrade opencode` updates deliberately; portable preferences select
 `update: "notify"` and `share: "disabled"`.
 
 ## Sources of truth

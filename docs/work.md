@@ -106,13 +106,16 @@ gateway, the portable preferences) are in [`kits/`](../kits/README.md).
 ## Verification and smoke test
 
 ```bash
-./bin/verify --tier work
-./bin/verify --tier work --diagnose
-./bin/verify --tier work --tail
-./bin/verify --tier work --smoke
+dotfiles verify                       # the profile's selection (work tier: Docker, sandboxes)
+dotfiles verify --tier work           # the work tier, whatever the profile says
+dotfiles verify --diagnose            # add bounded local sbx diagnostics
+dotfiles verify --tail                # expect Tailscale too
+dotfiles verify --smoke               # create, run in, and remove one sandbox
 ```
 
 Verification is read-only and bounded by timeouts unless `--smoke` is supplied.
+Readiness problems in the Docker, Local sandboxes, and Tailscale sections need
+you rather than setup, so they exit 2 (see [maintenance](../README.md#maintenance)).
 It distinguishes package absence, KVM absence/access, active versus pending
 group membership, rootless versus system Docker, remote Docker contexts,
 stopped services, sandbox daemon health, and optional Tailscale
@@ -144,7 +147,7 @@ Bootstrap installs Git and updates the checkout even when setup receives
 Reconnect if group membership changed, enroll Tailscale with the intended
 routing/SSH policy, run `sbx login`, set the Git identity and GitHub login
 (`git profile add NAME --default`), authenticate selected tools, and run
-`./bin/verify --tier work --tail`. Use `--smoke` only when image downloads
+`dotfiles verify --tail`. Use `--smoke` only when image downloads
 and temporary resource use are acceptable.
 
 ## Cloud CLIs

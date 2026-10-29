@@ -73,7 +73,7 @@ accepting new ones, run `keymap check --update`.
   - OpenCode: the binary;
   - pi: its package.
 
-  Run it after `ai-update` and commit the diff. Your own settings stay in the
+  Run it after `dotfiles upgrade` and commit the diff. Your own settings stay in the
   usual configs: `configs/ai/claude/keybindings.json`, the `[tui.keymap]`
   tables in `configs/codex.defaults.toml`, `keybinds` in
   `configs/opencode-cli*.json`, and `configs/ai/pi/keybindings.json`. They're

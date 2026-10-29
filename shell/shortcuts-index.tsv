@@ -258,7 +258,14 @@ shell│fp│Fuzzy search and open project directory│FZF project finder
 # Other tools
 shell│fr│Find and replace text across files│replace
 shell│cheat│Show this interactive cheatsheet│cheatsheet
-shell│verify│Validate dotfiles installation health│verify
+shell│dotfiles bump│Move a pin in versions.lock to a checked release; never commits│dotfiles bump TOOL [VERSION]
+shell│dotfiles update│Pull upstream, apply the machine profile, refresh, then verify│dotfiles update [--dry-run] [--upgrade]
+shell│dotfiles apply│Bring this machine to the checkout and its profile, no pull│dotfiles apply [--dry-run] [--only X,Y] [--upgrade]
+shell│dotfiles upgrade│Update installed AI CLIs now, leaving the profile as it is│dotfiles upgrade claude|codex|opencode|pi [--dry-run]
+shell│dotfiles refresh│Bring tmux up to date with the disk; list what needs a restart│dotfiles refresh [-v]
+shell│dotfiles profile│Show or change what dotfiles manages here│dotfiles profile [--add X|--remove X|--tier T|--propose]
+shell│dotfiles verify│Check this machine against the checkout and profile; changes nothing│dotfiles verify [-v] [--latest] [--tier T] [--all] [--tail ...]
+shell│verify│Older name for dotfiles verify -v (keeps --tier, --all)│verify [--tier T] [--all] [--tail] [--smoke]
 shell│diff-config│Show drift between dotfiles sources and ~/│diff-config [--diff] [name]
 shell│check-updates│Compare every pin with its newest release; list advisories│check-updates [--outdated] [--json] [tool]
 shell│uninstall-tool│Remove a tool installed by dotfiles (--list to inspect)│uninstall-tool <name>
