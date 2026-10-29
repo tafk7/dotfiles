@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Run a slash command in the Codex in PANE, for keys Codex has no binding for:
+# Alt+M's /model (configs/tmux.conf) and the /permissions of Alt+Shift+J, K
+# and L (bin/tmux-agent-mode). Only into an empty prompt with no turn running,
+# so nothing typed is lost; otherwise it fails, and with --say tells you why.
+#
+# Usage: tmux-codex-slash [--say] COMMAND PANE
+
+set -uo pipefail
+
+say=0
+[[ "${1:-}" == --say ]] && { say=1; shift; }
+usage="usage: tmux-codex-slash [--say] COMMAND PANE"
+command=${1:?$usage}
+pane=${2:?$usage}
+[[ "$command" =~ ^[a-z-]+$ ]] || { echo "$usage" >&2; exit 2; }
+
+bottom() { tmux capture-pane -p -t "$pane" 2>/dev/null | tail -n "$1"; }
+
+# An empty prompt shows its placeholder dimmed after the › marker, with
+# whatever colours the theme sets in between.
+esc=$'\e'
+sgr="$esc\\[[0-9;]*m"
+if bottom 6 | grep -q 'esc to interrupt' ||
+    ! tmux capture-pane -e -p -t "$pane" | tail -n 6 | grep -q -E "›($sgr)* ($sgr)*$esc\\[([0-9;]*;)?2(;[0-9;]*)?m"; then
+    ((say)) && tmux display-message -t "$pane" "Codex: /$command needs an empty prompt and no turn running"
+    exit 1
+fi
+
+# Codex takes keys that come in a burst as a paste, Enter included, so Enter
+# waits until the command shows and a moment after.
+tmux send-keys -t "$pane" -l "/$command"
+for _ in {1..40}; do
+    bottom 12 | grep -q "^› /$command" && break
+    sleep 0.05
+done
+sleep 0.3
+tmux send-keys -t "$pane" Enter

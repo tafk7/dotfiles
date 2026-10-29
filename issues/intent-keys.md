@@ -85,7 +85,7 @@ share the left pinky).
 | Mode cycle | Shift+Tab | native: Claude's permission modes, Codex's plan mode, OpenCode's agents |
 | Yolo / auto / edits only | Alt+Shift+J / K / L | tmux, `bin/tmux-agent-mode`; see [Permission modes](#permission-modes) |
 | Reasoning effort | Ctrl+PgUp / Ctrl+PgDn | agent configs; Shift+↑↓ freed, so Shift+arrows only ever select. Claude Code and pi keep the prompt cache across an effort change on current models (the effort goes in as a message at the turn where it changes); other providers may rebuild it |
-| Pick a model | Alt+M | agent configs (Codex has no key; `/model`) |
+| Pick a model | Alt+M | agent configs; Codex has no key, so tmux runs `/model` there from an empty prompt (`bin/tmux-codex-slash`) |
 | Stop | Break, or Esc in agents | tmux sends Esc to an agent and Ctrl+C to anything else. A plain Ctrl+C would exit OpenCode and clear pi's prompt |
 | Undo the last turn | Alt+Z | tmux sends Claude and Codex Esc Esc (still native there), OpenCode Ctrl+X U; pi binds it to its session tree |
 | Answer a permission prompt | 1 / 2 / 3 | native (Codex numbers its options too) |

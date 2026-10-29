@@ -59,6 +59,7 @@ tmux│Alt+Enter│Queue a message for after the turn (Enter steers a running on
 tmux│Alt+Shift+Enter│Take queued messages back into the prompt (OpenCode: open its queue; Ctrl+U there)│Claude Up, Codex Shift+Left, OpenCode Ctrl+X Q, pi Alt+Up
 tmux│Alt+Z│Back a turn: Claude rewind, Codex step back, OpenCode undo, pi session tree│Claude/Codex Esc Esc, OpenCode Ctrl+X U, pi Alt+Z
 tmux│Shift+Enter (Codex)│New line, which Codex would read as Enter│send-keys C-j
+tmux│Alt+M (Codex)│Pick a model: /model, from an empty prompt (the other agents bind Alt+M)│bin/tmux-codex-slash model
 tmux│Break (Pause key)│Stop whatever runs: Esc to an agent, Ctrl+C to anything else│WezTerm raw:19 → Shift+F9
 tmux│Ctrl+Z│Undo typing everywhere, never suspend; Codex has no undo│Claude C-_ (chat:undo), Codex nothing
 tmux│prefix Ctrl+Z│Suspend the foreground program (fg resumes it)│bin/tmux-suspend; Claude and Codex suspend on Ctrl+Z
