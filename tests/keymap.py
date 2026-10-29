@@ -107,6 +107,7 @@ class Build(unittest.TestCase):
             self.assertGreater(self.data['counts'][app], 5, app)
 
     def test_routes(self):
+        self.assertFalse([n for n in self.data['notes'] if n.startswith('tmux')], self.data['notes'])
         t = self.data['traces']
         self.assertEqual(t['alt+s']['claude']['effects'][0][:2], ['tmux', 'focus-left'])
         self.assertEqual(t['ctrl+c']['claude']['delivered'], 'esc')  # tmux's Claude rule

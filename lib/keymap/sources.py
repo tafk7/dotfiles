@@ -77,11 +77,14 @@ def wezterm(repo, notes):
 
 
 # --- tmux ---------------------------------------------------------------------------
-def tmux_dump(tmux_bin, conf, repo):
-    sock = f'keymap{os.getpid()}'
+def tmux_dump(tmux_bin, conf, repo, name):
+    """The key tables of a private server loaded with CONF, the extended-keys format, and
+    why it failed (None when it read). A socket of its own per dump: kill-server returns
+    before the server is gone, and a dump on the same socket could reach that server."""
+    sock = f'keymap{os.getpid()}-{name}'
     env = dict(os.environ, DOTFILES_DIR=repo)
     env.pop('TMUX', None)
-    run([tmux_bin, '-L', sock, '-f', conf, 'new-session', '-d', '-s', 'keymap'], env=env)
+    started = run([tmux_bin, '-L', sock, '-f', conf, 'new-session', '-d', '-s', 'keymap'], env=env)
     keys = run([tmux_bin, '-L', sock, 'list-keys'], env=env)
     fmt = run([tmux_bin, '-L', sock, 'show', '-sv', 'extended-keys-format'], env=env)
     run([tmux_bin, '-L', sock, 'kill-server'], env=env)
@@ -90,7 +93,12 @@ def tmux_dump(tmux_bin, conf, repo):
         m = re.match(r'bind-key\s+(?:-r\s+)?-T\s+(\S+)\s+(\S+)\s+(.*)', line)
         if m:
             table[(m.group(1), m.group(2))] = m.group(3).strip()
-    return table, (fmt.stdout.strip() if fmt and fmt.returncode == 0 else 'xterm')
+    failed = None
+    if not table:
+        step, result = ('new-session', started) if not started or started.returncode else ('list-keys', keys)
+        failed = f'{step} ' + ('timed out or could not run' if result is None else
+                               f'exited {result.returncode}: {result.stderr.strip()[:200]}')
+    return table, (fmt.stdout.strip() if fmt and fmt.returncode == 0 else 'xterm'), failed
 
 
 def tmux(repo, tmux_bin, notes):
@@ -100,8 +108,13 @@ def tmux(repo, tmux_bin, notes):
         notes.append('tmux skipped: no tmux binary')
         return [], {'extended_keys_format': 'xterm', 'version': None}
     version = run([tmux_bin, '-V'])
-    stock, _ = tmux_dump(tmux_bin, '/dev/null', repo)
-    ours, ext_format = tmux_dump(tmux_bin, os.path.join(repo, 'configs/tmux.conf'), repo)
+    conf = os.path.join(repo, 'configs/tmux.conf')
+    stock, _, _ = tmux_dump(tmux_bin, '/dev/null', repo, 'stock')
+    ours, ext_format, failed = tmux_dump(tmux_bin, conf, repo, 'ours')
+    if failed or ('root', 'M-s') not in ours:  # once more, on a fresh socket
+        ours, ext_format, failed = tmux_dump(tmux_bin, conf, repo, 'ours-again')
+    if failed or ('root', 'M-s') not in ours:
+        notes.append(f'tmux tables unread: {failed or "configs/tmux.conf did not load (no Alt+S)"}')
     out = []
     for (table, key), action in sorted(ours.items()):
         if table not in ('root', 'prefix', 'copy-mode-vi') or re.search(r'Mouse|Wheel|Click|Drag', key):
