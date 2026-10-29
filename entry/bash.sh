@@ -76,7 +76,7 @@ bind '"\e[3;3~": kill-line'          # Alt+Delete
 bind '"\C-z": undo'
 
 # Shift means the removed range is also published to tmux's shared buffer.
-# Windows Terminal transports these chords as virtual F13-F16 sequences.
+# WezTerm sends these chords as Shift+F1-F4 sequences (configs/wezterm.lua).
 _tafk_cut_backward_word() {
     local line="$READLINE_LINE" point=$READLINE_POINT start char cut
     start=$point

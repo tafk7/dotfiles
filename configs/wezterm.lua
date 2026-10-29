@@ -9,6 +9,14 @@ local act = wezterm.action
 
 local config = wezterm.config_builder()
 
+-- This file's revision, for the hosts you SSH into: `dotfiles verify` there
+-- compares it with the repo's copy and says when this one needs copying again.
+-- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
+-- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
+-- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
+local CONFIG_REVISION = '99bf3e36eeca'
+config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
+
 -- ---------------------------------------------------------------------------
 -- Rendering and terminal behavior
 -- ---------------------------------------------------------------------------
@@ -317,7 +325,7 @@ config.keys = {
     action = act.SendString '\x1b[20;2~',
   },
 
-  -- Client utilities retained from the Windows Terminal surface.
+  -- Client utilities: the command palette, fullscreen and font size.
   {
     key = 'p',
     mods = 'CTRL|SHIFT',

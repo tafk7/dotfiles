@@ -260,13 +260,12 @@ zsh_plain=$(PATH="$SHELL_PATH" zsh -fc 'for f in claude codex opencode pi; do so
 assert_eq "$(head -n 3 <<< "$zsh_interactive" | tr '\n' ' ')" '"^[i" ai-command "^[I" ai-command-reset 1 ' "zsh bindings and hook"
 assert_eq "$(tail -n +4 <<< "$zsh_interactive")" "$zsh_plain" "zsh AI wrappers"
 
-# --- Key collisions: tmux, WezTerm, and Windows Terminal leave Alt+I and
-# Alt+Shift+I to the shell.
+# --- Key collisions: tmux and WezTerm leave Alt+I and Alt+Shift+I to the
+# shell.
 root_keys=$(ti list-keys -T root)
 grep -qE '^bind-key +(-r +)?-T root +M-e ' <<< "$root_keys" || fail "tmux root table not as expected: $root_keys"
 ! grep -E '^bind-key +(-r +)?-T root +M-[iI] ' <<< "$root_keys" || fail "tmux binds M-i or M-I"
 ! grep -nE "key = ['\"][iI]['\"]" "$ROOT/configs/wezterm.lua" || fail "WezTerm binds an I key"
-! grep -niE '"keys": *"alt\+(shift\+)?i"' "$ROOT/configs/windows-terminal-keybindings.jsonc" || fail "Windows Terminal binds Alt+I"
 
 # --- Both shells for real: raw keys through the tracked tmux.conf.
 # command_line: the last screen line with the prompt on it.

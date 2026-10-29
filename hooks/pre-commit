@@ -17,6 +17,8 @@
 #      ${XDG_CONFIG_HOME:-~/.config}/dotfiles/denylist if that file exists (the
 #      Claude invariant guard reads the same file at write time). Skipped when
 #      neither exists, so the list never enters the repo.
+#   7. configs/wezterm.lua: its revision stamp matches its content
+#      (lib/wezterm.sh), so the copy on Windows reports a true revision.
 #
 # Bypass: ALLOW_PROTECTED=1 git commit   (protected-paths gate only)
 #         git commit --no-verify         (all checks)
@@ -159,6 +161,21 @@ for f in "${STAGED[@]}"; do
         rm -f /tmp/precommit-kits.$$
         break
     fi
+done
+
+# Check 7: the WezTerm config's revision stamp, against the staged content.
+for f in "${STAGED[@]}"; do
+    [[ "$f" == configs/wezterm.lua ]] || continue
+    staged_lua="$(mktemp)"
+    git show :configs/wezterm.lua > "$staged_lua"
+    # shellcheck source=lib/wezterm.sh
+    source lib/wezterm.sh
+    if [[ "$(wezterm_revision_in "$staged_lua")" != "$(wezterm_revision_of "$staged_lua")" ]]; then
+        fail "configs/wezterm.lua: its CONFIG_REVISION stamp is stale"
+        note "bash lib/wezterm.sh --stamp && git add configs/wezterm.lua"
+        ((errors++))
+    fi
+    rm -f "$staged_lua"
 done
 
 # Check 6: denylisted words (employer and host identifiers) in staged content

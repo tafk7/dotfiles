@@ -117,7 +117,7 @@ share the left pinky).
 | OpenCode | Alt+M model list; Ctrl+PgUp/PgDn effort variants; TAFK delete keys; Ctrl+Z undo | done (`9ceb032`) |
 | pi | New keybindings file, deployed by `bin/ai-config`: thinking level, model, TAFK delete keys, Ctrl+Z undo | done (`9ceb032`) |
 | keymap | Thumb pairs rated by feel; raw keys; intents and known issues to match | done |
-| Windows Terminal | The same Ctrl+Shift keys and fullscreen in `configs/windows-terminal-keybindings.jsonc`; ScrLk and Pause there need the firmware fallback. Font size keeps its defaults | done |
+| Windows Terminal | Its fragment, `configs/windows-terminal-keybindings.jsonc`, was retired on 2026-10-29: WezTerm is the only client | retired |
 | tmux, Codex | Shift+Tab native again; Alt+Shift+J/K/L permission modes; Ctrl+Shift+Tab goes on to the program | branch `mode-keys` |
 | tmux | Shift+PgUp in Claude adds three wheel-ups when Claude is at its bottom, which 2.1.312 holds against the first three | branch `mode-keys` |
 | Defy | The four thumb keys, in Bazecor | yours to do; re-export the backup over `configs/keyboard/dygma-defy.json` |

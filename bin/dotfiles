@@ -25,6 +25,7 @@ source "$DOTFILES_DIR/lib/outcomes.sh"
 source "$DOTFILES_DIR/lib/operation.sh"
 source "$DOTFILES_DIR/lib/profile.sh"
 source "$DOTFILES_DIR/lib/verify.sh"
+source "$DOTFILES_DIR/lib/wezterm.sh"
 source "$DOTFILES_DIR/lib/staleness.sh"
 source "$DOTFILES_DIR/lib/environment.sh"
 source "$DOTFILES_DIR/lib/refresh.sh"
@@ -356,6 +357,7 @@ cmd_verify() {
         verify_ai
         verify_host
         verify_environment
+        verify_wezterm
         staleness_report
         [[ "$latest" != true ]] || verify_upstream
         if [[ "$smoke" == true ]]; then

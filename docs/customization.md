@@ -275,8 +275,8 @@ A conversation ends at the next prompt (you ran the command, or pressed Ctrl+C
 on the line), when you change directory, and with `Alt+Shift+I`. The next
 `Alt+I` then takes the command line as a new request. Every shell, and so every
 tmux pane, has its own conversation. Inside and outside tmux the keys are the
-same: neither tmux nor the tracked WezTerm and Windows Terminal configurations
-bind `Alt+I` or `Alt+Shift+I`.
+same: neither tmux nor the tracked WezTerm configuration binds `Alt+I` or
+`Alt+Shift+I`.
 
 `bin/ai-command` reads these at each request; export them, for example from
 `~/.shell.local`:

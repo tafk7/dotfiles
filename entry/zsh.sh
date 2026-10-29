@@ -125,7 +125,7 @@ bindkey '^Z' undo
 bindkey '^[[Z' spell-word         # Shift+Tab
 
 # Shift means the removed range is also published to tmux's shared buffer.
-# Windows Terminal transports these chords as virtual F13-F16 sequences.
+# WezTerm sends these chords as Shift+F1-F4 sequences (configs/wezterm.lua).
 _tafk_cut_backward_word() {
     local before="$LBUFFER" removed
     zle backward-kill-word
