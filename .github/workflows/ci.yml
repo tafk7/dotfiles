@@ -88,6 +88,9 @@ jobs:
           ./bin/opencode-contract --help    >/dev/null
           ./bin/viz --help                  >/dev/null
           ./bin/ai-command --help           >/dev/null
+          ./bin/dotfiles --help             >/dev/null
+          ./bin/verify --help               >/dev/null
+          ./bin/ai-update --help            >/dev/null
 
       - name: Codex installer ownership behavior
         run: |
@@ -230,10 +233,16 @@ jobs:
           chown test:test /home/test/assert.sh
           sudo -u test -H bash /home/test/assert.sh
 
-      - name: Re-run setup and verify bash profile
+      - name: Re-run setup and verify the install
         run: |
+          set -euo pipefail
           su - test -c 'cd ~/dev/dotfiles && ./setup.sh --bash'
-          su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash'
+          # Setup recorded the bash tier in the machine profile; dotfiles verify
+          # checks the install against it, and exits 0 only when nothing is
+          # left to converge, every check could be made, and nothing needs
+          # attention. The older bin/verify name maps onto it.
+          su - test -c 'cd ~/dev/dotfiles && ./bin/dotfiles profile && ./bin/dotfiles verify -v'
+          su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash >/dev/null'
 
   startup-benchmark:
     name: Shell startup benchmark

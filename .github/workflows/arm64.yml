@@ -15,6 +15,7 @@ on:
       - installers/**
       - lib/**
       - setup.sh
+      - bin/dotfiles
       - bin/verify
       - tests/fixtures/eget-assets/**
       - .github/workflows/arm64.yml
@@ -26,6 +27,7 @@ on:
       - installers/**
       - lib/**
       - setup.sh
+      - bin/dotfiles
       - bin/verify
       - tests/fixtures/eget-assets/**
       - .github/workflows/arm64.yml
@@ -109,5 +111,9 @@ jobs:
           apt-get install -y --no-install-recommends file >/dev/null
           sudo -u test -H bash /home/test/assert-arm64.sh
 
-      - name: Verify bash profile
-        run: su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash'
+      - name: Verify the install
+        run: |
+          set -euo pipefail
+          # Against the profile setup recorded (the bash tier); see ci.yml.
+          su - test -c 'cd ~/dev/dotfiles && ./bin/dotfiles profile && ./bin/dotfiles verify -v'
+          su - test -c 'cd ~/dev/dotfiles && ./bin/verify --tier bash >/dev/null'
