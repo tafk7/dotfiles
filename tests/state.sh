@@ -16,12 +16,18 @@ wait "$first"; wait "$second"
 assert_eq "$(preference_get feature.theme)" disabled "concurrent theme preference"
 assert_eq "$(preference_get feature.agent-badge)" enabled "concurrent badge preference"
 
-# A lock whose owner has created its pid file but not yet written it is held,
-# not stale: breaking it let two writers in, and one update was lost.
-mkdir "$DOTFILES_STATE_LOCK" && : > "$DOTFILES_STATE_LOCK/pid"
-DOTFILES_STATE_LOCK_ATTEMPTS=3 _state_lock_acquire 2>/dev/null && fail "a lock mid-write was broken"
-[[ -d "$DOTFILES_STATE_LOCK" ]] || fail "a lock mid-write was removed"
-rm -rf -- "$DOTFILES_STATE_LOCK"
+# Many writers at once each keep their update. The directory lock this
+# replaced lost one now and then: a writer judged a just-released lock stale and
+# removed the next writer's.
+pids=()
+for i in $(seq 1 12); do
+    preference_set "test.writer-$i" "value-$i" & pids+=($!)
+done
+for pid in "${pids[@]}"; do wait "$pid" || fail "a concurrent writer failed"; done
+for i in $(seq 1 12); do
+    assert_eq "$(preference_get "test.writer-$i")" "value-$i" "concurrent writer $i"
+done
+
 state_validate || fail "valid state rejected"
 THEME_REQUEST=""
 feature_enabled theme && fail "disabled theme preference did not persist"
@@ -29,17 +35,32 @@ THEME_REQUEST=enabled
 feature_enabled theme || fail "explicit theme enable did not override stored preference"
 THEME_REQUEST=""
 
-mkdir -p "$DOTFILES_STATE_LOCK"
-printf '99999999\n' > "$DOTFILES_STATE_LOCK/pid"
-preference_set feature.theme enabled
-assert_eq "$(preference_get feature.theme)" enabled "stale lock recovery"
+# hold_lock SECONDS: hold the state lock in one process, as a writer would.
+hold_lock() { ( exec {fd}>>"$DOTFILES_STATE_LOCK"; flock "$fd"; exec sleep "$1" ) & holder=$!; sleep 0.2; }
 
-mkdir -p "$DOTFILES_STATE_LOCK"
-printf '%s\n' "$$" > "$DOTFILES_STATE_LOCK/pid"
-DOTFILES_STATE_LOCK_ATTEMPTS=2 preference_set feature.theme disabled >/dev/null 2>&1 \
+# A held lock makes a writer wait, and give up at its timeout with the value
+# unchanged. A writer with time to spare waits it out, however long it is held:
+# the directory lock this replaced broke a lock it judged stale after a second
+# or two, and a writer stalled that long lost its update.
+hold_lock 2.5
+DOTFILES_STATE_LOCK_TIMEOUT=0.3 preference_set feature.theme enabled >/dev/null 2>&1 \
     && fail "live state lock was stolen"
-[[ -d "$DOTFILES_STATE_LOCK" ]] || fail "live state lock was removed"
-rm -rf "$DOTFILES_STATE_LOCK"
+assert_eq "$(preference_get feature.theme)" disabled "write under a live lock"
+DOTFILES_STATE_LOCK_TIMEOUT=10 preference_set feature.theme enabled || fail "a waiting writer gave up"
+kill -0 "$holder" 2>/dev/null && fail "a lock held for 2.5 s was broken"
+assert_eq "$(preference_get feature.theme)" enabled "write after a long-held lock"
+wait "$holder" 2>/dev/null || true
+
+# A holder killed outright leaves nothing behind: the next writer goes ahead.
+hold_lock 30
+kill -9 "$holder"; wait "$holder" 2>/dev/null || true
+DOTFILES_STATE_LOCK_TIMEOUT=1 preference_set feature.theme disabled || fail "a killed holder kept the lock"
+assert_eq "$(preference_get feature.theme)" disabled "write after a killed holder"
+
+# The old directory lock, left by an earlier version, doesn't block.
+mkdir -p "$DOTFILES_STATE_DIR/.lock" && printf '%s\n' "$$" > "$DOTFILES_STATE_DIR/.lock/pid"
+DOTFILES_STATE_LOCK_TIMEOUT=1 preference_set feature.theme enabled || fail "the old lock directory blocked a write"
+rm -rf -- "$DOTFILES_STATE_DIR/.lock"
 
 ledger_record demo yes dotfiles installed 1.0 "$HOME/.local/bin/demo" ok
 line="$(ledger_line demo)"
