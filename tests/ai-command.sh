@@ -173,9 +173,12 @@ for shell in bash zsh; do
         expect "$_ai_command_out" "ai-command: claude failed: API Error: 529 overloaded (stub)" "failure"
         expect "$_AI_COMMAND_SESSION_ID/$_AI_COMMAND_ACTIVE/$_AI_COMMAND_LAST_RESULT" "/1/echo stub 3" "state after a failure"
         _ai_command_plan "echo stub 3"
+        # Ctrl+C the trap took before the backend started: the turn is cancelled
+        # and no request is made.
+        calls=$(wc -l < "$AI_STUB_DIR/calls.jsonl")
         _ai_command_interrupted=1
         ! _ai_command_send "echo stub 3" "again" || die "an interrupted turn succeeded"
-        expect "$_ai_command_out" "ai-command: cancelled" "Ctrl+C, whatever the exit status"
+        expect "$_ai_command_out/$(wc -l < "$AI_STUB_DIR/calls.jsonl")" "ai-command: cancelled/$calls" "Ctrl+C before the request"
         _ai_command_interrupted=0
         rm "$AI_STUB_DIR/mode"
         _ai_command_plan "echo stub 3"
@@ -193,7 +196,7 @@ for shell in bash zsh; do
         printf "%s %s %s\n" "$first" "$second" "$third"
     ' _ "$TEST_ROOT/work") || fail "$shell widget state"
     read -r first second third <<< "$ids"
-    assert_eq "$(stub_calls)" 6 "$shell backend calls"
+    assert_eq "$(stub_calls)" 5 "$shell backend calls"
     assert_eq "$(stub_call 1 'opt("--session-id")')" "$first" "$shell first conversation"
     stdin_has 1 "Shell: $shell"
     stdin_has 1 "Working directory: $TEST_ROOT/work"$'\n'
@@ -204,7 +207,7 @@ for shell in bash zsh; do
     stdin_has 3 "Working directory: $TEST_ROOT/work/sub"
     stdin_has 3 $'The command line reads:\n<command-line>\necho stub 2\n</command-line>\n\nCorrection: add -print'
     assert_eq "$(stub_call 4 'opt("--resume")')" "$second" "$shell failed correction"
-    assert_eq "$(stub_call 6 'opt("--session-id")')" "$third" "$shell conversation after a failure"
+    assert_eq "$(stub_call 5 'opt("--session-id")')" "$third" "$shell conversation after a failure"
 done
 
 # The Bash widget itself, without a terminal: buffer, cursor, INT trap.
@@ -319,6 +322,8 @@ e2e() {
     tk_until tk_screen_has 'refine>' "$pane" || fail "$shell: no refine prompt before the slow call"
     tk_raw 'slower\r'
     tk_until tk_screen_has 'ai-command: asking claude... (Ctrl+C cancels)' "$pane" || fail "$shell: no status"
+    # Once the request is under way; Ctrl+C before it starts is checked below.
+    tk_until test -s "$AI_STUB_DIR/slow.pid" || fail "$shell: the slow request never started"
     tk_raw '\003'
     tk_until tk_screen_has 'ai-command: cancelled' "$pane" || fail "$shell: no cancel message: $(ti capture-pane -p -t "$pane")"
     tk_until tk_lacks 'asking claude' ti capture-pane -p -t "$pane" || fail "$shell: status left on screen"

@@ -54,7 +54,9 @@ _ai_command_plan() {
 # the error and the conversation is dropped: a failed turn is never resumed.
 # Request and command line go on stdin, out of the process list. The widgets'
 # INT trap sets _ai_command_interrupted: Ctrl+C during Python's startup ends
-# the backend with a traceback rather than its own exit status.
+# the backend with a traceback rather than its own exit status, and Ctrl+C
+# just before the backend starts reaches only the trap. Either way the turn is
+# cancelled: no backend is started after one, and an answer is not used.
 _ai_command_send() {
     local line="$1" feedback="${2:-}" backend="$DOTFILES_DIR/bin/ai-command" rc
     local -a args=(--stdin --cwd "$PWD")
@@ -75,6 +77,9 @@ _ai_command_send() {
     if [[ ! -x "$backend" ]]; then
         _ai_command_out="ai-command: $backend is missing"
         rc=127
+    elif (( ${_ai_command_interrupted:-0} )); then
+        _ai_command_out=""
+        rc=130
     elif [[ "$_ai_command_mode" == new ]]; then
         _ai_command_out=$(printf '%s' "$line" | "$backend" "${args[@]}" 2>&1)
         rc=$?
@@ -82,7 +87,7 @@ _ai_command_send() {
         _ai_command_out=$(printf '%s\0%s' "$feedback" "$line" | "$backend" "${args[@]}" 2>&1)
         rc=$?
     fi
-    if (( rc == 0 )); then
+    if (( rc == 0 && ! ${_ai_command_interrupted:-0} )); then
         _AI_COMMAND_ACTIVE=1
         _AI_COMMAND_CWD=$PWD
         _AI_COMMAND_LAST_RESULT=$_ai_command_out
