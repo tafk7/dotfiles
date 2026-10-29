@@ -1,8 +1,9 @@
 # Secure terminal-only visualization viewer with live reload
 
-**Status:** first implementation on branch `viz-ssh`, 2026-10-28, revised
-after an independent security review. Not yet tried from the Windows laptop:
-see [still to verify](#still-to-verify). Created 2026-10-26 as an idea note;
+**Status:** implemented, revised after an independent security review; on
+`main` since 2026-10-28. On 2026-10-29 it worked from the Windows laptop
+through the `LocalForward` (steps 1 to 3 of [still to verify](#still-to-verify));
+the rest of that list is still open. Created 2026-10-26 as an idea note;
 this revision records the decided design.
 
 ## User need
