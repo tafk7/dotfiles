@@ -131,7 +131,11 @@ model_log="$TEST_ROOT/codex-model.log"
 codex_model=$(stub codex "$model_log" --codex-modes)
 tk_raw '\em'
 on_screen '› /model' "$codex_model" Codex
-tk_raw 'draft\em'
+# Sent, not just typed: the prompt is empty again.
+on_screen 'Ask Codex to do anything' "$codex_model" Codex
+tk_raw 'draft'
+on_screen '› draft' "$codex_model" Codex
+tk_raw '\em'
 said 'Codex: /model needs an empty prompt and no turn running'
 for agent in claude opencode pi; do
     log="$TEST_ROOT/model-$agent.log"
