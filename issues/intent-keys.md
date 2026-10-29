@@ -1,13 +1,15 @@
 # Intent keys: one key per intent, fitted to the Defy
 
-**Status:** built (2026-10-28) on branch `keymap`, except the Defy's thumb
-keys, which are set in Bazecor. The proposal page was reviewed through four
+**Status:** built; on `main` since 2026-10-28, except the Defy's thumb keys,
+which are set in Bazecor. Revised on 2026-10-29: Alt+Enter queues (replacing
+Shift+F8) and Alt+Shift+Enter takes back, Alt+Z goes back a turn, Ctrl+Z
+undoes everywhere and never suspends, and Alt+M reaches Codex's `/model`. The proposal page was reviewed through four
 rounds; this records what was decided. Tested in private tmux servers (3.4,
 3.7, 3.8) with stub agents; Shift+Tab's mode steps were also checked against
 the real Claude 2.1.312. The [To check](#to-check) items need the laptop or
 the real agents.
 
-**Revised (2026-10-28), branch `mode-keys`:** Shift+Tab stepping through only
+**Revised (2026-10-28), now on `main`:** Shift+Tab stepping through only
 three modes felt janky, so Shift+Tab is each agent's own cycle again and three
 keys on the home row jump to one mode each, a dial from most access to least:
 Alt+Shift+J yolo, Alt+Shift+K auto, Alt+Shift+L edits only

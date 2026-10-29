@@ -1,7 +1,8 @@
 # Inline conversational AI shell-command generator
 
-**Status:** first implementation on branch `ai-command`, not merged
-(2026-10-27). See [First implementation](#first-implementation-2026-10-27).
+**Status:** implemented; on `main` since 2026-10-28. A Ctrl+C just before the
+request starts cancels it too (2026-10-29, `ed6e08b`). See
+[First implementation](#first-implementation-2026-10-27).
 
 ## User motivation and use case
 

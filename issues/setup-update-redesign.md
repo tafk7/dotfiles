@@ -1,6 +1,8 @@
 # Install, update, and refresh: review and redesign
 
-Status: proposal, revision 2. Nothing here is implemented. Revision 2 takes in
+Status: implemented, on `main` since 2026-10-27; what was built and where it
+departs from this proposal is in [the status](setup-update-status.md). This is
+the proposal as written, revision 2, which takes in
 [the review](setup-update-redesign-review.md): it corrects findings the review
 showed to be wrong or overstated, and replaces the contracts it showed to be
 underspecified. File references are to `352b71e`. Claims marked *observed* were

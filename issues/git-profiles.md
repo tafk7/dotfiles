@@ -1,7 +1,7 @@
 # Spec: git profiles — per-repo identity, auth, and signing
 
-**Status:** implemented on branch `git-profiles`, not merged (2026-10-27). Not
-yet adopted on any machine (§9.3). Where the implementation departs from the
+**Status:** implemented; on `main` since 2026-10-28. Not yet adopted on any
+machine (§9.3). Where the implementation departs from the
 proposal, the sections below describe what was built, and §8 lists each
 deviation and why.
 **Problem:** setup couples git identity to the install track (flags, a warning,
