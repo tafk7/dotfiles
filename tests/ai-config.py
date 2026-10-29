@@ -208,6 +208,12 @@ custom_binding = "ctrl-k"
         self.assertEqual(data['keybinds']['messages.copy'], '<leader>w')
         self.assertTrue(data['keybinds']['session.first'].startswith('ctrl+home,'))
         self.assertTrue(data['keybinds']['session.last'].startswith('ctrl+end,'))
+        # Home/End move in the prompt line, as in the shell, Codex and pi; only
+        # Ctrl+Home/End jump through the session.
+        self.assertNotIn('home', data['keybinds']['session.first'].split(','))
+        self.assertNotIn('end', data['keybinds']['session.last'].split(','))
+        self.assertIn('home', data['keybinds']['input.line.home'].split(','))
+        self.assertIn('end', data['keybinds']['input.line.end'].split(','))
         self.run_config('opencode', '--check')
 
     def test_mod_plugins_require_the_claude_floor(self):

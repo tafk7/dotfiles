@@ -1,7 +1,9 @@
 {
   "keybinds": {
-    "session.first": "ctrl+home,ctrl+g,home,alt+home",
-    "session.last": "ctrl+end,ctrl+alt+g,end",
+    "session.first": "ctrl+home,ctrl+g,alt+home",
+    "session.last": "ctrl+end,ctrl+alt+g",
+    "input.line.home": "home",
+    "input.line.end": "end,ctrl+e",
     "model.list": "alt+m,<leader>m",
     "variant.cycle": "ctrl+pageup,ctrl+pagedown",
     "input.undo": "ctrl+z,ctrl+-,super+z",

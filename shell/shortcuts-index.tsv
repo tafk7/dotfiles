@@ -299,6 +299,7 @@ shell│cxhc│Continue last Codex (alt dir)│CODEX_HOME=~/.codex-alt codex res
 shell│cxhp│One-off Codex prompt (alt dir)│CODEX_HOME=~/.codex-alt codex exec
 shell│oc│Launch opencode TUI (new session)│opencode
 opencode│Ctrl+Home / Ctrl+End│First / last message of the session│cli.json keybinds session.first/session.last
+opencode│Home / End│Start / end of the prompt line (not the session's first / last message)│cli.json keybinds input.line.home/input.line.end
 opencode│Ctrl+Tab│Next session tab; Ctrl+Shift+Tab is its previous (Alt+Up belongs to tmux)│session.tab.next
 opencode│Alt+M│Model list│cli.json keybinds model.list
 opencode│Ctrl+PgUp / Ctrl+PgDn│Cycle the model's effort variants│cli.json keybinds variant.cycle

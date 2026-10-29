@@ -34,7 +34,7 @@ standing in for WezTerm; "source" means read in the tagged release (Codex
 | Fullscreen | `tui: "fullscreen"`; default depends on install history while nonessential traffic is off | Default (`tui.fullscreen_transcript = true`, `tui.alternate_screen = "auto"`) | Always, for the full interface |
 | Mouse capture | `CLAUDE_CODE_DISABLE_MOUSE` / `_CLICKS` | On; off only when tmux `mouse` is off | `mouse` in `cli.json` |
 | Inline alternative | Classic renderer (`tui: "default"`, `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1`) | `fullscreen_transcript = false` or `--no-alt-screen` (§1.2.21) | `opencode mini`, without copy or export (§1.2.25) |
-| Scroll keys | PgUp/PgDn (half page), Ctrl+Home/End, wheel | PgUp/PgDn, Ctrl+Home/End, Alt+`<`/`>`, wheel | PgUp/PgDn (half page), Ctrl+Home/End (from `cli.json`) and Home/End, Ctrl+Alt+Y/E (line), wheel |
+| Scroll keys | PgUp/PgDn (half page), Ctrl+Home/End, wheel | PgUp/PgDn, Ctrl+Home/End, Alt+`<`/`>`, wheel | PgUp/PgDn (half page), Ctrl+Home/End (from `cli.json`, which gives Home/End to the prompt line), Ctrl+Alt+Y/E (line), wheel |
 | Transcript search | `Ctrl+O`, then `/`, `n`/`N`, `{`/`}` between prompts | `F3`, then Ctrl+P/Ctrl+N | none (the timeline filters prompts only) |
 | Start a selection from the keyboard | no (§1.2.18) | `Ctrl+Space`, anchored at the top-left of the view (§1.2.19) | no (§1.2.23) |
 | Extend / copy a selection | Shift+arrows, Shift+Home/End; `Ctrl+Shift+C`, `Ctrl+C`; copy on mouse release | arrows; `Ctrl+C`, `Ctrl+Shift+C`, `Ctrl+Insert`, Enter; copy on mouse release in tmux | mouse only; copy on release |
