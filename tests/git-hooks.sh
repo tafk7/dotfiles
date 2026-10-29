@@ -63,4 +63,17 @@ if (cd "$repo" && DOTFILES_DENYLIST="$TEST_ROOT/missing" hooks/pre-commit 2>/dev
     echo "FAIL: unreadable denylist was ignored" >&2; exit 1
 fi
 
+# The WezTerm config's revision stamp must match its staged content.
+mkdir -p "$repo/configs"
+cp "$ROOT/lib/wezterm.sh" "$repo/lib/wezterm.sh"
+cp "$ROOT/configs/wezterm.lua" "$repo/configs/wezterm.lua"
+git -C "$repo" add lib/wezterm.sh configs/wezterm.lua
+(cd "$repo" && hooks/pre-commit) || { echo "FAIL: a current WezTerm stamp was blocked" >&2; exit 1; }
+printf -- '-- an edit\n' >> "$repo/configs/wezterm.lua"
+git -C "$repo" add configs/wezterm.lua
+if (cd "$repo" && hooks/pre-commit 2>/dev/null); then
+    echo "FAIL: a stale WezTerm stamp was not blocked" >&2; exit 1
+fi
+(cd "$repo" && bash lib/wezterm.sh --stamp >/dev/null && git add configs/wezterm.lua && hooks/pre-commit) \
+    || { echo "FAIL: the restamped WezTerm config was blocked" >&2; exit 1; }
 printf 'git-hooks: ok\n'

@@ -14,8 +14,8 @@ sandbox_mode = "workspace-write"
 [history]
 persistence = "save-all"
 
-# TAFK line-editing semantics for the Codex composer. Windows Terminal often
-# encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
+# TAFK line-editing semantics for the Codex composer. Terminals often
+# encode Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
 [tui]
 status_line = ["context-used", "total-output-tokens", "model"]
 # Codex's default title, plus the thread id, which tells review (prefix+f in

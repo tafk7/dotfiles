@@ -181,11 +181,10 @@ yo <command>              # print output and copy it to the clipboard
   press, and where sibling programs disagree. `keymap why CHORD` traces one
   chord, and `keymap check` (run in CI) catches new broken keys. See
   [docs/keybindings.md](docs/keybindings.md).
-- **Windows Terminal:** merge
-  [`configs/windows-terminal-keybindings.jsonc`](configs/windows-terminal-keybindings.jsonc)
-  into `settings.json`.
 - **WezTerm:** copy [`configs/wezterm.lua`](configs/wezterm.lua) to
-  `%USERPROFILE%\.wezterm.lua`.
+  `%USERPROFILE%\.wezterm.lua`, and add `SendEnv LC_TAFK_WEZTERM` to the Host
+  block of your Windows `~/.ssh/config`: the copy then reports its revision
+  over SSH, and `dotfiles verify` says when it needs copying again.
 - **WSL:** adds `pbcopy`/`pbpaste`, `cdwin`, and `open`. To use a Windows SSH
   agent such as Bitwarden or 1Password, run `./bin/ssh-bridge enable`.
 

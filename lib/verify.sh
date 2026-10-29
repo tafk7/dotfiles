@@ -2,8 +2,8 @@
 # Checks behind `dotfiles verify`. Each prints outcome records
 # (lib/outcomes.sh) and changes nothing; the command renders them and exits on
 # their classes. Sections: checkout, state, profile, components, configs,
-# editor plugins, AI, Docker, local sandboxes, Tailscale, environment, running
-# (lib/staleness.sh), and upstream (--latest).
+# editor plugins, AI, Docker, local sandboxes, Tailscale, environment, the
+# WezTerm copy on Windows, running (lib/staleness.sh), and upstream (--latest).
 
 [[ -n "${_DOTFILES_VERIFY_LOADED:-}" ]] && return 0
 _DOTFILES_VERIFY_LOADED=1
@@ -277,6 +277,27 @@ verify_host() {
     fi
     if grep -Fxq tailscale <<< "$expected"; then
         _verify_host_section=Tailscale tail_verify_checks true
+    fi
+}
+
+# WezTerm runs on Windows from a copy of configs/wezterm.lua, which sends its
+# revision stamp over SSH (lib/wezterm.sh). Inside tmux the session's value,
+# updated at each attach, is the current one; a pane keeps what it started
+# with. Nothing to compare without a stamp or an SSH session.
+verify_wezterm() {
+    local section=Terminal want have="${LC_TAFK_WEZTERM:-}" line
+    want="$(wezterm_revision_in "$DOTFILES_DIR/configs/wezterm.lua")" || return 0
+    if [[ -n "${TMUX:-}" ]] && line="$(tmux show-environment LC_TAFK_WEZTERM 2>/dev/null)"; then
+        have=""
+        [[ "$line" != LC_TAFK_WEZTERM=* ]] || have="${line#*=}"
+    fi
+    if [[ -z "$have" ]]; then
+        [[ -n "${SSH_CONNECTION:-}" ]] || return 0
+        outcome advisory "$section" "WezTerm config" "not reported over SSH; the Windows ssh config's Host block needs SendEnv LC_TAFK_WEZTERM"
+    elif [[ "$have" == "$want" ]]; then
+        outcome ok "$section" "WezTerm config" "the copy on Windows matches configs/wezterm.lua ($want)"
+    else
+        outcome advisory "$section" "WezTerm config" "the copy on Windows ($have) is not configs/wezterm.lua ($want); copy it to %USERPROFILE%\\.wezterm.lua"
     fi
 }
 

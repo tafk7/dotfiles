@@ -6,8 +6,8 @@
 # `/keymap` can inspect and persist bindings from inside Codex. When changing
 # bindings there, mirror the resulting tui.keymap entries back into this file.
 
-# TAFK line-editing semantics for the Codex composer. Windows Terminal often
-# encodes Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
+# TAFK line-editing semantics for the Codex composer. Terminals often
+# encode Ctrl+Backspace as Ctrl+H, so accept both names for word deletion.
 [tui.keymap.editor]
 delete_backward = "backspace"
 delete_backward_word = ["ctrl-backspace", "ctrl-h"]

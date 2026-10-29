@@ -80,4 +80,19 @@ verify
 assert_eq "$VERIFY_RC" 3 "verify during an operation"
 kill "$holder"
 
+# The WezTerm copy on Windows: its revision, sent over SSH, against the repo's.
+# Nothing is said outside SSH; a missing or different revision is a note.
+revision="$(source "$ROOT/lib/wezterm.sh"; wezterm_revision_in "$ROOT/configs/wezterm.lua")"
+[[ "$revision" == "$(source "$ROOT/lib/wezterm.sh"; wezterm_revision_of "$ROOT/configs/wezterm.lua")" ]] \
+    || fail "configs/wezterm.lua's stamp is stale (bash lib/wezterm.sh --stamp)"
+VERIFY_OUTPUT="$(env -u TMUX -u SSH_CONNECTION -u LC_TAFK_WEZTERM "$ROOT/bin/dotfiles" verify -v 2>&1)" || true
+[[ "$VERIFY_OUTPUT" != *"WezTerm config"* ]] || fail "WezTerm checked outside SSH: $VERIFY_OUTPUT"
+VERIFY_OUTPUT="$(env -u TMUX -u LC_TAFK_WEZTERM SSH_CONNECTION='10.0.0.2 1 10.0.0.1 22' "$ROOT/bin/dotfiles" verify 2>&1)" || true
+[[ "$VERIFY_OUTPUT" == *"note WezTerm config: not reported over SSH"* ]] || fail "an unreported WezTerm revision: $VERIFY_OUTPUT"
+VERIFY_OUTPUT="$(env -u TMUX SSH_CONNECTION='10.0.0.2 1 10.0.0.1 22' LC_TAFK_WEZTERM=000000000000 "$ROOT/bin/dotfiles" verify 2>&1)" || true
+[[ "$VERIFY_OUTPUT" == *"note WezTerm config: the copy on Windows (000000000000) is not configs/wezterm.lua ($revision)"* ]] \
+    || fail "a stale WezTerm copy: $VERIFY_OUTPUT"
+VERIFY_OUTPUT="$(env -u TMUX SSH_CONNECTION='10.0.0.2 1 10.0.0.1 22' LC_TAFK_WEZTERM="$revision" "$ROOT/bin/dotfiles" verify -v 2>&1)" || true
+[[ "$VERIFY_OUTPUT" == *"ok   WezTerm config: the copy on Windows matches"* ]] || fail "a current WezTerm copy: $VERIFY_OUTPUT"
+
 printf 'dotfiles-verify: ok\n'
