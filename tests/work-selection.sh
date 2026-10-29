@@ -88,13 +88,28 @@ exit 1
 chmod +x "$TEST_ROOT/verify-bin/docker"
 for platform in wsl ubuntu; do
     output="$(DOTFILES_TEST_PLATFORM="$platform" DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_OS_VERSION=24.04 \
-        PATH="$TEST_ROOT/verify-bin:$TEST_SYSTEM_PATH" "$ROOT/bin/verify" --tier work 2>&1 || true)"
-    [[ "$output" == *"Docker readiness"* ]] || fail "verify skipped Docker on $platform"
+        PATH="$TEST_ROOT/verify-bin:$TEST_SYSTEM_PATH" "$ROOT/bin/dotfiles" verify -v --tier work 2>&1 || true)"
+    [[ "$output" == *$'\nDocker\n'* ]] || fail "verify skipped Docker on $platform: $output"
     if [[ "$platform" == wsl ]]; then
-        [[ "$output" != *"Local sandbox readiness"* && "$output" != *"sbx package missing"* ]] \
-            || fail "verify checked sbx where it does not apply"
+        [[ "$output" != *"Local sandboxes"* && "$output" != *"sbx package missing"* ]] \
+            || fail "verify checked sbx where it does not apply: $output"
     else
-        [[ "$output" == *"Local sandbox readiness"* ]] || fail "verify skipped sbx where it applies"
+        [[ "$output" == *$'\nLocal sandboxes\n'* ]] || fail "verify skipped sbx where it applies: $output"
+    fi
+done
+
+# --diagnose adds sbx's bounded local diagnostics to the sandbox checks.
+printf '#!/bin/sh\necho "sbx $*" >> "%s/sbx.log"\n' "$TEST_ROOT" > "$TEST_ROOT/verify-bin/sbx"
+chmod +x "$TEST_ROOT/verify-bin/sbx"
+for diagnose in "" --diagnose; do
+    : > "$TEST_ROOT/sbx.log"
+    output="$(DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_OS_VERSION=24.04 \
+        PATH="$TEST_ROOT/verify-bin:$TEST_SYSTEM_PATH" "$ROOT/bin/dotfiles" verify -v --tier work $diagnose 2>&1 || true)"
+    if [[ -n "$diagnose" ]]; then
+        grep -Fxq 'sbx diagnose' "$TEST_ROOT/sbx.log" || fail "--diagnose did not run sbx diagnose: $(<"$TEST_ROOT/sbx.log")"
+        [[ "$output" == *"ok   bounded local sbx diagnostics"* ]] || fail "--diagnose: $output"
+    else
+        grep -Fxq 'sbx diagnose' "$TEST_ROOT/sbx.log" && fail "sbx diagnose ran without --diagnose"
     fi
 done
 
