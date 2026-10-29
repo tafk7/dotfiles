@@ -8,5 +8,8 @@
   "tui.editor.deleteToLineStart": ["alt+backspace", "ctrl+u"],
   "tui.editor.deleteToLineEnd": ["alt+delete", "ctrl+k"],
   "tui.editor.undo": ["ctrl+z", "ctrl+-"],
-  "app.suspend": []
+  "app.suspend": [],
+  "app.session.tree": ["alt+z"],
+  "tui.altScreen.lineUp": ["shift+pageUp"],
+  "tui.altScreen.lineDown": ["shift+pageDown"]
 }

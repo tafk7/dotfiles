@@ -14,6 +14,9 @@
 #                                at the bottom against the first three
 #                                wheel-ups, so those come first; it shows
 #                                "Jump to bottom" once it has let go
+#   pi                           its line scroll (Shift+PgUp/PgDn,
+#                                configs/ai/pi/keybindings.json), pressed that
+#                                many times
 #   a compose pane               its agent, as PgUp is forwarded
 #   a shell                      copy-mode that many lines up, which exits at
 #                                the bottom; down at the bottom does nothing
@@ -36,6 +39,13 @@ IFS='|' read -r in_mode command alternate mouse sgr width height < <(tmux displa
 
 if [[ "$in_mode" == 1 ]]; then
     tmux send-keys -t "$pane" -X -N "$lines" "scroll-$dir"
+    exit
+fi
+
+if [[ "$command" == pi ]]; then
+    key=S-PPage
+    [[ "$dir" == down ]] && key=S-NPage
+    tmux send-keys -t "$pane" -N "$lines" "$key"
     exit
 fi
 

@@ -57,7 +57,7 @@ already do. Bazecor codes are for the backup file.
 |---|---|---|---|
 | Right thumb, beside Symbols (74) | Ctrl | 224 | Ctrl chords on left-hand keys turn two-handed; Ctrl+Alt becomes cross-hand |
 | Right thumb, beside Enter (78) | Ctrl+J | 269 | New line: the one new-line key every agent and key mode agrees on |
-| Right thumb, outermost (79) | Shift+F8 | 2113 | Queue a message for after the turn |
+| Right thumb, outermost (79) | Alt+Enter | (macro) | Queue a message for after the turn; with Shift, take queued messages back |
 | Left thumb, under Copy (71) | Ctrl+Alt+V | 793 | Paste a screenshot: WezTerm uploads it to the host |
 
 ScrLk and Pause keep their codes. WezTerm's Windows key table has no names for
@@ -75,8 +75,10 @@ share the left pinky).
 | Intent | Key | How each program gets it |
 |---|---|---|
 | Submit | Enter | native everywhere |
-| New line | New line key (Ctrl+J), or Shift+Enter | native everywhere; Ctrl+J also gets round Codex hearing Shift+Enter as Enter |
-| Queue a message for after the turn | Queue key (Shift+F8) | tmux sends Claude and OpenCode Ctrl+X Enter, Codex Tab, pi Alt+Enter |
+| New line | New line key (Ctrl+J), or Shift+Enter | native everywhere; Codex hears Shift+Enter as Enter, so tmux sends it Ctrl+J |
+| Send, steering a running turn | Enter | native everywhere |
+| Queue a message for after the turn | Alt+Enter (the Queue key) | tmux sends Claude and OpenCode Ctrl+X Enter, Codex Tab, pi Alt+Enter; a compose pane sends its draft. Replaces Shift+F8 |
+| Take queued messages back | Alt+Shift+Enter | tmux sends Claude Up and pi Alt+Up (all of them), Codex Shift+Left (the last); OpenCode opens its queue (Ctrl+X Q), where Ctrl+U takes one back |
 | Compose box | Alt+V | tmux (unchanged) |
 | Compose, full pane | Alt+Shift+V | tmux; with no box, it presses the program's own editor key: Claude, Codex and pi Ctrl+G, OpenCode Ctrl+X E, bash Ctrl+X Ctrl+E. Replaces Ctrl+Shift+G |
 | History search | Ctrl+R | native (Claude, Codex, bash) |
@@ -85,17 +87,17 @@ share the left pinky).
 | Reasoning effort | Ctrl+PgUp / Ctrl+PgDn | agent configs; Shift+↑↓ freed, so Shift+arrows only ever select. Claude Code and pi keep the prompt cache across an effort change on current models (the effort goes in as a message at the turn where it changes); other providers may rebuild it |
 | Pick a model | Alt+M | agent configs (Codex has no key; `/model`) |
 | Stop | Break, or Esc in agents | tmux sends Esc to an agent and Ctrl+C to anything else. A plain Ctrl+C would exit OpenCode and clear pi's prompt |
-| Undo the last turn | Esc Esc | native (OpenCode keeps Ctrl+X U) |
+| Undo the last turn | Alt+Z | tmux sends Claude and Codex Esc Esc (still native there), OpenCode Ctrl+X U; pi binds it to its session tree |
 | Answer a permission prompt | 1 / 2 / 3 | native (Codex numbers its options too) |
 | Paste a screenshot | Image key | WezTerm's upload (unchanged) |
 | Copy last reply | Shift+Copy | tmux (unchanged) |
-| Undo typing | Ctrl+Z | OpenCode and pi configs; tmux sends Claude Ctrl+_. Codex has no undo. bash keeps job control |
+| Undo typing | Ctrl+Z | never suspends: bash and zsh turn the terminal's suspend key off and bind Ctrl+Z to undo; Neovim, OpenCode and pi configs; tmux sends Claude Ctrl+_ and Codex (no undo) nothing. prefix+Ctrl+Z suspends the foreground program (`bin/tmux-suspend`) |
 | Read the conversation | ScrLk | review, every pane. The agents' own transcript keys stay; review uses Claude's Ctrl+O |
 | Review and search | Shift+ScrLk | review, every pane |
 | Select text in review | hold Shift and move; `h` toggles; a click places the cursor | Shift and `h` built: see [scrollback](scrollback-copy-compose.md) §3.3 |
 | Top, bottom | Ctrl+Home / Ctrl+End | native; Ctrl makes a move bigger, as on the arrows |
 | Focus a pane | Alt+E/S/D/F | tmux; at the left or right edge, the next window's facing pane, wrapping around (`tests/tmux-navigation.sh`) |
-| Fullscreen | Ctrl+Shift+Enter | WezTerm; Alt+Enter goes back to the programs (pi's follow-up, Codex's and OpenCode's new line) |
+| Fullscreen | Ctrl+Shift+Enter | WezTerm; Alt+Enter goes back to the programs (now the queue key) |
 | Clipboard export | always on | the toggle (`C-a E`, Pause, `CLIP OFF`) goes |
 | Font size | Ctrl+Shift+= / - / 0 | WezTerm; frees Ctrl+- (undo in Claude, OpenCode and pi) and Ctrl+0 (OpenCode's tab 10) |
 
@@ -107,7 +109,7 @@ share the left pinky).
 | WezTerm | Search goes; Ctrl+Shift+E/D/F reach tmux | done (`db657a1`) |
 | tmux | Clipboard export toggle goes | done (`d29d1f0`) |
 | WezTerm | Fullscreen on Ctrl+Shift+Enter; font size on Ctrl+Shift; Ctrl+Shift+G pass-through goes; ScrLk and Pause by raw code; F17/F18 rules go | done (`979d6d6`) |
-| tmux | Shift+F7 review and search; Shift+F9 stop; Shift+F8 queue; Alt+Shift+V full-pane compose; Ctrl+Shift+Tab; Shift+Tab with `tmux-agent-mode`; Ctrl+Z in Claude; a click in copy-mode places the cursor | done (`979d6d6`) |
+| tmux | Shift+F7 review and search; Shift+F9 stop; Alt+Enter queue, Alt+Shift+Enter take back, Alt+Z back a turn, Shift+Enter in Codex; Alt+Shift+V full-pane compose; Ctrl+Shift+Tab; Shift+Tab with `tmux-agent-mode`; Ctrl+Z in Claude; a click in copy-mode places the cursor | done (`979d6d6`) |
 | Codex | Editor and end of line back to its defaults (Ctrl+G, Ctrl+E); `next_permission_mode` on F7; effort on Ctrl+PgUp/PgDn | done (`979d6d6`) |
 | Claude | Alt+M model; Ctrl+PgUp/PgDn effort; Shift+↑↓ and Alt+P unbound | done (`9ceb032`) |
 | OpenCode | Alt+M model list; Ctrl+PgUp/PgDn effort variants; TAFK delete keys; Ctrl+Z undo | done (`9ceb032`) |

@@ -169,9 +169,12 @@ yo <command>              # print output and copy it to the clipboard
   intent in every agent. Shift+Tab is each agent's own mode cycle, and
   Alt+Shift+J, K and L are a dial from most access to least: yolo (bypass
   permissions), auto and edits only, in Claude, Codex and OpenCode. Alt+M
-  picks a model, Ctrl+PgUp/PgDn change the effort, Ctrl+Z undoes typing, and
-  Break (Pause) stops whatever runs. On the Defy, thumb keys queue a message
-  (Shift+F8), start a new line (Ctrl+J) and paste a screenshot (Ctrl+Alt+V).
+  picks a model, Ctrl+PgUp/PgDn change the effort, Ctrl+Z undoes typing (it
+  never suspends; prefix+Ctrl+Z does), Alt+Z goes back a turn, and Break
+  (Pause) stops whatever runs. Enter sends, Alt+Enter queues a message for
+  after the turn and Alt+Shift+Enter takes it back. On the Defy, thumb keys
+  queue a message (Alt+Enter), start a new line (Ctrl+J) and paste a
+  screenshot (Ctrl+Alt+V).
   WezTerm's fullscreen is Ctrl+Shift+Enter and its font size Ctrl+Shift+=/-/0.
 - **Key map:** `keymap open` maps every key across the Defy, Windows,
   WezTerm, tmux and the pane programs: who takes each chord, what it costs to

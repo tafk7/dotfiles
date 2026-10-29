@@ -119,6 +119,9 @@ bindkey '^[[3;5~' kill-word       # Ctrl+Delete
 bindkey $'\e\x08' backward-kill-line # Alt+Backspace (BS encoding)
 bindkey $'\e\x7f' backward-kill-line # Alt+Backspace (DEL encoding)
 bindkey '^[[3;3~' kill-line          # Alt+Delete
+# Ctrl+Z undoes and never suspends; see entry/bash.sh.
+[[ -t 0 ]] && stty susp undef 2>/dev/null
+bindkey '^Z' undo
 bindkey '^[[Z' spell-word         # Shift+Tab
 
 # Shift means the removed range is also published to tmux's shared buffer.

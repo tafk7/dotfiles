@@ -96,6 +96,16 @@ for flags in "--alt --mouse" "--alt"; do
     ti kill-window
 done
 
+# pi scrolls a line a press (configs/ai/pi/keybindings.json), so it gets the
+# key three times.
+log="$TEST_ROOT/pi.log"
+ti new-window -t test "$(tk_stub pi "$log" --alt --mouse)"
+tk_ready "$log"
+tk_wait '#{pane_current_command}' pi
+tk_raw "$S_PGUP$S_PGDN"
+tk_expect '^[[5;2~^[[5;2~^[[5;2~^[[6;2~^[[6;2~^[[6;2~' "Shift+PgUp/PgDn in pi" tk_input "$log"
+ti kill-window
+
 # @scroll-lines sets the step: six lines are six Claude events (and the three
 # at its bottom), two OpenCode ones, and six lines of a shell's history.
 ti set -g @scroll-lines 6

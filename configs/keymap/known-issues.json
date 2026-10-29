@@ -1,7 +1,6 @@
 {
   "$comment": "Broken keys keymap check tolerates until they are fixed; refresh with keymap check --update.",
   "known": [
-    "codex shift+enter insert_newline",
     "opencode ctrl+shift+d input.delete.line",
     "opencode ctrl+shift+e input.select.line.end",
     "wezterm f11 ToggleFullScreen"

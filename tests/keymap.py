@@ -117,7 +117,8 @@ class Build(unittest.TestCase):
         self.assertEqual(t['pause']['shell']['delivered'], 'ctrl+c')
 
     def test_judgement(self):
-        self.assertEqual(self.finding('codex', 'shift+enter')[0]['sev'], 'bug')  # plain keys merge it into Enter
+        self.assertEqual(self.data['traces']['shift+enter']['codex']['delivered'], 'ctrl+j')  # plain keys would merge it into Enter
+        self.assertEqual(self.data['traces']['alt+z']['claude']['delivered'], 'esc esc')  # the pause between is no effect
         self.assertEqual(self.finding('opencode', 'ctrl+shift+d')[0]['sev'], 'bug')  # arrives as Ctrl+D: exit
         self.assertEqual(self.finding('claude', 'ctrl+c')[0]['sev'], 'adapted')
         self.assertEqual(self.finding('shell', 'alt+f')[0]['sev'], 'cost')

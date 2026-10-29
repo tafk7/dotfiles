@@ -128,4 +128,16 @@ zsh_prompt="$(env -u SSH_CONNECTION HOME="$HOME" PATH="$PATH" ZDOTDIR="$TEST_ROO
 HOME="$HOME" PATH="$PATH" bash -c 'source "$1"; ! declare -F _dotfiles_prompt_mark && [[ "${PROMPT_COMMAND:-}" != *133* ]]' _ \
     "$ROOT/entry/bash.sh" >/dev/null || fail "non-interactive bash got the prompt mark"
 
+# Ctrl+Z undoes in both shells; the terminal's suspend key is off, checked
+# here on a pty (script) so that the shells see a terminal.
+bash_z="$(env -u SSH_CONNECTION HOME="$HOME" PATH="$PATH" bash --rcfile "$ROOT/entry/bash.sh" -i -c 'bind -q undo' 2>/dev/null)"
+[[ "$bash_z" == *'"\C-z"'* ]] || fail "bash Ctrl+Z is not undo: $bash_z"
+zsh_z="$(env -u SSH_CONNECTION HOME="$HOME" PATH="$PATH" ZDOTDIR="$TEST_ROOT/zdot" zsh -i -c 'bindkey "^Z"' 2>/dev/null)"
+[[ "$zsh_z" == *undo ]] || fail "zsh Ctrl+Z is not undo: $zsh_z"
+if command -v script >/dev/null; then
+    susp="$(env -u SSH_CONNECTION HOME="$HOME" PATH="$PATH" script -qec \
+        "bash --rcfile '$ROOT/entry/bash.sh' -i -c 'stty -a'" /dev/null 2>/dev/null | tr -d '\r')"
+    [[ "$susp" == *'susp = <undef>'* ]] || fail "bash left the terminal's suspend key on: $(grep -o 'susp = [^;]*' <<<"$susp")"
+fi
+
 printf 'shell-behavior: ok\n'

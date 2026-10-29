@@ -8,6 +8,8 @@
     "terminal.suspend": "none",
     "app.exit": "ctrl+d,<leader>q",
     "session.rename": "none",
+    "session.message.user.previous": "ctrl+up",
+    "session.message.user.next": "ctrl+down",
     "input.delete.word.backward": "ctrl+backspace,ctrl+h,ctrl+w",
     "input.delete.word.forward": "ctrl+delete",
     "input.delete.to.line.start": "alt+backspace,ctrl+u",

@@ -202,15 +202,19 @@ nnoremap <leader>Q :qa!<CR>
 inoremap jk <Esc>
 
 " Line deletes match the shells and Codex: Alt+Backspace to the start of the
-" line, Alt+Delete to the end. That frees Ctrl+U (scrolling is Shift+Up here)
-" to be undo in every mode; in visual mode it leaves the selection first.
+" line, Alt+Delete to the end. Ctrl+U keeps Neovim's meaning, which in insert
+" mode is the same delete, as in the shells and agents.
 inoremap <M-BS> <C-g>u<C-u>
 inoremap <M-Del> <C-g>u<Cmd>call setline('.', strpart(getline('.'), 0, col('.') - 1))<CR>
 cnoremap <M-BS> <C-u>
 cnoremap <M-Del> <Cmd>call setcmdline(strpart(getcmdline(), 0, getcmdpos() - 1))<CR>
-inoremap <C-u> <C-g>u<Cmd>undo<CR>
-nnoremap <C-u> u
-xnoremap <C-u> <Esc>u
+
+" Ctrl+Z undoes in every mode, as in the shells, the agents and Windows, and
+" never suspends (configs/tmux.conf); in visual mode it leaves the selection
+" first.
+inoremap <C-z> <C-g>u<Cmd>undo<CR>
+nnoremap <C-z> u
+xnoremap <C-z> <Esc>u
 
 " Word deletes match them too: Ctrl+Backspace and Ctrl+Delete take a word.
 " tmux hands Ctrl+Backspace on as Ctrl+H, which Neovim would read as one
