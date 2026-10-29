@@ -31,7 +31,7 @@ an existing config).
 `DISABLE_ERROR_REPORTING=1`, on every machine. Unlisted keys remain local.
 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is not shipped, so Claude's automatic
 updater runs. Setting it to `1` locally disables the updater as well (confirmed
-by Claude Code 2.1.273's `doctor`); `bin/ai-update claude` then updates explicitly.
+by Claude Code 2.1.273's `doctor`); `dotfiles upgrade claude` then updates explicitly.
 
 **Fleet enforcement (admins):** user `settings.json` is *lowest* precedence.
 To enforce policy that can't be bypassed, use system managed settings at

@@ -104,7 +104,7 @@ Each setup run writes `~/.local/state/dotfiles/logs/setup-<UTC time>.log`
 checkout revision with its uncommitted-file count, and host. The body is the
 whole transcript without color codes. The footer gives the exit status and the
 ledger rows the run changed, timestamps aside. Standalone installer runs are
-not logged; `bin/ai-update` runs setup, so it is. `DOTFILES_SETUP_LOG=0` disables the log;
+not logged; `dotfiles upgrade` runs setup, so it is. `DOTFILES_SETUP_LOG=0` disables the log;
 the test harness sets it.
 
 ## Recovery
@@ -119,7 +119,7 @@ setup makes one bounded attempt to reconcile it: if the artifact now at the
 target runs, it is recorded and the journal removed. Otherwise the journal is
 kept, and it blocks further replacements of that component only, until setup
 reconciles it; the rest of the run proceeds and the run reports failure.
-`bin/verify` reports a pending journal as a failure. Recovery checks the
+`dotfiles verify` reports a pending journal as work for setup (exit 1). Recovery checks the
 recorded artifact itself, not whatever binary is on PATH. If that artifact
 cannot run, diagnose the paths before retrying.
 

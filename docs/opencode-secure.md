@@ -14,7 +14,7 @@ establish a network boundary.
   currently unavailable in V2.
 
 Before V2 is installed, the reconciler uses the supported V1 `autoupdate`
-spelling. Update with `bin/ai-update opencode`, which passes `--no-modify-path`.
+spelling. Update with `dotfiles upgrade opencode`, which passes `--no-modify-path`.
 Shell startup files remain managed by dotfiles.
 
 Use V2 `providers` with environment references such as `{env:MY_API_KEY}`.

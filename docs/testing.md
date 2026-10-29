@@ -80,7 +80,7 @@ or first-prompt rendering. Don't run them concurrently with other tests.
 ## Manual RDP checklist
 
 On a disposable VM, run the `--rdp` setup, verify the port, TLS configuration,
-desktop session, and service state, then run `bin/verify --tier rdp`. Confirm
+desktop session, and service state, then run `dotfiles verify --rdp`. Confirm
 you can restore from the timestamped xrdp configuration backup.
 
 ## Manual work-host checklist
@@ -88,5 +88,5 @@ you can restore from the timestamped xrdp configuration backup.
 On a disposable Ubuntu 24.04/26.04 VM or bare-metal host with KVM/nested
 virtualization exposed, run `setup.sh --full --tail`, log out and back in,
 enroll Tailscale, run `sbx login`, and run
-`bin/verify --tier work --tail --smoke`. Then check that Docker, `tailscaled`,
+`dotfiles verify --tier work --tail --smoke`. Then check that Docker, `tailscaled`,
 group access, and a new local sandbox all survive an SSH reconnect and a reboot.

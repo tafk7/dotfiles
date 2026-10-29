@@ -38,7 +38,7 @@ unchanged except as noted under Deviations.
 | 1.3 | Operation lock (`lib/operation.sh`) |
 | 1.4 | Machine profile (`lib/profile.sh`) and `dotfiles profile` |
 | 1.5 | Side-effect-free observation (`lib/observe.sh`); `--observe` on every installer |
-| 1.6 | `dotfiles verify` on records; `check-updates --records` |
+| 1.6 | `dotfiles verify` on records; `check-updates --records`; `bin/verify` wraps it |
 | 1.7 | Thin `dotfiles update` |
 | — | sbx pinned at 0.49.2 (user request); kits built and validated with it |
 | 2.1 | `versions.lock`: every download pinned with digests; eget tools current by binary digest; `eget.lock` gone |
@@ -54,7 +54,7 @@ unchanged except as noted under Deviations.
 | 3.2 | tmux refresh: one server's environment, guards, PATH segments, session overrides reported, config, badge, theme, version check |
 | 3.3 | Staleness: change events (`changes.tsv`), shell load records under `$XDG_RUNTIME_DIR`, process scan; verify's Running section |
 | 3.4 | `dotfiles refresh`; one refresh at the end of every apply (`--no-refresh`) |
-| 3.5 | `--upgrade`: APT only-upgrade with apt's simulated plan, held packages skipped; vendor updaters and `rustup self update`; `ai-update` wraps setup |
+| 3.5 | `--upgrade`: APT only-upgrade with apt's simulated plan, held packages skipped; vendor updaters and `rustup self update`; `ai-update` wraps `dotfiles upgrade` |
 | 3.6 | Full update proven end to end (pin bump and environment change against a local remote) |
 | 4.1 | `dotfiles bump` with a handler per kind of pin, both architectures, 14-day cool-down; the lock generator moved to `lib/lockgen.py` |
 | 4.2 | `check-updates` covers every pin, with advisories, JSON, records, exit codes |
@@ -72,6 +72,11 @@ unchanged except as noted under Deviations.
 
 Done after adoption:
 
+- One verifier and one front door (2026-10-29): `dotfiles verify` took
+  `bin/verify`'s modes and checks, and `bin/verify` and `bin/ai-update` are
+  wrappers (see Deviations, 1.6 and 3.5). CI's install jobs (x86_64 and
+  arm64) run `dotfiles verify -v` against the real install, and its `--help`
+  step covers `bin/dotfiles`.
 - Enforced keys and per-machine defaults for the AI CLIs' settings
   ([ai-settings-per-machine.md](ai-settings-per-machine.md)).
 - `dotfiles profile --propose` observes ownership instead of reading the
@@ -126,9 +131,23 @@ the installer names them.
 - 1.4: `dotfiles profile --propose` derives the profile from observations
   (dotfiles-owned and package-manager components), not from ledger rows,
   whose ownership an older checkout may have recorded wrong.
-- 1.6: `bin/verify` stays as it is for its `--tier`, `--all`, and capability
-  modes, and isn't rewritten as a wrapper yet. `dotfiles verify` is the new
-  record-based check.
+- 1.6: `bin/verify` first stayed as it was for its `--tier`, `--all`, and
+  capability modes. Since 2026-10-29 `dotfiles verify` is the one verifier:
+  those modes are its options (`--tier T`, `--all`, `--tail` and the other
+  capabilities, `--diagnose`), and it makes the checks only `bin/verify` made
+  (Git identity, pre-commit hook, WSL clipboard, theme and tmux version,
+  EDITOR's single source, the agent shell's functions, aliases, and
+  BASH_ENV). `bin/verify` maps its options onto `dotfiles verify -v` and exits
+  as it does (0, 1, 2, 3), no longer with the number of failed checks. Under
+  `--installed` it now reads the profile when there is one, the ledger only
+  without one. Ledger-only findings changed class: a component found away
+  from its recorded path is a note (an external install) rather than a
+  failure, and one off its pin is work for setup.
+- 3.5: `ai-update` wraps `dotfiles upgrade CLI` instead of running setup
+  itself. Setup merges its flags into the profile, so an update made the
+  machine manage that CLI; `dotfiles upgrade` runs the same setup command with
+  the profile left alone (`DOTFILES_KEEP_PROFILE`), refuses a CLI that is not
+  installed (`dotfiles profile --add` installs and manages one), and takes pi.
 - 2.1: `eget.toml` keeps its tags, because `--refresh` reads them. The check
   fails when they disagree with `versions.lock`, which is the only file
   installers read.

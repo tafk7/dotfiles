@@ -200,9 +200,13 @@ Settings not listed are left alone. See
 ```bash
 ./bin/ai-config --dry-run
 ./bin/ai-config --check --plugins
-./bin/ai-update claude            # explicit update through the official installer
-./bin/ai-update opencode          # opencode only notifies about new releases
+dotfiles upgrade claude           # explicit update through the official installer
+dotfiles upgrade opencode         # opencode only notifies about new releases
 ```
+
+`dotfiles upgrade` updates installed CLIs (claude, codex, opencode, pi) and
+leaves the machine profile alone; `dotfiles profile --add CLI` is what makes
+dotfiles install and manage one. `bin/ai-update` is its older name.
 
 `Alt+I` at a Bash or Zsh prompt, inside tmux or not, turns the request typed
 there into a command: `find every JSON file changed in the last week` becomes
@@ -276,11 +280,16 @@ adding tools, configs, and aliases.
 ## Maintenance
 
 `dotfiles verify` checks the checkout, state, the profile's components,
-configs, AI settings, and host readiness, and changes nothing. It prints only
+configs, AI settings, host readiness, Git, and what an agent's shell inherits,
+and changes nothing. It prints only
 what needs attention (`-v` lists every check) and exits 1 when setup has work
 to do, 3 when a check could not be made, 2 when something needs you (Tailscale
 enrollment, a group login), and 0 otherwise. `--latest` adds newer upstream
-releases of pinned tools.
+releases of pinned tools. `--tier T` checks a tier's components in place of
+the profile's, a capability option (`--tail`, `--rdp`, `--ai`, ...) expects
+that capability too, and `--all` also looks at every other component that
+applies here. `bin/verify` is the older name for `dotfiles verify -v`, with its
+`--tier` and `--all` options mapped; it now exits as `dotfiles verify` does.
 
 `dotfiles apply` brings the machine to the checkout and its profile without
 pulling: it installs, moves, or repairs what the profile selects, runs their
@@ -300,7 +309,8 @@ dotfiles refresh                  # tmux up to date; list what needs a restart
 dotfiles apply --dry-run          # what applying the profile would change
 dotfiles apply --only node        # one component (blocked if nvm is missing)
 dotfiles verify                   # this machine against the checkout and profile
-./bin/verify --tier work          # a tier against current reality (also --all)
+dotfiles verify --tier work       # a tier against current reality (also --all)
+dotfiles upgrade claude           # update one installed AI CLI; the profile stays
 ./bin/diff-config                 # drift between tracked configs and $HOME
 ./bin/check-updates               # every pin vs its newest release, plus advisories
 ./bin/uninstall-tool --dry-run X  # remove a component that dotfiles installed

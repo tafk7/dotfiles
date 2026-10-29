@@ -1,7 +1,7 @@
 # Customization
 
 Most extensions are table entries in `lib/config.sh` or `lib/registry.sh`;
-`setup.sh`, `bin/verify`, `bin/uninstall-tool`, and `bin/cheatsheet` read those
+`setup.sh`, `dotfiles verify`, `bin/uninstall-tool`, and `bin/cheatsheet` read those
 tables, so they pick up a new entry without code changes. Setup installs the
 selected entries of the registry's install order (`_REGISTRY_ORDER`), so a new
 component also needs a place there, after everything its `needs` names; the
@@ -341,7 +341,7 @@ See [adding a theme](theme-system.md#adding-a-theme).
 ```bash
 bash -n path/to/script.sh
 ./setup.sh --dry-run --bash
-./bin/verify
+./bin/dotfiles verify -v
 ```
 
 For the full suite and its isolation rules, see [testing](testing.md). Develop
@@ -350,6 +350,6 @@ in a separate checkout, not the live one (see [maintenance](maintenance.md)).
 ## Conventions
 
 - `setup.sh` orchestrates. Put logic in `lib/`, `installers/`, or `shell/`.
-- Set `EDITOR` only in `shell/env.sh`; `bin/verify` checks this.
+- Set `EDITOR` only in `shell/env.sh`; `dotfiles verify` checks this.
 - Keep install libraries out of shell startup.
 - Pin tool versions and bump them explicitly.

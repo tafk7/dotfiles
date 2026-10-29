@@ -47,9 +47,13 @@ automatic updater and makes `$.http.fetch` fail in Claude Code mods (use
 `$.process.run` instead). opencode only notifies about
 new releases and never shares sessions: its own updater reruns the upstream
 installer without `--no-modify-path`, which would append to the repo-owned
-`~/.bashrc`. Use `bin/ai-update claude`, `codex` or `opencode` to update
-explicitly: it runs `setup.sh --CLI --only CLI --upgrade`, the official
-installer's update path followed by the CLI's configure steps.
+`~/.bashrc`. Use `dotfiles upgrade claude` (or `codex`, `opencode`, `pi`) to
+update explicitly: it runs `setup.sh --CLI --only CLI --upgrade`, the official
+installer's update path followed by the CLI's configure steps, and leaves the
+machine profile alone, so updating a CLI does not make dotfiles manage it. A
+CLI that is not installed is refused; `dotfiles profile --add CLI` installs and
+manages one. `dotfiles apply --upgrade` updates the CLIs the profile selects.
+`bin/ai-update CLI` is the older name.
 
 Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
 not part of the installers: setup runs them after each selected AI CLI's
