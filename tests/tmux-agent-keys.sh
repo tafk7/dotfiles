@@ -212,6 +212,17 @@ tk_raw '\032x'
 tk_expect 'x' "Ctrl+Z in Codex" tk_input "$codex_z_log"
 said 'Codex has no undo'
 
+# Ctrl+Backspace (C-h): OpenCode reads a plain C-h as Backspace, so it gets its
+# other delete-word key, C-w; anything else gets C-h.
+oc_bs_log="$TEST_ROOT/opencode-bs.log"
+stub opencode "$oc_bs_log" >/dev/null
+tk_raw '\b'
+tk_expect '^W' "Ctrl+Backspace in OpenCode" tk_input "$oc_bs_log"
+ti select-window -t "$(ti display-message -p -t "$app" '#{window_id}')"
+: > "$app_log"
+tk_raw '\b'
+tk_expect '^H' "Ctrl+Backspace in another program" tk_input "$app_log"
+
 # prefix+Ctrl+Z suspends: Claude and Codex get the key, which suspends them;
 # anything else in the foreground is sent SIGTSTP (bin/tmux-suspend).
 ti select-window -t "$(ti display-message -p -t "$claude" '#{window_id}')"
