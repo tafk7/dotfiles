@@ -169,6 +169,8 @@ FRIENDLY = [  # first match wins
     (r'tmux-review" search', 'review-search', 'review and search'),
     (r'tmux-review', 'review', 'review transcript'),
     (r'tmux-agent-mode" (\w+)', 'mode', '{0} permission mode'),
+    (r'tmux-codex-slash"(?: --say)? (\w+)', 'codex-slash', 'Codex: /{0} from an empty prompt'),
+    (r'tmux-suspend', 'suspend-job', 'suspend the foreground program'),
     (r'tmux-copy', 'export', 'buffer to clipboard'),
     (r'send -X cancel', 'copy-toggle', 'copy mode on/off'),
     (r'select-pane -U', 'focus-up', 'focus pane above'),

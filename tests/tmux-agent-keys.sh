@@ -2,9 +2,9 @@
 # The intent keys tmux translates for each agent (issues/intent-keys.md):
 # Alt+Shift+J, K and L put it in yolo, auto or edits-only mode (Shift+Tab
 # stays its own), Alt+Enter queues a message and Alt+Shift+Enter takes it
-# back, Shift+Enter is a new line, Alt+Z goes back a turn, Break stops
-# whatever runs, Ctrl+Z undoes typing, and Alt+Shift+V opens a program's own
-# editor.
+# back, Shift+Enter is a new line, Alt+Z goes back a turn, Alt+M picks a
+# model, Break stops whatever runs, Ctrl+Z undoes typing, and Alt+Shift+V
+# opens a program's own editor.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
@@ -124,6 +124,21 @@ app_log="$TEST_ROOT/app.log"
 app=$(stub app "$app_log")
 tk_raw "$SHIFT_TAB$YOLO$AUTO$EDITS"
 tk_expect '^[[Z^[J^[K^[L' "Shift+Tab and Alt+Shift+J, K, L in another program" tk_input "$app_log"
+
+# Alt+M: Codex has no model key, so tmux runs /model from an empty prompt and
+# says why not with a draft; the others bind Alt+M themselves.
+model_log="$TEST_ROOT/codex-model.log"
+codex_model=$(stub codex "$model_log" --codex-modes)
+tk_raw '\em'
+on_screen '› /model' "$codex_model" Codex
+tk_raw 'draft\em'
+said 'Codex: /model needs an empty prompt and no turn running'
+for agent in claude opencode pi; do
+    log="$TEST_ROOT/model-$agent.log"
+    stub "$agent" "$log" >/dev/null
+    tk_raw '\em'
+    tk_expect '^[m' "Alt+M in $agent" tk_input "$log"
+done
 
 # Alt+Enter queues, Alt+Shift+Enter takes back, Alt+Z goes back a turn: each
 # agent's own keys; anything else gets the keys as they are.
