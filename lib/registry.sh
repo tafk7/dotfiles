@@ -1,6 +1,6 @@
 #!/bin/bash
 # Tool registry — single source of truth for all managed tools.
-# Sourced by setup.sh (via config.sh), bin/verify, bin/uninstall-tool, and
+# Sourced by setup.sh (via config.sh), bin/dotfiles, bin/uninstall-tool, and
 # bin/cheatsheet. Data and lookup helpers only; no side effects.
 
 [[ -n "${_DOTFILES_REGISTRY_LOADED:-}" ]] && return 0
