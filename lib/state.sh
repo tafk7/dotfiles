@@ -15,7 +15,9 @@ DOTFILES_THEME_STATE_FILE="$DOTFILES_STATE_DIR/theme.tsv"
 DOTFILES_HOLDS_FILE="$DOTFILES_STATE_DIR/holds.tsv"
 DOTFILES_DEPLOYED_FILE="$DOTFILES_STATE_DIR/deployed.tsv"
 DOTFILES_CHANGES_FILE="$DOTFILES_STATE_DIR/changes.tsv"
-DOTFILES_STATE_LOCK="$DOTFILES_STATE_DIR/.lock"
+# An flock file. Earlier versions locked with a .lock directory, which this
+# no longer reads.
+DOTFILES_STATE_LOCK="$DOTFILES_STATE_DIR/state.lock"
 
 _state_error() { printf 'Error: %s\n' "$*" >&2; }
 
@@ -59,55 +61,31 @@ state_validate() {
     done < <(_journal_files)
 }
 
+# One writer at a time: an flock on $DOTFILES_STATE_LOCK, taken in the
+# writer's subshell and held until it exits. The kernel drops the lock when its
+# holder dies, so a crashed writer never leaves a stale one, and nothing has to
+# judge whether an owner is still alive. (The directory lock before this did,
+# and could remove a lock another writer had just taken.)
 _state_lock_acquire() {
-    local attempts="${DOTFILES_STATE_LOCK_ATTEMPTS:-100}" holder="" i lock_age lock_mtime
-    local stale_seconds="${DOTFILES_STATE_LOCK_STALE_SECONDS:-2}"
-    local owner="${BASHPID:-$$}"
+    local timeout="${DOTFILES_STATE_LOCK_TIMEOUT:-5}"
     mkdir -p "$DOTFILES_STATE_DIR" || return 1
-    for ((i = 0; i < attempts; i++)); do
-        if mkdir "$DOTFILES_STATE_LOCK" 2>/dev/null; then
-            # Written whole, then renamed: a reader never sees an empty owner.
-            { printf '%s\n' "$owner" > "$DOTFILES_STATE_LOCK/pid.new" \
-                && mv -f "$DOTFILES_STATE_LOCK/pid.new" "$DOTFILES_STATE_LOCK/pid"; } || {
-                rm -rf -- "$DOTFILES_STATE_LOCK"
-                return 1
-            }
-            return 0
-        fi
-        holder=""
-        if [[ -r "$DOTFILES_STATE_LOCK/pid" ]]; then
-            read -r holder < "$DOTFILES_STATE_LOCK/pid" || holder=""
-        fi
-        if [[ "$holder" =~ ^[0-9]+$ ]]; then
-            if kill -0 "$holder" 2>/dev/null; then
-                sleep 0.05
-                continue
-            fi
-        else
-            # No owner recorded yet: it is being taken, and stale only once
-            # old. (Breaking it here let two writers in; one update was lost.)
-            lock_mtime="$(stat -c %Y "$DOTFILES_STATE_LOCK" 2>/dev/null || date +%s)"
-            lock_age=$(( $(date +%s) - lock_mtime ))
-            if (( lock_age < stale_seconds )); then
-                sleep 0.05
-                continue
-            fi
-        fi
-        # A lock without a live numeric owner is stale. Only remove the exact
-        # state lock path; never follow or derive this target from state data.
-        rm -rf -- "$DOTFILES_STATE_LOCK"
-    done
-    _state_error "Timed out waiting for dotfiles state lock: $DOTFILES_STATE_LOCK (owner ${holder:-unknown})"
+    # As with the operation lock (lib/operation.sh), no flock means no lock.
+    if ! command -v flock >/dev/null 2>&1; then
+        printf 'Warning: flock is unavailable; writing dotfiles state without a lock\n' >&2
+        return 0
+    fi
+    exec {_state_lock_fd}>>"$DOTFILES_STATE_LOCK" || return 1
+    flock -w "$timeout" "$_state_lock_fd" && return 0
+    exec {_state_lock_fd}>&-
+    _state_lock_fd=""
+    _state_error "Timed out waiting for dotfiles state lock: $DOTFILES_STATE_LOCK"
     return 1
 }
 
 _state_lock_release() {
-    [[ -d "$DOTFILES_STATE_LOCK" ]] || return 0
-    local holder=""
-    [[ -r "$DOTFILES_STATE_LOCK/pid" ]] && read -r holder < "$DOTFILES_STATE_LOCK/pid" || true
-    if [[ -z "$holder" || "$holder" == "${BASHPID:-$$}" ]]; then
-        rm -rf -- "$DOTFILES_STATE_LOCK"
-    fi
+    [[ -n "${_state_lock_fd:-}" ]] || return 0
+    exec {_state_lock_fd}>&-
+    _state_lock_fd=""
 }
 
 _state_commit_file() {

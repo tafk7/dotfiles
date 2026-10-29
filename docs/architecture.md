@@ -103,14 +103,15 @@ Durable state lives under
 - `install-path`: fallback checkout discovery for flattened deployments;
 - `transactions/`: one journal per interrupted artifact replacement;
 - `operation.lock`: the lock a state-changing command holds, with its run id;
+- `state.lock`: the flock each read-modify-write of these files holds;
 - `backups/`: displaced user configuration.
 
 These files have a version header, contain data only, are validated before use,
-and are atomically replaced. Read-modify-write operations use a bounded
-inter-process lock with conservative stale-lock recovery. Setup reconciles an
-incomplete artifact journal before starting another install; verification
-reports a pending journal as a failure. The checkout is not the machine-state
-database.
+and are atomically replaced. Read-modify-write operations hold an flock with a
+timeout; the kernel releases it when its holder exits, so no lock goes stale.
+Setup reconciles an incomplete artifact journal before starting another
+install; verification reports a pending journal as a failure. The checkout is
+not the machine-state database.
 
 ## Configuration ownership
 
