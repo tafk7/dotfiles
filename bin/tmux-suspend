@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# prefix+Ctrl+Z (configs/tmux.conf): suspend the program in the foreground of
+# the pane whose shell is PID, as the terminal's suspend key did before the
+# shells turned it off so that Ctrl+Z could be undo. The program's process
+# group gets SIGTSTP; its shell reports it stopped, and fg resumes it. With
+# only the shell in the foreground there is nothing to suspend.
+#
+# Usage: tmux-suspend PID
+
+set -uo pipefail
+
+pid="${1:?usage: tmux-suspend PID}"
+[[ "$pid" =~ ^[0-9]+$ ]] || { echo "usage: tmux-suspend PID" >&2; exit 2; }
+
+# The terminal's foreground process group, from the shell's own entry.
+group=$(ps -o tpgid= -p "$pid" 2>/dev/null | tr -d ' ')
+[[ "$group" =~ ^[0-9]+$ ]] && (( group > 1 )) || exit 0
+[[ "$group" == "$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')" ]] && exit 0
+kill -TSTP -- "-$group" 2>/dev/null || true

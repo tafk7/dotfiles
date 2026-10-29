@@ -258,6 +258,8 @@ def run_tmux(cmd, ctx):
             s, e = run_tmux(chosen, ctx)
             sends += s
             effects += e
+        elif c[0] in ('run-shell', 'run') and re.fullmatch(r'sleep [0-9.]+', c[-1]):
+            continue  # a pause between keys sent, as between Alt+Z's two Escapes
         elif c[0] in ('send-keys', 'send'):
             args, keys, i, xcmd = c[1:], [], 0, None
             while i < len(args):
@@ -288,6 +290,8 @@ def scroll_effect(app, direction):
         return 'consume', f'scroll-lines-{direction}', f'copy mode, 3 lines {direction}'
     if a['cmd'] in ('claude', 'codex', 'opencode') and a['mouse'] == '1':
         return 'consume', f'scroll-lines-{direction}', f'3 lines {direction} (wheel events)'
+    if a['cmd'] == 'pi':
+        return 'pass', None, f"passes the key on, 3 times: pi's line scroll"
     if a['alt'] == '0' and a['mouse'] == '0':
         if direction == 'up':
             return 'consume', 'scroll-lines-up', 'copy mode, 3 lines up'

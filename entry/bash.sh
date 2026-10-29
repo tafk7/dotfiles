@@ -68,6 +68,13 @@ bind '"\e\C-h": backward-kill-line' # Alt+Backspace (BS encoding)
 bind '"\e\C-?": backward-kill-line' # Alt+Backspace (DEL encoding)
 bind '"\e[3;3~": kill-line'          # Alt+Delete
 
+# Ctrl+Z undoes, as in the agents and Windows, and never suspends: the
+# terminal's suspend key is off for this shell and what it runs, so Ctrl+Z
+# reaches programs as a key. prefix+Ctrl+Z suspends the foreground program
+# instead (bin/tmux-suspend); fg, bg and jobs work as ever.
+[[ -t 0 ]] && stty susp undef 2>/dev/null
+bind '"\C-z": undo'
+
 # Shift means the removed range is also published to tmux's shared buffer.
 # Windows Terminal transports these chords as virtual F13-F16 sequences.
 _tafk_cut_backward_word() {

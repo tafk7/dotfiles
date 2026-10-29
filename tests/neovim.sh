@@ -137,7 +137,8 @@ output="$(NVIM_REVIEW=1 NVIM_REVIEW_PROMPT='^## User' nvim_run "$TEST_ROOT/selec
     || fail "review selection keys: $output"
 
 # Alt+Backspace / Alt+Delete delete to the line's start / end in insert mode;
-# Ctrl+U undoes in insert, normal, and visual mode.
+# Ctrl+Z undoes in insert, normal, and visual mode, and Ctrl+U deletes to the
+# line's start in insert mode, as in the shells.
 printf 'hello brave world\n' > "$TEST_ROOT/keys.md"
 line_after() {
     nvim_run "$TEST_ROOT/keys.md" "+call cursor(1, $1)" "+call feedkeys(\"$2\", 'xt')" \
@@ -145,9 +146,10 @@ line_after() {
 }
 line_after 7 'i\<M-BS>\<Esc>' 'brave world'
 line_after 7 'i\<M-Del>\<Esc>' 'hello '
-line_after 1 'A typed\<C-u>\<Esc>' 'hello brave world'
-line_after 1 'A one\<Esc>A two\<Esc>\<C-u>' 'hello brave world one'
-line_after 1 'A one\<Esc>v\<C-u>' 'hello brave world'
+line_after 1 'A typed\<C-z>\<Esc>' 'hello brave world'
+line_after 1 'A one\<Esc>A two\<Esc>\<C-z>' 'hello brave world one'
+line_after 1 'A one\<Esc>v\<C-z>' 'hello brave world'
+line_after 13 'i\<C-u>\<Esc>' 'world'
 # Ctrl+Backspace (Ctrl+H through tmux) and Ctrl+Delete delete a word, to the
 # word's end as the shells' kill-word does.
 line_after 7 'i\<C-h>\<Esc>' 'brave world'

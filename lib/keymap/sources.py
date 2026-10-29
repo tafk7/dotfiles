@@ -138,7 +138,6 @@ def readline(repo, notes):
             if alt.split(' ')[-1] not in ours:
                 out.append(Binding('shell', alt, m.group(2), context='readline', source='bash defaults'))
     out += [Binding('shell', 'ctrl+c', 'interrupt (SIGINT)', context='terminal', source='tty'),
-            Binding('shell', 'ctrl+z', 'suspend (SIGTSTP)', context='terminal', source='tty'),
             Binding('shell', 'ctrl+d', 'end of input', context='terminal', source='tty')]
     return out
 

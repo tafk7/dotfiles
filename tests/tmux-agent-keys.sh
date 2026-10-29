@@ -1,9 +1,10 @@
 #!/bin/bash
 # The intent keys tmux translates for each agent (issues/intent-keys.md):
 # Alt+Shift+J, K and L put it in yolo, auto or edits-only mode (Shift+Tab
-# stays its own), the Queue key queues a message, Break
-# stops whatever runs, Ctrl+Z undoes typing, and Alt+Shift+V opens a program's
-# own editor.
+# stays its own), Alt+Enter queues a message and Alt+Shift+Enter takes it
+# back, Shift+Enter is a new line, Alt+Z goes back a turn, Break stops
+# whatever runs, Ctrl+Z undoes typing, and Alt+Shift+V opens a program's own
+# editor.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
@@ -12,7 +13,10 @@ SHIFT_TAB='\e[Z'
 YOLO='\eJ'
 AUTO='\eK'
 EDITS='\eL'
-QUEUE='\e[19;2~'
+QUEUE='\e\r'
+UNQUEUE='\e[27;4;13~'
+SHIFT_ENTER='\e[27;2;13~'
+UNDO_TURN='\ez'
 BREAK='\e[20;2~'
 ALT_SHIFT_V='\eV'
 
@@ -121,7 +125,8 @@ app=$(stub app "$app_log")
 tk_raw "$SHIFT_TAB$YOLO$AUTO$EDITS"
 tk_expect '^[[Z^[J^[K^[L' "Shift+Tab and Alt+Shift+J, K, L in another program" tk_input "$app_log"
 
-# Queue: each agent's key for a message after the turn; nothing elsewhere.
+# Alt+Enter queues, Alt+Shift+Enter takes back, Alt+Z goes back a turn: each
+# agent's own keys; anything else gets the keys as they are.
 for agent in claude codex opencode pi; do
     log="$TEST_ROOT/queue-$agent.log"
     stub "$agent" "$log" >/dev/null
@@ -131,12 +136,37 @@ for agent in claude codex opencode pi; do
         codex) want='^I' ;;
         pi) want='^[^M' ;;
     esac
-    tk_expect "$want" "Queue key in $agent" tk_input "$log"
+    tk_expect "$want" "Alt+Enter in $agent" tk_input "$log"
+    : > "$log"
+    tk_raw "$UNQUEUE"
+    case "$agent" in
+        claude) want='^[[A' ;;
+        codex) want='^[[1;2D' ;;
+        opencode) want='^Xq' ;;
+        pi) want='^[[1;3A' ;;
+    esac
+    tk_expect "$want" "Alt+Shift+Enter in $agent" tk_input "$log"
+    : > "$log"
+    tk_raw "$UNDO_TURN"
+    case "$agent" in
+        claude | codex) want='^[^[' ;;
+        opencode) want='^Xu' ;;
+        pi) want='^[z' ;;
+    esac
+    tk_expect "$want" "Alt+Z in $agent" tk_input "$log"
+    if [[ "$agent" == codex ]]; then
+        : > "$log"
+        tk_raw "${SHIFT_ENTER}x"
+        tk_expect $'\nx' "Shift+Enter in Codex (Ctrl+J)" tk_input "$log"
+    fi
 done
 ti select-window -t "$(ti display-message -p -t "$app" '#{window_id}')"
 : > "$app_log"
-tk_raw "${QUEUE}x"
-tk_expect 'x' "Queue key in another program" tk_input "$app_log"
+tk_raw "${QUEUE}${UNDO_TURN}x"
+tk_expect '^[^M^[zx' "Alt+Enter and Alt+Z in another program" tk_input "$app_log"
+: > "$app_log"
+tk_raw "${SHIFT_ENTER}x"
+tk_expect '^Mx' "Shift+Enter in another program" tk_input "$app_log"
 
 # Break: Esc to an agent, Ctrl+C to anything else.
 : > "$app_log"
@@ -147,7 +177,8 @@ pi=$(stub pi "$pi_log")
 tk_raw "${BREAK}x"
 tk_expect '^[x' "Break in pi" tk_input "$pi_log"
 
-# Ctrl+Z: Claude's undo is Ctrl+_; elsewhere the key goes on.
+# Ctrl+Z: Claude's undo is Ctrl+_; Codex, which would suspend, gets nothing;
+# elsewhere the key goes on.
 ti select-window -t "$(ti display-message -p -t "$claude" '#{window_id}')"
 : > "$claude_log"
 tk_raw '\032'
@@ -156,6 +187,28 @@ ti select-window -t "$(ti display-message -p -t "$app" '#{window_id}')"
 : > "$app_log"
 tk_raw '\032'
 tk_expect '^Z' "Ctrl+Z in another program" tk_input "$app_log"
+codex_z_log="$TEST_ROOT/codex-z.log"
+stub codex "$codex_z_log" >/dev/null
+tk_raw '\032x'
+tk_expect 'x' "Ctrl+Z in Codex" tk_input "$codex_z_log"
+said 'Codex has no undo'
+
+# prefix+Ctrl+Z suspends: Claude and Codex get the key, which suspends them;
+# anything else in the foreground is sent SIGTSTP (bin/tmux-suspend).
+ti select-window -t "$(ti display-message -p -t "$claude" '#{window_id}')"
+: > "$claude_log"
+tk_raw '\001\032'
+tk_expect '^Z' "prefix+Ctrl+Z in Claude" tk_input "$claude_log"
+job=$(ti new-window -t test -P -F '#{pane_id}' 'bash --norc --noprofile -i')
+tk_wait '#{pane_current_command}' bash "$job"
+ti send-keys -t "$job" 'sleep 300' Enter
+tk_wait '#{pane_current_command}' sleep "$job"
+sleeper=$(pgrep -P "$(ti display-message -p -t "$job" '#{pane_pid}')" -x sleep)
+tk_raw '\001\032'
+stopped() { [[ "$(ps -o stat= -p "$sleeper" | tr -d ' ')" == T* ]]; }
+tk_until stopped || fail "prefix+Ctrl+Z did not suspend the foreground job"
+on_screen 'Stopped' "$job" "the shell"
+kill -KILL "$sleeper" 2>/dev/null || true
 
 # Alt+Shift+V with no compose-editor: the program's own editor key; nothing in
 # a program without one.

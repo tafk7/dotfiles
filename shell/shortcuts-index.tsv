@@ -55,9 +55,13 @@ tmux│PgUp / PgDn / Ctrl+Home / Ctrl+End (compose)│Scroll the agent's convers
 tmux│Alt+Shift+J (Claude, Codex, OpenCode)│Yolo: Claude bypass permissions, Codex Full Access (from an empty prompt), OpenCode auto accept (saved for every session)│tmux-agent-mode yolo
 tmux│Alt+Shift+K (Claude, Codex)│Auto permission mode: Claude auto mode, Codex Approve for me│tmux-agent-mode auto
 tmux│Alt+Shift+L (Claude, Codex, OpenCode)│Edits only: Claude accept edits, Codex Ask for approval, OpenCode prompt│tmux-agent-mode edits
-tmux│Queue key (Shift+F8)│Queue a message for after the turn; in a compose pane, send the draft│Claude/OpenCode Ctrl+X Enter, Codex Tab, pi Alt+Enter
+tmux│Alt+Enter│Queue a message for after the turn (Enter steers a running one); in a compose pane, send the draft│Claude/OpenCode Ctrl+X Enter, Codex Tab, pi Alt+Enter
+tmux│Alt+Shift+Enter│Take queued messages back into the prompt (OpenCode: open its queue; Ctrl+U there)│Claude Up, Codex Shift+Left, OpenCode Ctrl+X Q, pi Alt+Up
+tmux│Alt+Z│Back a turn: Claude rewind, Codex step back, OpenCode undo, pi session tree│Claude/Codex Esc Esc, OpenCode Ctrl+X U, pi Alt+Z
+tmux│Shift+Enter (Codex)│New line, which Codex would read as Enter│send-keys C-j
 tmux│Break (Pause key)│Stop whatever runs: Esc to an agent, Ctrl+C to anything else│WezTerm raw:19 → Shift+F9
-tmux│Ctrl+Z (Claude)│Undo typing│send-keys C-_ (chat:undo)
+tmux│Ctrl+Z│Undo typing everywhere, never suspend; Codex has no undo│Claude C-_ (chat:undo), Codex nothing
+tmux│prefix Ctrl+Z│Suspend the foreground program (fg resumes it)│bin/tmux-suspend; Claude and Codex suspend on Ctrl+Z
 tmux│Ctrl+L (compose, insert)│Fix the last spelling or grammar mark before the cursor│Harper's suggestion, else Vim's first spelling suggestion
 # Prefix — Panes
 tmux│Ctrl+a ↑↓←→│Move focus between panes│select-pane -U/-D/-L/-R
@@ -150,7 +154,7 @@ vim│jk│Exit insert mode│imap jk <Esc>
 vim│Alt+Backspace / Alt+Delete│Insert and command line: delete to the start / end of the line, as in the shells│<C-u> / setline
 vim│Ctrl+Backspace / Ctrl+Delete│Insert mode: delete a word back / forward, as in the shells and agents│<C-w> / kill-word
 vim│Shift+PgUp / Shift+PgDn│Scroll a few lines (tmux @scroll-lines, default 3), as in tmux and review│<C-y> / <C-e>
-vim│Ctrl+U│Undo in insert, normal, and visual mode (visual leaves the selection)│u
+vim│Ctrl+Z│Undo in insert, normal, and visual mode (visual leaves the selection)│u
 vim│,/│Toggle comment on line/selection│:Commentary
 vim│gc│Comment out motion (e.g. gcap for paragraph)│gc{motion}
 vim│,w│Force-save file│:w!
@@ -177,6 +181,7 @@ vim│:Theme│Pin this editor to a theme (follow = window theme)│:Theme <name
 # Line editing
 shell│Ctrl+Backspace│Delete from the cursor back through the previous word│backward-kill-word
 shell│Ctrl+Delete│Delete from the cursor through the next word│kill-word
+shell│Ctrl+Z│Undo; never suspends (the terminal's suspend key is off; prefix Ctrl+Z suspends)│undo
 shell│Alt+Backspace│Delete from cursor to line start│backward-kill-line
 shell│Alt+Delete│Delete from cursor to line end│kill-line
 shell│Ctrl+Shift+Backspace│Cut previous word to tmux buffer│TAFK F13 widget
@@ -290,6 +295,7 @@ opencode│Ctrl+Tab│Next session tab; Ctrl+Shift+Tab is its previous (Alt+Up b
 opencode│Alt+M│Model list│cli.json keybinds model.list
 opencode│Ctrl+PgUp / Ctrl+PgDn│Cycle the model's effort variants│cli.json keybinds variant.cycle
 opencode│Ctrl+Z│Undo typing (instead of suspending)│cli.json keybinds input.undo
+opencode│Ctrl+Up / Ctrl+Down│Previous / next prompt you sent│cli.json keybinds session.message.user.previous/next
 opencode│Ctrl+C│Clear the prompt; never exits (Ctrl+D or Ctrl+X Q do)│cli.json keybinds app.exit
 opencode│Ctrl+R│Unbound, where the other agents search history (rename is in Ctrl+P)│cli.json keybinds session.rename none
 shell│ocr│Run one-off opencode prompt│opencode run
@@ -300,6 +306,8 @@ shell│pir│Browse and select a past Pi session│pi -r
 pi│Alt+M│Pick a model│configs/ai/pi/keybindings.json app.model.select
 pi│Ctrl+PgUp / Ctrl+PgDn│Cycle the thinking level│configs/ai/pi/keybindings.json app.thinking.cycle
 pi│Ctrl+Z│Undo typing (instead of suspending)│configs/ai/pi/keybindings.json tui.editor.undo
+pi│Alt+Z│Session tree, to go back to an earlier turn│configs/ai/pi/keybindings.json app.session.tree
+pi│Shift+PgUp / Shift+PgDn│Scroll a few lines (tmux presses it @scroll-lines times)│tui.altScreen.lineUp/lineDown
 
 # Docker shortcuts
 docker│dps│List running containers│docker ps
