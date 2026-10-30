@@ -182,8 +182,9 @@ yo <command>              # print output and copy it to the clipboard
   key across the Defy, Windows, WezTerm, tmux and the pane programs: who takes
   each chord, what it costs to press, and where sibling programs disagree.
   `keys why CHORD` traces one chord, `keys card codex` fits one program's keys
-  on a screen, and `keys check` (run in CI) catches new broken keys and
-  descriptions gone stale. See
+  on a screen, `keys diff` says what changed since you last looked, and
+  `keys check` (run in CI) catches new broken keys and descriptions gone
+  stale. See
   [docs/keybindings.md](docs/keybindings.md).
 - **WezTerm:** copy [`configs/wezterm.lua`](configs/wezterm.lua) to
   `%USERPROFILE%\.wezterm.lua`, and add `SendEnv LC_TAFK_WEZTERM` to the Host

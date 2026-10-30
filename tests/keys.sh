@@ -1,8 +1,9 @@
 #!/bin/bash
 # bin/keys in the shell: the plain listing off a terminal, the pane-command
-# mapping behind --here, the tmux popup on Alt+? and prefix+? (scoped to the
-# pane's program, Ctrl+S widening it, Enter copying through OSC 52), the cache
-# going stale when an input changes, and cheat as the old name.
+# mapping behind --here, the cache going stale when an input changes, what
+# changed since the last look (keys diff, keys seen), the tmux popup on Alt+?
+# and prefix+? (scoped to the pane's program, Ctrl+S widening it, Enter copying
+# through OSC 52), and cheat as the old name.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
@@ -32,6 +33,16 @@ touch "$TK_CHECKOUT/configs/tmux.conf"
 "$KEYS" _stale || fail "an edited tmux.conf left the cache fresh"
 "$KEYS" build --cache-only >/dev/null
 "$KEYS" _stale && fail "a rebuild left the cache stale"
+
+# --- What changed: the first build is the baseline; an edited note marks its key,
+# keys diff lists it, and keys seen clears the marks.
+[[ -z "$("$KEYS" ls --changed --tsv)" ]] || fail "the first build marked changes"
+sed -i 's/bind -N "First window" -n M-S/bind -N "The first window" -n M-S/' "$TK_CONFIG"
+"$KEYS" build --cache-only >/dev/null
+assert_eq "$("$KEYS" ls --changed --tsv | cut -f1)" "tmux:alt+shift+s" "the changed entry"
+"$KEYS" diff | grep -q 'Alt+Shift+S .*The first window (summary)' || fail "keys diff: $("$KEYS" diff)"
+"$KEYS" seen | grep -q '^Seen: ' || fail "keys seen"
+[[ -z "$("$KEYS" ls --changed --tsv)" ]] || fail "keys seen left marks"
 
 # --- The popup: both keys open bin/keys scoped to the pane.
 for key in "-T root M-?" "-T prefix ?"; do

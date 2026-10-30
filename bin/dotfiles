@@ -311,6 +311,8 @@ cmd_upgrade() {
         --only "$(IFS=,; printf '%s' "${names[*]}")" --upgrade || rc=$?
     (( rc != 64 )) || return 64
     (( rc == 0 )) || return 1
+    # A new version can move its stock keys; keys defaults reads them and says what moved.
+    [[ "$dry_run" == true ]] || log "Agent keys may have moved: keys defaults ${names[*]} saves the new defaults and lists what changed"
 }
 
 # Every registry tool, its binary, how it installs, its tier and capability, and

@@ -115,12 +115,34 @@ def parser():
     bd.add_argument('mods', nargs='?', default='alt')
     bd.add_argument('-a', '--app', choices=[a for a in route.APPS])
     bd.add_argument('--layer', type=int, default=0, choices=[0, 1], help='1: the Symbols layer, its thumb key held')
+    df = sub.add_parser('diff')
+    df.add_argument('rev', nargs='?', help='a commit, or 7d for a week back (default: since you last looked)')
+    df.add_argument('--since-seen', action='store_true', help='since keys seen (the default)')
+    sub.add_parser('seen')
     sub.add_parser('inputs')
     pv = sub.add_parser('_preview')
     pv.add_argument('id')
     pv.add_argument('--width', type=int, default=int(os.environ.get('FZF_PREVIEW_COLUMNS') or 80))
     sub.add_parser('_index')
     return ap
+
+
+def cmd_defaults(apps):
+    """keys defaults: refresh the saved agent defaults, say per app what moved, then check."""
+    from keymap import sources, track
+    names = apps or ['claude', 'codex', 'opencode', 'pi']
+    before = {a: sources.vendored(REPO, a) for a in names}
+    status = defaults.refresh(REPO, apps)
+    paint = views.paint_for()
+    moved = {}
+    for a in names:
+        d = track.defaults_diff(a, before[a], sources.vendored(REPO, a))
+        print(track.describe_defaults(a, d, paint))
+        if d['added'] or d['removed'] or d['rebound']:
+            moved[a] = d
+    track.save(os.path.join(track.state_dir(), 'defaults-changes.json'), moved)
+    data, index, problems = cache.build(REPO, TMUX_BIN, decorate=lambda ix: track.decorate(REPO, ix))
+    return check(data, entries.from_json(index['entries']), problems, False) or status
 
 
 def index_or_build():
@@ -234,7 +256,12 @@ def main():
             data, index, _ = cache.build(REPO, TMUX_BIN, decorate=lambda ix: track.decorate(REPO, ix))
         if getattr(args, 'cache_only', False):
             return 0
-        html = render(data, index, getattr(args, 'out', None) or default_out())
+        from keymap import track
+        changes = dict(index.get('changes') or {})
+        moved = track.load(os.path.join(track.state_dir(), 'defaults-changes.json'))
+        if moved:
+            changes['defaults'] = moved
+        html = render(data, index, getattr(args, 'out', None) or default_out(), changes)
         n = analysis.counts(data['findings'])
         print(f"{html}: {len(data['traces'])} chords traced, {len(index['entries'])} entries; {n['bug']} broken, "
               f"{n['adapted']} rewritten on purpose, {n['cost']} hidden by design")
@@ -248,12 +275,13 @@ def main():
             os.execvp('viz', ['viz', 'open', target])
         return 0
     if args.cmd == 'defaults':
-        return defaults.refresh(REPO, args.apps)
+        return cmd_defaults(args.apps)
     if args.cmd == 'inputs':
         print('\n'.join(os.path.relpath(p, REPO) if p.startswith(REPO) else p for p in cache.inputs(REPO, TMUX_BIN)))
         return 0
     if args.cmd == 'check':
-        data, index, problems = cache.build(REPO, TMUX_BIN)
+        from keymap import track
+        data, index, problems = cache.build(REPO, TMUX_BIN, decorate=lambda ix: track.decorate(REPO, ix))
         return check(data, entries.from_json(index['entries']), problems, args.update)
     if args.cmd == 'ls':
         return cmd_ls(args)
@@ -263,6 +291,30 @@ def main():
         index = cache.load(REPO, 'entries.json')
         if index:
             cache.write_index(REPO, index)
+        return 0
+    if args.cmd == 'seen':
+        from keymap import track
+        _, index = index_or_build()
+        n = sum(1 for e in index['entries'] if e.get('changed'))
+        snap = track.mark_seen(index)
+        cache.save(REPO, None, index)
+        print(f"Seen: {len(index['entries'])} entries at {snap['commit'][:9] or 'this checkout'}"
+              + (f'; {n} changed ones no longer marked' if n else ''))
+        return 0
+    if args.cmd == 'diff':
+        from keymap import track
+        _, index = index_or_build()
+        paint = views.paint_for()
+        if args.rev and not args.since_seen:
+            commit = track.resolve(REPO, args.rev)
+            if not commit:
+                print(f'keys diff: no commit for {args.rev}', file=sys.stderr)
+                return 64
+            base = track.snapshot_of(REPO, commit, TMUX_BIN)
+            doc = track.changes_doc(base, track.snapshot(index), index, f'{args.rev} ({commit[:9]})')
+        else:
+            doc = index.get('changes') or track.changes_doc(track.snapshot(index), track.snapshot(index), index, 'you last looked')
+        print(track.describe(doc, paint))
         return 0
     data, index = index_or_build()
     size = shutil.get_terminal_size((80, 24))
