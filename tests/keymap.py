@@ -198,8 +198,8 @@ class Readers(unittest.TestCase):
 
     def test_tmux_lines(self):
         conf = 'bind -n M-z send-keys x\nbind -N "Zoom" z resize-pane -Z\nbind -T copy-mode-vi -N "up" e send -X cursor-up\nbind -r S-Up resize-pane -U 5\n'
-        self.assertEqual(sources.tmux_lines(conf), {('root', 'alt+z'): 1, ('prefix', 'z'): 2, ('copy-mode-vi', 'e'): 3,
-                                                    ('prefix', 'shift+up'): 4})
+        self.assertEqual(sources.tmux_lines(conf), {('root', 'alt+z'): (1, ''), ('prefix', 'z'): (2, 'Zoom'),
+                                                    ('copy-mode-vi', 'e'): (3, 'up'), ('prefix', 'shift+up'): (4, '')})
 
     @unittest.skipUnless(shutil.which('tmux'), 'needs tmux')
     def test_bind_notes(self):
@@ -351,6 +351,27 @@ class Build(unittest.TestCase):
         self.assertEqual(views.TSV_COLUMNS, ['id', 'kind', 'label', 'layer', 'summary', 'intent', 'status', 'origin',
                                              'scope', 'tags', 'source'])
         self.assertEqual(dict(zip(views.TSV_COLUMNS, row))['intent'], 'focus-left')
+
+    def test_page(self):
+        """The page: routes stored once, entries inline, under 1 MB, nothing fetched but viz's own."""
+        out = os.path.join(self.tmp, 'page')
+        r = self.keys('build', '-o', out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(os.path.join(out, 'keymap.html')) as f:
+            html = f.read()
+        self.assertLess(len(html.encode()), 1_000_000)
+        self.assertNotIn('fonts.googleapis', html)
+        self.assertNotIn('<link', html)
+        self.assertNotRegex(html, r'(src|href)="https?://')
+        for part in ('id="q"', 'id="shell"', 'id="cards"', 'id="changed"', '@media print', 'keyroutes-theme'):
+            self.assertIn(part, html)
+        from keymap import main
+        index = {'entries': entries.to_json(self.entries), 'groups': {}}
+        inline = main.page_data(self.data, index)
+        for ch in ('alt+z', 'ctrl+c', 'shift+tab'):
+            for n, app in enumerate(inline['routeApps']):
+                self.assertEqual(inline['routes'][inline['routeTable'][ch][n]], self.data['traces'][ch][app])
+        self.assertIsNone(inline['traces'])
 
     def test_plain_listing(self):
         """Off a terminal, keys is keys ls: plain text, no fzf, no color."""

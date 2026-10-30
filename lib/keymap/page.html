@@ -1,11 +1,9 @@
 <title>TAFK Key Routes</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@400;600&family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=Chakra+Petch:wght@500;600;700&display=swap">
 <style>
-/* Layout: a routing board. The Defy's two halves sit side by side with the chosen key's
-   route lanes beneath; the alignment matrix and findings run full width below.
+/* Layout: a routing board. A search over every entry heads the page; the Defy's two
+   halves sit side by side with the chosen key's route lanes beneath; the alignment
+   matrix, findings, the shell's names and the printable cards run full width below.
    Layer hues double as the legend. */
 :root {
   --bg: #eef1f0;
@@ -24,9 +22,10 @@
   --ok: #2b7549;
   --cap: #fbfcfb;
   --cap-edge: #c2ccc8;
-  --f-display: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
-  --f-body: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', system-ui, sans-serif;
-  --f-mono: 'Atkinson Hyperlegible Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  /* System stacks only: the page looks the same offline (Segoe UI and Cascadia Mono on Windows). */
+  --f-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --f-body: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --f-mono: 'Cascadia Mono', ui-monospace, 'SF Mono', Consolas, 'DejaVu Sans Mono', monospace;
   --radius: 6px;
 }
 @media (prefers-color-scheme: dark) {
@@ -230,6 +229,59 @@ table.plain { border-collapse: collapse; width: 100%; font-size: 0.82rem; margin
 .ref .panel h3 { margin-bottom: 10px; }
 footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 @media (prefers-reduced-motion: no-preference) { .cap rect.body { transition: fill .15s, stroke .15s; } }
+
+/* Search */
+.searchbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.searchbar input[type=search] { flex: 1 1 22rem; min-width: 0; font: inherit; font-size: 1rem; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.searchbar label { font-size: 0.84rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.results { margin: 8px 0 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; max-height: 26rem; overflow-y: auto; }
+.results[hidden] { display: none; }
+.results li { display: grid; grid-template-columns: 1.2rem minmax(7rem, 11rem) 6.5rem 1fr; gap: 8px; align-items: baseline; padding: 6px 10px; cursor: pointer; font-size: 0.86rem; }
+.results li + li { border-top: 1px solid var(--line); }
+.results li.on, .results li:hover { background: color-mix(in srgb, var(--l-tmux) 10%, var(--surface)); }
+.results .mk { font-family: var(--f-mono); color: var(--muted); }
+.results .mk.bug { color: var(--bug); } .results .mk.chg { color: var(--warn); } .results .mk.adp { color: var(--l-tmux); }
+.results .ly { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.results .it { color: var(--muted); font-size: 0.76rem; }
+.entry-card { margin-top: 10px; }
+.entry-card[hidden] { display: none; }
+.entry-card .src { font-family: var(--f-mono); font-size: 0.74rem; color: var(--muted); }
+.entry-card .runs { font-family: var(--f-mono); font-size: 0.8rem; background: var(--sunk); padding: 6px 8px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+.theme { margin-left: auto; }
+
+/* Shell names */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 0.82rem; }
+.names th, .names td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+.names thead th { font-family: var(--f-mono); font-weight: 400; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-top: 0; cursor: pointer; user-select: none; white-space: nowrap; }
+.names thead th[aria-sort="ascending"]::after { content: " ▲"; } .names thead th[aria-sort="descending"]::after { content: " ▼"; }
+.names tr.grp td { background: var(--bg); font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.names td.nm { font-family: var(--f-mono); font-weight: 600; white-space: nowrap; }
+.names td.ex, .names td.sr { font-family: var(--f-mono); font-size: 0.74rem; color: var(--muted); word-break: break-word; }
+
+/* What changed */
+.changes { display: grid; gap: 10px; }
+.changes ul { margin: 4px 0 0; padding-left: 1.2rem; font-size: 0.86rem; }
+.changes h3 { font-size: 0.95rem; }
+.cap.chg rect.body { stroke: var(--warn); stroke-width: 4; stroke-dasharray: none; }
+.results li .new, .chip.new { color: var(--warn); }
+
+/* Cards */
+.card-sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; }
+.card-sheet h3 { font-size: 1.2rem; margin-bottom: 8px; }
+.card-sheet h4 { font-family: var(--f-mono); font-weight: 400; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px; }
+.card-cols { columns: 2 18rem; column-gap: 28px; font-size: 0.84rem; }
+.card-cols div { break-inside: avoid; padding: 2px 0; display: grid; grid-template-columns: minmax(6.5rem, max-content) 1fr; gap: 8px; }
+.card-cols .ok { color: var(--ok); } .card-cols .no { color: var(--warn); }
+@media print {
+  :root { --bg: #fff; --surface: #fff; --sunk: #f2f2f2; --ink: #000; --muted: #444; --line: #bbb; }
+  body { padding: 0; background: #fff; }
+  .wrap > *:not(#cards) { display: none !important; }
+  #cards .section-head p, #cards .tabs, #cards .print { display: none; }
+  .card-sheet { border: 0; padding: 0; }
+  .card-cols { font-size: 9.5pt; }
+  @page { margin: 12mm; }
+}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -243,12 +295,26 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 
 <div class="wrap">
 <header>
-  <p class="eyebrow" id="meta"></p>
+  <div class="controls"><p class="eyebrow" id="meta"></p><span class="seg theme" id="theme" role="group" aria-label="Theme"></span></div>
   <h1>TAFK Key Routes</h1>
-  <p class="lede">A key you press passes through the Defy's firmware, then Windows, then WezTerm, then tmux, before the program in the pane sees it. Any layer can take the key, rewrite it, or let it through. This map traces every bound chord through every layer to eight pane programs, shows what each chord costs your hands, and checks that sibling programs answer the same intent with the same key.</p>
+  <p class="lede">A key you press passes through the Defy's firmware, then Windows, then WezTerm, then tmux, before the program in the pane sees it. Any layer can take the key, rewrite it, or let it through. This map traces every bound chord through every layer to eight pane programs, shows what each chord costs your hands, and checks that sibling programs answer the same intent with the same key. The search finds any key, alias or command, as <span class="k">keys</span> does in the shell.</p>
+  <div>
+    <div class="searchbar"><input type="search" id="q" placeholder="Search keys, aliases, commands (press /)" autocomplete="off" aria-label="Search keys, aliases and commands" aria-controls="results">
+      <label><input type="checkbox" id="q-stock"> stock keys too</label></div>
+    <ul class="results" id="results" role="listbox" hidden></ul>
+    <div class="panel entry-card" id="entry" aria-live="polite" hidden></div>
+  </div>
   <div class="stack" id="stack"></div>
   <div class="tally" id="tally"></div>
 </header>
+
+<section id="changed" hidden>
+  <div class="section-head">
+    <h2>What changed</h2>
+    <p id="changed-sub"></p>
+  </div>
+  <div class="changes panel" id="changes"></div>
+</section>
 
 <section id="map">
   <div class="section-head">
@@ -313,6 +379,25 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
   <details class="costs"><summary id="costs-sum">Lost stock keys</summary><div class="scroll-x" style="border:0"><table class="plain" id="costs"></table></div></details>
 </section>
 
+<section id="shell">
+  <div class="section-head">
+    <h2>Shell names</h2>
+    <p>Aliases, functions, git aliases and commands, with what each runs and where it is defined; what each does comes from the comment beside it. Click a heading to sort. In the shell, <span class="k">keys</span> searches them with the keys.</p>
+  </div>
+  <div class="tabs seg" id="shell-tabs"></div>
+  <div class="scroll-x"><table class="names" id="names"></table></div>
+</section>
+
+<section id="cards">
+  <div class="section-head">
+    <h2>Cards</h2>
+    <p>One sheet per program: the intent keys first (✓ where the program answers on the shared key), then our own keys for it, then tmux's rules for it. Print one (it fits a page); <span class="k">keys card codex</span> shows the same in the shell.</p>
+  </div>
+  <div class="tabs seg" id="card-tabs"></div>
+  <div class="card-sheet" id="card"></div>
+  <p class="print"><button class="trace-link" id="print" type="button">Print this card</button></p>
+</section>
+
 <section id="reference">
   <div class="section-head"><h2>Layer facts</h2></div>
   <div class="ref">
@@ -327,7 +412,7 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     </div>
     <div class="panel">
       <h3>How this was built</h3>
-      <p><span class="k">bin/keymap</span> reads the checkout: <span class="k">configs/keyboard/dygma-defy.json</span> (a Bazecor backup), <span class="k">wezterm.lua</span> under <span class="k">nvim -l</span>, tmux's <span class="k">list-keys</span> from a private server, bash <span class="k">bind -p</span>, Neovim's keymaps, and the agents' defaults saved in <span class="k">configs/keymap/defaults</span> with your config on top. Windows' own shortcuts are a fixed list. How each program hears keys comes from live panes.</p>
+      <p><span class="k">bin/keys</span> reads the checkout: <span class="k">configs/keyboard/dygma-defy.json</span> (a Bazecor backup), <span class="k">wezterm.lua</span> under <span class="k">nvim -l</span>, tmux's <span class="k">list-keys</span> from a private server, bash <span class="k">bind -p</span>, Neovim's keymaps, and the agents' defaults saved in <span class="k">configs/keymap/defaults</span> with your config on top. Windows' own shortcuts are a fixed list. How each program hears keys comes from live panes. What each entry does comes from beside it (a tmux <span class="k">bind -N</span> note, a comment, a <span class="k">desc</span>) or from <span class="k">configs/keymap/notes.toml</span>.</p>
       <p>Not verified: whether WezTerm hands tmux every chord distinctly, and which of Claude's Chat and Scroll contexts wins Shift+↑/↓.</p>
       <p id="notes"></p>
     </div>
@@ -341,6 +426,10 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 <script>
 (function () {
   const D = JSON.parse(document.getElementById('data').textContent);
+  // keys build stores each distinct route once: rebuild chord -> program -> route.
+  D.traces = Object.fromEntries(Object.entries(D.routeTable).map(([c, row]) =>
+    [c, Object.fromEntries(row.map((i, n) => [D.routeApps[n], D.routes[i]]))]));
+  const E = D.entries || [];
   const KB = D.keyboard;
   const APPS = D.apps;
   const APP = Object.fromEntries(APPS.map(a => [a.id, a]));
@@ -367,6 +456,28 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     return a.split(/[:.]/).pop().replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
   }
   const ratingTag = (r) => r ? `<span class="rating ${r.replace(' ', '-')}">${esc(r)}</span>` : '';
+  // An entry per layer and chord (its first context), for what a key does in words.
+  const byLayerKey = {};
+  for (const e of E) if (e.kind === 'chord' && !byLayerKey[e.layer + ':' + e.key]) byLayerKey[e.layer + ':' + e.key] = e;
+  const layerOf = (a) => a === 'copy' ? 'tmux-copy' : a;
+  const describe = (layer, chord) => (byLayerKey[layerOf(layer) + ':' + chord] || {}).summary || '';
+  const changedChords = new Set(E.filter(e => e.changed && e.kind === 'chord').map(e => e.key.split(' ')[0]));
+
+  // ---- Theme: system, light or dark, remembered in this browser -------------------------------
+  const THEMES = [['', 'System'], ['light', 'Light'], ['dark', 'Dark']];
+  let theme = '';
+  try { theme = localStorage.getItem('keyroutes-theme') || ''; } catch (e) {}
+  function applyTheme() {
+    if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme;
+    document.querySelectorAll('#theme button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === theme));
+  }
+  $('#theme').innerHTML = THEMES.map(t => `<button type="button" data-t="${t[0]}">${t[1]}</button>`).join('');
+  $('#theme').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    theme = b.dataset.t; try { localStorage.setItem('keyroutes-theme', theme); } catch (err) {}
+    applyTheme();
+  });
+  applyTheme();
 
   // ---- Header -----------------------------------------------------------------------------
   const v = D.versions;
@@ -415,11 +526,15 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     return ['ctrl', 'alt', 'shift', 'super'].filter(m => set.has(m)).concat([k]).join('+');
   }
   const entry = (pos) => KB.layers[state.fw][pos] || KB.layers[0][pos];
+  const SHIFTED = { '1': '!', '2': '@', '3': '#', '4': '$', '5': '%', '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
+    '-': '_', '=': '+', '[': '{', ']': '}', '\\': '|', ';': ':', "'": '"', '`': '~', ',': '<', '.': '>', '/': '?' };
   function chordAt(pos, prefix) {
     const e = entry(pos);
     if (!e || e.kind !== 'key') return null;
     const mods = new Set((prefix || state.mods === 'prefix' ? [] : state.mods.split('+')).concat(e.mods || []).filter(Boolean));
     if (e.typed) { mods.delete('shift'); return make([...mods], e.typed); }
+    // Alt+Shift+/ reaches tmux as Alt+? (Esc ?), as Shift+/ types ?.
+    if (mods.has('shift') && !mods.has('ctrl') && SHIFTED[e.key]) { mods.delete('shift'); return make([...mods], SHIFTED[e.key]); }
     return make([...mods], e.key);
   }
 
@@ -534,7 +649,8 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     } else if (e.kind === 'key') {
       const ch = chordAt(pos);
       const info = capInfo(ch);
-      cls += ' ' + info.cls + (state.mods !== 'prefix' && ch === state.chord ? ' sel' : '');
+      cls += ' ' + info.cls + (state.mods !== 'prefix' && ch === state.chord ? ' sel' : '') +
+        (state.mods !== 'prefix' && changedChords.has(ch) ? ' chg' : '');
       own = info.own;
       title = info.title;
       data = ` data-chord="${esc(ch)}" tabindex="0" role="button"`;
@@ -625,6 +741,8 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
       $('#trace').innerHTML = h; return;
     }
     const related = D.findings.filter(f => f.chord.split(' ')[0] === ch && f.sev !== 'cost');
+    const outer = ['windows', 'wezterm', 'tmux'].map(l => [l, describe(l, ch)]).filter(x => x[1]);
+    if (outer.length) h += outer.map(([l, d]) => `<p class="sub"><b>${esc({ windows: 'Windows', wezterm: 'WezTerm', tmux: 'tmux' }[l])}:</b> ${esc(d)}</p>`).join('');
     h += `<p class="sub">Each row follows the chord to one pane program: what Windows, WezTerm, tmux and the terminal's key encoding do on the way.</p>`;
     h += '<div class="lanes"><table><thead><tr><th>Pane</th><th>Windows</th><th>WezTerm</th><th>tmux</th><th>Keys</th><th>Result</th></tr></thead><tbody>';
     for (const a of ORDER) {
@@ -641,7 +759,7 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
       const own = r.effects.filter(e => e[0] === a);
       const isBug = related.some(f => f.app === a && f.sev === 'bug');
       if (dead) res = `<span class="none">taken before it arrives</span>`;
-      else if (own.length) res = `<span class="act">${esc(human(own[0][2]))}</span> <span class="ctx">${esc(own[0][1])}</span>` +
+      else if (own.length) res = `<span class="act">${esc(describe(a, r.delivered) || human(own[0][2]))}</span> <span class="ctx">${esc(own[0][1])}</span>` +
         (own.length > 1 ? `<div class="ctx">also: ${own.slice(1, 3).map(e => esc(human(e[2]))).join(', ')}</div>` : '');
       else if (r.prefixes && r.prefixes.length) res = `<span class="ctx">starts ${esc(r.prefixes.slice(0, 2).map(p => human(p[2])).join(', '))}</span>`;
       else res = `<span class="none">nothing</span>`;
@@ -704,7 +822,7 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     }
     const inst = f.instead && f.instead.length ? f.instead.map(human).join(', ') : 'nothing';
     return `<article class="finding" style="--c:${color}"><p class="who">${esc(APP[f.app].label)} · ${esc(f.ctx)}${f.origin === 'ours' ? ' · your config' : ''}</p>` +
-      `<h3>${kbd(f.chord)} should ${esc(human(f.action))}</h3>` +
+      `<h3>${kbd(f.chord)} should ${esc((describe(f.app, f.chord) || human(f.action)).replace(/^./, c => c.toLowerCase()))}</h3>` +
       `<p>${esc(f.cause[0].toUpperCase() + f.cause.slice(1))}. Pressing it does <b>${esc(inst)}</b>.</p>` +
       (f.via && f.via.length ? `<p class="fix">The action still answers on ${f.via.map(x => kbd(x)).join(' ')}.</p>` : '') +
       (fix ? `<p class="fix"><b>Fix:</b> ${fix}</p>` : '') +
@@ -746,7 +864,194 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
       `<p>${winKeys.length ? `${winKeys.length} keys send Win chords that Windows keeps (Ctrl+Win+←/→ switch virtual desktops). ` : ''}WezTerm has no names for ScrollLock and Pause and reads them by Windows key code (raw:145, raw:19).</p>`;
   }
   $('#notes').textContent = D.notes.length ? 'Skipped on this run: ' + D.notes.join('; ') + '.' : '';
-  $('#footer').textContent = `Defaults: Claude Code ${v.claude}, Codex ${v.codex}, OpenCode ${v.opencode}, pi ${v.pi}. Rebuild with bin/keymap build.`;
+  $('#footer').textContent = `Defaults: Claude Code ${v.claude}, Codex ${v.codex}, OpenCode ${v.opencode}, pi ${v.pi}. ${E.length} entries. Rebuild with keys build; keys open shows it.`;
+
+  // ---- Search: every entry, ranked as the shell's lookup ranks them ---------------------------------
+  const LAYER_NAME = { 'tmux-prefix': 'tmux pfx', 'tmux-copy': 'copy', 'tmux-mouse': 'mouse', bin: 'command' };
+  const layerName = (e) => e.kind === 'alias' || e.kind === 'function' ? e.kind : (LAYER_NAME[e.layer] || e.layer);
+  const marker = (e) => e.changed ? ['●', 'chg'] : (e.status === 'bug' || e.status === 'unpressable') ? ['✗', 'bug'] :
+    e.status === 'adapted' ? ['~', 'adp'] : e.origin === 'stock' ? ['·', ''] : ['', ''];
+  const hay = E.map(e => [e.label, e.key, e.summary || '', e.expands || '', (e.tags || []).join(' '), layerName(e),
+    (e.scope || []).map(a => APP[a] ? APP[a].label : a).join(' '), e.id].join(' ').toLowerCase());
+  const KIND_RANK = { intent: 0, chord: 1, tip: 2, alias: 3, function: 3, 'git-alias': 4, command: 4 };
+  function search(q, stock) {
+    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    const out = [];
+    E.forEach((e, i) => {
+      if (e.origin === 'stock' && !stock) return;
+      if (!terms.every(t => hay[i].includes(t))) return;
+      const label = e.label.toLowerCase(), joined = terms.join(' ');
+      const rank = label === joined || e.key === joined ? 0 : label.startsWith(terms[0]) ? 1 :
+        (label + ' ' + e.key).includes(terms[0]) ? 2 : (e.summary || '').toLowerCase().includes(terms[0]) ? 3 : 4;
+      out.push([rank, KIND_RANK[e.kind] ?? 5, (e.tags || []).includes('internal') ? 1 : 0, e.label.length, i]);
+    });
+    out.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1] || a[3] - b[3]);
+    return out.slice(0, 40).map(x => E[x[4]]);
+  }
+  let hits = [], hit = -1;
+  function showResults() {
+    const q = $('#q').value;
+    hits = search(q, $('#q-stock').checked);
+    hit = hits.length ? 0 : -1;
+    $('#results').hidden = !q.trim();
+    $('#results').innerHTML = hits.length ? hits.map((e, i) => {
+      const [m, c] = marker(e);
+      return `<li role="option" data-i="${i}" class="${i === hit ? 'on' : ''}"><span class="mk ${c}">${m}</span>` +
+        `<span>${e.kind === 'chord' || e.kind === 'intent' ? kbd(e.key) : `<b>${esc(e.label)}</b>`}</span>` +
+        `<span class="ly">${esc(layerName(e))}</span><span>${esc(e.summary || e.expands || '')}` +
+        `${e.intent && e.kind !== 'intent' ? ` <span class="it">⟨${esc(e.intent)}⟩</span>` : ''}</span></li>`;
+    }).join('') : '<li><span></span><span class="ctx">nothing matches</span></li>';
+  }
+  function entryCard(e) {
+    const [m] = marker(e);
+    const bits = [layerName(e), e.origin].concat(e.status ? [e.status] : []);
+    let h = `<p class="eyebrow">${esc(bits.join(' · '))}</p><h3>${e.kind === 'chord' || e.kind === 'intent' ? kbd(e.key) : esc(e.label)} ${m ? esc(m) : ''}</h3>`;
+    if (e.summary) h += `<p>${esc(e.summary)}</p>`;
+    if (e.cause) h += `<p class="sub">${esc(e.cause)}</p>`;
+    if (e.kind === 'intent' && e.apps) h += '<table class="plain"><tbody>' + Object.entries(e.apps).map(([a, v]) =>
+      `<tr><td><b>${esc(APP[a] ? APP[a].label : a)}</b></td><td>${esc(v)}</td></tr>`).join('') + '</tbody></table>';
+    if (e.expands) h += `<p class="runs">${esc(e.expands)}</p>`;
+    const foot = [e.source, (e.tags || []).filter(Boolean).join(', '), e.changed ? e.changed + ' since the baseline' : ''].filter(Boolean);
+    if (foot.length) h += `<p class="src">${esc(foot.join(' · '))}</p>`;
+    $('#entry').innerHTML = h; $('#entry').hidden = false;
+  }
+  function pickEntry(e) {
+    $('#results').hidden = true;
+    entryCard(e);
+    if (e.kind === 'chord' && e.layer !== 'tmux-mouse' && KB) {
+      const stroke = e.layer === 'tmux-prefix' ? e.key.split(' ')[1] : e.key.split(' ')[0];
+      if (e.layer === 'tmux-prefix') {
+        state.mods = 'prefix';
+      } else {
+        const mods = stroke === '+' ? '' : stroke.split('+').slice(0, -1).join('+');
+        state.mods = MODSETS.some(m => m[0] === mods) ? mods : '';
+        state.chord = stroke;
+        if (APP[layerOf(e.layer) === 'tmux-copy' ? 'copy' : e.layer]) state.app = e.layer === 'tmux-copy' ? 'copy' : e.layer;
+      }
+      save();
+      $('#mods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === state.mods));
+      $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.a === state.app));
+      syncLegend(); renderKB();
+      if (state.mods === 'prefix') renderPrefixTrace(stroke); else renderTrace();
+    } else if (e.kind === 'intent' && e.key && D.traces[e.key]) {
+      state.chord = e.key; save(); renderKB(); renderTrace();
+    }
+  }
+  $('#q').addEventListener('input', showResults);
+  $('#q-stock').addEventListener('change', showResults);
+  $('#q').addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!hits.length) return;
+      hit = (hit + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length;
+      $('#results').querySelectorAll('li').forEach((li, i) => li.classList.toggle('on', i === hit));
+      const on = $('#results').querySelector('li.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && hit >= 0) { e.preventDefault(); pickEntry(hits[hit]); }
+    else if (e.key === 'Escape') { $('#results').hidden = true; }
+  });
+  $('#results').addEventListener('click', e => { const li = e.target.closest('li[data-i]'); if (li) pickEntry(hits[+li.dataset.i]); });
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('#q').focus(); }
+  });
+
+  // ---- What changed: since the baseline keys keeps (keys seen), and the agents' defaults --------------
+  const C = D.changes || {};
+  const changeCount = ['added', 'changed', 'removed'].reduce((n, k) => n + (C[k] || []).length, 0) +
+    ((C.findings || {}).new || []).length + ((C.findings || {}).fixed || []).length;
+  let dismissed = '';
+  try { dismissed = localStorage.getItem('keyroutes-seen') || ''; } catch (e) {}
+  if (changeCount && C.hash !== dismissed) {
+    const line = (x) => `<li>${x.key ? kbd(x.key) : ''} <b>${esc(x.label || x.id)}</b> <span class="ctx">${esc(LAYER_NAME[x.layer] || x.layer || '')}</span> ${esc(x.summary || '')}${x.fields ? ` <span class="ctx">(${esc(x.fields.join(', '))})</span>` : ''}</li>`;
+    let h = '';
+    for (const [k, title] of [['added', 'Added'], ['changed', 'Changed'], ['removed', 'Removed']]) {
+      if ((C[k] || []).length) h += `<div><h3>${title} (${C[k].length})</h3><ul>${C[k].slice(0, 60).map(line).join('')}</ul></div>`;
+    }
+    const F = C.findings || {};
+    if ((F.new || []).length) h += `<div><h3>New broken keys</h3><ul>${F.new.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    if ((F.fixed || []).length) h += `<div><h3>Fixed</h3><ul>${F.fixed.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    h += `<p><button class="trace-link" id="seen" type="button">Seen: hide this in this browser</button> <span class="ctx">keys seen in the shell sets the baseline for every view.</span></p>`;
+    $('#changes').innerHTML = h;
+    $('#changed-sub').textContent = `${changeCount} changes since ${C.since || 'the baseline'}${C.sinceDate ? ' (' + C.sinceDate + ')' : ''}. Changed keys have an amber ring on the keyboard.`;
+    $('#changed').hidden = false;
+    $('#seen').addEventListener('click', () => { try { localStorage.setItem('keyroutes-seen', C.hash || ''); } catch (e) {} $('#changed').hidden = true; });
+  }
+
+  // ---- Shell names: aliases, functions, git aliases, commands, by tag -------------------------------
+  const SHELL_TABS = [['names', 'Aliases and functions', e => e.kind === 'alias' || e.kind === 'function'],
+    ['git', 'Git aliases', e => e.kind === 'git-alias'],
+    ['bin', 'Commands', e => e.kind === 'command' || (e.kind === 'tip' && e.layer === 'shell')]];
+  let shellTab = 'names', sortBy = null, sortDir = 1;
+  function renderNames() {
+    const tab = SHELL_TABS.find(t => t[0] === shellTab);
+    const rows = E.filter(tab[2]);
+    const cols = [['label', 'Name'], ['summary', 'What it does'], ['expands', 'Runs'], ['source', 'Where'], ['tags', 'Tags']];
+    let h = '<thead><tr>' + cols.map(c => `<th data-k="${c[0]}" aria-sort="${sortBy === c[0] ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'}">${c[1]}</th>`).join('') + '</tr></thead><tbody>';
+    const cell = (e) => `<tr><td class="nm">${esc(e.label)}</td><td>${esc(e.summary || '')}</td><td class="ex">${esc(e.expands || '')}</td>` +
+      `<td class="sr">${esc(e.source || '')}</td><td class="ex">${esc((e.tags || []).slice(1).join(', '))}</td></tr>`;
+    if (sortBy) {
+      const val = (e) => String(sortBy === 'tags' ? (e.tags || []).join(' ') : e[sortBy] || '').toLowerCase();
+      rows.sort((a, b) => val(a) < val(b) ? -sortDir : val(a) > val(b) ? sortDir : 0);
+      h += rows.map(cell).join('');
+    } else {
+      const groups = {};
+      for (const e of rows) (groups[(e.tags || [])[0] || 'other'] = groups[(e.tags || [])[0] || 'other'] || []).push(e);
+      for (const g of Object.keys(groups).sort()) h += `<tr class="grp"><td colspan="5">${esc(g)}</td></tr>` + groups[g].map(cell).join('');
+    }
+    $('#names').innerHTML = h + '</tbody>';
+  }
+  $('#shell-tabs').innerHTML = SHELL_TABS.map(t => `<button type="button" data-t="${t[0]}" aria-pressed="${t[0] === shellTab}">${t[1]} (${E.filter(t[2]).length})</button>`).join('');
+  $('#shell-tabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    shellTab = b.dataset.t; sortBy = null;
+    $('#shell-tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderNames();
+  });
+  $('#names').addEventListener('click', e => {
+    const th = e.target.closest('th[data-k]'); if (!th) return;
+    if (sortBy === th.dataset.k) { if (sortDir < 0) sortBy = null; sortDir = -sortDir; } else { sortBy = th.dataset.k; sortDir = 1; }
+    renderNames();
+  });
+  renderNames();
+
+  // ---- Cards: one sheet per program, as keys card prints it ---------------------------------------
+  let cardApp = 'claude';
+  function renderCard() {
+    const name = APP[cardApp].label;
+    const row = (k, t, cls) => `<div><span>${k}</span><span${cls ? ` class="${cls}"` : ''}>${esc(t)}</span></div>`;
+    let h = `<h3>${esc(name)}: the keys that matter</h3>`;
+    const intents = E.filter(e => e.kind === 'intent' && e.apps && e.apps[cardApp]);
+    if (intents.length) {
+      h += '<h4>Same key in every program</h4><div class="card-cols">' + intents.map(e => {
+        const got = e.apps[cardApp], ok = got.startsWith('✓');
+        const key = got.replace(/^✓ /, '').split(',')[0];
+        return row(key && !/^(none|differs)$/.test(key) ? kbd(key.toLowerCase().replace(/ /g, '+')).replace(/>[^<]*</, `>${esc(key)}<`) : '—',
+          (ok ? '✓ ' : '≠ ') + e.summary.split(':')[0], ok ? '' : 'no');
+      }).join('') + '</div>';
+    }
+    const every = new Set(Object.keys(APP));
+    const inScope = (e) => !e.scope || e.scope.includes(cardApp);
+    const own = E.filter(e => e.kind === 'chord' && e.origin === 'ours' && e.scope && e.scope.includes(cardApp) &&
+      !['tmux', 'tmux-prefix', 'wezterm', 'windows', 'tmux-mouse'].includes(e.layer) && !e.intent);
+    if (own.length) h += `<h4>${esc(name)}: our own keys</h4><div class="card-cols">` + own.map(e => row(kbd(e.key), e.summary || e.expands || '')).join('') + '</div>';
+    const rules = E.filter(e => e.layer === 'tmux' && e.kind === 'chord' && e.scope && e.scope.includes(cardApp) && !e.intent);
+    if (rules.length) h += `<h4>tmux, for ${esc(name)}</h4><div class="card-cols">` + rules.map(e => row(kbd(e.key), e.summary || '')).join('') + '</div>';
+    const everywhere = E.filter(e => e.layer === 'tmux' && e.kind === 'chord' && !e.scope && !e.intent && !e.group && e.origin === 'ours');
+    if (everywhere.length) h += '<h4>tmux, everywhere</h4><div class="card-cols">' + everywhere.slice(0, 24).map(e => row(kbd(e.key), e.summary || '')).join('') + '</div>';
+    const changed = E.filter(e => e.changed && inScope(e));
+    if (changed.length) h += '<h4>Changed since you last looked</h4><div class="card-cols">' + changed.map(e => row(e.kind === 'chord' ? kbd(e.key) : esc(e.label), e.summary || '', 'no')).join('') + '</div>';
+    $('#card').innerHTML = h;
+  }
+  const CARD_APPS = ['claude', 'codex', 'opencode', 'pi', 'shell', 'nvim', 'copy', 'fzf'];
+  $('#card-tabs').innerHTML = CARD_APPS.map(a => `<button type="button" data-a="${a}" aria-pressed="${a === cardApp}">${esc(APP[a].label.replace('tmux copy mode', 'copy mode').replace('Claude Code', 'Claude'))}</button>`).join('');
+  $('#card-tabs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    cardApp = b.dataset.a;
+    $('#card-tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderCard();
+  });
+  $('#print').addEventListener('click', () => window.print());
+  renderCard();
 
   renderKB();
   renderTrace();
