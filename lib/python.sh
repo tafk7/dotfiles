@@ -1,5 +1,5 @@
 #!/bin/bash
-# The Python for tools that need 3.11 or newer (tomllib): keymap. The system
+# The Python for tools that need 3.11 or newer (tomllib): keys. The system
 # python3 when it is new enough; else one uv manages, which setup installs where
 # the system's is older (configure_uv_python; Ubuntu 22.04 has 3.10). The choice
 # is cached, so a tool starts as fast as it would on the system Python, and

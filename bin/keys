@@ -202,8 +202,13 @@ lookup() {
         refresh
     fi
     python_cmd
+    # The lookup leans on fzf 0.54+ (--ellipsis, transform); a background build reloads it
+    # through a socket where fzf listens on one (the pinned fzf does).
+    local help listen=()
+    help="$(fzf --help 2>/dev/null)"
+    [[ "$help" == *SOCKET_PATH* ]] && listen=(--listen "$KEYS_SOCK")
     out="$(rows "$KEYS_STATE" | fzf --ansi --delimiter '\t' --with-nth 7 --no-hscroll --ellipsis '' \
-        --listen "$KEYS_SOCK" --query "$query" --prompt "$(prompt "$KEYS_STATE")" --header "$(header "$KEYS_STATE")" \
+        "${listen[@]}" --query "$query" --prompt "$(prompt "$KEYS_STATE")" --header "$(header "$KEYS_STATE")" \
         --height 100% --layout reverse --info inline-right --exact --tiebreak begin,length \
         --preview "$(printf %q "$PY") $(printf %q "$ROOT/lib/keymap/main.py") _preview {1}" \
         --preview-window 'down,45%,wrap,border-top' \
@@ -267,7 +272,7 @@ main() {
     # the lookup has no keys for.
     local id plain=0 arg
     local -a args=() query=()
-    [[ -t 1 && -t 0 ]] && command -v fzf >/dev/null 2>&1 || plain=1
+    [[ -t 1 && -t 0 ]] && command -v fzf >/dev/null 2>&1 && fzf --help 2>/dev/null | grep -q -- --ellipsis || plain=1
     for arg in "$@"; do
         case "$arg" in -m|--mods|-k|--kind|-l|--layer|-t|--tag|--changed|--broken|--all|--ours) plain=1 ;; esac
     done

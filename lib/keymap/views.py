@@ -84,7 +84,7 @@ def filtered(entries, args, groups=None):
         if getattr(args, 'broken', False) and e['status'] not in ('bug', 'unpressable'):
             continue
         everything = getattr(args, 'all', False)
-        if e['origin'] == 'stock' and not (getattr(args, 'stock', False) or everything):
+        if hidden_stock(e) and not (getattr(args, 'stock', False) or everything):
             continue
         if internal(e) and not everything and not (kinds and 'command' in kinds and getattr(args, 'all', False)):
             continue
@@ -132,8 +132,13 @@ def copy_text(e):
     return e['label']
 
 
+def hidden_stock(e):
+    """A stock binding stays out of the default views, unless a note says why it matters."""
+    return e['origin'] == 'stock' and e.get('via') != 'note'
+
+
 def flags(e):
-    out = 's' if e['origin'] == 'stock' else 'o'
+    out = 's' if hidden_stock(e) else 'o'
     out += 'i' if internal(e) else ''
     out += 'g' if e.get('group') and not e['id'].startswith('group:') else ''
     out += 'c' if e.get('changed') else ''

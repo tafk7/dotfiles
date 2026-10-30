@@ -1,7 +1,7 @@
 #!/bin/bash
 # The Python for tools that need 3.11 or newer (lib/python.sh): the system's
 # when it is new enough, else uv's, cached, with DOTFILES_PYTHON over both, and
-# a plain message when there is none. bin/keymap runs through it.
+# a plain message when there is none. bin/keys runs through it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_REPO_ROOT="$ROOT"
