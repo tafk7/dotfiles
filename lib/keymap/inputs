@@ -1,0 +1,19 @@
+# What a keys build reads, relative to the checkout: a change to any of these
+# makes the cache stale. bin/keys tests them with find; lib/keymap/cache.py walks
+# them. The tmux binary is added to both.
+configs/tmux.conf
+configs/wezterm.lua
+configs/init.vim
+configs/gitconfig
+configs/nvim
+configs/keymap
+configs/keyboard
+configs/ai
+configs/codex.defaults.toml
+configs/codex.toml
+configs/opencode-cli.defaults.json
+configs/opencode-cli.json
+entry
+shell
+bin
+lib/keymap

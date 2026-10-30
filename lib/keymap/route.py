@@ -342,6 +342,7 @@ def aliases(k, kmode):
 class Model:
     def __init__(self, bindings, tmux_meta, keyboard):
         self.kb = keyboard
+        self.bindings = bindings  # every layer's, for the entry index
         self.apps = {a: dict(v) for a, v in APPS.items()}
         if tmux_meta.get('extended_keys_format') == 'csi-u':
             self.apps['codex']['kmode'] = 'mok2'  # Codex asks for modifyOtherKeys 2 only under csi-u
@@ -420,7 +421,7 @@ class Model:
                         f' (fallback for programs other than {", ".join(named)})' if named else '')
                 sends, effects = run_tmux(cmd, pane_ctx(app))
                 if effects or not sends:
-                    label = '; '.join(e[1] for e in effects) or 'nothing here (edge of the layout)'
+                    label = '; '.join(e[1] for e in effects) or 'nothing here'
                     hops.append(['tmux', 'consume', label, None])
                     return dict(hops=hops, effects=[['tmux', e[0], e[1]] for e in effects] or [['tmux', 'nothing', 'nothing']],
                                 delivered=None)

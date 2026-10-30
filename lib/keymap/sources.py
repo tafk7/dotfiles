@@ -28,6 +28,7 @@ class Binding:
     origin: str = 'stock'  # stock | ours
     primary: bool = True   # main screen of the program, not a dialog or picker
     source: str = ''
+    note: str = ''         # what the binding does, in words: bind -N, a comment, a desc
 
 
 def read(path):
@@ -49,11 +50,26 @@ def alternatives(ch):
 
 
 # --- WezTerm -----------------------------------------------------------------------
+def wezterm_comments(text):
+    """(mods, key) -> (line, comment) for each `key = '...'` line of wezterm.lua's key
+    tables; the comment is a trailing `-- ...` on that line."""
+    out, lines = {}, text.splitlines()
+    for i, line in enumerate(lines):
+        m = re.match(r"\s*key = '([^']+)',\s*(?:--\s*(.*))?$", line)
+        if not m:
+            continue
+        mods = next((mm.group(1) for l in lines[i + 1:i + 3] if (mm := re.match(r"\s*mods = '([^']+)'", l))), 'NONE')
+        out.setdefault((mods, m.group(1)), (i + 1, (m.group(2) or '').strip()))
+    return out
+
+
 def wezterm(repo, notes):
     if not shutil.which('nvim'):
         notes.append('WezTerm skipped: nvim is needed to evaluate wezterm.lua')
         return []
-    r = run(['nvim', '-l', os.path.join(HERE, 'wezterm-dump.lua'), os.path.join(repo, 'configs/wezterm.lua')])
+    path = os.path.join(repo, 'configs/wezterm.lua')
+    r = run(['nvim', '-l', os.path.join(HERE, 'wezterm-dump.lua'), path])
+    comments = wezterm_comments(read(path))
     out = []
     for line in ((r.stdout + r.stderr) if r else '').splitlines():
         parts = line.split('\t')
@@ -61,16 +77,18 @@ def wezterm(repo, notes):
             continue
         mods, key, action = parts
         ch = chord.wezterm(mods, key)
+        lnum, note = comments.get((mods, key), (0, ''))
+        src = f'configs/wezterm.lua:{lnum}' if lnum else 'configs/wezterm.lua'
         m = re.match(r'SendString\("(.*)"\)$', action)
         if m:
             sent = chord.decode(chord.unescape(m.group(1)))
-            out.append(Binding('wezterm', ch, action, 'translate', [sent[0].split('|')[0]], source='configs/wezterm.lua'))
+            out.append(Binding('wezterm', ch, action, 'translate', [sent[0].split('|')[0]], source=src, note=note))
         elif action == 'callback' and ch == 'ctrl+insert':
             out.append(Binding('wezterm', ch, 'copy a WezTerm selection', 'conditional', [ch],
-                               context='passes when nothing is selected', source='configs/wezterm.lua'))
+                               context='passes when nothing is selected', source=src, note=note))
         else:
             label = 'upload clipboard image' if action == 'callback' else action
-            out.append(Binding('wezterm', ch, label, origin='ours', source='configs/wezterm.lua'))
+            out.append(Binding('wezterm', ch, label, source=src, note=note))
     for b in out:
         b.origin = 'ours'
     return out
@@ -78,8 +96,8 @@ def wezterm(repo, notes):
 
 # --- tmux ---------------------------------------------------------------------------
 def tmux_dump(tmux_bin, conf, repo, name):
-    """The key tables of a private server loaded with CONF, the extended-keys format, and
-    why it failed (None when it read). A socket of its own per dump: kill-server returns
+    """The key tables of a private server loaded with CONF, the extended-keys format,
+    why it failed (None when it read), and the bindings' notes. A socket of its own per dump: kill-server returns
     before the server is gone, and a dump on the same socket could reach that server."""
     sock = f'keymap{os.getpid()}-{name}'
     env = dict(os.environ, DOTFILES_DIR=repo)
@@ -87,18 +105,52 @@ def tmux_dump(tmux_bin, conf, repo, name):
     started = run([tmux_bin, '-L', sock, '-f', conf, 'new-session', '-d', '-s', 'keymap'], env=env)
     keys = run([tmux_bin, '-L', sock, 'list-keys'], env=env)
     fmt = run([tmux_bin, '-L', sock, 'show', '-sv', 'extended-keys-format'], env=env)
+    # Notes (bind -N) only show with -N, one table at a time: the key, padded, then
+    # the note; -P '' drops the prefix tmux puts before each key. list-keys itself
+    # never prints them (3.2a, 3.4 and 3.8 alike), so the table regex is unchanged.
+    noted = {t: run([tmux_bin, '-L', sock, 'list-keys', '-N', '-P', '', '-T', t], env=env)
+             for t in ('root', 'prefix', 'copy-mode-vi')}
     run([tmux_bin, '-L', sock, 'kill-server'], env=env)
     table = {}
     for line in (keys.stdout if keys else '').splitlines():
         m = re.match(r'bind-key\s+(?:-r\s+)?-T\s+(\S+)\s+(\S+)\s+(.*)', line)
         if m:
             table[(m.group(1), m.group(2))] = m.group(3).strip()
+    notes = {}
+    for t, r in noted.items():
+        for line in (r.stdout if r and r.returncode == 0 else '').splitlines():
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2:
+                notes[(t, chord.tmux(parts[0]))] = parts[1].strip()
     failed = None
     if not table:
         step, result = ('new-session', started) if not started or started.returncode else ('list-keys', keys)
         failed = f'{step} ' + ('timed out or could not run' if result is None else
                                f'exited {result.returncode}: {result.stderr.strip()[:200]}')
-    return table, (fmt.stdout.strip() if fmt and fmt.returncode == 0 else 'xterm'), failed
+    return table, (fmt.stdout.strip() if fmt and fmt.returncode == 0 else 'xterm'), failed, notes
+
+
+def tmux_lines(text):
+    """(table, chord) -> the line of tmux.conf that binds it (the last, as tmux keeps the last)."""
+    out = {}
+    for i, line in enumerate(text.splitlines()):
+        m = re.match(r'\s*bind(?:-key)?\s+(.*)', line)
+        if not m:
+            continue
+        toks, table = re.findall(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|\S+', m.group(1)), 'prefix'
+        while toks and toks[0].startswith('-'):
+            flag = toks.pop(0)
+            if flag == '-n':
+                table = 'root'
+            elif flag in ('-T', '-N') and toks:
+                value = toks.pop(0)
+                table = value if flag == '-T' else table
+        if toks:
+            key = toks[0]
+            if key[0] in '"\'' and key[-1] == key[0] and len(key) > 1:
+                key = key[1:-1].replace('\\177', '\x7f')
+            out[(table, chord.tmux(key))] = i + 1
+    return out
 
 
 def tmux(repo, tmux_bin, notes):
@@ -109,33 +161,59 @@ def tmux(repo, tmux_bin, notes):
         return [], {'extended_keys_format': 'xterm', 'version': None}
     version = run([tmux_bin, '-V'])
     conf = os.path.join(repo, 'configs/tmux.conf')
-    stock, _, _ = tmux_dump(tmux_bin, '/dev/null', repo, 'stock')
-    ours, ext_format, failed = tmux_dump(tmux_bin, conf, repo, 'ours')
+    stock, _, _, _ = tmux_dump(tmux_bin, '/dev/null', repo, 'stock')
+    ours, ext_format, failed, noted = tmux_dump(tmux_bin, conf, repo, 'ours')
     if failed or ('root', 'M-s') not in ours:  # once more, on a fresh socket
-        ours, ext_format, failed = tmux_dump(tmux_bin, conf, repo, 'ours-again')
+        ours, ext_format, failed, noted = tmux_dump(tmux_bin, conf, repo, 'ours-again')
     if failed or ('root', 'M-s') not in ours:
         notes.append(f'tmux tables unread: {failed or "configs/tmux.conf did not load (no Alt+S)"}')
+    lines = tmux_lines(read(conf))
     out = []
     for (table, key), action in sorted(ours.items()):
         if table not in ('root', 'prefix', 'copy-mode-vi') or re.search(r'Mouse|Wheel|Click|Drag', key):
             continue
         layer = {'root': 'tmux', 'prefix': 'tmux-prefix', 'copy-mode-vi': 'tmux-copy'}[table]
         origin = 'stock' if stock.get((table, key)) == action else 'ours'
-        out.append(Binding(layer, chord.tmux(key), action, origin=origin, source='configs/tmux.conf'))
+        ch = chord.tmux(key)
+        lnum = lines.get((table, ch))
+        src = f'configs/tmux.conf:{lnum}' if lnum and origin == 'ours' else 'configs/tmux.conf' if origin == 'ours' else 'tmux'
+        out.append(Binding(layer, ch, action, origin=origin, source=src, note=noted.get((table, ch), '')))
     return out, {'extended_keys_format': ext_format,
                  'version': version.stdout.strip() if version else None}
 
 
 # --- Shells --------------------------------------------------------------------------
+# A trailing comment that only names the key ("# Ctrl+Delete") says nothing the chord doesn't.
+KEY_LABEL = re.compile(r'^(Ctrl|Alt|Shift|Meta|Super)\+|^(Backspace|Delete|Tab|Enter)\b')
+
+
+def shell_files(repo, first):
+    """FIRST (an entry file) and the shell tools, which bind widgets of their own (Alt+I)."""
+    out = [first]
+    tools = os.path.join(repo, 'shell/tools')
+    if os.path.isdir(tools):
+        out += sorted(os.path.join('shell/tools', f) for f in os.listdir(tools) if f.endswith('.sh'))
+    return out
+
+
+def comment_of(line):
+    m = re.search(r"\s#\s*(.*)$", line)
+    text = m.group(1).strip() if m else ''
+    return '' if KEY_LABEL.match(text) else text
+
+
 def readline(repo, notes):
     out, ours = [], set()
-    text = read(os.path.join(repo, 'entry/bash.sh'))
-    for m in re.finditer(r'^\s*bind\s+(-x\s+)?\'"([^"]+)":\s*([^\']+)\'', text, re.M):
-        ch = chord.decode(chord.unescape(m.group(2)))[0]
-        for alt in alternatives(ch):
-            ours.add(alt)
-            out.append(Binding('shell', alt, m.group(3).strip(), context='readline', origin='ours',
-                               source='entry/bash.sh'))
+    for path in shell_files(repo, 'entry/bash.sh'):
+        for i, line in enumerate(read(os.path.join(repo, path)).splitlines()):
+            m = re.match(r'\s*bind\s+(?:-m\s+\S+\s+)?(-x\s+)?\'"([^"]+)":\s*([^\']+)\'', line)
+            if not m:
+                continue
+            ch = chord.decode(chord.unescape(m.group(2)))[0]
+            for alt in alternatives(ch):
+                ours.add(alt)
+                out.append(Binding('shell', alt, m.group(3).strip(), context='readline', origin='ours',
+                                   source=f'{path}:{i + 1}', note=comment_of(line)))
     if not shutil.which('bash'):
         return out
     r = run(['bash', '--noprofile', '--norc', '-i', '-c', 'bind -p'])
@@ -155,6 +233,29 @@ def readline(repo, notes):
     return out
 
 
+def zsh(repo, notes):
+    """bindkey lines in entry/zsh.sh and the shell tools. Not traced: tmux's rules test for
+    bash, and zsh hears keys as bash does, so these only become entries."""
+    out = []
+    for path in shell_files(repo, 'entry/zsh.sh'):
+        if not os.path.exists(os.path.join(repo, path)):
+            continue
+        for i, line in enumerate(read(os.path.join(repo, path)).splitlines()):
+            m = re.match(r"\s*bindkey\s+(?:-M\s+\S+\s+)?(\$?)'([^']+)'\s+(\S+)", line)
+            if not m:
+                continue
+            seq = m.group(2)
+            if m.group(1):  # $'...': C escapes
+                seq = re.sub(r'\\x([0-9a-fA-F]{2})', lambda x: chr(int(x.group(1), 16)), seq)
+            ch = chord.decode(chord.unescape(seq))
+            if len(ch) > 2:
+                continue
+            for alt in alternatives(' '.join(ch)):
+                out.append(Binding('zsh', alt, m.group(3), context='zle', origin='ours',
+                                   source=f'{path}:{i + 1}', note=comment_of(line)))
+    return out
+
+
 def fzf(repo, notes):
     out, seen = [], set()
     for path in ('shell/fzf.sh', 'shell/tools/fzf.sh'):
@@ -171,22 +272,35 @@ def nvim(repo, notes):
     if not shutil.which('nvim'):
         notes.append('Neovim skipped: no nvim')
         return []
-    lua = ("local o={} for _,m in ipairs({'n','i','x'}) do for _,k in ipairs(vim.api.nvim_get_keymap(m)) do "
-           "o[#o+1]=m..'\\t'..k.lhs..'\\t'..(k.desc or k.rhs or '<lua>'):gsub('\\n',' ') end end "
+    # mode, lhs, desc, rhs, and where it was defined (its script, from :scriptnames)
+    lua = ("local s={} for l in vim.fn.execute('scriptnames'):gmatch('[^\\n]+') do "
+           "local n,p=l:match('^%s*(%d+):%s*(.-)%s*$') if n then s[tonumber(n)]=vim.fn.expand(p) end end "
+           "local function src(k) local p=s[k.sid or -1] return p and (p..':'..(k.lnum or 0)) or '' end "
+           "local o={} for _,m in ipairs({'n','i','x'}) do for _,k in ipairs(vim.api.nvim_get_keymap(m)) do "
+           "o[#o+1]=table.concat({m,k.lhs,((k.desc or ''):gsub('[\\t\\n]',' ')),"
+           "((k.rhs or '<lua>'):gsub('[\\t\\n]',' ')),src(k)},'\\t') end end "
            "io.stdout:write(table.concat(o,'\\n'))")
 
     def maps(*args):
         env = dict(os.environ, DOTFILES_DIR=repo)
         r = run(['nvim', *args, '--headless', '-c', f'lua {lua}', '-c', 'qa!'], env=env)
-        return {tuple(l.split('\t')) for l in ((r.stdout + r.stderr) if r else '').splitlines() if l.count('\t') == 2}
+        return {tuple(l.split('\t')) for l in ((r.stdout + r.stderr) if r else '').splitlines() if l.count('\t') == 4}
 
     clean = {m[:2] for m in maps('--clean')}
+    configs = os.path.realpath(os.path.join(repo, 'configs')) + os.sep
     out = []
-    for mode, lhs, rhs in sorted(maps('-u', os.path.join(repo, 'configs/init.vim'), '-i', 'NONE')):
+    for mode, lhs, desc, rhs, where in sorted(maps('-u', os.path.join(repo, 'configs/init.vim'), '-i', 'NONE')):
         if (mode, lhs) in clean or lhs.startswith('<Plug>') or '<SNR>' in lhs:
             continue
-        out.append(Binding('nvim', chord.vim(lhs.replace(' ', '<Space>')), rhs[:80], context=f'mode {mode}',
-                           origin='ours', primary=mode in ('n', 'i'), source='configs/init.vim'))
+        path, _, lnum = where.rpartition(':')
+        path = os.path.realpath(path) if path else ''
+        # A plugin's own maps (surround, unimpaired) are its defaults, not ours.
+        if path.startswith(configs) or not path:
+            src, origin = 'configs/' + path[len(configs):] + f':{lnum}' if path else 'configs/init.vim', 'ours'
+        else:
+            src, origin = 'plugin ' + (re.search(r'/([^/]+)/(?:plugin|autoload|ftplugin)/', path) or re.search(r'()', '')).group(1), 'stock'
+        out.append(Binding('nvim', chord.vim(lhs.replace(' ', '<Space>')), (desc or rhs)[:80], context=f'mode {mode}',
+                           origin=origin, primary=mode in ('n', 'i'), source=src.rstrip(), note=desc))
     return out
 
 
@@ -243,7 +357,8 @@ def claude(repo, notes):
     for ctx, b in table.items():
         for key, action in b.items():
             out.append(Binding('claude', plus_any(key), action, context=ctx, primary=ctx in ('Global', 'Chat', 'Scroll'),
-                               origin='ours' if (ctx, key) in ours else 'stock', source='claude defaults'))
+                               origin='ours' if (ctx, key) in ours else 'stock',
+                               source='configs/ai/claude/keybindings.json' if (ctx, key) in ours else 'claude defaults'))
     out += [Binding('claude', k, 'hard:' + a, context='Built in', source='claude composer') for k, a in CLAUDE_BUILT_IN]
     return out, d['version']
 
@@ -274,7 +389,8 @@ def codex(repo, notes):
             for key in keys:
                 out.append(Binding('codex', plus_any(key, '-'), action, context=ctx,
                                    primary=ctx in ('global', 'chat', 'composer', 'editor'),
-                                   origin='ours' if action in user.get(ctx, {}) else 'stock', source='codex defaults'))
+                                   origin='ours' if action in user.get(ctx, {}) else 'stock',
+                                   source='configs/codex.defaults.toml' if action in user.get(ctx, {}) else 'codex defaults'))
     out += [Binding('codex', k, 'fixed:' + a, context='fixed', source='codex (not rebindable)') for k, a in CODEX_FIXED]
     return out, d['version']
 
@@ -298,6 +414,7 @@ def opencode(repo, notes):
     for k, v in user.items():
         table[k] = norm(v)
     leader = (table.get('leader') or ['ctrl+x'])[0]
+    desc = d.get('descriptions', {})
     out = []
     for oid, keys in table.items():
         if oid == 'leader':
@@ -305,7 +422,9 @@ def opencode(repo, notes):
         primary = oid.split('.')[0] in ('app', 'prompt', 'input', 'session', 'agent', 'messages', 'command', 'model')
         for key in keys:
             out.append(Binding('opencode', plus_any(key.replace('<leader>', leader + ' ')), oid, context='keybinds',
-                               primary=primary, origin='ours' if oid in user else 'stock', source='opencode defaults'))
+                               primary=primary, origin='ours' if oid in user else 'stock',
+                               source='configs/opencode-cli.defaults.json' if oid in user else 'opencode defaults',
+                               note=desc.get(oid, '')))
     return out, d['version']
 
 
@@ -316,11 +435,13 @@ def pi(repo, notes):
     # configs/ai/pi/keybindings.json replaces an action's keys, as pi applies it.
     user = load_jsonc(os.path.join(repo, 'configs/ai/pi/keybindings.json'))
     out = []
+    desc = d.get('descriptions', {})
     for pid, keys in {**d['bindings'], **user}.items():
         primary = not pid.startswith(('app.tree', 'app.models', 'app.session', 'tui.select', 'tui.altScreen.search'))
         for key in [keys] if isinstance(keys, str) else keys:
             out.append(Binding('pi', plus_any(key), pid, context=pid.rsplit('.', 1)[0], primary=primary,
-                               source='configs/ai/pi/keybindings.json' if pid in user else 'pi defaults'))
+                               source='configs/ai/pi/keybindings.json' if pid in user else 'pi defaults',
+                               note=desc.get(pid, '')))
     return out, d['version']
 
 

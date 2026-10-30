@@ -1,8 +1,9 @@
 {
-  "$comment": "Broken keys keymap check tolerates until they are fixed; refresh with keymap check --update.",
+  "$comment": "Broken keys keys check tolerates until they are fixed, and the count of our own bindings, aliases and commands with no description, which may only shrink; refresh with keys check --update.",
   "known": [
     "opencode ctrl+shift+d input.delete.line",
     "opencode ctrl+shift+e input.select.line.end",
     "wezterm f11 ToggleFullScreen"
-  ]
+  ],
+  "undescribed": 403
 }
