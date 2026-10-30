@@ -95,6 +95,22 @@ printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/external/systemctl"
 DOTFILES_TEST_SYSTEMD_RUNNING=1 configure_tailscaled tailscale >/dev/null
 grep -Fxq "systemctl enable --now tailscaled" "$TEST_ROOT/sudo.log" || fail "an inactive tailscaled was not enabled"
 
+# Every eget tool gets its configure steps, not only the first in the batch;
+# one the batch failed gets none.
+eget_configured=()
+configure_uv_python() { eget_configured+=(uv); }
+select_run --bash
+ONLY_COMPONENTS="eget,starship,uv" install_selection >/dev/null 2>&1 || true
+assert_eq "${eget_configured[*]-}" uv "configure steps of a later eget tool"
+eget_configured=()
+install_eget_tools() { INSTALL_FAIL+=(uv); return 1; }
+ONLY_COMPONENTS="eget,starship,uv" install_selection >/dev/null 2>&1 || true
+assert_eq "${eget_configured[*]-}" "" "configure steps of a failed eget tool"
+install_eget_tools() { :; }
+INSTALL_FAIL=()
+# The real step again, for the cases below.
+_DOTFILES_CONFIGURE_LOADED="" source "$ROOT/lib/configure.sh"
+
 # uv's Python: installed only where the system's is older than 3.11, without
 # links on PATH, and not in a dry run.
 mkdir -p "$TEST_ROOT/pyold"

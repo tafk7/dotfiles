@@ -1658,9 +1658,13 @@ install_selection() {
         fi
         case "$kind" in
             eget)
-                [[ "$eget_done" == false ]] || continue
-                eget_done=true
-                install_eget_tools "${eget_tools[@]}" || failed=true
+                if [[ "$eget_done" == false ]]; then
+                    eget_done=true
+                    install_eget_tools "${eget_tools[@]}" || failed=true
+                fi
+                # The batch ran at the first one's place; each eget tool it
+                # installed or found still gets its own configure steps below.
+                [[ " ${INSTALL_FAIL[*]-} ${INSTALL_NA[*]-} " != *" $entry "* ]] || continue
                 ;;
             bootstrap)
                 # The eget batch bootstraps eget; alone, it installs here.

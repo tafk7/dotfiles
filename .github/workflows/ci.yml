@@ -307,6 +307,7 @@ jobs:
       # with uv (pinned and checked against versions.lock), and keymap uses it.
       - name: keymap on uv's Python where the system's is older
         if: matrix.release == '22.04'
+        shell: bash
         run: |
           DEBIAN_FRONTEND=noninteractive apt-get install -y python3
           read -r _ _ version repo asset sha _ < <(awk '$1 == "uv" && $2 == "x86_64"' versions.lock)
