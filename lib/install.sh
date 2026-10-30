@@ -435,6 +435,65 @@ setup_wsl_ssh_agent() {
         || wsl_log "ssh-agent bridge: for boot-start without a login, run:  sudo loginctl enable-linger $USER"
 }
 
+# Keep viz serving across reboots. A browser tab left open polls every second,
+# and with no server behind the client's LocalForward each poll makes ssh print
+# "open failed". Generated, not tracked: ExecStart names this checkout. Starts
+# with the user manager (the first login after boot) and stops with it, which
+# viz does anyway when logout removes its runtime directory.
+setup_viz_service() {
+    # The manager must be this HOME's: one serving another HOME would never
+    # load the unit written here. Its socket is checked first so a runtime
+    # directory without one (a test fixture's) never reaches systemctl.
+    local manager_env
+    if [[ ! -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/systemd/private" ]] \
+       || ! command -v systemctl >/dev/null 2>&1 \
+       || ! manager_env="$(systemctl --user show-environment 2>/dev/null)" \
+       || ! grep -qxF "HOME=$HOME" <<< "$manager_env"; then
+        [[ "${DRY_RUN:-false}" == "true" ]] \
+            || log "viz: no systemd user instance; viz open, viz start or viz login starts it on demand"
+        return 0
+    fi
+
+    # ExecStartPre hands an on-demand server over to the unit; otherwise the
+    # unit's server finds the lock held and fails.
+    local unit="$HOME/.config/systemd/user/viz.service" content
+    content="[Unit]
+Description=viz: serve ~/viz to the ssh client's browser
+
+[Service]
+Type=simple
+ExecStartPre=-\"$DOTFILES_DIR/bin/viz\" stop
+ExecStart=\"$DOTFILES_DIR/bin/viz\" serve
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target"
+    if [[ -f "$unit" && "$(<"$unit")" == "$content" ]] \
+       && systemctl --user is-enabled viz.service >/dev/null 2>&1 \
+       && systemctl --user is-active viz.service >/dev/null 2>&1; then
+        return 0
+    fi
+    if [[ "${DRY_RUN:-false}" == "true" ]]; then
+        log "[DRY RUN] Would install and start viz.service"
+        return 0
+    fi
+
+    local staged
+    mkdir -p "${unit%/*}" || return 1
+    staged="$(mktemp "${unit%/*}/.viz.service.XXXXXX")" || return 1
+    printf '%s\n' "$content" > "$staged" && mv -f "$staged" "$unit" || { rm -f "$staged"; return 1; }
+
+    systemctl --user daemon-reload || { warn "viz: systemd user daemon-reload failed"; return 1; }
+    if systemctl --user enable viz.service >/dev/null 2>&1 \
+       && systemctl --user restart viz.service >/dev/null 2>&1; then
+        success "viz server runs as a user service (viz.service)"
+    else
+        warn "viz: could not enable or start viz.service; see: systemctl --user status viz"
+        return 1
+    fi
+}
+
 # Record the checkout path in durable machine state. Shell entrypoints normally
 # derive it from their symlink; this handles flattened copies/bind mounts.
 write_dotfiles_env() {
