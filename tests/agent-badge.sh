@@ -2,19 +2,20 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TMUX_BIN="$(command -v tmux)" || { echo 'tmux required for agent-badge tests' >&2; exit 1; }
 TEST_ROOT="$(mktemp -d)"
 SERVER="dotfiles-badge-$RANDOM-$$"
 trap 'TMUX_TMPDIR="$TEST_ROOT/tmux" tmux -L "$SERVER" kill-server 2>/dev/null || true; rm -rf "$TEST_ROOT"' EXIT
 mkdir -p "$TEST_ROOT/tmux"
 export TMUX_TMPDIR="$TEST_ROOT/tmux"
 
-t() { /usr/bin/tmux -L "$SERVER" "$@"; }
+t() { "$TMUX_BIN" -L "$SERVER" "$@"; }
 t -f /dev/null new-session -d -s test
 t set-option -g window-status-format ' #I:#W '
 t set-option -g window-status-current-format ' #I:#W '
 
 mkdir -p "$TEST_ROOT/bin"
-printf '#!/bin/sh\nexec /usr/bin/tmux -L %q "$@"\n' "$SERVER" > "$TEST_ROOT/bin/tmux"
+printf '#!/bin/sh\nexec %q -L %q "$@"\n' "$TMUX_BIN" "$SERVER" > "$TEST_ROOT/bin/tmux"
 chmod +x "$TEST_ROOT/bin/tmux"
 PATH="$TEST_ROOT/bin:$PATH" TMUX=test "$ROOT/plugins/shared/agent-badge.tmux" wire
 [[ "$(t show-options -gv window-status-format)" == *'@cc_win_badge'* ]] \

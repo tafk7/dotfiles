@@ -246,6 +246,12 @@ in once with `viz login`. The sign-in lasts 30 days, or until
 `viz login --reset`. Recopy `configs/wezterm.lua`, so image paste doesn't
 compete for the forward.
 
+Where systemd runs a user instance, setup installs `viz.service`, so the server
+comes back with your first login after a reboot. Without it, an open viz tab
+keeps polling a dead socket and ssh prints `channel N: open failed` once a
+second. The unit doesn't see `VIZ_DIR` from your shell; set it with
+`systemctl --user edit viz` too if you change it.
+
 ### Themes
 
 One global theme colors tmux and everything running in it: Neovim, fzf, bat,

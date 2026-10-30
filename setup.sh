@@ -621,6 +621,7 @@ phase_setup_configs() {
         setup_wsl_clipboard || failed=true
         setup_wsl_ssh_agent || failed=true
     fi
+    setup_viz_service || failed=true
 
     if [[ -n "${DOTFILES_REFRESH_FOLLOWS:-}" ]]; then
         log "Running processes (tmux, theme) are refreshed after setup"

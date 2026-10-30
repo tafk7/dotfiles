@@ -93,6 +93,18 @@ assert_eq "$path" "$HOME/.local/share/claude/versions/2" "self-updated claude pa
     if setup_wsl_ssh_agent >/dev/null 2>&1; then fail "systemd user reload failure was ignored"; fi
 )
 (
+    mkdir -p "$XDG_RUNTIME_DIR/systemd"
+    python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$XDG_RUNTIME_DIR/systemd/private"
+    systemctl() {
+        case "$*" in
+            "--user show-environment") printf 'HOME=%s\n' "$HOME" ;;
+            "--user daemon-reload") return 1 ;;
+        esac
+    }
+    if setup_viz_service >/dev/null 2>&1; then fail "viz service reload failure was ignored"; fi
+    ! compgen -G "$HOME/.config/systemd/user/.viz.service.*" >/dev/null || fail "viz service left a staged unit"
+)
+(
     record_install_path() { return 1; }
     if write_dotfiles_env >/dev/null 2>&1; then fail "install path write failure was ignored"; fi
 )
