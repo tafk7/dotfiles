@@ -316,4 +316,4 @@ jobs:
           tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1
           su -s /bin/bash test -c "cd '$GITHUB_WORKSPACE' && python3 --version \
             && bash -c 'export DOTFILES_DIR=\$PWD; source lib/runtime.sh; source lib/configure.sh; configure_uv_python uv' \
-            && bin/keymap --help | head -n 1 && bash tests/python-select.sh"
+            && bin/keys ls --help | head -n 1 && bash tests/python-select.sh"

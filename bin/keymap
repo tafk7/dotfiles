@@ -1,10 +1,3 @@
 #!/usr/bin/env bash
-# Map every key binding across the keyboard, Windows, WezTerm, tmux and the pane programs.
-# Runs lib/keymap/main.py (its usage: keymap --help) under a Python 3.11 or
-# newer: the system's, or one uv manages where the system's is older (lib/python.sh).
-set -euo pipefail
-ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
-# shellcheck source=lib/python.sh
-source "$ROOT/lib/python.sh"
-python="$(dotfiles_python)" || exit 1
-exec "$python" "$ROOT/lib/keymap/main.py" "$@"
+# The older name for keys (bin/keys), which took over every keymap command.
+exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/keys" "$@"

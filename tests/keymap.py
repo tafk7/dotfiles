@@ -1,16 +1,38 @@
 #!/usr/bin/env python3
-"""bin/keymap: chord notation, tmux rule evaluation, the Defy export, and a full build of this checkout."""
+"""bin/keys (lib/keymap): chord notation, tmux rule evaluation, the Defy export, the readers
+behind the entry index, notes, and a full build of this checkout."""
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, 'lib'))
 
-from keymap import analysis, chord, keyboard, route  # noqa: E402
+from keymap import analysis, chord, entries, keyboard, names, route, sources, views  # noqa: E402
+KEYS = os.path.join(REPO, 'bin/keys')
+
+
+def fixture(files):
+    """A checkout-shaped temp dir with FILES ({path: text}); executable under bin/."""
+    root = tempfile.mkdtemp()
+    for path, text in files.items():
+        full = os.path.join(root, path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, 'w') as f:
+            f.write(text)
+        if path.startswith('bin/'):
+            os.chmod(full, 0o755)
+    return root
+
+
+def keys_env(tmp):
+    """bin/keys with its cache and state in TMP, never the caller's."""
+    return dict(os.environ, XDG_CACHE_HOME=os.path.join(tmp, 'cache'), XDG_STATE_HOME=os.path.join(tmp, 'state'),
+                VIZ_DIR=os.path.join(tmp, 'viz'), NO_COLOR='1')
 
 
 class Notation(unittest.TestCase):
@@ -90,11 +112,164 @@ class Defy(unittest.TestCase):
         self.assertEqual(self.kb.presses('ctrl+_')[0][3], 1)
 
 
+class Names(unittest.TestCase):
+    """Aliases, functions, git aliases and commands, described from their own source."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = fixture({
+            'shell/tools/demo.sh': (
+                '#!/bin/bash\n# Demo tools\n\n'
+                '# Status and inspection\n'
+                "alias ds='git status'          # Show what changed\n"
+                "alias dl='git log --oneline'\n\n"
+                '# Make a directory and go into it\n'
+                'mk() {\n    mkdir -p "$1" && cd "$1" || return\n}\n\n'
+                '# A comment that heads an if, not a definition\n'
+                'if true; then\n    wrapped() { command wrapped "$@"; }\nfi\n\n'
+                '_private() { :; }\n'),
+            'shell/platform/wsl.sh': "#!/bin/bash\nalias clip='clip.exe'  # Pipe to the Windows clipboard\n",
+            'configs/gitconfig': ('[alias]\n    # Basic shortcuts\n    st = status -sb\n    co = checkout\n\n'
+                                  '    # Today\'s work\n    today = "!git log --since=midnight"\n[push]\n    default = simple\n'),
+            'bin/pydoc': '#!/usr/bin/env python3\n# A comment the docstring outranks.\n"""Do a thing, then another.\n\nMore."""\n',
+            'bin/strict': '#!/bin/bash\nset -euo pipefail\necho hi\n',
+            'bin/tool': ('#!/bin/bash\n# Run the tool. Second sentence.\n#\n# Usage:\n'
+                         '#   tool go [FAST]     go somewhere\n#   tool stop          stop it\nset -e\n'),
+            'bin/tmux-helper': '#!/bin/bash\n# A helper the keys run.\n',
+            'configs/tmux.conf': '',
+        })
+        cls.shell = {e['id']: e for e in names.shell(cls.root)}
+        cls.cmds = {e['id']: e for e in names.commands(cls.root)}
+
+    def test_trailing_comment_and_section(self):
+        self.assertEqual(self.shell['alias:ds']['summary'], 'Show what changed')
+        self.assertIn('status and inspection', self.shell['alias:ds']['tags'])
+        self.assertEqual(self.shell['alias:dl']['summary'], '')  # a section header is no description
+        self.assertEqual(self.shell['alias:dl']['expands'], 'git log --oneline')
+
+    def test_comment_above(self):
+        self.assertEqual(self.shell['fn:mk']['summary'], 'Make a directory and go into it')
+        self.assertEqual(self.shell['fn:wrapped']['summary'], '')  # not adjacent: it heads the if
+        self.assertNotIn('fn:_private', self.shell)
+        self.assertIn('wsl', self.shell['alias:clip']['tags'])
+
+    def test_git_aliases(self):
+        found = {e['id']: e for e in names.git_aliases(self.root)}
+        self.assertEqual(set(found), {'git:st', 'git:co', 'git:today'})
+        self.assertEqual(found['git:st']['expands'], 'git status -sb')
+        self.assertIn('basic shortcuts', found['git:st']['tags'])
+        self.assertEqual(found['git:today']['summary'], "Today's work")
+        self.assertEqual(found['git:today']['expands'], 'git log --since=midnight')
+
+    def test_commands(self):
+        self.assertEqual((self.cmds['cmd:pydoc']['summary'], self.cmds['cmd:pydoc']['via']), ('Do a thing, then another', 'docstring'))
+        self.assertEqual(self.cmds['cmd:strict']['summary'], '')  # set -euo pipefail is no description
+        self.assertEqual(self.cmds['cmd:tool']['summary'], 'Run the tool')
+        self.assertEqual(self.cmds['cmd:tool go']['summary'], 'go somewhere')
+        self.assertEqual(self.cmds['cmd:tool go']['expands'], 'tool go [FAST]')
+        self.assertIn('cmd:tool stop', self.cmds)
+        self.assertIn('internal', self.cmds['cmd:tmux-helper']['tags'])
+
+
+class Readers(unittest.TestCase):
+    def test_zsh_bindkey(self):
+        root = fixture({'entry/zsh.sh': ("bindkey '^[[3;5~' kill-word       # Ctrl+Delete\n"
+                                         "bindkey $'\\e\\x7f' backward-kill-line # Alt+Backspace (DEL encoding)\n"
+                                         "bindkey '^X^E' edit-command-line\n"),
+                        'shell/tools/w.sh': "bindkey -M emacs '^[i' my-widget  # Do my thing\n"})
+        found = {(b.chord, b.action): b for b in sources.zsh(root, [])}
+        self.assertIn(('ctrl+delete', 'kill-word'), found)
+        self.assertEqual(found[('ctrl+delete', 'kill-word')].note, '')  # a comment naming the key says nothing
+        self.assertIn(('alt+backspace', 'backward-kill-line'), found)
+        self.assertIn(('ctrl+x ctrl+e', 'edit-command-line'), found)
+        self.assertEqual(found[('alt+i', 'my-widget')].note, 'Do my thing')
+        self.assertEqual(found[('alt+i', 'my-widget')].source, 'shell/tools/w.sh:1')
+
+    def test_wezterm_comments(self):
+        text = "  {\n    key = 'a', -- Next tab\n    mods = 'CTRL|SHIFT',\n  },\n  {\n    key = 'F11',\n    mods = 'NONE',\n  },\n"
+        self.assertEqual(sources.wezterm_comments(text), {('CTRL|SHIFT', 'a'): (2, 'Next tab'), ('NONE', 'F11'): (6, '')})
+
+    def test_tmux_lines(self):
+        conf = 'bind -n M-z send-keys x\nbind -N "Zoom" z resize-pane -Z\nbind -T copy-mode-vi -N "up" e send -X cursor-up\nbind -r S-Up resize-pane -U 5\n'
+        self.assertEqual(sources.tmux_lines(conf), {('root', 'alt+z'): 1, ('prefix', 'z'): 2, ('copy-mode-vi', 'e'): 3,
+                                                    ('prefix', 'shift+up'): 4})
+
+    @unittest.skipUnless(shutil.which('tmux'), 'needs tmux')
+    def test_bind_notes(self):
+        """bind -N notes come back from list-keys -N; list-keys itself is unchanged by them."""
+        root = fixture({'configs/tmux.conf': ('bind -N "Jump to the first window" -n M-S select-window -t "{start}"\n'
+                                              'bind -N \'Zoom "it"\' z resize-pane -Z\n'
+                                              'bind -N "Move up" -T copy-mode-vi e send -X cursor-up\n'
+                                              'bind -n M-s select-pane -L\nbind \'"\' new-window\n')})
+        table, _, failed, notes = sources.tmux_dump(shutil.which('tmux'), os.path.join(root, 'configs/tmux.conf'), root, 'notes')
+        self.assertIsNone(failed)
+        self.assertIn(('root', 'M-S'), table)
+        self.assertEqual(notes[('root', 'alt+shift+s')], 'Jump to the first window')
+        self.assertEqual(notes[('prefix', 'z')], 'Zoom "it"')
+        self.assertEqual(notes[('copy-mode-vi', 'e')], 'Move up')
+        self.assertNotIn(('root', 'alt+s'), notes)
+        self.assertNotIn(('prefix', '"'), notes)  # rebinding a stock key without -N drops its note
+
+
+def entry(eid, **kw):
+    layer, _, key = eid.partition(':')
+    return entries.Entry(id=eid, kind=kw.pop('kind', 'chord'), key=key, label=key, layer=layer, **kw)
+
+
+class Notes(unittest.TestCase):
+    def test_apply(self):
+        root = fixture({'bin/tool': '#!/bin/bash\n# go fast\n'})
+        found = [entry('tmux:alt+z', summary='if-shell ...', via='action'), entry('tmux:alt+1'), entry('tmux:alt+2'),
+                 entry('zsh:alt+i'), entry('shell:alt+i')]
+        notes = {'note': {'tmux:alt+z': {'summary': 'Back a turn'}, 'shell:alt+i': {'summary': 'AI', 'also': ['zsh:alt+i']},
+                          'tmux:alt+q': {'summary': 'gone'}},
+                 'group': {'window-n': {'match': 'tmux:alt+[0-9]', 'label': 'Alt+1…0'}, 'none': {'match': 'nope:*'}},
+                 'tip': {'fast': {'label': 'go', 'summary': 'Go fast', 'anchor': ['bin/tool', 'go fast']},
+                         'stale': {'label': 'x', 'summary': 'y', 'anchor': ['bin/tool', 'no such words']}},
+                 'hide': {'ids': ['tmux:alt+2', 'tmux:gone']}}
+        problems = entries.apply_notes(found, notes, root)
+        by = {e.id: e for e in found}
+        self.assertEqual((by['tmux:alt+z'].summary, by['tmux:alt+z'].via), ('Back a turn', 'note'))
+        self.assertEqual(by['zsh:alt+i'].summary, 'AI')
+        self.assertEqual(by['tmux:alt+1'].group, 'window-n')
+        self.assertNotIn('tmux:alt+2', by)
+        self.assertEqual(by['tip:fast'].summary, 'Go fast')
+        self.assertEqual(sorted(problems), sorted([
+            'configs/keymap/notes.toml: note "tmux:alt+q" matches no entry',
+            'configs/keymap/notes.toml: group "none" (nope:*) matches no entry',
+            'configs/keymap/notes.toml: tip "stale": "no such words" is no longer in bin/tool',
+            'configs/keymap/notes.toml: hide "tmux:gone" matches no entry']))
+
+    def test_nvim_notes_without_plugins(self):
+        found = [entry('nvim:, f@n')]
+        notes = {'note': {'nvim:, g@n': {'summary': 'grep'}}}
+        self.assertEqual(entries.apply_notes(found, notes, REPO, plugins=False), [])
+        self.assertEqual(len(entries.apply_notes(found, notes, REPO, plugins=True)), 1)
+
+    def test_compact_outcomes(self):
+        labels = {a: a for a in route.APPS}
+        apps = {'shell': '⇒ nothing', 'fzf': '⇒ nothing', 'claude': 'tmux: sends Esc Esc ⇒ rewind',
+                'codex': 'tmux: sends Esc Esc ⇒ edit previous', 'pi': '⇒ tree'}
+        self.assertEqual(views.merged_outcomes(apps, labels), [
+            ('claude, codex', 'tmux sends Esc Esc ⇒ rewind / edit previous'), ('pi', 'straight through ⇒ tree'),
+            ('shell, fzf', '⇒ nothing')])
+
+
 @unittest.skipUnless(shutil.which('tmux') and shutil.which('nvim'), 'needs tmux and nvim')
 class Build(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data, cls.model = analysis.build(REPO)
+        cls.entries, cls.problems = entries.build(REPO, cls.data, cls.model)
+        cls.by = {e.id: e for e in cls.entries}
+        cls.tmp = tempfile.mkdtemp()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def keys(self, *args):
+        return subprocess.run([KEYS, *args], capture_output=True, text=True, env=keys_env(self.tmp))
 
     def finding(self, app, ch):
         return [f for f in self.data['findings'] if f.get('app') == app and f['chord'] == ch]
@@ -126,15 +301,57 @@ class Build(unittest.TestCase):
         focus = next(i for i in self.data['intents'] if i['label'] == 'Focus left')
         self.assertTrue(all(a['status'] == 'ok' for a in focus['apps'].values()))
 
-    def test_check_matches_known_issues(self):
-        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'check'], capture_output=True, text=True)
+    def test_check_passes(self):
+        """keys check, rules 1-5, holds for this checkout (and keymap is keys)."""
+        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'check'], capture_output=True, text=True, env=keys_env(self.tmp))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.problems, [])
 
     def test_why(self):
-        r = subprocess.run([os.path.join(REPO, 'bin/keymap'), 'why', 'alt+shift+v', 'codex', 'pi'],
-                           capture_output=True, text=True)
+        r = self.keys('why', 'alt+shift+v', 'codex', 'pi', '--all')
         self.assertIn('prompt in nvim, full pane', r.stdout)
         self.assertIn('LAlt (left thumb)', r.stdout)
+        compact = self.keys('why', 'alt+k').stdout.splitlines()
+        self.assertEqual(compact[-1].split()[-2:], ['⇒', 'nothing'])  # every app: one line
+
+    def test_entries(self):
+        ids = [e.id for e in self.entries]
+        self.assertEqual(len(ids), len(set(ids)))
+        alt_s = self.by['tmux:alt+s']
+        self.assertEqual((alt_s.kind, alt_s.label, alt_s.origin, alt_s.intent), ('chord', 'Alt+S', 'ours', 'focus-left'))
+        self.assertTrue(alt_s.source.startswith('configs/tmux.conf:'))
+        self.assertIn('codex', alt_s.scope)
+        self.assertEqual(self.by['opencode:ctrl+shift+d'].status, 'bug')
+        self.assertEqual(self.by['intent:undo-turn'].key, 'alt+z')
+        self.assertEqual(self.by['alias:gs'].kind, 'alias')
+        self.assertIn('internal', self.by['cmd:tmux-scroll'].tags)
+        self.assertEqual(self.by['pi:alt+m@app.model'].via, 'desc')  # pi's saved descriptions
+
+    def test_ids_stable(self):
+        data, model = analysis.build(REPO)
+        again, _ = entries.build(REPO, data, model)
+        self.assertEqual([e.id for e in again], [e.id for e in self.entries])
+
+    def test_ls_tsv_columns(self):
+        """keys ls --tsv: the golden columns scripts rely on."""
+        lines = self.keys('ls', '--tsv', '-l', 'tmux').stdout.splitlines()
+        self.assertTrue(lines)
+        self.assertTrue(all(len(l.split('\t')) == len(views.TSV_COLUMNS) for l in lines))
+        row = next(l.split('\t') for l in lines if l.startswith('tmux:alt+s\t'))
+        self.assertEqual(dict(zip(views.TSV_COLUMNS, row))['label'], 'Alt+S')
+        self.assertEqual(views.TSV_COLUMNS, ['id', 'kind', 'label', 'layer', 'summary', 'intent', 'status', 'origin',
+                                             'scope', 'tags', 'source'])
+        self.assertEqual(dict(zip(views.TSV_COLUMNS, row))['intent'], 'focus-left')
+
+    def test_plain_listing(self):
+        """Off a terminal, keys is keys ls: plain text, no fzf, no color."""
+        r = self.keys('-k', 'alias')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn('\033[', r.stdout)
+        self.assertTrue(any(l.split()[:2] == ['gs', 'alias'] for l in r.stdout.splitlines()), r.stdout[:400])
+        stock = self.keys('ls', '-l', 'claude').stdout
+        self.assertNotIn('·', stock)  # stock agent keys stay hidden ...
+        self.assertIn('·', self.keys('ls', '-l', 'claude', '--stock').stdout)  # ... until asked for
 
 
 if __name__ == '__main__':

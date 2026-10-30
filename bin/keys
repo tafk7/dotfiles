@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+# Every key binding, alias and command in one place: look one up, trace it, see what changed.
+#
+# Usage:
+#   keys [QUERY]              look up a key, alias or command (fzf); a plain list off a terminal
+#   keys ls [FILTERS]         list entries as text (--tsv, --json for scripts)
+#   keys why CHORD [APP...]   trace one chord through every layer (--all: each app in full)
+#   keys card [APP]           one screen of the keys that matter in a program
+#   keys board [MODS]         the keyboard as text, each key colored by who takes it
+#   keys free [MODS]          chords the keyboard sends that nothing binds
+#   keys diff [REV]           what changed since REV, or since you last looked
+#   keys seen                 mark what keys shows now as seen
+#   keys build [-o DIR]       rebuild the index and the page (default: $VIZ_DIR/keymap)
+#   keys open [CHORD]         show the page through viz, at CHORD
+#   keys check [--update]     fail on new broken keys, stale notes, undescribed bindings
+#   keys defaults [APP...]    refresh the agents' saved default keys, and show what changed
+#
+# Filters, for keys, ls and card: -a APP (what acts in that program), -m MODS
+# (alt+shift), -k KIND (chord, intent, alias, function, git-alias, command, tip),
+# -l LAYER (tmux, wezterm, nvim, claude, ...), -t TAG (docker), --stock (stock
+# bindings, hidden by default), --changed, --broken, --all.
+#
+# In the lookup: Enter copies the key or name (OSC 52, so over SSH too) and
+# prints it; Ctrl+O traces it in the pager; Ctrl+S cycles the scope (this
+# program, every program, shell names only); Ctrl+T shows stock keys; Ctrl+R
+# lists what changed; Ctrl+W prints the page's link to it; Ctrl+G types a name
+# into the pane the popup came from. Alt+? or prefix+? opens it in tmux, scoped
+# to the pane's program (--here).
+#
+# The index is built from this checkout by lib/keymap (Python 3.11+, through
+# lib/python.sh) and cached under $XDG_CACHE_HOME/keys. A lookup reads the cache
+# without Python; when an input changed, it shows the old index and rebuilds in
+# the background.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+SELF="$ROOT/bin/keys"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/keys/${ROOT//\//%}"
+
+usage() { sed -n '2,/^set -euo/{/^set -euo/d;s/^# \{0,1\}//;p}' "$SELF"; }
+
+python_cmd() {
+    # shellcheck source=lib/python.sh
+    source "$ROOT/lib/python.sh"
+    PY="$(dotfiles_python)" || exit 1
+}
+
+py() { python_cmd; "$PY" "$ROOT/lib/keymap/main.py" "$@"; }
+
+# stale: the cache is missing, from another commit, or older than an input.
+stale() {
+    local commit line tmux_bin
+    local -a paths=()
+    [[ -r "$CACHE/stamp" && -r "$CACHE/index.tsv" ]] || return 0
+    IFS= read -r commit < "$CACHE/stamp" || return 0
+    [[ "$commit" == "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" ]] || return 0
+    while IFS= read -r line; do
+        line="${line%%#*}"
+        line="${line//[[:space:]]/}"
+        [[ -n "$line" && -e "$ROOT/$line" ]] && paths+=("$ROOT/$line")
+    done < "$ROOT/lib/keymap/inputs"
+    tmux_bin="${TMUX_BIN:-$(command -v tmux 2>/dev/null || true)}"
+    [[ -n "$tmux_bin" ]] && paths+=("$(readlink -f "$tmux_bin")")
+    [[ -n "$(find "${paths[@]}" -name __pycache__ -prune -o -newer "$CACHE/stamp" -print -quit 2>/dev/null)" ]]
+}
+
+# refresh [--wait]: rebuild the cache; in the background unless --wait, one build
+# at a time. A finished background build reloads a running lookup (fzf --listen).
+refresh() {
+    mkdir -p "$CACHE"
+    if [[ "${1:-}" == --wait ]]; then
+        py build --cache-only
+        return
+    fi
+    mkdir "$CACHE/building" 2>/dev/null || return 0
+    python_cmd
+    (
+        trap 'rmdir "$CACHE/building" 2>/dev/null' EXIT
+        "$PY" "$ROOT/lib/keymap/main.py" build --cache-only >/dev/null 2>&1 || exit 0
+        rm -f "${KEYS_STATE:-/nonexistent}/building"
+        if [[ -S "${KEYS_SOCK:-}" ]] && command -v curl >/dev/null 2>&1; then
+            curl -s --max-time 2 --unix-socket "$KEYS_SOCK" -XPOST http://localhost \
+                -d "reload($SELF _rows $(printf %q "$KEYS_STATE"))+change-header($(header "$KEYS_STATE"))" >/dev/null 2>&1 || true
+        fi
+    ) </dev/null >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+}
+
+# app_for COMMAND IN_MODE: the app id a pane command means (lib/keymap/route.py APPS).
+app_for() {
+    [[ "${2:-0}" == 1 ]] && { echo copy; return; }
+    awk -F'\t' -v c="$1" '$1 == c { print $2; exit }' "$CACHE/apps.tsv" 2>/dev/null
+}
+
+# _rows STATE: the index rows the lookup shows for the scope and toggles in STATE.
+rows() {
+    local state="$1" scope=all app='' stock=0 changed=0 all=0
+    # shellcheck source=/dev/null
+    [[ -r "$state/vars" ]] && source "$state/vars"
+    awk -F'\t' -v scope="$scope" -v app="$app" -v stock="$stock" -v changed="$changed" -v all="$all" '
+        {
+            f = $3
+            if (!all && f ~ /m/) next                       # group members: their group row stands in
+            if (!all && f ~ /i/) next                       # internal helpers
+            if (!stock && !all && f ~ /s/) next
+            if (changed && f !~ /c/) next
+            if (scope == "shell" && f !~ /h/) next
+            if (scope == "app" && app != "" && ("," $4 ",") !~ ("," app ",")) next
+            print
+        }' "$CACHE/index.tsv"
+}
+
+header() {
+    local state="$1" scope=all app='' stock=0 changed=0 all=0 n=0 tags=()
+    # shellcheck source=/dev/null
+    [[ -r "$state/vars" ]] && source "$state/vars"
+    tags+=("$([[ $stock == 1 ]] && echo 'with stock' || echo ours)")
+    [[ $changed == 1 ]] && tags+=(changed)
+    [[ -r "$state/building" ]] && tags+=('rebuilding…')
+    n=$(awk -F'\t' '$3 ~ /c/ && $3 !~ /[sim]/' "$CACHE/index.tsv" 2>/dev/null | wc -l)
+    local line="[${tags[*]}]  Enter copy · ^O trace · ^S scope · ^T stock"
+    (( n > 0 )) && line+=" · $n changed since you last looked: ^R"
+    printf '%s' "${line// · /  }"
+}
+
+prompt() {
+    local state="$1" scope=all app=''
+    # shellcheck source=/dev/null
+    [[ -r "$state/vars" ]] && source "$state/vars"
+    case "$scope" in
+        app) printf 'keys ▸ %s > ' "$app" ;;
+        shell) printf 'keys ▸ shell > ' ;;
+        *) printf 'keys > ' ;;
+    esac
+}
+
+# set_var STATE NAME VALUE / toggle STATE NAME
+set_var() {
+    local file="$1/vars"
+    grep -v "^$2=" "$file" 2>/dev/null > "$file.new" || true
+    printf '%s=%q\n' "$2" "$3" >> "$file.new"
+    mv "$file.new" "$file"
+}
+
+# _key STATE ACTION: a lookup key's fzf actions (fzf transform).
+key_action() {
+    local state="$1" scope=all app='' stock=0 changed=0 all=0
+    # shellcheck source=/dev/null
+    [[ -r "$state/vars" ]] && source "$state/vars"
+    case "$2" in
+        scope)
+            case "$scope" in
+                app) set_var "$state" scope all ;;
+                all) set_var "$state" scope shell ;;
+                *) set_var "$state" scope "$([[ -n "$app" ]] && echo app || echo all)" ;;
+            esac ;;
+        stock) set_var "$state" stock $(( 1 - stock )) ;;
+        changed) set_var "$state" changed $(( 1 - changed )) ;;
+    esac
+    printf 'reload(%q _rows %q)+change-prompt(%s)+change-header(%s)' "$SELF" "$state" "$(prompt "$state")" "$(header "$state")"
+}
+
+# more ID KIND KEY: Ctrl+O, the whole story in the pager.
+more() {
+    {
+        if [[ "$2" == chord && "$1" != tmux-prefix:* && "$1" != group:* ]]; then
+            py why --all "${3%% *}"
+            echo
+        fi
+        NO_COLOR='' py _preview "$1" --width "${COLUMNS:-100}"
+    } | less -R
+}
+
+# copy TEXT: the clipboard through bin/tmux-copy (OSC 52, so it works over SSH).
+copy() {
+    [[ -n "${TMUX:-}" ]] && printf '%s' "$1" | "$ROOT/bin/tmux-copy" 2>/dev/null || true
+}
+
+lookup() {
+    local query="" app="" pane="" stock=0 here="" in_mode=0 out key sel id kind text
+    while (($#)); do
+        case "$1" in
+            --here) here="${2:-}"; shift ;;
+            --in-mode) in_mode="${2:-0}"; shift ;;
+            --pane) pane="${2:-}"; shift ;;
+            -a|--app) app="${2:-}"; shift ;;
+            --stock) stock=1 ;;
+            *) query="${query:+$query }$1" ;;
+        esac
+        shift
+    done
+    if [[ ! -r "$CACHE/index.tsv" ]]; then
+        echo "keys: building the index (once; later builds run in the background)…" >&2
+        refresh --wait >/dev/null || exit 1
+    fi
+    [[ -n "$here" && -z "$app" ]] && app="$(app_for "$here" "$in_mode")"
+    KEYS_STATE="$(mktemp -d "${TMPDIR:-/tmp}/keys.XXXXXX")"
+    export KEYS_STATE KEYS_SOCK="$KEYS_STATE/fzf.sock"
+    trap 'rm -rf "$KEYS_STATE"' EXIT
+    { printf 'scope=%s\napp=%q\nstock=%s\n' "$([[ -n "$app" ]] && echo app || echo all)" "$app" "$stock"; } > "$KEYS_STATE/vars"
+    if stale; then
+        touch "$KEYS_STATE/building"
+        refresh
+    fi
+    python_cmd
+    out="$(rows "$KEYS_STATE" | fzf --ansi --delimiter '\t' --with-nth 7 --no-hscroll --ellipsis '' \
+        --listen "$KEYS_SOCK" --query "$query" --prompt "$(prompt "$KEYS_STATE")" --header "$(header "$KEYS_STATE")" \
+        --height 100% --layout reverse --info inline-right --exact --tiebreak begin,length \
+        --preview "$(printf %q "$PY") $(printf %q "$ROOT/lib/keymap/main.py") _preview {1}" \
+        --preview-window 'down,45%,wrap,border-top' \
+        --expect enter,ctrl-w,ctrl-g \
+        --bind "ctrl-o:execute($(printf %q "$SELF") _more {1} {2} {5})" \
+        --bind "ctrl-s:transform($(printf %q "$SELF") _key $(printf %q "$KEYS_STATE") scope)" \
+        --bind "ctrl-t:transform($(printf %q "$SELF") _key $(printf %q "$KEYS_STATE") stock)" \
+        --bind "ctrl-r:transform($(printf %q "$SELF") _key $(printf %q "$KEYS_STATE") changed)" \
+        )" || exit 0
+    key="$(sed -n 1p <<< "$out")"
+    sel="$(sed -n 2p <<< "$out")"
+    [[ -n "$sel" ]] || exit 0
+    IFS=$'\t' read -r id kind _ _ _ text _ <<< "$sel"
+    case "$key" in
+        ctrl-w)
+            local html="${VIZ_DIR:-$HOME/viz}/keymap/keymap.html" chord="${sel#*$'\t'*$'\t'*$'\t'*$'\t'}"
+            chord="${chord%%$'\t'*}"
+            printf '%s#%s\n' "$html" "$( [[ -n "$app" ]] && printf 'app=%s&' "$app")key=${chord// /+}" ;;
+        ctrl-g)
+            if [[ -n "$pane" && "$kind" =~ ^(alias|function|command|git-alias)$ ]]; then
+                tmux send-keys -t "$pane" -l -- "$text"
+            else
+                printf '%s\n' "$text"
+            fi ;;
+        *)
+            copy "$text"
+            printf '%s\n' "$text" ;;
+    esac
+}
+
+# One exact hit for QUERY prints its card instead of opening the lookup.
+exact() {
+    local q="${1,,}" hits
+    hits="$(awk -F'\t' -v q="$q" '$3 !~ /[sim]/ && ($5 == q || tolower($6) == q) { print $1 }' "$CACHE/index.tsv" 2>/dev/null)"
+    [[ -n "$hits" && "$(wc -l <<< "$hits")" -eq 1 ]] && printf '%s' "$hits"
+}
+
+main() {
+    case "${1:-}" in
+        -h|--help|help) usage; return ;;
+        _rows) rows "$2"; return ;;
+        _key) key_action "$2" "$3"; return ;;
+        _more) more "$2" "$3" "${4:-}"; return ;;
+        _stale) stale; return ;;
+        ls|why|card|board|free|diff|seen|build|open|check|defaults|inputs|_preview|_index) exec_py "$@" ;;
+    esac
+    # The lookup, or its plain form: off a terminal, without fzf, or with filters
+    # the lookup has no keys for.
+    local id plain=0 arg
+    local -a args=() query=()
+    [[ -t 1 && -t 0 ]] && command -v fzf >/dev/null 2>&1 || plain=1
+    for arg in "$@"; do
+        case "$arg" in -m|--mods|-k|--kind|-l|--layer|-t|--tag|--changed|--broken|--all|--ours) plain=1 ;; esac
+    done
+    if (( plain )); then
+        if stale; then refresh --wait >/dev/null || true; fi
+        while (($#)); do
+            case "$1" in
+                --here|--in-mode|--pane) shift ;;
+                -a|--app|-m|--mods|-k|--kind|-l|--layer|-t|--tag) args+=("$1" "${2:-}"); shift ;;
+                -*) args+=("$1") ;;
+                *) query+=("$1") ;;
+            esac
+            shift
+        done
+        (( ${#query[@]} )) && args+=("${query[*]}")
+        if [[ -t 1 ]]; then
+            py ls "${args[@]}" | less -R
+        else
+            py ls "${args[@]}"
+        fi
+        return
+    fi
+    if [[ $# -eq 1 && "$1" != -* ]] && [[ -r "$CACHE/index.tsv" ]] && id="$(exact "$1")" && [[ -n "$id" ]]; then
+        py _preview "$id" --width "$(tput cols 2>/dev/null || echo 80)"
+        return
+    fi
+    lookup "$@"
+}
+
+exec_py() {
+    python_cmd
+    exec "$PY" "$ROOT/lib/keymap/main.py" "$@"
+}
+
+main "$@"

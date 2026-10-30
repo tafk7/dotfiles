@@ -46,7 +46,7 @@ if out="$(pick "$TEST_ROOT/old:$TEST_SYSTEM_PATH" 2>&1)"; then fail "no Python s
 mkdir -p "${cache%/*}" && echo /gone/python3 > "$cache"
 assert_eq "$(pick)" "$real" "a stale cache"
 
-# bin/keymap starts through it, from anywhere.
-(cd "$TEST_ROOT" && "$ROOT/bin/keymap" --help) | grep -q '^usage: keymap' || fail "keymap --help through the launcher"
+# bin/keys (and keymap, its older name) start Python through it, from anywhere.
+(cd "$TEST_ROOT" && "$ROOT/bin/keymap" ls --help) | grep -q '^usage: keys ls' || fail "keys ls --help through the launcher"
 
 printf 'python-select: ok\n'

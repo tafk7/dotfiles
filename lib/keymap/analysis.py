@@ -12,7 +12,8 @@ def collect(repo, tmux_bin=None):
     notes = []
     bindings = sources.windows() + sources.wezterm(repo, notes)
     tmux_bindings, tmux_meta = sources.tmux(repo, tmux_bin, notes)
-    bindings += tmux_bindings + sources.readline(repo, notes) + sources.fzf(repo, notes) + sources.nvim(repo, notes)
+    bindings += tmux_bindings + sources.readline(repo, notes) + sources.zsh(repo, notes) + sources.fzf(repo, notes)
+    bindings += sources.nvim(repo, notes)
     versions = {}
     for app in ('claude', 'codex', 'opencode', 'pi'):
         found, version = getattr(sources, app)(repo, notes)
