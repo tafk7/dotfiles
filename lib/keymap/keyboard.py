@@ -32,6 +32,14 @@ LEGEND = {'backspace': 'Bksp', 'delete': 'Del', 'pageup': 'PgUp', 'pagedown': 'P
           'left': '←', 'right': '→'}
 
 
+def typed_form(ch):
+    """The chord a terminal reports for a shifted symbol with Alt: alt+shift+/ -> alt+? (or None)."""
+    mods, key = chord.split(ch)
+    if 'shift' in mods and 'ctrl' not in mods and key in SHIFTED:
+        return chord.make(mods - {'shift'}, SHIFTED[key])
+    return None
+
+
 def decode(code, names):
     if code == 65535:
         return {'kind': 'transparent'}
@@ -150,11 +158,22 @@ class Keyboard:
         out = [chord.make(mods, e['key'])]
         if e['typed']:
             out.insert(0, chord.make(mods - {'shift'}, e['typed']))
+        elif 'shift' in mods and 'ctrl' not in mods and e['key'] in SHIFTED:
+            # Alt+Shift+/ reaches tmux as Alt+? (Esc ?), as Shift+/ types ?.
+            out.insert(0, chord.make(mods - {'shift'}, SHIFTED[e['key']]))
         return out
 
     def presses(self, target):
-        """Ways to press a chord: [(cost, rating, [(pos, role)])], cheapest first."""
+        """Ways to press a chord: [(cost, rating, [(pos, role)])], cheapest first. A shifted
+        symbol no key types by itself is pressed with Shift: Alt+? is Alt+Shift+/ (tmux's M-?)."""
         want_mods, key = chord.split(target)
+        ways = self._presses(want_mods, key)
+        unshifted = next((k for k, v in SHIFTED.items() if v == key), None)
+        if not ways and unshifted and 'shift' not in want_mods:
+            ways = self._presses(want_mods | {'shift'}, unshifted)
+        return ways
+
+    def _presses(self, want_mods, key):
         ways = []
         for layer in (0, 1):
             if layer and 1 not in self.hold:

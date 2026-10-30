@@ -204,8 +204,8 @@ btop() {
 # Find and replace utility
 alias fr='$DOTFILES_DIR/bin/replace'  # Find and replace text across files
 
-# Cheatsheet for keybindings
-alias cheat='$DOTFILES_DIR/bin/cheatsheet'  # Show this interactive cheatsheet
+# cheat, the lookup's old name (bin/keys)
+alias cheat='$DOTFILES_DIR/bin/keys'  # The keys lookup, by its old name
 
 # direnv shortcuts
 if command -v direnv >/dev/null 2>&1; then

@@ -166,6 +166,7 @@ FRIENDLY = [  # first match wins
     (r'tmux-compose" toggle', 'compose', 'compose box'),
     (r'tmux-compose" fullscreen', 'compose-full', 'prompt in nvim, full pane'),
     (r'tmux-last-reply', 'last-reply', 'copy last reply'),
+    (r'bin/keys"? --popup', 'keys', 'key lookup'),
     (r'tmux-review" search', 'review-search', 'review and search'),
     (r'tmux-review', 'review', 'review transcript'),
     (r'tmux-agent-mode" (\w+)', 'mode', '{0} permission mode'),

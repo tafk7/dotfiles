@@ -320,3 +320,167 @@ def card(e, index, paint, width=80):
         out.append('')
         out.append(paint.dim(' · '.join(foot)))
     return '\n'.join(out)
+
+
+# --- keys card: one screen per program -------------------------------------------------------------
+def strip_ansi(text):
+    return re.sub(r'\033\[[0-9;]*m', '', text)
+
+
+def cells(items, width, cols):
+    """Lay (label, text) pairs out in COLS columns of WIDTH characters."""
+    out, per = [], (len(items) + cols - 1) // cols if items else 0
+    for r in range(per):
+        line = ''
+        for c in range(cols):
+            i = c * per + r
+            if i < len(items):
+                label, text = items[i]
+                room = width - 2 - len(strip_ansi(label))
+                text = text if len(text) <= room else text[:room - 1] + '…'
+                cell = f'{label} {text}'
+                line += cell + ' ' * max(1, width - len(strip_ansi(cell)))
+        out.append(line.rstrip())
+    return out
+
+
+def program_card(index, app, paint, width=80, height=24):
+    """keys card APP: intent keys first, then our own keys for the program, then tmux's rules
+    for it, then what changed; as much as fits on one screen."""
+    labels = index['labels']
+    name = labels.get(app, app)
+    es = index['entries']
+    cols = 2 if width >= 76 else 1
+    colw = width // cols
+    lines = [paint.bold(f'{name}: the keys that matter') + paint.dim(f'   keys card {app} · keys {app} to search')]
+
+    def section(title, items):
+        if not items:
+            return
+        w = min(16, max(len(strip_ansi(k)) for k, _ in items))
+        items = [(paint.key(strip_ansi(k).ljust(w)), t) for k, t in items]
+        room = height - len(lines) - 2
+        if room <= 1:
+            return
+        body = cells(items, colw, cols)
+        lines.append(paint.layer(title))
+        lines.extend(body[:room - 1])
+        if len(body) > room - 1:
+            lines[-1] = lines[-1][:colw - 2] + paint.dim(' …')
+
+    intents = []
+    for e in es:
+        if e['kind'] != 'intent' or app not in e['apps']:
+            continue
+        got = e['apps'][app]
+        mark = '✓' if got.startswith('✓') else '≠'
+        key = got.lstrip('✓ ').split(',')[0] if got and got not in ('none', 'differs') else '—'
+        intents.append((paint.key(f'{key:<11}'), f"{mark} {e['summary'].split(':')[0]}"))
+    section('Same key in every program', intents)
+    own = [e for e in es if e['kind'] == 'chord' and e['origin'] == 'ours' and app in e['scope']
+           and e['layer'] not in ('tmux', 'tmux-prefix', 'wezterm', 'windows', 'tmux-mouse') and not e.get('intent')]
+    section(f'{name}: our own keys', [(paint.key(f"{e['label']:<11}"), summary_of(e)) for e in own])
+    every = set(route.APPS)
+    rules = [e for e in es if e['layer'] == 'tmux' and e['kind'] == 'chord' and app in e['scope']
+             and set(e['scope']) != every and not e.get('intent')]
+    section(f'tmux, for {name}', [(paint.key(f"{e['label']:<11}"), summary_of(e)) for e in rules])
+    changed = [e for e in es if e.get('changed') and (app in e['scope'])]
+    section('Changed since you last looked', [(paint.key(f"{e['label']:<11}"), summary_of(e)) for e in changed])
+    return '\n'.join(lines)
+
+
+# --- keys board: the keyboard in text --------------------------------------------------------------
+def owner(data, ch, app):
+    """Who answers CH: windows, wezterm, tmux, app (a program acts), or free."""
+    t = data['traces'].get(ch)
+    if not t:
+        return 'free'
+    apps = [app] if app else APP_ORDER
+    for a in apps:
+        taken = next((h for h in t[a]['hops'] if h[1] == 'consume'), None)
+        if taken and (app or data['summary'].get(ch) in ('windows', 'wezterm', 'tmux', 'deaf')):
+            return {'windows': 'windows', 'wezterm': 'wezterm', 'tmux': 'tmux'}.get(taken[0], 'free')
+    if not app and data['summary'].get(ch) == 'tmux-cond':
+        return 'tmux'
+    if any(e[0] == a for a in apps for e in t[a]['effects']):
+        return 'app'
+    return 'free'
+
+
+def chord_at(kb, pos, layer, mods):
+    e = kb['layers'][layer].get(str(pos)) or kb['layers'][0].get(str(pos))
+    if not e or e.get('kind') != 'key':
+        return None, e
+    ms = set(mods) | set(e.get('mods') or [])
+    if e.get('typed'):
+        ms.discard('shift')
+        return chord.make(ms, e['typed']), e
+    return chord.make(ms, e['key']), e
+
+
+def board(data, mods, app, paint, layer=0):
+    """keys board: both halves of the Defy, each cap colored by the outermost layer that
+    answers it (or, with --app, what happens in that program)."""
+    kb = data.get('keyboard')
+    if not kb:
+        return 'No keyboard export in configs/keyboard.'
+    mods = [m for m in mods.split('+') if m]
+    hue = {'windows': HUE['windows'], 'wezterm': HUE['wezterm'], 'tmux': HUE['tmux'], 'app': HUE['app'],
+           'free': HUE['free']}
+    # The main keys sit on a grid (row, column); the thumb arcs become two rows under
+    # the inner columns: left 64-67 above 71-68, right 76-79 above 75-72.
+    grid = {(g['side'], g['row'], g['col']): int(p) for p, g in kb['geo'].items() if g['finger'] != 'thumb'}
+    for row, left, right in ((4, (64, 65, 66, 67), (76, 77, 78, 79)), (5, (71, 70, 69, 68), (75, 74, 73, 72))):
+        for i, p in enumerate(left):
+            grid[('left', row, 3 + i)] = p
+        for i, p in enumerate(right):
+            grid[('right', row, i)] = p
+    out, what = [], {}
+    for row in range(6):
+        line = ''
+        for side in ('left', 'right'):
+            for col in range(7):
+                pos = grid.get((side, row, col))
+                if pos is None or str(pos) not in kb['geo']:
+                    line += ' ' * 7
+                    continue
+                ch, e = chord_at(kb, pos, layer, mods)
+                legend = ((e or {}).get('legend') or '')[:4]
+                if ch is None:
+                    line += paint.dim(f'[{legend:<4} ]')
+                    continue
+                who = owner(data, ch, app)
+                cap = f'[{legend:<4}{MARK[who]}]'
+                line += paint.c256(hue[who], cap) if who != 'free' else paint.dim(cap)
+                if who in ('windows', 'wezterm', 'tmux'):
+                    what.setdefault(who, []).append(f"{legend.strip()} {short_effect(data, ch, app, who)}")
+            line += '   '
+        out.append(line.rstrip())
+    scope = f" in {next((a['label'] for a in data['apps'] if a['id'] == app), app)}" if app else ''
+    held = '+'.join(m.capitalize() for m in mods) or 'no modifier'
+    out.insert(0, paint.bold(f'Defy, holding {held}{scope}') + paint.dim('   (the thumb keys on the last two rows)'))
+    out.append('')
+    out.append('  '.join(paint.c256(hue[k], f'{MARK[k]}') + ' ' + v for k, v in
+                         (('windows', 'Windows'), ('wezterm', 'WezTerm'), ('tmux', 'tmux'),
+                          ('app', 'reaches the program'))) + '  ' + paint.dim('(blank: free)'))
+    for who, label in (('windows', 'Windows'), ('wezterm', 'WezTerm'), ('tmux', 'tmux')):
+        if what.get(who):
+            text = f'{label}: ' + ' · '.join(what[who])
+            out.append(text if len(text) <= 100 else text[:99] + '…')
+    return '\n'.join(out)
+
+
+MARK = {'windows': 'W', 'wezterm': 'w', 'tmux': 't', 'app': '•', 'free': ' '}
+
+
+def short_effect(data, ch, app, who):
+    """A key's effect in a few words, for the board's lists."""
+    t = data['traces'][ch]
+    for a in ([app] if app else APP_ORDER):
+        h = next((h for h in t[a]['hops'] if h[0] == who and h[1] in ('consume', 'rewrite')), None)
+        if h:
+            text = re.sub(r' \((?:rule|fallback) for [^)]*\)', '', h[2])
+            text = re.sub(r'^focus pane ', '', text)
+            return text if len(text) <= 18 else text[:17] + '…'
+    return ''
+

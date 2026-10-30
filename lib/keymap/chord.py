@@ -190,7 +190,8 @@ def label(chord):
              'enter': 'Enter', 'esc': 'Esc', 'tab': 'Tab', 'space': 'Space', 'up': '↑', 'down': '↓',
              'left': '←', 'right': '→', 'home': 'Home', 'end': 'End', 'click': 'Click', 'release': 'Release',
              'drag': 'Drag', 'drag-end': 'Drag release', 'double-click': 'Double-click',
-             'triple-click': 'Triple-click', 'wheel-up': 'Wheel up', 'wheel-down': 'Wheel down'}
+             'triple-click': 'Triple-click', 'wheel-up': 'Wheel up', 'wheel-down': 'Wheel down',
+             'scrolllock': 'ScrollLock', 'pause': 'Pause', 'printscreen': 'PrtSc', 'capslock': 'CapsLock'}
     strokes = []
     for stroke in chord.split(' '):
         mods, key = split(stroke)

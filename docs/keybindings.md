@@ -20,20 +20,52 @@ Any layer can take a key, rewrite it, or let it through. The terminal's key
 encoding can also merge keys on the way in: a program that asks for no
 extended keys hears Ctrl+Shift+E as Ctrl+E and Shift+Enter as Enter.
 
-## `keymap`
+## `keys`
 
-`bin/keymap` reads all five layers from this checkout and traces every chord
-through them to each pane program. It needs Python 3.11 or newer: the system's
-where it is new enough, else one uv manages, which setup installs where the
-system's is older, as on Ubuntu 22.04 (`lib/python.sh`).
+`bin/keys` reads all five layers from this checkout, traces every chord
+through them to each pane program, and keeps one index of everything you can
+press or type: each binding, each intent, and the aliases, functions, git
+aliases and `bin/` commands in `shell/`, `configs/gitconfig` and `bin/`. Every
+entry says what it does, in words taken from beside it: a tmux binding's
+`bind -N` note, a trailing comment on an alias or a WezTerm key, a Neovim map's
+`desc`, the descriptions OpenCode and pi ship, a script's header. What no
+config states is in [configs/keymap/notes.toml](../configs/keymap/notes.toml).
+`keymap` is its older name. It needs Python 3.11 or newer: the system's where it
+is new enough, else one uv manages, which setup installs where the system's is
+older, as on Ubuntu 22.04 (`lib/python.sh`).
 
 ```bash
-keymap open                    # build the map page and show it through viz
-keymap why shift+tab           # one chord, layer by layer, for every program
-keymap why pause codex         # ... or only some
-keymap free alt                # chords the keyboard sends that nothing binds
-keymap check                   # fail on broken keys not already known
+keys                           # look up a key, alias or command (fzf)
+keys yolo                      # ... prefilled; one exact hit (keys gs) prints its card
+keys ls -a codex -k chord      # plain text: what acts in Codex (--tsv, --json for scripts)
+keys why shift+tab             # one chord, layer by layer; identical routes merged
+keys why pause codex --all     # ... only some programs, every route in full
+keys card codex                # one screen of the keys that matter in Codex
+keys board alt -a claude       # the Defy as text, each key colored by who takes it
+keys free alt                  # chords the keyboard sends that nothing binds
+keys open alt+z                # build the map page and show it through viz, at Alt+Z
+keys check                     # fail on new broken keys, stale notes, undescribed keys
 ```
+
+In tmux, **Alt+?** (or prefix+?, which replaces tmux's own `list-keys`) opens
+the lookup in a popup, scoped to the program in the pane: Codex's keys and the
+tmux keys that reach Codex. Inside it, keys are Ctrl only, since Alt belongs to
+tmux:
+
+- **Enter** copies the key or name to the clipboard (OSC 52, so over SSH too)
+  and prints it.
+- **Ctrl+O** traces it in the pager; **Ctrl+S** cycles the scope (this program,
+  every program, shell names only); **Ctrl+T** shows the agents' stock keys,
+  hidden by default; **Ctrl+R** lists what changed since you last looked.
+- **Ctrl+W** prints the page's link to the key; **Ctrl+G** types an alias or
+  command into the pane the popup came from.
+
+Off a terminal, or without fzf, `keys` prints the same list as `keys ls`.
+
+The index is cached under `$XDG_CACHE_HOME/keys`, one directory per checkout,
+and stamped with the commit. A lookup reads it without starting Python; when a
+file `keys` reads has changed since ([lib/keymap/inputs](../lib/keymap/inputs)),
+it shows the index it has and rebuilds in the background.
 
 The page has four parts:
 
@@ -60,15 +92,26 @@ The page has four parts:
 
 ## Keeping it current
 
-`keymap check` runs in CI. It tolerates the broken keys listed in
-[configs/keymap/known-issues.json](../configs/keymap/known-issues.json) and
-fails when a new one appears or a listed one is fixed. After fixing keys, or
-accepting new ones, run `keymap check --update`.
+`keys check` runs in CI. It fails when:
+
+- a key breaks: it tolerates the broken keys listed in
+  [configs/keymap/known-issues.json](../configs/keymap/known-issues.json), and
+  fails when a new one appears or a listed one is fixed;
+- a note, group or hide in `notes.toml` matches no entry any more, or a tip's
+  anchor (a file and a literal) is gone from its file;
+- our own bindings, aliases and commands with no description grow past the
+  count in `known-issues.json` (`undescribed`): give a new tmux binding a
+  `bind -N "..."` note, an alias a trailing comment;
+- a `bin/` command has no header comment or docstring;
+- an intent has no `id`, or names a program `keys` does not know.
+
+After fixing keys, accepting new ones, or describing more, run
+`keys check --update`.
 
 - **Keyboard:** after changing the Defy in Bazecor, export a backup
   (Preferences > Backup) over `configs/keyboard/dygma-defy.json`.
 - **Agent defaults:** none of the agent CLIs prints its built-in keys, so
-  `keymap defaults` reads them from the installed tools into
+  `keys defaults` reads them from the installed tools into
   [configs/keymap/defaults](../configs/keymap/defaults):
   - Claude Code: the binary;
   - Codex: `keymap.rs` at the installed tag;
@@ -81,8 +124,8 @@ accepting new ones, run `keymap check --update`.
   `configs/opencode-cli*.json`, and `configs/ai/pi/keybindings.json`. They're
   applied on top.
 - **Intents:** rows live in
-  [configs/keymap/intents.json](../configs/keymap/intents.json). Each row names
-  the TAFK key and, per program, the action ids that count.
+  [configs/keymap/intents.json](../configs/keymap/intents.json). Each row has
+  an `id`, names the TAFK key and, per program, the action ids that count.
 
 ## How each program hears keys
 

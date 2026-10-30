@@ -78,6 +78,12 @@ def parser():
     c.add_argument('--update', action='store_true', help='record the current broken keys and description count')
     d = sub.add_parser('defaults')
     d.add_argument('apps', nargs='*')
+    cd = sub.add_parser('card')
+    cd.add_argument('app', nargs='?', default='shell', choices=[a for a in route.APPS])
+    bd = sub.add_parser('board')
+    bd.add_argument('mods', nargs='?', default='alt')
+    bd.add_argument('-a', '--app', choices=[a for a in route.APPS])
+    bd.add_argument('--layer', type=int, default=0, choices=[0, 1], help='1: the Symbols layer, its thumb key held')
     sub.add_parser('inputs')
     pv = sub.add_parser('_preview')
     pv.add_argument('id')
@@ -228,6 +234,13 @@ def main():
             cache.write_index(REPO, index)
         return 0
     data, index = index_or_build()
+    size = shutil.get_terminal_size((80, 24))
+    if args.cmd == 'card':
+        print(views.program_card(index, args.app, views.paint_for(), min(size.columns, 120), max(size.lines, 24)))
+        return 0
+    if args.cmd == 'board':
+        print(views.board(data, args.mods, args.app, views.paint_for(), args.layer))
+        return 0
     if args.cmd == 'why':
         print(views.why(data, args.chord, args.apps or None, compact=not args.all))
     elif args.cmd == 'free':

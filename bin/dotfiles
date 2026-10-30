@@ -11,6 +11,7 @@
 #                        [--tier T] [--all] [--CAPABILITY]...
 #        dotfiles profile [--add X | --remove X | --tier T | --propose]
 #                         [--yes] [--no-apply]
+#        dotfiles tools
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -105,6 +106,9 @@ Commands:
                         applies the new tier; lowering it uninstalls nothing.
   profile --propose     Derive a profile from what dotfiles or the package
                         manager installed here and offer to save it.
+  tools                 List every tool lib/registry.sh knows, with its tier,
+                        capability, install method, and whether it is here.
+                        Read-only. (Keys, aliases and commands: keys.)
 
 Options:
   --yes                 Apply (or save a proposal) without asking.
@@ -307,6 +311,18 @@ cmd_upgrade() {
         --only "$(IFS=,; printf '%s' "${names[*]}")" --upgrade || rc=$?
     (( rc != 64 )) || return 64
     (( rc == 0 )) || return 1
+}
+
+# Every registry tool, its binary, how it installs, its tier and capability, and
+# whether it is present here. Read-only; it was `cheat tools` before keys.
+cmd_tools() {
+    local name status membership
+    while IFS= read -r name; do
+        membership="tier=${TOOL_TIER[$name]:--}"
+        [[ -z "${TOOL_CAPABILITIES[$name]:-}" ]] || membership+="; cap=${TOOL_CAPABILITIES[$name]}"
+        if tool_is_present "$name"; then status=installed; else status="not installed"; fi
+        printf '%-18s %-12s (%s, %s, %s)\n' "$name" "${TOOL_BINARY[$name]}" "${TOOL_METHOD[$name]}" "$membership" "$status"
+    done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | sort)
 }
 
 cmd_profile() {
@@ -585,6 +601,7 @@ case "${1:-}" in
     bump) shift; exec python3 "$DOTFILES_DIR/lib/bump.py" "$@" ;;
     verify) shift; ORIGINAL_ARGS=("$@"); cmd_verify "$@" ;;
     profile) shift; ORIGINAL_ARGS=("$@"); cmd_profile "$@" ;;
+    tools) shift; cmd_tools ;;
     --help|-h|help|"") usage ;;
     *) error "Unknown command: $1"; usage >&2; exit 64 ;;
 esac
