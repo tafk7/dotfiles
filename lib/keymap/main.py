@@ -27,13 +27,44 @@ def default_out():
     return os.path.join(os.environ.get('VIZ_DIR', os.path.expanduser('~/viz')), 'keymap')
 
 
-def render(data, index, out_dir):
+def page_data(data, index, changes=None):
+    """What the page carries inline: the build, with each distinct route stored once
+    (traces become indexes into routes), and the entry index without what it repeats."""
+    routes, ids, table = [], {}, {}
+    for ch, per_app in data['traces'].items():
+        row = []
+        for app, r in per_app.items():
+            k = json.dumps(r, separators=(',', ':'), sort_keys=True)
+            if k not in ids:
+                ids[k] = len(routes)
+                routes.append(r)
+            row.append(ids[k])
+        table[ch] = row
+    every = set(route.APPS)
+    slim = []
+    for e in index['entries']:
+        x = {k: e[k] for k in ('id', 'kind', 'key', 'label', 'layer', 'summary', 'origin', 'status', 'intent', 'tags',
+                               'source', 'changed', 'group', 'context', 'cause') if e.get(k)}
+        if e.get('expands') and e['expands'] != e['summary']:
+            x['expands'] = e['expands'][:160]
+        if e['scope'] and set(e['scope']) != every:
+            x['scope'] = e['scope']
+        if e['kind'] == 'intent':
+            x['apps'] = e['apps']
+        slim.append(x)
+    out = dict(data, traces=None, routes=routes, routeTable=table, routeApps=list(next(iter(data['traces'].values()), {})),
+               entries=slim, groups=index.get('groups', {}), changes=changes or {})
+    return out
+
+
+def render(data, index, out_dir, changes=None):
     """keymap.json and keymap.html in OUT_DIR, the page with the data inline."""
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, 'keymap.json'), 'w') as f:
         json.dump(data, f, separators=(',', ':'))
+    inline = json.dumps(page_data(data, index, changes), separators=(',', ':'))
     with open(PAGE) as f:
-        page = f.read().replace('/*DATA*/', json.dumps(data, separators=(',', ':')).replace('</', '<\\/'))
+        page = f.read().replace('/*DATA*/', inline.replace('</', '<\\/'))
     html = os.path.join(out_dir, 'keymap.html')
     with open(html, 'w') as f:
         f.write(page)

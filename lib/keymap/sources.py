@@ -146,25 +146,30 @@ def mouse_chord(key):
 
 
 def tmux_lines(text):
-    """(table, chord) -> the line of tmux.conf that binds it (the last, as tmux keeps the last)."""
+    """(table, chord) -> (the line of tmux.conf that binds it, its -N note); the last
+    binding wins, as in tmux. The note read here stands in where list-keys -N leaves a key
+    out: tmux before 3.8 lists no mouse keys there."""
     out = {}
     for i, line in enumerate(text.splitlines()):
         m = re.match(r'\s*bind(?:-key)?\s+(.*)', line)
         if not m:
             continue
-        toks, table = re.findall(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|\S+', m.group(1)), 'prefix'
+        toks, table, note = re.findall(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|\S+', m.group(1)), 'prefix', ''
         while toks and toks[0].startswith('-'):
             flag = toks.pop(0)
             if flag == '-n':
                 table = 'root'
             elif flag in ('-T', '-N') and toks:
                 value = toks.pop(0)
-                table = value if flag == '-T' else table
+                if flag == '-T':
+                    table = value
+                else:
+                    note = value[1:-1] if value[:1] in '"\'' else value
         if toks:
             key = toks[0]
             if key[0] in '"\'' and key[-1] == key[0] and len(key) > 1:
                 key = key[1:-1].replace('\\177', '\x7f')
-            out[(table, chord.tmux(key))] = i + 1
+            out[(table, chord.tmux(key))] = (i + 1, note)
     return out
 
 
@@ -191,17 +196,17 @@ def tmux(repo, tmux_bin, notes):
             # Not traced, but listed when ours: what a click or the wheel does, from its note.
             mouse = mouse_chord(key)
             if mouse and stock.get((table, key)) != action:
-                lnum = lines.get((table, chord.tmux(key)))
+                lnum, note = lines.get((table, chord.tmux(key)), (0, ''))
                 out.append(Binding('tmux-mouse', mouse, action, context='copy' if table == 'copy-mode-vi' else '',
                                    origin='ours', source=f'configs/tmux.conf:{lnum}' if lnum else 'configs/tmux.conf',
-                                   note=noted.get((table, chord.tmux(key)), '')))
+                                   note=noted.get((table, chord.tmux(key))) or note))
             continue
         layer = {'root': 'tmux', 'prefix': 'tmux-prefix', 'copy-mode-vi': 'tmux-copy'}[table]
         origin = 'stock' if stock.get((table, key)) == action else 'ours'
         ch = chord.tmux(key)
-        lnum = lines.get((table, ch))
+        lnum, note = lines.get((table, ch), (0, ''))
         src = f'configs/tmux.conf:{lnum}' if lnum and origin == 'ours' else 'configs/tmux.conf' if origin == 'ours' else 'tmux'
-        out.append(Binding(layer, ch, action, origin=origin, source=src, note=noted.get((table, ch), '')))
+        out.append(Binding(layer, ch, action, origin=origin, source=src, note=noted.get((table, ch)) or note))
     return out, {'extended_keys_format': ext_format,
                  'version': version.stdout.strip() if version else None}
 
