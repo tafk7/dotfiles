@@ -1,10 +1,10 @@
 <title>TAFK Key Routes</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: a routing board. A search over every entry heads the page; the Defy's two
-   halves sit side by side with the chosen key's route lanes beneath; the alignment
-   matrix, findings, the shell's names and the printable cards run full width below.
-   Layer hues double as the legend. */
+/* Layout: the keyboard is the page. A slim bar (name, search, theme, jump links with
+   counts) heads it; the Defy's two halves fill the width, and a key's route opens in a
+   card floating beside the key. The alignment matrix, findings, the shell's names, the
+   printable cards and the layer facts run full width below. Layer hues double as the legend. */
 :root {
   --bg: #eef1f0;
   --surface: #ffffff;
@@ -51,18 +51,17 @@ body {
   font-size: 15px;
   line-height: 1.5;
   margin: 0;
-  padding-block: 28px 64px;
+  padding-block: 18px 64px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 44px; }
+.wrap { max-width: 1480px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; }
 h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
-h1 { font-size: clamp(2rem, 4.4vw, 3rem); font-weight: 700; letter-spacing: -0.01em; }
 h2 { font-size: 1.45rem; font-weight: 600; }
 h3 { font-size: 1.05rem; font-weight: 600; }
 p { margin: 0; }
 .eyebrow { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.lede { max-width: 66ch; color: var(--muted); font-size: 1.02rem; }
+.lede { max-width: 72ch; color: var(--muted); font-size: 0.9rem; }
 .section-head { display: grid; gap: 6px; margin-bottom: 18px; }
 .section-head p { max-width: 72ch; color: var(--muted); }
 button { font: inherit; color: inherit; }
@@ -80,30 +79,35 @@ button { font: inherit; color: inherit; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Header */
-header { display: grid; gap: 14px; }
-.stack { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin-top: 8px; }
-.stack .layer { display: grid; gap: 2px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--c); min-width: 8.5rem; }
+/* Top bar: the name, the search and the theme; the jump links carry the counts */
+header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
+.brand { display: grid; gap: 2px; }
+.brand h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.005em; }
+.jump { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: -26px; font-size: 0.86rem; }
+.jump a { display: inline-flex; align-items: baseline; gap: 6px; color: var(--muted); text-decoration: none; padding: 2px 0; border-bottom: 1px solid transparent; }
+.jump a:hover { color: var(--ink); border-bottom-color: var(--line); }
+.jump a b { font-family: var(--f-mono); font-size: 0.8rem; font-weight: 600; color: var(--c, var(--muted)); font-variant-numeric: tabular-nums; }
+.jump a.hot { color: var(--warn); }
+.stack { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin-top: 12px; }
+.stack .layer { display: grid; gap: 2px; padding: 8px 12px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--line); border-top: 3px solid var(--c); min-width: 8.5rem; }
 .stack .layer b { font-family: var(--f-display); font-weight: 600; font-size: 0.95rem; }
 .stack .layer span { font-size: 0.78rem; color: var(--muted); }
 .stack .arrow { align-self: center; color: var(--muted); font-family: var(--f-mono); }
-.tally { display: flex; flex-wrap: wrap; gap: 10px; }
-.tally a { display: inline-flex; align-items: baseline; gap: 8px; text-decoration: none; color: var(--ink); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
-.tally a strong { font-family: var(--f-display); font-size: 1.15rem; color: var(--c, var(--ink)); }
-.tally a span { font-size: 0.85rem; color: var(--muted); }
 
-/* Map */
+/* The deck: controls, both halves, the legend */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
-.map { display: grid; gap: 18px; }
-.controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 10px; }
+.deck { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px 14px; display: grid; gap: 8px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
 .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: 0; background: transparent; padding: 6px 10px; font-size: 0.84rem; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button { border: 0; background: transparent; padding: 5px 10px; font-size: 0.84rem; cursor: pointer; border-right: 1px solid var(--line); }
 .seg button:last-child { border-right: 0; }
+.seg button:hover { background: var(--sunk); }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .ctl-label { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
 
-.kb { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 28px; }
-.kb svg { width: min(100%, 560px); height: auto; overflow: visible; }
+.kb { display: flex; justify-content: center; gap: 0 2%; padding-block: 6px 0; }
+.kb svg { flex: 1 1 0; min-width: 0; max-width: 690px; height: auto; overflow: visible; }
+@media (max-width: 760px) { .kb { flex-direction: column; align-items: center; } .kb svg { flex: none; width: 100%; } }
 .cap { cursor: pointer; }
 .cap rect.body { fill: var(--cap); stroke: var(--cap-edge); stroke-width: 2; }
 .cap .lg { font-family: var(--f-mono); font-weight: 600; font-size: 21px; fill: var(--ink); }
@@ -132,12 +136,15 @@ header { display: grid; gap: 14px; }
 .cap.o-spare { cursor: default; }
 .cap.o-spare rect.body { fill: transparent; stroke: var(--l-fw); stroke-dasharray: 2 5; stroke-width: 2.5; }
 .cap.o-spare .lg { fill: var(--l-fw); font-size: 15px; }
-.cap.sel rect.body { stroke: var(--ink); stroke-width: 5; }
+.cap[data-pos]:hover rect.body { stroke: var(--muted); stroke-width: 3; }
+.cap.sel rect.body, .cap.sel:hover rect.body { stroke: var(--ink); stroke-width: 5; stroke-dasharray: none; }
 .cap:focus { outline: none; }
 .cap:focus-visible rect.body { stroke: var(--l-tmux); stroke-width: 6; }
 @media (max-width: 620px) { .cap .own, .cap .dot { display: none; } }
 
-.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 0.8rem; color: var(--muted); }
+.deck-foot { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 10px; }
+.hint { font-size: 0.84rem; color: var(--muted); max-width: 62ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.78rem; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .sw { width: 16px; height: 12px; border-radius: 3px; border: 1px solid var(--cap-edge); display: inline-block; background: var(--cap); }
 .sw.win { background: color-mix(in srgb, var(--l-win) 20%, var(--cap)); border-color: var(--l-win); }
@@ -150,12 +157,52 @@ header { display: grid; gap: 14px; }
 .sw.deaf { border: 1px dotted var(--bug); background: var(--sunk); }
 .sw.rewapp { border: 1px dashed var(--l-tmux); }
 .sw.merged { border: 2px solid var(--warn); }
-.legend .only-app[hidden] { display: none; }
+.sw.bugdot { width: 10px; height: 10px; border-radius: 50%; border: 0; background: var(--bug); }
 
-/* Trace */
-.trace h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 1.25rem; }
-.trace .sub { color: var(--muted); font-size: 0.86rem; margin-top: 6px; }
-.press { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.84rem; }
+/* The key card: floats beside the key it describes; a sheet at the foot of a phone */
+.pop { position: absolute; z-index: 40; width: min(410px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--cap-edge); border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 14px 36px -10px rgb(0 0 0 / .32); }
+.pop[hidden] { display: none; }
+.pop-body { max-height: min(78vh, 680px); overflow-y: auto; padding: 14px 16px 16px; display: grid; gap: 10px; align-content: start; }
+/* The caret points at the key; the body scrolls, so the caret sits on the card itself */
+.pop::before { content: ""; position: absolute; width: 12px; height: 12px; background: var(--surface); border: 1px solid var(--cap-edge); transform: rotate(45deg); }
+.pop[data-side="right"]::before { left: -7px; top: calc(var(--ay, 24px) - 6px); border-top: 0; border-right: 0; }
+.pop[data-side="left"]::before { right: -7px; top: calc(var(--ay, 24px) - 6px); border-bottom: 0; border-left: 0; }
+.pop[data-side="below"]::before { top: -7px; left: calc(var(--ax, 24px) - 6px); border-bottom: 0; border-right: 0; }
+.pop.sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; border-radius: 14px 14px 0 0; }
+.pop.sheet::before { display: none; }
+.pop.sheet .pop-body { max-height: 62vh; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+@media (prefers-reduced-motion: no-preference) { .pop:not([hidden]) { animation: pop-in .12s ease-out; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(3px); } }
+.pop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pop-head h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 1.25rem; margin-top: 3px; }
+.pop-head h3 .k { font-size: 0.9em; }
+.pop .x { flex: none; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; width: 28px; height: 28px; line-height: 1; cursor: pointer; color: var(--muted); }
+.pop .x:hover { color: var(--ink); }
+.pop .lead { font-size: 0.9rem; }
+.pop .src { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); word-break: break-word; }
+.pop .runs { font-family: var(--f-mono); font-size: 0.8rem; background: var(--sunk); padding: 6px 8px; border-radius: 5px; white-space: pre-wrap; word-break: break-word; }
+.says { display: grid; gap: 4px; }
+.says p { font-size: 0.84rem; padding-left: 9px; border-left: 3px solid var(--c); }
+.says b { font-weight: 600; }
+.progs { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.progs li { display: grid; grid-template-columns: 7.4rem 1fr; gap: 2px 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.84rem; }
+.progs li.focus { background: color-mix(in srgb, var(--l-tmux) 9%, var(--surface)); margin-inline: -8px; padding-inline: 8px; border-radius: 4px; }
+.progs .pn { font-weight: 600; }
+.progs .pn small { display: block; font-weight: 400; color: var(--muted); font-size: 0.68rem; }
+.progs .act { font-weight: 500; }
+.progs .ctx, .pop .ctx { color: var(--muted); font-size: 0.74rem; }
+.progs .none { color: var(--muted); font-style: italic; }
+.progs li.bug .act { color: var(--bug); }
+.via { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.pill { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; border: 1px solid var(--line); }
+.pill.consume { color: var(--surface); border: 0; background: var(--c); font-weight: 600; }
+.pill.rewrite { border-color: var(--c); color: var(--c); font-family: var(--f-mono); }
+.pill.cond { border: 1px dashed var(--c); color: var(--c); }
+.pill.collapse { border-color: var(--warn); color: var(--warn); font-family: var(--f-mono); }
+.press { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.84rem; }
 .press .hand { display: inline-flex; flex-direction: column; padding: 3px 8px; border-radius: 5px; background: var(--sunk); line-height: 1.2; }
 .press .hand b { font-family: var(--f-mono); font-weight: 600; font-size: 0.82rem; }
 .press .hand small { color: var(--muted); font-size: 0.7rem; }
@@ -165,28 +212,8 @@ header { display: grid; gap: 14px; }
 .rating.one-hand { color: var(--muted); }
 .rating.tight { color: var(--warn); }
 .rating.stretch, .rating.unpressable { color: var(--bug); }
-.lanes { margin-top: 14px; overflow-x: auto; }
-.lanes table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.8rem; }
-.lanes th { font-family: var(--f-mono); font-weight: 400; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 6px 6px; }
-.lanes td { padding: 5px 6px; vertical-align: middle; }
-.lanes tr + tr td { border-top: 1px solid var(--line); }
-.lanes tr.focus td { background: color-mix(in srgb, var(--l-tmux) 9%, var(--surface)); }
-.lanes td.app { font-weight: 600; white-space: nowrap; }
-.lanes td.app small { display: block; font-weight: 400; color: var(--muted); font-size: 0.7rem; }
-.node { position: relative; height: 26px; min-width: 5.5rem; }
-.node::before { content: ""; position: absolute; left: -6px; right: -6px; top: 50%; border-top: 2px solid var(--line); }
-.node.dead::before { display: none; }
-.pill { position: relative; display: inline-flex; align-items: center; max-width: 100%; height: 22px; margin-top: 2px; padding: 0 7px; border-radius: 4px; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--surface); border: 1px solid var(--line); }
-.pill.consume { color: var(--surface); border: 0; background: var(--c); font-weight: 600; }
-.pill.rewrite { border: 1px solid var(--c); color: var(--c); font-family: var(--f-mono); }
-.pill.cond { border: 1px dashed var(--c); color: var(--c); }
-.pill.collapse { border: 1px solid var(--warn); color: var(--warn); font-family: var(--f-mono); }
-.lanes td.res { min-width: 12rem; }
-.res .act { font-weight: 600; }
-.res .ctx { color: var(--muted); font-size: 0.72rem; }
-.res .none { color: var(--muted); font-style: italic; }
-.res.bug .act { color: var(--bug); }
-.note { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--c, var(--line)); background: var(--sunk); border-radius: 0 6px 6px 0; font-size: 0.85rem; }
+.note { padding: 9px 11px; border-left: 3px solid var(--c, var(--line)); background: var(--sunk); border-radius: 0 6px 6px 0; font-size: 0.84rem; }
+.sub { color: var(--muted); font-size: 0.86rem; }
 
 /* Intent matrix */
 .scroll-x { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
@@ -231,10 +258,10 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 @media (prefers-reduced-motion: no-preference) { .cap rect.body { transition: fill .15s, stroke .15s; } }
 
 /* Search */
-.searchbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
-.searchbar input[type=search] { flex: 1 1 22rem; min-width: 0; font: inherit; font-size: 1rem; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
-.searchbar label { font-size: 0.84rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
-.results { margin: 8px 0 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; max-height: 26rem; overflow-y: auto; }
+.searchbar { position: relative; flex: 1 1 24rem; min-width: min(100%, 16rem); display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.searchbar input[type=search] { flex: 1 1 14rem; min-width: 0; font: inherit; font-size: 0.95rem; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.searchbar label { font-size: 0.8rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.results { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 45; margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--cap-edge); border-radius: 8px; max-height: 26rem; overflow-y: auto; box-shadow: 0 12px 32px -8px rgb(0 0 0 / .28); }
 .results[hidden] { display: none; }
 .results li { display: grid; grid-template-columns: 1.2rem minmax(7rem, 11rem) 6.5rem 1fr; gap: 8px; align-items: baseline; padding: 6px 10px; cursor: pointer; font-size: 0.86rem; }
 .results li + li { border-top: 1px solid var(--line); }
@@ -243,11 +270,8 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
 .results .mk.bug { color: var(--bug); } .results .mk.chg { color: var(--warn); } .results .mk.adp { color: var(--l-tmux); }
 .results .ly { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .results .it { color: var(--muted); font-size: 0.76rem; }
-.entry-card { margin-top: 10px; }
-.entry-card[hidden] { display: none; }
-.entry-card .src { font-family: var(--f-mono); font-size: 0.74rem; color: var(--muted); }
-.entry-card .runs { font-family: var(--f-mono); font-size: 0.8rem; background: var(--sunk); padding: 6px 8px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
-.theme { margin-left: auto; }
+.results .ctx { color: var(--muted); }
+@media (max-width: 620px) { .results li { grid-template-columns: 1.2rem 1fr; } .results .ly, .results li > span:last-child { grid-column: 2; } }
 
 /* Shell names */
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -294,19 +318,41 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
 </svg>
 
 <div class="wrap">
-<header>
-  <div class="controls"><p class="eyebrow" id="meta"></p><span class="seg theme" id="theme" role="group" aria-label="Theme"></span></div>
-  <h1>TAFK Key Routes</h1>
-  <p class="lede">A key you press passes through the Defy's firmware, then Windows, then WezTerm, then tmux, before the program in the pane sees it. Any layer can take the key, rewrite it, or let it through. This map traces every bound chord through every layer to eight pane programs, shows what each chord costs your hands, and checks that sibling programs answer the same intent with the same key. The search finds any key, alias or command, as <span class="k">keys</span> does in the shell.</p>
-  <div>
-    <div class="searchbar"><input type="search" id="q" placeholder="Search keys, aliases, commands (press /)" autocomplete="off" aria-label="Search keys, aliases and commands" aria-controls="results">
-      <label><input type="checkbox" id="q-stock"> stock keys too</label></div>
-    <ul class="results" id="results" role="listbox" hidden></ul>
-    <div class="panel entry-card" id="entry" aria-live="polite" hidden></div>
-  </div>
-  <div class="stack" id="stack"></div>
-  <div class="tally" id="tally"></div>
+<header class="top">
+  <div class="brand"><h1>TAFK Key Routes</h1><p class="eyebrow" id="meta"></p></div>
+  <div class="searchbar"><input type="search" id="q" placeholder="Search keys, aliases, commands (press /)" autocomplete="off" aria-label="Search keys, aliases and commands" aria-controls="results">
+    <label><input type="checkbox" id="q-stock"> stock keys too</label>
+    <ul class="results" id="results" role="listbox" hidden></ul></div>
+  <span class="seg theme" id="theme" role="group" aria-label="Theme"></span>
 </header>
+<nav class="jump" id="jump" aria-label="Sections"></nav>
+
+<section id="map" class="deck" aria-label="Who takes each key">
+  <div class="controls">
+    <div><span class="ctl-label">Hold</span><span class="seg" id="mods"></span></div>
+    <div><span class="ctl-label">Layer</span><span class="seg" id="fwlayer"></span></div>
+    <div><span class="ctl-label">Program</span><span class="seg" id="appsel"></span></div>
+  </div>
+  <div class="kb" id="kb"></div>
+  <div class="deck-foot">
+    <p class="hint" id="hint"></p>
+    <div class="legend">
+      <span><i class="sw win"></i>Windows takes it</span>
+      <span><i class="sw wez"></i>WezTerm takes it</span>
+      <span><i class="sw rew"></i>WezTerm rewrites it</span>
+      <span><i class="sw tmux"></i>tmux takes it</span>
+      <span><i class="sw tmuxc"></i>tmux, in some panes</span>
+      <span><i class="sw"></i>reaches the pane</span>
+      <span><i class="sw free"></i>free</span>
+      <span><i class="sw deaf"></i>never arrives</span>
+      <span><i class="sw spare"></i>unassigned</span>
+      <span class="only-app"><i class="sw rewapp"></i>tmux rewrites it</span>
+      <span class="only-app"><i class="sw merged"></i>heard as another key</span>
+      <span><i class="sw bugdot"></i>broken</span>
+    </div>
+  </div>
+</section>
+<div class="pop" id="pop" role="dialog" aria-label="Key route" aria-live="polite" hidden></div>
 
 <section id="changed" hidden>
   <div class="section-head">
@@ -314,37 +360,6 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     <p id="changed-sub"></p>
   </div>
   <div class="changes panel" id="changes"></div>
-</section>
-
-<section id="map">
-  <div class="section-head">
-    <h2>Who takes each key</h2>
-    <p>Pick the modifiers you hold and a layer, then a key; its route through every layer appears below. Color is the outermost layer that acts on the chord. The eight marks along each key are the pane programs that get an action for it, in the order bash, fzf, Neovim, copy mode, Claude, Codex, OpenCode, pi. Pick one program to label every key with what it does there instead. A red dot marks a broken key.</p>
-  </div>
-  <div class="map">
-    <div class="panel">
-      <div class="controls">
-        <div><span class="ctl-label">Hold</span><span class="seg" id="mods"></span></div>
-        <div><span class="ctl-label">Layer</span><span class="seg" id="fwlayer"></span></div>
-        <div><span class="ctl-label">Program</span><span class="seg" id="appsel"></span></div>
-      </div>
-      <div class="kb" id="kb"></div>
-      <div class="legend">
-        <span><i class="sw win"></i>Windows takes it</span>
-        <span><i class="sw wez"></i>WezTerm takes it</span>
-        <span><i class="sw rew"></i>WezTerm rewrites it</span>
-        <span><i class="sw tmux"></i>tmux takes it</span>
-        <span><i class="sw tmuxc"></i>tmux takes it in some panes</span>
-        <span><i class="sw"></i>reaches the pane</span>
-        <span><i class="sw free"></i>free everywhere</span>
-        <span><i class="sw deaf"></i>never arrives</span>
-        <span><i class="sw spare"></i>unassigned key</span>
-        <span class="only-app"><i class="sw rewapp"></i>tmux rewrites it on the way</span>
-        <span class="only-app"><i class="sw merged"></i>the program hears a different key</span>
-      </div>
-    </div>
-    <div class="panel trace" id="trace" aria-live="polite"></div>
-  </div>
 </section>
 
 <section id="align">
@@ -402,6 +417,11 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
   <div class="section-head"><h2>Layer facts</h2></div>
   <div class="ref">
     <div class="panel">
+      <h3>How a key travels</h3>
+      <p>A key you press passes through the Defy's firmware, then Windows, then WezTerm, then tmux, before the program in the pane sees it. Any layer can take the key, rewrite it, or let it through. This page traces every bound chord through every layer to eight pane programs, shows what each chord costs your hands, and checks that sibling programs answer the same intent with the same key.</p>
+      <div class="stack" id="stack"></div>
+    </div>
+    <div class="panel">
       <h3>Your Defy</h3>
       <div id="defy-facts"></div>
     </div>
@@ -436,6 +456,7 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
   const ORDER = ['shell', 'fzf', 'nvim', 'copy', 'claude', 'codex', 'opencode', 'pi'];
   const LAYER_C = { windows: 'var(--l-win)', wezterm: 'var(--l-wez)', tmux: 'var(--l-tmux)', keys: 'var(--warn)' };
   const $ = (s) => document.querySelector(s);
+  const pop = $('#pop');
   const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const KEYNAME = { pageup: 'PgUp', pagedown: 'PgDn', backspace: 'Bksp', delete: 'Del', insert: 'Ins', enter: 'Enter',
@@ -496,24 +517,33 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
   const adapts = D.findings.filter(f => f.sev === 'adapted');
   const costs = D.findings.filter(f => f.sev === 'cost');
   const misaligned = D.intents.filter(it => it.canon && Object.values(it.apps).some(a => a.status !== 'ok')).length;
-  $('#tally').innerHTML = [
-    ['#broken', bugs.length, 'broken keys', 'var(--bug)'],
-    ['#align', misaligned, 'intents out of line', 'var(--warn)'],
-    ['#adapted', adapts.length, 'rewritten on purpose', 'var(--l-tmux)'],
-    ['#hidden', costs.length, 'stock keys hidden by design', 'var(--muted)'],
-  ].map(t => `<a href="${t[0]}" style="--c:${t[3]}"><strong>${t[1]}</strong><span>${t[2]}</span></a>`).join('');
+  // The sections under the keyboard, with what needs a look counted. What changed joins when it shows.
+  const jump = [
+    ['#align', 'Same intent', misaligned ? misaligned + ' off' : '', 'var(--warn)'],
+    ['#broken', 'Broken', bugs.length, 'var(--bug)'],
+    ['#adapted', 'Rewritten', adapts.length, 'var(--l-tmux)'],
+    ['#hidden', 'Hidden by design', costs.length, 'var(--muted)'],
+    ['#shell', 'Shell names', '', ''], ['#cards', 'Cards', '', ''], ['#reference', 'Layer facts', '', ''],
+  ];
+  const renderJump = (extra) => {
+    $('#jump').innerHTML = (extra || []).concat(jump).map(t =>
+      `<a href="${t[0]}"${t[3] ? ` style="--c:${t[3]}"` : ''}${t[4] ? ` class="${t[4]}"` : ''}>${esc(t[1])}${t[2] !== '' ? ` <b>${esc(t[2])}</b>` : ''}</a>`).join('');
+  };
+  renderJump();
 
   // ---- Keyboard -------------------------------------------------------------------------------
   const MODSETS = [['', 'None'], ['shift', 'Shift'], ['ctrl', 'Ctrl'], ['alt', 'Alt'], ['ctrl+shift', 'Ctrl+Shift'],
     ['alt+shift', 'Alt+Shift'], ['ctrl+alt', 'Ctrl+Alt'], ['prefix', 'Ctrl+A, then']];
-  let state = { mods: 'alt', fw: 0, chord: 'shift+tab', app: '' };
+  // pos is the physical key the card stays on while Hold or Layer changes; chord is what it sends.
+  let state = { mods: 'alt', fw: 0, chord: 'alt+h', pos: '', app: '' };
   try { const s = JSON.parse(localStorage.getItem('keyroutes') || 'null'); if (s && s.mods !== undefined) state = Object.assign(state, s); } catch (e) {}
-  // #app=codex&mods=ctrl&layer=1&key=shift+tab opens the page in that view
+  // #app=codex&mods=ctrl&layer=1&key=shift+tab opens the page in that view, with that key's card open
+  let openAtLoad = false;
   for (const [k, val] of new URLSearchParams(location.hash.slice(1))) {
     if (k === 'app' && (val === '' || APP[val])) state.app = val;
     if (k === 'mods' && MODSETS.some(m => m[0] === val)) state.mods = val;
     if (k === 'layer') state.fw = +val ? 1 : 0;
-    if (k === 'key') state.chord = val.replace(/ /g, '+');
+    if (k === 'key') { state.chord = val.replace(/ /g, '+'); state.pos = ''; openAtLoad = true; }
   }
   if (state.app && !APP[state.app]) state.app = '';
   const save = () => { try { localStorage.setItem('keyroutes', JSON.stringify(state)); } catch (e) {} };
@@ -536,6 +566,17 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     // Alt+Shift+/ reaches tmux as Alt+? (Esc ?), as Shift+/ types ?.
     if (mods.has('shift') && !mods.has('ctrl') && SHIFTED[e.key]) { mods.delete('shift'); return make([...mods], SHIFTED[e.key]); }
     return make([...mods], e.key);
+  }
+  // The key that sends CHORD under the held modifiers: this layer's first, then the other's.
+  function posOf(chord) {
+    if (!KB || !chord) return '';
+    const ps = Object.keys(KB.geo);
+    const here = ps.find(p => chordAt(p) === chord);
+    if (here !== undefined || state.mods === 'prefix') return here || '';
+    const fw = state.fw; state.fw = fw ? 0 : 1;
+    const there = ps.find(p => chordAt(p) === chord);
+    if (there === undefined) state.fw = fw;
+    return there || '';
   }
 
   const SHORT = [
@@ -649,11 +690,11 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     } else if (e.kind === 'key') {
       const ch = chordAt(pos);
       const info = capInfo(ch);
-      cls += ' ' + info.cls + (state.mods !== 'prefix' && ch === state.chord ? ' sel' : '') +
+      cls += ' ' + info.cls + (!pop.hidden && pos === state.pos ? ' sel' : '') +
         (state.mods !== 'prefix' && changedChords.has(ch) ? ' chg' : '');
       own = info.own;
       title = info.title;
-      data = ` data-chord="${esc(ch)}" tabindex="0" role="button"`;
+      data = ` data-chord="${esc(ch)}" data-pos="${pos}" tabindex="0" role="button" aria-label="${esc(title)}"`;
       if (state.mods !== 'prefix' && !state.app) {
         dots = ORDER.map((a, i) => `<rect class="dot${info.apps && info.apps.includes(a) ? ' on' : ''}" x="${x0 + 10 + i * 9}" y="${-y0 - 15}" width="7" height="7" rx="1.5"></rect>`).join('');
       }
@@ -682,47 +723,43 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     $('#kb').innerHTML = ['left', 'right'].map(side =>
       `<svg viewBox="${side === 'left' ? '18 12 790 780' : '915 12 790 780'}" role="group" aria-label="${side} half">${sides[side].map(capSVG).join('')}</svg>`).join('');
   }
-  $('#mods').innerHTML = MODSETS.map(m => `<button data-m="${m[0]}" aria-pressed="${state.mods === m[0]}">${m[1]}</button>`).join('');
-  $('#fwlayer').innerHTML = (KB ? [0, 1] : [0]).map(l => `<button data-l="${l}" aria-pressed="${state.fw === l}">${esc(KB ? KB.layerNames[l] + (l ? ' (thumb held)' : '') : 'Base')}</button>`).join('');
+  $('#mods').innerHTML = MODSETS.map(m => `<button type="button" data-m="${m[0]}">${m[1]}</button>`).join('');
+  $('#fwlayer').innerHTML = (KB ? [0, 1] : [0]).map(l => `<button type="button" data-l="${l}">${esc(KB ? KB.layerNames[l] + (l ? ' (thumb held)' : '') : 'Base')}</button>`).join('');
   const APPSEL = [['', 'All']].concat(['claude', 'codex', 'opencode', 'pi', 'shell', 'fzf', 'nvim', 'copy'].map(a => [a, APP[a].label.replace('tmux copy mode', 'copy mode').replace('Claude Code', 'Claude')]));
-  $('#appsel').innerHTML = APPSEL.map(m => `<button data-a="${m[0]}" aria-pressed="${state.app === m[0]}">${esc(m[1])}</button>`).join('');
-  const syncLegend = () => document.querySelectorAll('.legend .only-app').forEach(x => { x.hidden = !state.app; });
-  syncLegend();
-  $('#appsel').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    state.app = b.dataset.a; save();
-    $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
-    syncLegend(); renderKB(); renderTrace();
-  });
-  $('#mods').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    state.mods = b.dataset.m; save();
-    $('#mods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
-    renderKB();
-  });
-  $('#fwlayer').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    state.fw = +b.dataset.l; save();
-    $('#fwlayer').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
-    renderKB();
-  });
-  function pick(target) {
-    const g = target.closest('g.cap[data-chord]'); if (!g) return;
-    if (state.mods === 'prefix') { renderPrefixTrace(g.dataset.chord); return; }
-    state.chord = g.dataset.chord; save(); renderKB(); renderTrace();
-    const again = document.querySelector(`g.cap[data-chord="${CSS.escape(state.chord)}"]`);
-    if (again) again.focus();
+  $('#appsel').innerHTML = APPSEL.map(m => `<button type="button" data-a="${m[0]}">${esc(m[1])}</button>`).join('');
+  function syncControls() {
+    $('#mods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === state.mods));
+    $('#fwlayer').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', +x.dataset.l === state.fw));
+    $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.a === state.app));
+    document.querySelectorAll('.legend .only-app').forEach(x => { x.hidden = !state.app; });
+    $('#hint').textContent = state.mods === 'prefix'
+      ? 'After Ctrl+A, tmux reads one more key from its prefix table. Click a key to see what it does.'
+      : (state.app ? `Each key is labeled with what it does in ${APP[state.app].label}.`
+        : 'Color: the outermost layer that takes the chord. Marks: bash, fzf, Neovim, copy mode, Claude, Codex, OpenCode, pi, filled where each acts.') +
+        ' Click a key for its route. With its card open, change Hold or Layer to compare chords on that key.';
   }
-  $('#kb').addEventListener('click', e => pick(e.target));
-  $('#kb').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e.target); } });
+  // A change of view redraws the board, and an open card follows its key to the chord it sends now.
+  function refresh() {
+    save(); syncControls();
+    if (cardKind === 'key') {
+      const ch = state.pos !== '' ? chordAt(state.pos) : null;
+      if (ch) { state.chord = ch; cardEntry = null; } else { pop.hidden = true; cardKind = ''; }
+    }
+    renderKB();
+    if (!pop.hidden) renderPop();
+  }
+  $('#appsel').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.app = b.dataset.a; refresh(); } });
+  $('#mods').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.mods = b.dataset.m; refresh(); } });
+  $('#fwlayer').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.fw = +b.dataset.l; refresh(); } });
 
-  // ---- Trace -------------------------------------------------------------------------------------
+  // ---- The key card ------------------------------------------------------------------------------
+  const LNAME = { windows: 'Windows', wezterm: 'WezTerm', tmux: 'tmux', keys: 'the terminal' };
   function pill(h) {
     const c = LAYER_C[h[0]] || 'var(--l-app)';
-    if (h[1] === 'consume') return `<span class="pill consume" style="--c:${c}" title="${esc(h[2])}">${esc(h[2])}</span>`;
-    if (h[1] === 'rewrite') return `<span class="pill rewrite" style="--c:${c}" title="${esc(h[2])}">→ ${esc(fmt(h[3]))}</span>`;
-    if (h[1] === 'cond') return `<span class="pill cond" style="--c:${c}" title="${esc(h[2])}">passes</span>`;
-    if (h[1] === 'collapse') return `<span class="pill collapse" title="${esc(h[2])}">→ ${esc(fmt(h[3]))}</span>`;
+    if (h[1] === 'consume') return `<span class="pill consume" style="--c:${c}" title="${esc(h[2])}">${esc(LNAME[h[0]] || h[0])}</span>`;
+    if (h[1] === 'rewrite') return `<span class="pill rewrite" style="--c:${c}" title="${esc(h[2])}">${esc(LNAME[h[0]] || h[0])} → ${esc(fmt(h[3]))}</span>`;
+    if (h[1] === 'cond') return `<span class="pill cond" style="--c:${c}" title="${esc(h[2])}">${esc(LNAME[h[0]] || h[0])} passes it</span>`;
+    if (h[1] === 'collapse') return `<span class="pill collapse" title="${esc(h[2])}">heard as ${esc(fmt(h[3]))}</span>`;
     return '';
   }
   function pressHTML(ch) {
@@ -732,52 +769,158 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     const parts = p.keys.map(k => `<span class="hand"><b>${esc(k.name)}</b><small>${esc(k.hand)} ${esc(k.finger)}</small></span>`);
     return `<div class="press">${parts.join('<span class="plus">+</span>')} ${ratingTag(p.rating)}${p.layer ? ' <span class="ctx">on the Symbols layer</span>' : ''}</div>`;
   }
-  function renderTrace() {
-    const ch = state.chord;
+  const head = (eyebrow, title) => `<div class="pop-head"><div><p class="eyebrow">${eyebrow}</p><h3>${title}</h3></div>` +
+    '<button type="button" class="x" aria-label="Close">✕</button></div>';
+  const entryEyebrow = (e) => esc([layerName(e), e.origin].concat(e.status ? [e.status] : []).join(' · '));
+  // An entry's own words: what it does, why it's flagged, what it runs, where it lives.
+  function entryBits(e) {
+    let h = '';
+    if (e.summary) h += `<p class="lead">${esc(e.summary)}</p>`;
+    if (e.cause) h += `<p class="sub">${esc(e.cause)}</p>`;
+    if (e.kind === 'intent' && e.apps) h += '<table class="plain"><tbody>' + Object.entries(e.apps).map(([a, v]) =>
+      `<tr><td><b>${esc(APP[a] ? APP[a].label : a)}</b></td><td>${esc(v)}</td></tr>`).join('') + '</tbody></table>';
+    if (e.expands) h += `<p class="runs">${esc(e.expands)}</p>`;
+    const foot = [e.source, (e.tags || []).filter(Boolean).join(', '), e.changed ? e.changed + ' since the baseline' : ''].filter(Boolean);
+    if (foot.length) h += `<p class="src">${esc(foot.join(' · '))}</p>`;
+    return h;
+  }
+  function entryHTML(e) {
+    const [m] = marker(e);
+    return head(entryEyebrow(e), (e.kind === 'chord' || e.kind === 'intent' ? kbd(e.key) : esc(e.label)) + (m ? ' ' + esc(m) : '')) + entryBits(e);
+  }
+  function routeHTML(ch, e) {
+    const layer = KB && state.fw ? ' · ' + KB.layerNames[state.fw] + ' layer' : '';
+    let h = head(e ? entryEyebrow(e) : 'Route' + esc(layer), kbd(ch)) + (e ? entryBits(e) : '') + pressHTML(ch);
     const t = D.traces[ch];
-    let h = `<p class="eyebrow">Route</p><h3>${kbd(ch)}</h3>` + pressHTML(ch);
-    if (!t) {
-      h += `<p class="sub">No layer binds ${esc(fmt(ch))}. It's free for a new binding everywhere.</p>`;
-      $('#trace').innerHTML = h; return;
-    }
+    if (!t) return h + `<p class="sub">No layer binds ${esc(fmt(ch))}. It's free for a new binding everywhere.</p>`;
     const related = D.findings.filter(f => f.chord.split(' ')[0] === ch && f.sev !== 'cost');
     const outer = ['windows', 'wezterm', 'tmux'].map(l => [l, describe(l, ch)]).filter(x => x[1]);
-    if (outer.length) h += outer.map(([l, d]) => `<p class="sub"><b>${esc({ windows: 'Windows', wezterm: 'WezTerm', tmux: 'tmux' }[l])}:</b> ${esc(d)}</p>`).join('');
-    h += `<p class="sub">Each row follows the chord to one pane program: what Windows, WezTerm, tmux and the terminal's key encoding do on the way.</p>`;
-    h += '<div class="lanes"><table><thead><tr><th>Pane</th><th>Windows</th><th>WezTerm</th><th>tmux</th><th>Keys</th><th>Result</th></tr></thead><tbody>';
-    for (const a of ORDER) {
-      const r = t[a];
-      const by = Object.fromEntries(r.hops.map(x => [x[0], x]));
-      let dead = false;
-      const cells = ['windows', 'wezterm', 'tmux', 'keys'].map(L => {
-        const hop = by[L];
-        const cls = dead ? 'node dead' : 'node';
-        if (hop && hop[1] === 'consume') dead = true;
-        return `<td><div class="${cls}">${hop ? pill(hop) : ''}</div></td>`;
-      }).join('');
-      let res;
-      const own = r.effects.filter(e => e[0] === a);
-      const isBug = related.some(f => f.app === a && f.sev === 'bug');
-      if (dead) res = `<span class="none">taken before it arrives</span>`;
-      else if (own.length) res = `<span class="act">${esc(describe(a, r.delivered) || human(own[0][2]))}</span> <span class="ctx">${esc(own[0][1])}</span>` +
-        (own.length > 1 ? `<div class="ctx">also: ${own.slice(1, 3).map(e => esc(human(e[2]))).join(', ')}</div>` : '');
-      else if (r.prefixes && r.prefixes.length) res = `<span class="ctx">starts ${esc(r.prefixes.slice(0, 2).map(p => human(p[2])).join(', '))}</span>`;
-      else res = `<span class="none">nothing</span>`;
-      h += `<tr class="${a === state.app ? 'focus' : ''}"><td class="app">${esc(APP[a].label)}<small>${esc(APP[a].kmode === 'mok2' ? 'full keys' : APP[a].kmode === 'mok1' ? 'partial keys' : 'plain keys')}</small></td>${cells}<td class="res${isBug ? ' bug' : ''}">${res}</td></tr>`;
+    if (outer.length) h += '<div class="says">' + outer.map(([l, d]) => `<p style="--c:${LAYER_C[l]}"><b>${esc(LNAME[l])}:</b> ${esc(d)}</p>`).join('') + '</div>';
+    // What stops the chord short of each program, and the hops it took on the way
+    const take = (a) => { const i = t[a].hops.findIndex(x => x[1] === 'consume'); return [i < 0 ? null : t[a].hops[i], i < 0 ? t[a].hops : t[a].hops.slice(0, i)]; };
+    const firsts = ORDER.map(a => take(a)[0]);
+    if (firsts.every(x => x && x[0] === firsts[0][0] && x[2] === firsts[0][2])) {
+      h += `<p class="note" style="--c:${LAYER_C[firsts[0][0]] || 'var(--line)'}">${esc(LNAME[firsts[0][0]] || firsts[0][0])} takes it before any program sees it: <b>${esc(firsts[0][2])}</b>.</p>`;
+    } else {
+      // Programs that end the same way share a row: eight lines of "nothing" say less than one.
+      const rows = [];
+      for (const a of ORDER) {
+        const r = t[a], [took, before] = take(a);
+        const own = r.effects.filter(x => x[0] === a);
+        let res;
+        if (took) res = `<span class="none">taken by ${esc(LNAME[took[0]] || took[0])}</span> <span class="ctx">${esc(took[2])}</span>`;
+        else if (own.length) res = `<span class="act">${esc(describe(a, r.delivered) || human(own[0][2]))}</span> <span class="ctx">${esc(own[0][1])}</span>` +
+          (own.length > 1 ? `<div class="ctx">also: ${own.slice(1, 3).map(x => esc(human(x[2]))).join(', ')}</div>` : '');
+        else if (r.prefixes && r.prefixes.length) res = `<span class="ctx">starts ${esc(r.prefixes.slice(0, 2).map(p => human(p[2])).join(', '))}</span>`;
+        else res = '<span class="none">nothing</span>';
+        const via = before.map(pill).join('');
+        const body = res + (via ? `<span class="via">${via}</span>` : '');
+        const bug = related.some(f => f.app === a && f.sev === 'bug');
+        const same = !bug && rows.find(x => x.body === body && !x.bug);
+        if (same) same.apps.push(a); else rows.push({ body, bug, apps: [a] });
+      }
+      const KM = { mok2: 'full keys', mok1: 'partial keys' };
+      h += '<ul class="progs">' + rows.map(x => {
+        const names = x.apps.length === 1 ? `${esc(APP[x.apps[0]].label)}<small>${KM[APP[x.apps[0]].kmode] || 'plain keys'}</small>`
+          : x.apps.length === ORDER.length ? 'Every program' : x.apps.map(a => esc(APP[a].label.replace('tmux copy mode', 'copy mode').replace('Claude Code', 'Claude'))).join(', ');
+        return `<li class="${x.apps.includes(state.app) ? 'focus' : ''}${x.bug ? ' bug' : ''}"><span class="pn">${names}</span><span>${x.body}</span></li>`;
+      }).join('') + '</ul>';
     }
-    h += '</tbody></table></div>';
     for (const f of related) {
       const c = f.sev === 'bug' ? 'var(--bug)' : 'var(--l-tmux)';
-      h += f.app ? `<div class="note" style="--c:${c}"><b>${esc(APP[f.app].label)}</b> binds ${kbd(f.chord)} to <b>${esc(human(f.action))}</b>, but ${esc(f.cause)}.</div>` : '';
+      if (f.app) h += `<p class="note" style="--c:${c}"><b>${esc(APP[f.app].label)}</b> binds ${kbd(f.chord)} to <b>${esc(human(f.action))}</b>, but ${esc(f.cause)}.</p>`;
     }
-    $('#trace').innerHTML = h;
+    return h;
   }
-  function renderPrefixTrace(ch) {
+  function prefixHTML(ch, e) {
     const p = D.prefix[ch];
-    $('#trace').innerHTML = `<p class="eyebrow">Route</p><h3>${kbd('ctrl+a')} then ${kbd(ch)}</h3>` + pressHTML('ctrl+a') +
-      `<p class="sub">${p ? 'tmux prefix table: <b>' + esc(p.label) + '</b>' + (p.origin === 'stock' ? ' (tmux default)' : ' (configs/tmux.conf)') : 'Nothing is bound after the prefix for this key.'}</p>` +
-      `<div class="note" style="--c:var(--l-tmux)">After Ctrl+A, tmux reads the next key from its prefix table and nothing reaches the pane. Ctrl+A twice sends a literal Ctrl+A.</div>`;
+    return head(e ? entryEyebrow(e) : 'tmux prefix', `${kbd('ctrl+a')} then ${kbd(ch)}`) + (e ? entryBits(e) : '') + pressHTML('ctrl+a') +
+      (e ? '' : `<p class="lead">${p ? '<b>' + esc(p.label) + '</b> <span class="ctx">' + (p.origin === 'stock' ? 'tmux default' : 'configs/tmux.conf') + '</span>' : 'Nothing is bound after the prefix for this key.'}</p>`) +
+      '<p class="note" style="--c:var(--l-tmux)">After Ctrl+A, tmux reads the next key from its prefix table and nothing reaches the pane. Ctrl+A twice sends a literal Ctrl+A.</p>';
   }
+
+  // cardKind is '' (closed), 'key' (beside state.pos) or 'entry' (under the search, for a name with no key)
+  let cardKind = '', cardEntry = null;
+  function renderPop() {
+    pop.innerHTML = '<div class="pop-body">' + (cardKind === 'entry' ? entryHTML(cardEntry)
+      : state.mods === 'prefix' ? prefixHTML(state.chord, cardEntry) : routeHTML(state.chord, cardEntry)) + '</div>';
+    place();
+  }
+  const capAt = (pos) => pos !== '' ? document.querySelector(`#kb g.cap[data-pos="${pos}"]`) : null;
+  const anchor = () => cardKind === 'entry' ? $('#q') : capAt(state.pos) || $('#mods');
+  // Beside the key, on the side with more room; under it when neither side has room; a sheet on a phone.
+  function place() {
+    if (pop.hidden) return;
+    const sheet = innerWidth < 640;
+    pop.classList.toggle('sheet', sheet);
+    if (sheet) { pop.style.left = pop.style.top = ''; delete pop.dataset.side; return; }
+    const r = anchor().getBoundingClientRect();
+    const m = 12, gap = 14, pw = pop.offsetWidth, ph = pop.offsetHeight;
+    const right = innerWidth - r.right - gap - m, left = r.left - gap - m;
+    let x, y, side;
+    if (cardKind !== 'entry' && capAt(state.pos) && Math.max(left, right) >= pw) {
+      side = right >= left ? 'right' : 'left';
+      x = side === 'right' ? r.right + gap : r.left - gap - pw;
+      y = Math.max(m, Math.min(r.top + r.height / 2 - 48, innerHeight - m - ph));
+      pop.style.setProperty('--ay', Math.max(18, Math.min(r.top + r.height / 2 - y, ph - 18)) + 'px');
+    } else {
+      side = 'below';
+      x = Math.max(m, Math.min(cardKind === 'entry' ? r.left : r.left + r.width / 2 - pw / 2, innerWidth - m - pw));
+      y = r.bottom + gap;
+      pop.style.setProperty('--ax', Math.max(18, Math.min(r.left + Math.min(r.width / 2, 40) - x, pw - 18)) + 'px');
+    }
+    pop.dataset.side = side;
+    pop.style.left = (x + scrollX) + 'px';
+    pop.style.top = (y + scrollY) + 'px';
+  }
+  function showCard(kind, e) {
+    cardKind = kind; cardEntry = e || null; pop.hidden = false;
+    renderKB(); renderPop();
+    const cap = kind === 'key' && capAt(state.pos);
+    if (cap) {
+      const r = cap.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > innerHeight) { cap.scrollIntoView({ block: 'center' }); place(); }
+    }
+  }
+  function closePop(refocus) {
+    if (pop.hidden) return;
+    pop.hidden = true; cardKind = ''; cardEntry = null;
+    renderKB();
+    const cap = refocus && capAt(state.pos);
+    if (cap) cap.focus();
+  }
+  // Show CHORD's card at the key that sends it, holding the modifiers it names.
+  function focusChord(ch, e, prefix) {
+    const m = ch === '+' ? '' : ch.split('+').slice(0, -1).join('+');
+    state.mods = prefix ? 'prefix' : MODSETS.some(x => x[0] === m) ? m : '';
+    state.chord = ch; state.pos = posOf(ch);
+    if (state.pos === '' && !prefix && state.mods) {
+      const held = state.mods; state.mods = ''; state.pos = posOf(ch);
+      if (state.pos === '') state.mods = held;
+    }
+    save(); syncControls(); showCard('key', e);
+  }
+  function pick(target) {
+    const g = target.closest('g.cap[data-pos]'); if (!g) return;
+    if (cardKind === 'key' && g.dataset.pos === state.pos) { closePop(true); return; }
+    state.pos = g.dataset.pos; state.chord = g.dataset.chord; save();
+    showCard('key');
+    const again = capAt(state.pos); if (again) again.focus();
+  }
+  $('#kb').addEventListener('click', e => pick(e.target));
+  $('#kb').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e.target); } });
+  pop.addEventListener('click', e => { if (e.target.closest('.x')) closePop(true); });
+  document.addEventListener('click', e => {
+    // a click on a key redraws the board, so its target has left the page by now
+    if (pop.hidden || !e.target.isConnected || pop.contains(e.target) || e.target.closest('#kb g.cap[data-pos], .searchbar, .controls, .trace-link')) return;
+    closePop();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('#results').hidden) { $('#results').hidden = true; return; }
+    closePop(true);
+  });
+  addEventListener('resize', place);
 
   // ---- Intent matrix -----------------------------------------------------------------------------
   const COLS = ['claude', 'codex', 'opencode', 'pi', 'shell', 'fzf', 'nvim', 'copy'];
@@ -830,12 +973,9 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
   }
   $('#bugs').innerHTML = bugs.map(f => card(f, 'var(--bug)')).join('');
   $('#adapts').innerHTML = adapts.map(f => card(f, 'var(--l-tmux)')).join('');
-  document.querySelectorAll('.trace-link').forEach(b => b.addEventListener('click', () => {
-    state.chord = b.dataset.chord; state.mods = ''; state.app = b.dataset.app || state.app; save();
-    $('#mods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === ''));
-    $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.a === state.app));
-    syncLegend();
-    renderKB(); renderTrace(); document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
+  document.querySelectorAll('.trace-link[data-chord]').forEach(b => b.addEventListener('click', () => {
+    state.app = b.dataset.app || state.app;
+    focusChord(b.dataset.chord);
   }));
 
   const byChord = {};
@@ -903,40 +1043,16 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
         `${e.intent && e.kind !== 'intent' ? ` <span class="it">⟨${esc(e.intent)}⟩</span>` : ''}</span></li>`;
     }).join('') : '<li><span></span><span class="ctx">nothing matches</span></li>';
   }
-  function entryCard(e) {
-    const [m] = marker(e);
-    const bits = [layerName(e), e.origin].concat(e.status ? [e.status] : []);
-    let h = `<p class="eyebrow">${esc(bits.join(' · '))}</p><h3>${e.kind === 'chord' || e.kind === 'intent' ? kbd(e.key) : esc(e.label)} ${m ? esc(m) : ''}</h3>`;
-    if (e.summary) h += `<p>${esc(e.summary)}</p>`;
-    if (e.cause) h += `<p class="sub">${esc(e.cause)}</p>`;
-    if (e.kind === 'intent' && e.apps) h += '<table class="plain"><tbody>' + Object.entries(e.apps).map(([a, v]) =>
-      `<tr><td><b>${esc(APP[a] ? APP[a].label : a)}</b></td><td>${esc(v)}</td></tr>`).join('') + '</tbody></table>';
-    if (e.expands) h += `<p class="runs">${esc(e.expands)}</p>`;
-    const foot = [e.source, (e.tags || []).filter(Boolean).join(', '), e.changed ? e.changed + ' since the baseline' : ''].filter(Boolean);
-    if (foot.length) h += `<p class="src">${esc(foot.join(' · '))}</p>`;
-    $('#entry').innerHTML = h; $('#entry').hidden = false;
-  }
+  // A key opens its card on the board; a name with no key opens one under the search.
   function pickEntry(e) {
     $('#results').hidden = true;
-    entryCard(e);
+    const strokes = e.key ? e.key.split(' ') : [];
     if (e.kind === 'chord' && e.layer !== 'tmux-mouse' && KB) {
-      const stroke = e.layer === 'tmux-prefix' ? e.key.split(' ')[1] : e.key.split(' ')[0];
-      if (e.layer === 'tmux-prefix') {
-        state.mods = 'prefix';
-      } else {
-        const mods = stroke === '+' ? '' : stroke.split('+').slice(0, -1).join('+');
-        state.mods = MODSETS.some(m => m[0] === mods) ? mods : '';
-        state.chord = stroke;
-        if (APP[layerOf(e.layer) === 'tmux-copy' ? 'copy' : e.layer]) state.app = e.layer === 'tmux-copy' ? 'copy' : e.layer;
-      }
-      save();
-      $('#mods').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === state.mods));
-      $('#appsel').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.a === state.app));
-      syncLegend(); renderKB();
-      if (state.mods === 'prefix') renderPrefixTrace(stroke); else renderTrace();
-    } else if (e.kind === 'intent' && e.key && D.traces[e.key]) {
-      state.chord = e.key; save(); renderKB(); renderTrace();
-    }
+      const lay = e.layer === 'tmux-copy' ? 'copy' : e.layer;
+      if (APP[lay]) state.app = lay;
+      if (e.layer === 'tmux-prefix') focusChord(strokes[1], e, true); else focusChord(strokes[0], e);
+    } else if (e.kind === 'intent' && e.key && D.traces[e.key]) focusChord(e.key, e);
+    else showCard('entry', e);
   }
   $('#q').addEventListener('input', showResults);
   $('#q-stock').addEventListener('change', showResults);
@@ -948,7 +1064,6 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
       $('#results').querySelectorAll('li').forEach((li, i) => li.classList.toggle('on', i === hit));
       const on = $('#results').querySelector('li.on'); if (on) on.scrollIntoView({ block: 'nearest' });
     } else if (e.key === 'Enter' && hit >= 0) { e.preventDefault(); pickEntry(hits[hit]); }
-    else if (e.key === 'Escape') { $('#results').hidden = true; }
   });
   $('#results').addEventListener('click', e => { const li = e.target.closest('li[data-i]'); if (li) pickEntry(hits[+li.dataset.i]); });
   document.addEventListener('keydown', e => {
@@ -983,7 +1098,8 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     $('#changes').innerHTML = h;
     $('#changed-sub').textContent = `${changeCount} changes since ${C.since || 'the baseline'}${C.sinceDate ? ' (' + C.sinceDate + ')' : ''}. Changed keys have an amber ring on the keyboard.`;
     $('#changed').hidden = false;
-    $('#seen').addEventListener('click', () => { try { localStorage.setItem('keyroutes-seen', C.hash || ''); } catch (e) {} $('#changed').hidden = true; });
+    renderJump([['#changed', 'What changed', changeCount, 'var(--warn)', 'hot']]);
+    $('#seen').addEventListener('click', () => { try { localStorage.setItem('keyroutes-seen', C.hash || ''); } catch (e) {} $('#changed').hidden = true; renderJump(); });
   }
 
   // ---- Shell names: aliases, functions, git aliases, commands, by tag -------------------------------
@@ -1062,7 +1178,7 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
   $('#print').addEventListener('click', () => window.print());
   renderCard();
 
-  renderKB();
-  renderTrace();
+  syncControls();
+  if (openAtLoad && KB) focusChord(state.chord); else renderKB();
 })();
 </script>

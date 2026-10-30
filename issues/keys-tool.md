@@ -265,8 +265,8 @@ Same page (`lib/keymap/page.html`), same delivery (`keys open` writes to
 `$VIZ_DIR/keymap`, and viz reloads it on rebuild). Changes:
 
 1. **A search bar at the top** over `entries`, with the same ranking and markers as
-   fzf. Picking a chord selects it on the keyboard and fills the route panel.
-   Picking an alias or command opens its card. `/` focuses the bar.
+   fzf. Picking a chord opens its key's card on the keyboard. Picking an alias or
+   command opens its card under the bar. `/` focuses the bar.
 2. **A new "Shell" section:** aliases, functions, git aliases and commands, grouped
    by tag in sortable tables showing expansion and source. This is where cheat's
    non-key half lives on the web.
@@ -276,8 +276,16 @@ Same page (`lib/keymap/page.html`), same delivery (`keys open` writes to
    ring on the keyboard.
 4. **Cards:** a "Card" tab per program, rendering `keys card` in HTML with an
    `@media print` stylesheet (a one-page A4 or letter sheet).
-5. **Descriptions everywhere:** the route panel and findings show `summary`, so
+5. **Descriptions everywhere:** the key card and findings show `summary`, so
    users see "Back a turn" rather than only `send-keys Escape`.
+6. **The keyboard is the page** (as built): a slim bar holds the name, search,
+   theme and jump links with the counts, and the Defy's halves fill the width under
+   it. Clicking a key opens a card beside it: what each outer layer does, what the
+   chord costs your hands, and each program's outcome, programs that end the same
+   way sharing a row. The card stays on the physical key, so changing Hold or Layer
+   with it open compares chords on that key; Escape or a click elsewhere closes it,
+   and on a phone it is a sheet at the foot of the screen. The other sections
+   follow the keyboard; the layer chain moves to Layer facts.
 
 **Robustness**
 
