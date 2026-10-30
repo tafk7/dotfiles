@@ -242,8 +242,9 @@ def free(data, mods):
     for c, p in sorted(data['presses'].items()):
         if p is None or p['rating'] == 'unpressable' or ' ' in c:
             continue
-        t = data['traces'].get(c)
-        if t and any(r['effects'] or r['delivered'] is None for r in t.values()):
+        # Alt+Shift+/ is bound as Alt+? (what the terminal sends), so both forms count.
+        taken = [data['traces'].get(x) for x in (c, keyboard.typed_form(c))]
+        if any(t and any(r['effects'] or r['delivered'] is None for r in t.values()) for t in taken):
             continue
         m, key = chord.split(c)
         if m == want and (want - {'shift'} or len(key) > 1):

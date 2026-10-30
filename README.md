@@ -107,8 +107,9 @@ in [kits/](kits/README.md).
 | `sed` | sd | used by `fr` |
 | pip + venv | uv | `uvs`, `uvr`, `uva` |
 
-`cheat` searches every alias, function, and keybinding, and `cheat commands`
-lists the `bin/` utilities. Some common ones:
+`keys` (or `cheat`, its old name) searches every key binding, alias, function
+and command, with what each does; Alt+? opens it in tmux for the program in the
+pane. `keys ls -k command` lists the `bin/` utilities. Some common ones:
 
 ```bash
 reload / mkcd <dir> / extract <archive>
@@ -176,10 +177,13 @@ yo <command>              # print output and copy it to the clipboard
   queue a message (Alt+Enter), start a new line (Ctrl+J) and paste a
   screenshot (Ctrl+Alt+V).
   WezTerm's fullscreen is Ctrl+Shift+Enter and its font size Ctrl+Shift+=/-/0.
-- **Key map:** `keymap open` maps every key across the Defy, Windows,
-  WezTerm, tmux and the pane programs: who takes each chord, what it costs to
-  press, and where sibling programs disagree. `keymap why CHORD` traces one
-  chord, and `keymap check` (run in CI) catches new broken keys. See
+- **Keys:** `keys` looks up any key, alias or command, and Alt+? (or
+  prefix+?) does it in a popup for the pane's program. `keys open` maps every
+  key across the Defy, Windows, WezTerm, tmux and the pane programs: who takes
+  each chord, what it costs to press, and where sibling programs disagree.
+  `keys why CHORD` traces one chord, `keys card codex` fits one program's keys
+  on a screen, and `keys check` (run in CI) catches new broken keys and
+  descriptions gone stale. See
   [docs/keybindings.md](docs/keybindings.md).
 - **WezTerm:** copy [`configs/wezterm.lua`](configs/wezterm.lua) to
   `%USERPROFILE%\.wezterm.lua`, and add `SendEnv LC_TAFK_WEZTERM` to the Host

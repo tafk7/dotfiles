@@ -9,15 +9,14 @@
 #      leaked SSH key path) can't ride along in an unrelated `git add`.
 #   2. bash -n on staged shell files
 #   3. shellcheck --severity=warning (skipped with info note if not installed)
-#   4. shell/shortcuts-index.tsv: every non-comment row has 4 │-separated fields
-#   5. agent-badge generated copies match plugins/shared/
-#   6. Denylist — staged files contain no word listed in the untracked file
+#   4. agent-badge generated copies match plugins/shared/
+#   5. Denylist — staged files contain no word listed in the untracked file
 #      named by $DOTFILES_DENYLIST (one case-insensitive word per line; blank
 #      and # lines ignored). When unset, defaults to
 #      ${XDG_CONFIG_HOME:-~/.config}/dotfiles/denylist if that file exists (the
 #      Claude invariant guard reads the same file at write time). Skipped when
 #      neither exists, so the list never enters the repo.
-#   7. configs/wezterm.lua: its revision stamp matches its content
+#   6. configs/wezterm.lua: its revision stamp matches its content
 #      (lib/wezterm.sh), so the copy on Windows reports a true revision.
 #
 # Bypass: ALLOW_PROTECTED=1 git commit   (protected-paths gate only)
@@ -68,13 +67,11 @@ is_shell_file() {
 }
 
 SHELL_FILES=()
-TSV_STAGED=false
 for f in "${STAGED[@]}"; do
     [[ ! -f "$f" ]] && continue
     if is_shell_file "$f"; then
         SHELL_FILES+=("$f")
     fi
-    [[ "$f" == "shell/shortcuts-index.tsv" ]] && TSV_STAGED=true
 done
 
 errors=0
@@ -123,17 +120,7 @@ if [[ ${#SHELL_FILES[@]} -gt 0 ]]; then
     fi
 fi
 
-# Check 4: TSV well-formed
-if [[ "$TSV_STAGED" == "true" ]]; then
-    bad_lines=$(awk -F'│' '!/^[[:space:]]*#/ && NF>0 && NF!=4 {printf "    line %d: %d fields (want 4)\n", NR, NF}' shell/shortcuts-index.tsv)
-    if [[ -n "$bad_lines" ]]; then
-        fail "shell/shortcuts-index.tsv has malformed rows (separator is │ U+2502):"
-        echo "$bad_lines" >&2
-        ((errors++))
-    fi
-fi
-
-# Check 5: agent-badge generated copies match plugins/shared/
+# Check 4: agent-badge generated copies match plugins/shared/
 # Claude and Codex need one plugin each (see plugins/sync-shared.sh), so the
 # scripts exist three times over. Editing a copy instead of the source is the
 # obvious mistake, and it fails silently — one harness keeps the old behaviour.
@@ -149,7 +136,7 @@ for f in "${STAGED[@]}"; do
     fi
 done
 
-# Check 5b: the ai-preferences sbx kit matches the portable configs/ it is
+# Check 4b: the ai-preferences sbx kit matches the portable configs/ it is
 # generated from (kits/sync-portable.py).
 for f in "${STAGED[@]}"; do
     if [[ "$f" == configs/claude-settings*.json || "$f" == configs/ai/* || "$f" == kits/ai-preferences/* ]]; then
@@ -163,7 +150,7 @@ for f in "${STAGED[@]}"; do
     fi
 done
 
-# Check 7: the WezTerm config's revision stamp, against the staged content.
+# Check 6: the WezTerm config's revision stamp, against the staged content.
 for f in "${STAGED[@]}"; do
     [[ "$f" == configs/wezterm.lua ]] || continue
     staged_lua="$(mktemp)"
@@ -178,7 +165,7 @@ for f in "${STAGED[@]}"; do
     rm -f "$staged_lua"
 done
 
-# Check 6: denylisted words (employer and host identifiers) in staged content
+# Check 5: denylisted words (employer and host identifiers) in staged content
 if [[ -z "${DOTFILES_DENYLIST:-}" && -r "${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/denylist" ]]; then
     DOTFILES_DENYLIST="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/denylist"
 fi

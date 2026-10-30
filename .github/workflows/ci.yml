@@ -91,6 +91,7 @@ jobs:
           ./bin/dotfiles --help             >/dev/null
           ./bin/verify --help               >/dev/null
           ./bin/ai-update --help            >/dev/null
+          ./bin/keys --help                 >/dev/null
 
       - name: Codex installer ownership behavior
         run: |
@@ -111,20 +112,12 @@ jobs:
           python3 tests/viz.py
           python3 tests/keymap.py
 
-      - name: Cheatsheet TSV is well-formed
+      - name: keys check
         run: |
           set -euo pipefail
-          # Every non-comment, non-empty row must have exactly 4 fields
-          # separated by U+2502 (│). Bad rows would silently break preview.
-          bad=$(awk -F'│' '
-            /^#/ || NF == 0 { next }
-            NF != 4 { print FILENAME ":" NR ": expected 4 fields, got " NF; bad=1 }
-            END { exit bad ? 1 : 0 }
-          ' shell/shortcuts-index.tsv) || {
-            echo "::error::Malformed cheatsheet rows:"
-            echo "$bad"
-            exit 1
-          }
+          # Known broken keys, notes that match no binding, the ratchet on
+          # undescribed bindings, command headers and intents (bin/keys).
+          XDG_CACHE_HOME="$RUNNER_TEMP/cache" bin/keys check
 
       - name: CONFIG_MAP source paths exist on disk
         run: |

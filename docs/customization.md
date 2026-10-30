@@ -1,7 +1,7 @@
 # Customization
 
 Most extensions are table entries in `lib/config.sh` or `lib/registry.sh`;
-`setup.sh`, `dotfiles verify`, `bin/uninstall-tool`, and `bin/cheatsheet` read those
+`setup.sh`, `dotfiles verify`, `dotfiles tools`, and `bin/uninstall-tool` read those
 tables, so they pick up a new entry without code changes. Setup installs the
 selected entries of the registry's install order (`_REGISTRY_ORDER`), so a new
 component also needs a place there, after everything its `needs` names; the
@@ -118,11 +118,16 @@ changed since then is kept and reported once. `bin/diff-config` and
 
 Every `shell/tools/*.sh` file is sourced by `shell/init.sh`; add to the matching
 domain file or create a new domain. WSL-only code goes in
-`shell/platform/wsl.sh`. Add a row to `shell/shortcuts-index.tsv` so `cheat`
-can find it.
+`shell/platform/wsl.sh`. `keys` finds an alias or function by itself; say what
+it does in a trailing comment (`alias gs='git status'  # Show the working tree
+status`), or in a comment right above a function. A comment above several
+definitions names their section instead, and becomes a tag.
 
-`bin/` scripts put a one-line description on line 2. `cheat commands` lists
-that line, and most scripts print their header comment as `--help`. Source
+`bin/` scripts say what they do in the first comment after the shebang, or a
+Python docstring; `keys` lists that sentence, and `keys check` (in CI) fails a
+script with neither. A header line of the form `#   NAME SUB ARGS   what it
+does` becomes an entry for the subcommand. Most scripts print their header
+comment as `--help`. Source
 `lib/runtime.sh` for `log`/`warn`/`error`, `is_wsl`, `command_exists`,
 `verify_binary`, `get_arch`, and `version_gte`. Commit the script executable.
 
