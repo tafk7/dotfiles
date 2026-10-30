@@ -188,7 +188,9 @@ def label(chord):
     """'ctrl+shift+pageup' -> 'Ctrl+Shift+PgUp' for people."""
     names = {'pageup': 'PgUp', 'pagedown': 'PgDn', 'backspace': 'Bksp', 'delete': 'Del', 'insert': 'Ins',
              'enter': 'Enter', 'esc': 'Esc', 'tab': 'Tab', 'space': 'Space', 'up': '↑', 'down': '↓',
-             'left': '←', 'right': '→', 'home': 'Home', 'end': 'End'}
+             'left': '←', 'right': '→', 'home': 'Home', 'end': 'End', 'click': 'Click', 'release': 'Release',
+             'drag': 'Drag', 'drag-end': 'Drag release', 'double-click': 'Double-click',
+             'triple-click': 'Triple-click', 'wheel-up': 'Wheel up', 'wheel-down': 'Wheel down'}
     strokes = []
     for stroke in chord.split(' '):
         mods, key = split(stroke)

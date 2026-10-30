@@ -55,7 +55,7 @@ fzf-project() {
 }
 
 # Quick-access aliases
-alias fgb='fzf-git-branch'
-alias fgl='fzf-git-log'
-alias frg='fzf-rg'
-alias fp='fzf-project'
+alias fgb='fzf-git-branch'  # Fuzzy search and checkout git branch
+alias fgl='fzf-git-log'     # Fuzzy search git log
+alias frg='fzf-rg'          # Fuzzy search file contents
+alias fp='fzf-project'      # Fuzzy search and open project directory

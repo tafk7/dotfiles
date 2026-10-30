@@ -47,7 +47,7 @@ winopen() {
     fi
 }
 
-# Explorer in current directory
+# Open Explorer (the current directory by default)
 explorer() {
     explorer.exe "${1:-.}"
 }
@@ -65,29 +65,29 @@ wcd() {
 # ==============================================================================
 
 # Navigation
-alias cdwin='cd $WIN_HOME'
-alias cddesk='cd $WIN_DESKTOP'
-alias cddl='cd $WIN_DOWNLOADS'
-alias cddocs='cd $WIN_DOCUMENTS'
+alias cdwin='cd $WIN_HOME'        # Go to Windows home directory
+alias cddesk='cd $WIN_DESKTOP'    # Go to Windows desktop
+alias cddl='cd $WIN_DOWNLOADS'    # Go to Windows downloads
+alias cddocs='cd $WIN_DOCUMENTS'  # Go to Windows documents
 
 # Windows programs
-alias notepad='notepad.exe'
-alias clip='clip.exe'
-alias cmd='cmd.exe'
-alias winget='/mnt/c/Windows/System32/winget.exe'
+alias notepad='notepad.exe'                        # Open Notepad
+alias clip='clip.exe'                              # Pipe to Windows clipboard
+alias cmd='cmd.exe'                                # Launch Windows Command Prompt
+alias winget='/mnt/c/Windows/System32/winget.exe'  # Windows package manager
 
 # PowerShell — call by absolute path. shell/env.sh strips the Windows
 # PowerShell directory from PATH, so `powershell.exe` by name would not resolve.
 if [[ -x "/mnt/c/Program Files/PowerShell/7/pwsh.exe" ]]; then
-    alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'
+    alias pwsh='/mnt/c/Program\ Files/PowerShell/7/pwsh.exe'  # PowerShell (7 if installed, otherwise 5)
 else
     alias pwsh='/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
 fi
 
 # File operations
-alias open='explorer'
-alias cwd='pwd | clip.exe'
+alias open='explorer'       # Same as explorer
+alias cwd='pwd | clip.exe'  # Copy current path to clipboard
 
 # Path conversion
-alias wpath='wslpath -w'
-alias lpath='wslpath -u'
+alias wpath='wslpath -w'  # Convert Linux path to Windows format
+alias lpath='wslpath -u'  # Convert Windows path to Linux format

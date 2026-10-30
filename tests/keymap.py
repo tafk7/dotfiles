@@ -189,6 +189,13 @@ class Readers(unittest.TestCase):
         text = "  {\n    key = 'a', -- Next tab\n    mods = 'CTRL|SHIFT',\n  },\n  {\n    key = 'F11',\n    mods = 'NONE',\n  },\n"
         self.assertEqual(sources.wezterm_comments(text), {('CTRL|SHIFT', 'a'): (2, 'Next tab'), ('NONE', 'F11'): (6, '')})
 
+    def test_mouse_chords(self):
+        self.assertEqual(sources.mouse_chord('M-DoubleClick1Pane'), 'alt+double-click')
+        self.assertEqual(sources.mouse_chord('MouseDragEnd1Pane'), 'drag-end')
+        self.assertEqual(sources.mouse_chord('WheelUpPane'), 'wheel-up')
+        self.assertIsNone(sources.mouse_chord('MouseDown3Status'))
+        self.assertEqual(chord.label('alt+double-click'), 'Alt+Double-click')
+
     def test_tmux_lines(self):
         conf = 'bind -n M-z send-keys x\nbind -N "Zoom" z resize-pane -Z\nbind -T copy-mode-vi -N "up" e send -X cursor-up\nbind -r S-Up resize-pane -U 5\n'
         self.assertEqual(sources.tmux_lines(conf), {('root', 'alt+z'): 1, ('prefix', 'z'): 2, ('copy-mode-vi', 'e'): 3,
@@ -325,7 +332,9 @@ class Build(unittest.TestCase):
         self.assertEqual(self.by['intent:undo-turn'].key, 'alt+z')
         self.assertEqual(self.by['alias:gs'].kind, 'alias')
         self.assertIn('internal', self.by['cmd:tmux-scroll'].tags)
-        self.assertEqual(self.by['pi:alt+m@app.model'].via, 'desc')  # pi's saved descriptions
+        self.assertEqual(self.by['pi:ctrl+w@tui.editor'].via, 'desc')  # pi's saved descriptions
+        self.assertEqual(self.by['tmux:alt+z'].via, 'tmux-N')  # bind -N
+        self.assertEqual(self.by['alias:gs'].via, 'comment')
 
     def test_ids_stable(self):
         data, model = analysis.build(REPO)

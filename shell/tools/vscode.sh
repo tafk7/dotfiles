@@ -3,10 +3,10 @@
 # VS Code aliases for quick access
 
 # Quick open VS Code
-alias c='code .'
+alias c='code .'  # Open VS Code in current directory
 
 # Open specific files/folders in VS Code
-alias cdot='code $DOTFILES_DIR'
+alias cdot='code $DOTFILES_DIR'  # Open dotfiles in VS Code
 
 # Quick project navigation + open
 cproj() {

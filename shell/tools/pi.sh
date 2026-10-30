@@ -11,7 +11,7 @@ if command -v pi >/dev/null 2>&1; then
     # zsh doesn't word-split unquoted expansions, so ${=VAR} is needed to pass
     # PI_FLAGS as separate arguments. Keep both branches in sync.
     if [[ -n "${ZSH_VERSION:-}" ]]; then
-        pi() { command pi ${=PI_FLAGS} "$@"; }
+        pi() { command pi ${=PI_FLAGS} "$@"; }  # Start new Pi session
     else
         pi() {
             local -a flags=()
@@ -29,5 +29,5 @@ fi
 
 # Pi shortcuts. No print alias: the obvious `pip` would shadow Python's pip, and
 # `pi -p` is already short. `pi` itself is the new-session entry point.
-alias pic='pi -c'    # Continue most recent session
-alias pir='pi -r'    # Browse and select a past session
+alias pic='pi -c'  # Continue the most recent pi session
+alias pir='pi -r'  # Browse and pick a past pi session

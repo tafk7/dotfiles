@@ -130,6 +130,21 @@ def tmux_dump(tmux_bin, conf, repo, name):
     return table, (fmt.stdout.strip() if fmt and fmt.returncode == 0 else 'xterm'), failed, notes
 
 
+MOUSE = {'MouseDown': 'click', 'MouseUp': 'release', 'MouseDrag': 'drag', 'MouseDragEnd': 'drag-end',
+         'DoubleClick': 'double-click', 'TripleClick': 'triple-click', 'SecondClick': 'second-click',
+         'WheelUp': 'wheel-up', 'WheelDown': 'wheel-down'}
+
+
+def mouse_chord(key):
+    """'M-DoubleClick1Pane' -> 'alt+double-click'; only the pane's own events, button 1 or the wheel."""
+    m = re.fullmatch(r'((?:[CMS]-)*)(MouseDragEnd|MouseDown|MouseUp|MouseDrag|DoubleClick|TripleClick|SecondClick|'
+                     r'WheelUp|WheelDown)(1?)Pane', key)
+    if not m:
+        return None
+    mods = [chord.MODS[x.lower()] for x in m.group(1).split('-') if x]
+    return chord.make(mods, MOUSE[m.group(2)])
+
+
 def tmux_lines(text):
     """(table, chord) -> the line of tmux.conf that binds it (the last, as tmux keeps the last)."""
     out = {}
@@ -170,7 +185,16 @@ def tmux(repo, tmux_bin, notes):
     lines = tmux_lines(read(conf))
     out = []
     for (table, key), action in sorted(ours.items()):
-        if table not in ('root', 'prefix', 'copy-mode-vi') or re.search(r'Mouse|Wheel|Click|Drag', key):
+        if table not in ('root', 'prefix', 'copy-mode-vi'):
+            continue
+        if re.search(r'Mouse|Wheel|Click|Drag', key):
+            # Not traced, but listed when ours: what a click or the wheel does, from its note.
+            mouse = mouse_chord(key)
+            if mouse and stock.get((table, key)) != action:
+                lnum = lines.get((table, chord.tmux(key)))
+                out.append(Binding('tmux-mouse', mouse, action, context='copy' if table == 'copy-mode-vi' else '',
+                                   origin='ours', source=f'configs/tmux.conf:{lnum}' if lnum else 'configs/tmux.conf',
+                                   note=noted.get((table, chord.tmux(key)), '')))
             continue
         layer = {'root': 'tmux', 'prefix': 'tmux-prefix', 'copy-mode-vi': 'tmux-copy'}[table]
         origin = 'stock' if stock.get((table, key)) == action else 'ours'

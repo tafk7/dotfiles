@@ -1,7 +1,7 @@
 #!/bin/bash
 # Process management functions
 
-# Process search
+# Search running processes by name
 psg() {
     if [[ -z "$1" ]]; then
         echo "Usage: psg <process_name>"
@@ -26,7 +26,7 @@ fkill() {
     fi
 }
 
-# Find and kill process listening on a port
+# Kill the process on a port (--force skips the question)
 killport() {
     if [[ -z "$1" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
         echo "Usage: killport [-f|--force] <port>"
