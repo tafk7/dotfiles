@@ -303,3 +303,16 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Exercise supported release without mutation
         run: su -s /bin/bash test -c "cd '$GITHUB_WORKSPACE' && bash tests/setup-safety.sh"
+      # 22.04's Python is 3.10; keymap needs 3.11+. Setup's step installs one
+      # with uv (pinned and checked against versions.lock), and keymap uses it.
+      - name: keymap on uv's Python where the system's is older
+        if: matrix.release == '22.04'
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3
+          read -r _ _ version repo asset sha _ < <(awk '$1 == "uv" && $2 == "x86_64"' versions.lock)
+          curl -fsSL -o /tmp/uv.tar.gz "https://github.com/$repo/releases/download/$version/$asset"
+          echo "$sha  /tmp/uv.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1
+          su -s /bin/bash test -c "cd '$GITHUB_WORKSPACE' && python3 --version \
+            && bash -c 'export DOTFILES_DIR=\$PWD; source lib/runtime.sh; source lib/configure.sh; configure_uv_python uv' \
+            && bin/keymap --help | head -n 1 && bash tests/python-select.sh"

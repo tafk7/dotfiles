@@ -23,7 +23,9 @@ extended keys hears Ctrl+Shift+E as Ctrl+E and Shift+Enter as Enter.
 ## `keymap`
 
 `bin/keymap` reads all five layers from this checkout and traces every chord
-through them to each pane program.
+through them to each pane program. It needs Python 3.11 or newer: the system's
+where it is new enough, else one uv manages, which setup installs where the
+system's is older, as on Ubuntu 22.04 (`lib/python.sh`).
 
 ```bash
 keymap open                    # build the map page and show it through viz
