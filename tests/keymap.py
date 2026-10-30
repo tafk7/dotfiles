@@ -12,7 +12,7 @@ import unittest
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, 'lib'))
 
-from keymap import analysis, chord, entries, keyboard, names, route, sources, views  # noqa: E402
+from keymap import analysis, chord, entries, keyboard, names, route, sources, track, views  # noqa: E402
 KEYS = os.path.join(REPO, 'bin/keys')
 
 
@@ -262,6 +262,59 @@ class Notes(unittest.TestCase):
             ('shell, fzf', '⇒ nothing')])
 
 
+class Tracking(unittest.TestCase):
+    """keys diff and the changed markers: snapshots compared by id."""
+
+    def index(self, rows, broken=()):
+        out = []
+        for eid, summary in rows.items():
+            out.append(dict(id=eid, kind='chord', key=eid.split(':')[1], label=eid, layer=eid.split(':')[0], summary=summary,
+                            status='', origin='ours', apps={}))
+        return dict(meta=dict(full='abc', date='2026-10-30'), entries=out, broken=list(broken))
+
+    def test_compare(self):
+        old = track.snapshot(self.index({'tmux:alt+z': 'Back a turn', 'tmux:alt+q': 'Gone', 'alias:gs': 'status'}))
+        new_index = self.index({'tmux:alt+z': 'Back a turn, now', 'alias:gs': 'status', 'tmux:alt+?': 'Lookup'}, ['x bug'])
+        d = track.compare(old, track.snapshot(new_index))
+        self.assertEqual((d['added'], d['removed'], d['changed']), (['tmux:alt+?'], ['tmux:alt+q'], [('tmux:alt+z', ['summary'])]))
+        self.assertEqual((d['new'], d['fixed']), (['x bug'], []))
+        doc = track.changes_doc(old, track.snapshot(new_index), new_index, 'abc')
+        self.assertEqual(doc['removed'][0]['summary'], 'Gone')  # from the baseline: the entry is gone now
+
+    def test_decorate_marks_since_seen(self):
+        with tempfile.TemporaryDirectory() as state:
+            env = os.environ.get('XDG_STATE_HOME')
+            os.environ['XDG_STATE_HOME'] = state
+            try:
+                first = self.index({'tmux:alt+z': 'Back a turn'})
+                track.decorate(REPO, first)  # the first build is the baseline
+                self.assertTrue(os.path.exists(os.path.join(state, 'keys/seen.json')))
+                later = self.index({'tmux:alt+z': 'Back two turns', 'tmux:alt+?': 'Lookup'})
+                track.decorate(REPO, later)
+                self.assertEqual({e['id']: e['changed'] for e in later['entries']}, {'tmux:alt+z': 'changed', 'tmux:alt+?': 'added'})
+                track.mark_seen(later)
+                again = self.index({'tmux:alt+z': 'Back two turns', 'tmux:alt+?': 'Lookup'})
+                track.decorate(REPO, again)
+                self.assertEqual([e['changed'] for e in again['entries']], ['', ''])
+            finally:
+                if env is None:
+                    os.environ.pop('XDG_STATE_HOME')
+                else:
+                    os.environ['XDG_STATE_HOME'] = env
+
+    def test_defaults_diff(self):
+        old = {'version': '1.0', 'bindings': {'app.exit': ['ctrl+c', 'ctrl+d'], 'model.list': ['ctrl+x m'], 'gone': ['f1']}}
+        new = {'version': '1.1', 'bindings': {'app.exit': ['ctrl+d'], 'model.list': ['ctrl+x m'], 'new.thing': ['f2']}}
+        d = track.defaults_diff('opencode', old, new)
+        self.assertEqual(d['version'], ['1.0', '1.1'])
+        self.assertEqual(d['added'], [('', 'new.thing', 'f2')])
+        self.assertEqual(d['removed'], [('', 'gone', 'f1')])
+        self.assertEqual(d['rebound'], [('', 'app.exit', ['ctrl+c', 'ctrl+d'], ['ctrl+d'])])
+        claude = track.defaults_diff('claude', {'version': 'a', 'bindings': {'Chat': {'ctrl+g': 'chat:externalEditor'}}},
+                                     {'version': 'b', 'bindings': {'Chat': {'ctrl+e': 'chat:externalEditor'}}})
+        self.assertEqual(claude['rebound'], [('Chat', 'chat:externalEditor', ['ctrl+g'], ['ctrl+e'])])
+
+
 @unittest.skipUnless(shutil.which('tmux') and shutil.which('nvim'), 'needs tmux and nvim')
 class Build(unittest.TestCase):
     @classmethod
@@ -372,6 +425,14 @@ class Build(unittest.TestCase):
             for n, app in enumerate(inline['routeApps']):
                 self.assertEqual(inline['routes'][inline['routeTable'][ch][n]], self.data['traces'][ch][app])
         self.assertIsNone(inline['traces'])
+
+    def test_diff_against_a_commit(self):
+        """keys diff REV builds REV's snapshot from git archive with today's readers."""
+        if not os.path.isdir(os.path.join(REPO, '.git')) and not os.path.isfile(os.path.join(REPO, '.git')):
+            self.skipTest('not a git checkout')
+        r = self.keys('diff', 'HEAD')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout.splitlines()[0], r'changes since HEAD|Nothing changed since HEAD')
 
     def test_plain_listing(self):
         """Off a terminal, keys is keys ls: plain text, no fzf, no color."""

@@ -44,6 +44,8 @@ keys card codex                # one screen of the keys that matter in Codex
 keys board alt -a claude       # the Defy as text, each key colored by who takes it
 keys free alt                  # chords the keyboard sends that nothing binds
 keys open alt+z                # build the map page and show it through viz, at Alt+Z
+keys diff                      # what changed since you last looked (keys seen marks that)
+keys diff 7d                   # ... or since a commit: a week back, HEAD~5, a tag
 keys check                     # fail on new broken keys, stale notes, undescribed keys
 ```
 
@@ -61,6 +63,15 @@ tmux:
   command into the pane the popup came from.
 
 Off a terminal, or without fzf, `keys` prints the same list as `keys ls`.
+
+**What changed.** `keys` remembers the index you last looked at
+(`$XDG_STATE_HOME/keys/seen.json`; the first build sets it) and marks every
+entry added or changed since with ●: in the lookup, whose header counts them
+(Ctrl+R lists them), in `keys ls --changed`, on the page's What changed section
+and its keyboard. `keys seen` moves the mark to now. `keys diff REV` compares
+with any commit: with the snapshot an earlier build of a clean checkout kept
+(the last 30, by commit), or by building REV from `git archive` with today's
+readers, which takes about a second.
 
 The index is cached under `$XDG_CACHE_HOME/keys`, one directory per checkout,
 and stamped with the commit. A lookup reads it without starting Python; when a
@@ -118,7 +129,10 @@ After fixing keys, accepting new ones, or describing more, run
   - OpenCode: the binary;
   - pi: its package.
 
-  Run it after `dotfiles upgrade` and commit the diff. Your own settings stay in the
+  Run it after `dotfiles upgrade` (which says so) and commit the diff. It
+  prints, per agent, the stock keys that were added, removed or rebound, puts
+  them on the page's What changed section, and then runs `keys check`, so the
+  keys an upgrade broke are a list. Your own settings stay in the
   usual configs: `configs/ai/claude/keybindings.json`, the `[tui.keymap]`
   tables in `configs/codex.defaults.toml`, `keybinds` in
   `configs/opencode-cli*.json`, and `configs/ai/pi/keybindings.json`. They're

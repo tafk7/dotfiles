@@ -81,7 +81,7 @@ def write(path, text):
 
 def index_doc(data, found, groups, meta):
     """entries.json: everything the shell views and the preview need, without the traces."""
-    from . import entries
+    from . import analysis, entries
     labels = {a['id']: a['label'] for a in data['apps']}
     presses = {}
     for e in found:
@@ -90,8 +90,9 @@ def index_doc(data, found, groups, meta):
             p = data['presses'].get(first)
             if p:
                 presses[first] = views.press_text(p)
+    broken = sorted({analysis.finding_key(f) for f in data['findings'] if f['sev'] == 'bug'})
     return dict(meta=meta, labels=labels, presses=presses, groups=groups, versions=data['versions'],
-                notes=data['notes'], entries=entries.to_json(found))
+                notes=data['notes'], broken=broken, entries=entries.to_json(found))
 
 
 def build(repo, tmux_bin=None, decorate=None):

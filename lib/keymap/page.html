@@ -957,12 +957,13 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
 
   // ---- What changed: since the baseline keys keeps (keys seen), and the agents' defaults --------------
   const C = D.changes || {};
+  const moved = C.defaults || {};
   const changeCount = ['added', 'changed', 'removed'].reduce((n, k) => n + (C[k] || []).length, 0) +
-    ((C.findings || {}).new || []).length + ((C.findings || {}).fixed || []).length;
+    ((C.findings || {}).new || []).length + ((C.findings || {}).fixed || []).length + Object.keys(moved).length;
   let dismissed = '';
   try { dismissed = localStorage.getItem('keyroutes-seen') || ''; } catch (e) {}
   if (changeCount && C.hash !== dismissed) {
-    const line = (x) => `<li>${x.key ? kbd(x.key) : ''} <b>${esc(x.label || x.id)}</b> <span class="ctx">${esc(LAYER_NAME[x.layer] || x.layer || '')}</span> ${esc(x.summary || '')}${x.fields ? ` <span class="ctx">(${esc(x.fields.join(', '))})</span>` : ''}</li>`;
+    const line = (x) => `<li>${x.key && x.key === x.label.toLowerCase().replace(/ /g, '') || /^(tmux|wezterm|windows|nvim|claude|codex|opencode|pi|fzf|shell|zsh)/.test(x.layer || '') ? kbd(x.key) : `<b>${esc(x.label || x.id)}</b>`} <span class="ctx">${esc(LAYER_NAME[x.layer] || x.layer || '')}</span> ${esc(x.summary || '')}${x.fields ? ` <span class="ctx">(${esc(x.fields.join(', '))})</span>` : ''}</li>`;
     let h = '';
     for (const [k, title] of [['added', 'Added'], ['changed', 'Changed'], ['removed', 'Removed']]) {
       if ((C[k] || []).length) h += `<div><h3>${title} (${C[k].length})</h3><ul>${C[k].slice(0, 60).map(line).join('')}</ul></div>`;
@@ -970,6 +971,14 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     const F = C.findings || {};
     if ((F.new || []).length) h += `<div><h3>New broken keys</h3><ul>${F.new.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
     if ((F.fixed || []).length) h += `<div><h3>Fixed</h3><ul>${F.fixed.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    // keys defaults: what an agent upgrade moved in its stock keys
+    for (const [app, d] of Object.entries(moved)) {
+      const ctx = (c) => c ? ` (${esc(c)})` : '';
+      const items = d.added.map(([c, x, k]) => `<li>+ ${esc(human(x))}${ctx(c)}: ${kbd(k.replace(/-/g, '+'))}</li>`)
+        .concat(d.removed.map(([c, x, k]) => `<li>− ${esc(human(x))}${ctx(c)}: ${kbd(k.replace(/-/g, '+'))}</li>`))
+        .concat(d.rebound.map(([c, x, o, n]) => `<li>${esc(human(x))}${ctx(c)}: ${esc(o.join(', ') || 'none')} → ${esc(n.join(', ') || 'none')}</li>`));
+      h += `<div><h3>${esc(APP[app] ? APP[app].label : app)} ${esc(d.version[0] || '')} → ${esc(d.version[1] || '')}: stock keys moved</h3><ul>${items.slice(0, 40).join('')}</ul></div>`;
+    }
     h += `<p><button class="trace-link" id="seen" type="button">Seen: hide this in this browser</button> <span class="ctx">keys seen in the shell sets the baseline for every view.</span></p>`;
     $('#changes').innerHTML = h;
     $('#changed-sub').textContent = `${changeCount} changes since ${C.since || 'the baseline'}${C.sinceDate ? ' (' + C.sinceDate + ')' : ''}. Changed keys have an amber ring on the keyboard.`;
