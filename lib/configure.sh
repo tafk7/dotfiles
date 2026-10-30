@@ -166,6 +166,26 @@ configure_pi_settings() {
     success "Provisioned ~/.pi/agent/settings.json (install/update telemetry off)."
 }
 
+# Tools that need Python 3.11 or newer (keymap; lib/python.sh) use the system
+# python3 when it is new enough. Elsewhere (Ubuntu 22.04 has 3.10) uv installs
+# one it manages, here at setup rather than at a tool's first run, and without
+# links on PATH (--no-bin), so the system's python3 stays what shells run.
+configure_uv_python() {
+    # shellcheck source=lib/python.sh
+    source "$DOTFILES_DIR/lib/python.sh"
+    local uv
+    uv="$(command -v uv 2>/dev/null || true)"
+    [[ -n "$uv" || ! -x "$HOME/.local/bin/uv" ]] || uv="$HOME/.local/bin/uv"
+    [[ -n "$uv" ]] || return 0
+    PATH="${uv%/*}:$PATH" dotfiles_python_find >/dev/null && return 0
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        log "[DRY RUN] Would install Python 3.12 with uv (the system's is older than $DOTFILES_PYTHON_MIN)"
+        return 0
+    fi
+    "$uv" python install --no-bin 3.12 >/dev/null 2>&1 || { error "uv could not install Python 3.12"; return 1; }
+    success "Installed Python 3.12 with uv, for tools that need $DOTFILES_PYTHON_MIN or newer (keymap)."
+}
+
 # tailscaled runs under systemd once installed. A masked unit is the
 # operator's decision and is left as it is; nothing here enrolls the node.
 configure_tailscaled() {

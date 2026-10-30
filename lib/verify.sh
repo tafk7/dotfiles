@@ -418,6 +418,15 @@ verify_environment() {
             outcome convergence "$section" delta "the Git config lacks the palette-based delta settings"
         fi
     fi
+    # The Python keymap runs on (lib/python.sh), where uv is installed to provide one.
+    if verify_expects uv; then
+        local python
+        if python="$(dotfiles_python_find)"; then
+            outcome ok "$section" "Python $DOTFILES_PYTHON_MIN+" "$python, for keymap"
+        else
+            outcome convergence "$section" "Python $DOTFILES_PYTHON_MIN+" "none; setup installs one with uv (dotfiles apply)"
+        fi
+    fi
     # An invalid theme state is reported with the rest of the state files.
     if feature_enabled theme; then
         theme="$("$DOTFILES_DIR/bin/theme-switcher" --current 2>/dev/null | sed -n 's/^global: //p' || true)"

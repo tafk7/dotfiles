@@ -95,4 +95,33 @@ printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/external/systemctl"
 DOTFILES_TEST_SYSTEMD_RUNNING=1 configure_tailscaled tailscale >/dev/null
 grep -Fxq "systemctl enable --now tailscaled" "$TEST_ROOT/sudo.log" || fail "an inactive tailscaled was not enabled"
 
+# uv's Python: installed only where the system's is older than 3.11, without
+# links on PATH, and not in a dry run.
+mkdir -p "$TEST_ROOT/pyold"
+printf '#!/bin/sh\n[ "$1" = --version ] && { echo "Python 3.10.12"; exit 0; }\nexit 1\n' > "$TEST_ROOT/pyold/python3"
+cat > "$TEST_ROOT/pyold/uv" <<EOF
+#!/bin/sh
+echo "\$*" >> "$TEST_ROOT/uv.log"
+[ "\$1 \$2" = "python find" ] && [ -e "$TEST_ROOT/uv-has-python" ] && echo /bin/sh
+exit 0
+EOF
+chmod +x "$TEST_ROOT/pyold/python3" "$TEST_ROOT/pyold/uv"
+PATH="$TEST_ROOT/pyold:$PATH" DRY_RUN=true configure_uv_python uv > "$TEST_ROOT/out" 2>&1 || fail "uv Python dry run failed"
+grep -q "Would install Python 3.12 with uv" "$TEST_ROOT/out" || fail "the dry run did not plan uv's Python: $(<"$TEST_ROOT/out")"
+! grep -q "python install" "$TEST_ROOT/uv.log" || fail "a dry run installed a Python"
+PATH="$TEST_ROOT/pyold:$PATH" configure_uv_python uv >/dev/null 2>&1 || fail "installing uv's Python failed"
+grep -Fxq "python install --no-bin 3.12" "$TEST_ROOT/uv.log" || fail "uv's Python not installed as planned: $(<"$TEST_ROOT/uv.log")"
+: > "$TEST_ROOT/uv.log"; touch "$TEST_ROOT/uv-has-python"
+PATH="$TEST_ROOT/pyold:$PATH" configure_uv_python uv >/dev/null 2>&1
+! grep -q "python install" "$TEST_ROOT/uv.log" || fail "uv's Python reinstalled although present"
+# A new enough system Python: uv isn't asked at all.
+if python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
+    mkdir -p "$TEST_ROOT/pynew"
+    ln -sf "$(command -v python3)" "$TEST_ROOT/pynew/python3"
+    ln -sf "$TEST_ROOT/pyold/uv" "$TEST_ROOT/pynew/uv"
+    : > "$TEST_ROOT/uv.log"
+    PATH="$TEST_ROOT/pynew:$PATH" configure_uv_python uv >/dev/null 2>&1 || fail "uv's Python step failed beside a new system Python"
+    [[ ! -s "$TEST_ROOT/uv.log" ]] || fail "uv was asked although the system Python is new enough: $(<"$TEST_ROOT/uv.log")"
+fi
+
 printf 'configure-steps: ok\n'

@@ -147,6 +147,7 @@ tailscale  configure              configure_tailscaled
 gh         eget-repo              cli/cli
 harper-ls  eget-repo              Automattic/harper
 uv         companions             uvx
+uv         configure              configure_uv_python
 neovim     update-source          neovim/neovim
 neovim     relative-binary        bin/nvim
 neovim     ownership-roots        $HOME/.local/bin|$HOME/.local/nvim|$HOME/.local/.dotfiles-neovim-rollback
