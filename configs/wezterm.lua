@@ -14,7 +14,7 @@ local config = wezterm.config_builder()
 -- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
 -- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
 -- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
-local CONFIG_REVISION = '99bf3e36eeca'
+local CONFIG_REVISION = 'ab4ac2c0e951'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -165,28 +165,28 @@ config.keys = {
   -- Top-level tabs: usually one per SSH machine, rarely more than a few, so
   -- one key cycles them (with two, it toggles). Alt is tmux's.
   {
-    key = 'a',
+    key = 'a', -- Next WezTerm tab (with two, toggles)
     mods = 'CTRL|SHIFT',
     action = act.ActivateTabRelative(1),
   },
   {
-    key = 'PageUp',
+    key = 'PageUp', -- Move the tab left
     mods = 'CTRL|SHIFT',
     action = act.MoveTabRelative(-1),
   },
   {
-    key = 'PageDown',
+    key = 'PageDown', -- Move the tab right
     mods = 'CTRL|SHIFT',
     action = act.MoveTabRelative(1),
   },
   {
-    key = 't',
+    key = 't', -- New local PowerShell tab
     mods = 'CTRL|SHIFT',
     -- Always a local PowerShell tab, even from a tab opened on an SSH domain.
     action = act.SpawnTab 'DefaultDomain',
   },
   {
-    key = 'n',
+    key = 'n', -- New WezTerm window
     mods = 'CTRL|SHIFT',
     action = act.SpawnWindow,
   },
@@ -196,7 +196,7 @@ config.keys = {
   -- WezTerm selection made otherwise. With none, it goes to tmux, which copies
   -- its copy-mode selection or hands the key to Claude.
   {
-    key = 'Insert',
+    key = 'Insert', -- Copy key: copy a WezTerm selection; with none, on to tmux
     mods = 'CTRL',
     action = wezterm.action_callback(function(window, pane)
       if window:get_selection_text_for_pane(pane) ~= '' then
@@ -207,23 +207,23 @@ config.keys = {
     end),
   },
   {
-    key = 'Insert',
+    key = 'Insert', -- Paste key: paste the Windows clipboard
     mods = 'SHIFT',
     action = act.PasteFrom 'Clipboard',
   },
   {
-    key = 'c',
+    key = 'c', -- Copy to the Windows clipboard
     mods = 'CTRL|SHIFT',
     action = act.CopyTo 'Clipboard',
   },
   {
-    key = 'v',
+    key = 'v', -- Paste the Windows clipboard
     mods = 'CTRL|SHIFT',
     action = act.PasteFrom 'Clipboard',
   },
   -- Clipboard image -> upload to the tab's SSH host -> paste its remote path.
   {
-    key = 'v',
+    key = 'v', -- Image key: upload the Windows clipboard image to the SSH host and paste its path
     mods = 'CTRL|ALT',
     action = wezterm.action_callback(paste_clipboard_image),
   },
@@ -231,7 +231,7 @@ config.keys = {
   -- Ctrl+Shift+S as an extended key (xterm modifyOtherKeys), so it reaches
   -- applications apart from Ctrl+S: the compose pane stages a prompt with it.
   {
-    key = 's',
+    key = 's', -- Send Ctrl+Shift+S apart from Ctrl+S (compose stages a prompt with it)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;83~',
   },
@@ -240,43 +240,43 @@ config.keys = {
   -- Ctrl+Shift+F: under tmux it sees only the screen, and review searches the
   -- whole conversation.
   {
-    key = 'e',
+    key = 'e', -- Send Ctrl+Shift+E apart from Ctrl+E (review selects to the previous prompt)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;69~',
   },
   {
-    key = 'd',
+    key = 'd', -- Send Ctrl+Shift+D apart from Ctrl+D (review selects to the next prompt)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;68~',
   },
   {
-    key = 'f',
+    key = 'f', -- Send Ctrl+Shift+F apart from Ctrl+F (review selects a word right)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;70~',
   },
   -- Ctrl+Shift+Tab likewise, for the program in the pane (OpenCode's previous
   -- session tab), not WezTerm's tabs.
   {
-    key = 'Tab',
+    key = 'Tab', -- Send Ctrl+Shift+Tab to the program (OpenCode's previous session tab)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[27;6;9~',
   },
 
   -- Shift + Copy: tmux copies the agent's last reply (prefix+y).
   {
-    key = 'Insert',
+    key = 'Insert', -- Shift+Copy: on to tmux, which copies the agent's last reply
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[2;6~',
   },
 
   -- Alt + the keyboard's physical Copy/Paste macros belongs to tmux.
   {
-    key = 'Insert',
+    key = 'Insert', -- Alt+Copy: on to tmux, which enters copy mode or copies the selection
     mods = 'CTRL|ALT',
     action = act.SendString '\x1b[2;7~',
   },
   {
-    key = 'Insert',
+    key = 'Insert', -- Alt+Paste: on to tmux, which pastes its buffer
     mods = 'ALT|SHIFT',
     action = act.SendString '\x1b[2;4~',
   },
@@ -284,22 +284,22 @@ config.keys = {
   -- Shift-cut transport. Bash/zsh map these virtual F13-F16 sequences to
   -- word/line cuts that publish the removed text to the tmux buffer.
   {
-    key = 'Backspace',
+    key = 'Backspace', -- Cut the word before the cursor into the tmux buffer (as Shift+F1)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[1;2P',
   },
   {
-    key = 'Delete',
+    key = 'Delete', -- Cut the word after the cursor into the tmux buffer (as Shift+F2)
     mods = 'CTRL|SHIFT',
     action = act.SendString '\x1b[1;2Q',
   },
   {
-    key = 'Backspace',
+    key = 'Backspace', -- Cut to the start of the line into the tmux buffer (as Shift+F3)
     mods = 'ALT|SHIFT',
     action = act.SendString '\x1b[1;2R',
   },
   {
-    key = 'Delete',
+    key = 'Delete', -- Cut to the end of the line into the tmux buffer (as Shift+F4)
     mods = 'ALT|SHIFT',
     action = act.SendString '\x1b[1;2S',
   },
@@ -310,29 +310,29 @@ config.keys = {
   -- searches (Shift+F7); Pause, the Break key, stops whatever runs (Shift+F9).
   -- Shift+F keys, clear of the Shift+F1-F4 cut transport above.
   {
-    key = 'raw:145',
+    key = 'raw:145', -- ScrollLock: review the pane (Shift+F5 to tmux)
     mods = 'NONE',
     action = act.SendString '\x1b[15;2~',
   },
   {
-    key = 'raw:145',
+    key = 'raw:145', -- Shift+ScrollLock: review and search upward (Shift+F7 to tmux)
     mods = 'SHIFT',
     action = act.SendString '\x1b[18;2~',
   },
   {
-    key = 'raw:19',
+    key = 'raw:19', -- Break (Pause): stop whatever runs (Shift+F9 to tmux)
     mods = 'NONE',
     action = act.SendString '\x1b[20;2~',
   },
 
   -- Client utilities: the command palette, fullscreen and font size.
   {
-    key = 'p',
+    key = 'p', -- WezTerm command palette
     mods = 'CTRL|SHIFT',
     action = act.ActivateCommandPalette,
   },
   {
-    key = 'F11',
+    key = 'F11', -- Fullscreen (keyboards with F11)
     mods = 'NONE',
     action = act.ToggleFullScreen,
   },
@@ -340,22 +340,22 @@ config.keys = {
   -- Ctrl+- and Ctrl+0 reach the programs. Physical keys, so Shift keeps the
   -- digit and the punctuation from turning into ) _ +.
   {
-    key = 'Enter',
+    key = 'Enter', -- Fullscreen (F11 on other keyboards)
     mods = 'CTRL|SHIFT',
     action = act.ToggleFullScreen,
   },
   {
-    key = 'phys:Equal',
+    key = 'phys:Equal', -- Font size up
     mods = 'CTRL|SHIFT',
     action = act.IncreaseFontSize,
   },
   {
-    key = 'phys:Minus',
+    key = 'phys:Minus', -- Font size down
     mods = 'CTRL|SHIFT',
     action = act.DecreaseFontSize,
   },
   {
-    key = 'phys:0',
+    key = 'phys:0', -- Font size back to the default
     mods = 'CTRL|SHIFT',
     action = act.ResetFontSize,
   },

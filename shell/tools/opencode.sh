@@ -41,6 +41,6 @@ unset _OPENCODE_BIN
 
 # V2 also accepts `opencode --continue` for interactive continuation.
 # OPENCODE_FLAGS must be valid for the invoked interface; model flags belong to run/mini.
-alias oc='opencode'                    # Launch the TUI (new session)
-alias ocr='opencode run'               # One-off prompt (non-interactive)
-alias ocrc='opencode run --continue'   # One-off prompt, continuing the last session
+alias oc='opencode'                   # Launch the OpenCode TUI (new session)
+alias ocr='opencode run'              # Run a one-off OpenCode prompt
+alias ocrc='opencode run --continue'  # One-off OpenCode prompt, continuing the last session

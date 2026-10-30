@@ -3,19 +3,19 @@
 
 # Neovim as default editor with escape hatches
 if command -v nvim >/dev/null 2>&1; then
-    alias vim='nvim'
-    alias vi='nvim'
-    command -v vim >/dev/null 2>&1 && alias vimvim='command vim'
-    command -v vi >/dev/null 2>&1 && alias vivim='command vi'
+    alias vim='nvim'  # Neovim
+    alias vi='nvim'   # Neovim
+    command -v vim >/dev/null 2>&1 && alias vimvim='command vim'  # The real vim, not nvim
+    command -v vi >/dev/null 2>&1 && alias vivim='command vi'     # The real vi, not nvim
 fi
 
 # Quick edit common files
-alias vimrc='nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"'
+alias vimrc='nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"'  # Edit neovim config
 
 # Quick plugin management
-alias vplug='nvim +PlugInstall +qall'
-alias vplugup='nvim +PlugUpdate +qall'
-alias vplugclean='nvim +PlugClean +qall'
+alias vplug='nvim +PlugInstall +qall'     # Install vim plugins
+alias vplugup='nvim +PlugUpdate +qall'    # Update vim plugins
+alias vplugclean='nvim +PlugClean +qall'  # Remove vim plugins no longer declared
 
 # Launch vim with specific config
 vim-with() {

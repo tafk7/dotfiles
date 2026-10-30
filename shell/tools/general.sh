@@ -3,10 +3,10 @@
 
 # Modern CLI tool aliases
 if command -v eza >/dev/null 2>&1; then
-    alias ll='eza -l --color=auto --group-directories-first --time-style=long-iso'
-    alias la='eza -la --color=auto --group-directories-first --time-style=long-iso'
-    alias l='eza -CF --color=auto --group-directories-first'
-    alias tree='eza --tree --color=auto --group-directories-first'
+    alias ll='eza -l --color=auto --group-directories-first --time-style=long-iso'  # Long listing with timestamps
+    alias la='eza -la --color=auto --group-directories-first --time-style=long-iso'  # Long listing including hidden files
+    alias l='eza -CF --color=auto --group-directories-first'  # Compact column listing
+    alias tree='eza --tree --color=auto --group-directories-first'  # Recursive directory tree
 else
     alias ll='ls -alF --color=auto'
     alias la='ls -A --color=auto'
@@ -14,48 +14,48 @@ else
     command -v tree >/dev/null 2>&1 && alias tree='tree -C'
 fi
 
-alias ls='ls --color=auto'
+alias ls='ls --color=auto'  # List with colors
 
 # File viewer
-command -v bat &>/dev/null && alias view='bat'
+command -v bat &>/dev/null && alias view='bat'  # Syntax-highlighted file viewer (bat)
 
 # Directory navigation. `.. N` goes up N directories (default 1).
 unalias .. 2>/dev/null
-..() {
+..() {  # Go up N directories (default 1)
     local n="${1:-1}" dir=..
     [[ "$n" =~ ^[1-9][0-9]*$ ]] || { printf 'usage: .. [N]\n' >&2; return 2; }
     while (( --n > 0 )); do dir+=/..; done
     cd -- "$dir" || return
 }
-alias ...='cd ../..'
-alias -- -='cd -'
+alias ...='cd ../..'  # Go up two directories
+alias -- -='cd -'     # Return to previous directory
 
 # Grep with color
-alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
+alias grep='grep --color=auto'    # grep in color
+alias fgrep='fgrep --color=auto'  # fgrep in color
+alias egrep='egrep --color=auto'  # egrep in color
 
 # System information
-alias df='df -h'
-alias du='du -h'
-alias free='free -h'
+alias df='df -h'      # Disk space (human readable)
+alias du='du -h'      # Directory size (human readable)
+alias free='free -h'  # Memory usage (human readable)
 
 # Network
-alias ports='ss -tulanp'
-myip() {
+alias ports='ss -tulanp'  # List open network ports
+myip() {  # Show public IP address
     curl --fail --silent --show-error --max-time 10 --proto '=https' \
         https://ifconfig.me/ip
     printf '\n'
 }
-alias localip='hostname -I'
+alias localip='hostname -I'  # Show local network IP
 
 # File viewing and editing
-alias nano='nano -w'
-alias less='less -R'
+alias nano='nano -w'  # nano without hard-wrapping long lines
+alias less='less -R'  # less that shows colors
 
 # Print canonical paths. With no arguments, resolve the current directory;
 # otherwise resolve every supplied path.
-p() {
+p() {  # Print the canonical current directory, or resolve the paths given
     if (( $# == 0 )); then
         pwd -P
     else
@@ -106,18 +106,18 @@ yo() (
 )
 
 # Process management
-alias killall='killall -v'
+alias killall='killall -v'  # killall that names what it signals
 
 # Disk usage
-alias du1='du -h --max-depth=1'
-alias ducks='du -cks * | sort -rn | head'
+alias du1='du -h --max-depth=1'            # Directory size one level deep
+alias ducks='du -cks * | sort -rn | head'  # Show largest items in current directory
 
 # History
-alias h='history'
-alias hgrep='history | grep'
+alias h='history'             # Show command history
+alias hgrep='history | grep'  # Search command history
 
-# Disable terminal mouse-reporting modes that may be left enabled when an SSH
-# connection or mouse-aware TUI exits without cleaning up. Safe to run manually
+# Reset stale terminal mouse-reporting modes: an SSH connection or mouse-aware
+# TUI that exits without cleaning up can leave them on. Safe to run by hand
 # when pointer movement or scrolling prints escape-sequence garbage.
 fixmouse() {
     printf '\033[?9l\033[?1000l\033[?1001l\033[?1002l\033[?1003l\033[?1005l\033[?1006l\033[?1007l\033[?1015l'
@@ -135,7 +135,7 @@ _tafk_tmux_buffer_set() {
 # variables and anything defined by hand are lost; refuses while jobs exist.
 # `reload --soft` re-sources the startup files in place instead: it adds and
 # changes definitions but cannot remove them.
-reload() {
+reload() {  # Restart the shell in place with fresh config (--soft re-sources instead)
     local shell_path
     case "${1:-}" in
         --soft)
@@ -176,14 +176,14 @@ reload() {
 }
 
 if [[ -n "$ZSH_VERSION" ]]; then
-    alias zshrc='nvim ~/.zshrc'
+    alias zshrc='nvim ~/.zshrc'    # Edit ~/.zshrc
 elif [[ -n "$BASH_VERSION" ]]; then
-    alias bashrc='nvim ~/.bashrc'
+    alias bashrc='nvim ~/.bashrc'  # Edit ~/.bashrc
 fi
 
 # Theme management
-alias theme='$DOTFILES_DIR/bin/theme-switcher'
-alias themes='$DOTFILES_DIR/bin/theme-switcher --list'
+alias theme='$DOTFILES_DIR/bin/theme-switcher'          # Set the global theme / interactive picker
+alias themes='$DOTFILES_DIR/bin/theme-switcher --list'  # List available themes
 
 # btop's built-in TTY theme draws with ANSI colors, which tmux maps to the
 # window's theme. Launch with a copy of the user's config that selects it, so
@@ -202,16 +202,16 @@ btop() {
 }
 
 # Find and replace utility
-alias fr='$DOTFILES_DIR/bin/replace'
+alias fr='$DOTFILES_DIR/bin/replace'  # Find and replace text across files
 
 # Cheatsheet for keybindings
-alias cheat='$DOTFILES_DIR/bin/cheatsheet'
+alias cheat='$DOTFILES_DIR/bin/cheatsheet'  # Show this interactive cheatsheet
 
 # direnv shortcuts
 if command -v direnv >/dev/null 2>&1; then
-    alias da='direnv allow'
-    alias de='${EDITOR:-nvim} .envrc'
+    alias da='direnv allow'            # Allow direnv in current directory
+    alias de='${EDITOR:-nvim} .envrc'  # Edit .envrc for current directory
 fi
 
 # btop as top replacement
-command -v btop >/dev/null 2>&1 && alias top='btop'
+command -v btop >/dev/null 2>&1 && alias top='btop'  # System monitor (btop)

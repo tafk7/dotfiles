@@ -18,10 +18,17 @@ GIT_ALIAS = re.compile(r'^\s*([\w-]+)\s*=\s*(.+)$')
 
 
 def first_sentence(text, cap=110):
-    """The first sentence of TEXT, or its first CAP characters."""
+    """The first sentence of TEXT (a semicolon in parentheses doesn't end it), or its
+    first CAP characters."""
     text = ' '.join(text.split())
-    m = re.match(r'(.+?[.;])(\s|$)', text)
-    out = (m.group(1) if m else text).rstrip('.;:')
+    depth, end = 0, len(text)
+    for i, c in enumerate(text):
+        depth += (c in '([') - (c in ')]')
+        after = text[i + 2:i + 3]
+        if c in '.;' and depth <= 0 and (i + 1 == len(text) or text[i + 1] == ' ' and (c == ';' or not after.islower())):
+            end = i
+            break
+    out = text[:end].rstrip('.;:')
     return out if len(out) <= cap else out[:cap - 1].rstrip() + '…'
 
 

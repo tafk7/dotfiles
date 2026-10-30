@@ -2,16 +2,16 @@
 # Tmux — aliases and functions
 
 # Session management
-alias tm='tmux new -s'
-alias ta='tmux attach -t'
-alias tl='tmux list-sessions'
-alias tk='tmux kill-session -t'
+alias tm='tmux new -s'           # Create new named tmux session
+alias ta='tmux attach -t'        # Attach to existing tmux session
+alias tl='tmux list-sessions'    # List all tmux sessions
+alias tk='tmux kill-session -t'  # Kill specific tmux session
 
 # Tmux resume: outside tmux, attach to the most recently used session (tmux
 # prefers an unattached one). Inside tmux, switch to the last session. Preserve
 # the standard `tr` utility whenever arguments are supplied.
 unalias tr 2>/dev/null
-tr() {
+tr() {  # Resume the most recently used tmux session (no args; inside tmux, the last session)
     if (( $# > 0 )); then
         command tr "$@"
     elif [[ -n "${TMUX:-}" ]]; then
@@ -21,7 +21,7 @@ tr() {
     fi
 }
 
-# Pane tinting — a subtler background from the window's theme for this pane
+# Tint this tmux pane's background: a subtler shade of the window's theme
 pane-tint() {
     if [[ -z "${TMUX:-}" ]]; then
         echo "Not in a tmux session"

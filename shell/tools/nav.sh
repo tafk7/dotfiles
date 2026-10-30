@@ -61,7 +61,7 @@ show_path() {
     echo "$PATH" | tr ':' '\n'
 }
 
-# Markdown viewer — paged through less when interactive, rendered when piped
+# Render Markdown in the terminal (paged when interactive)
 md() {
     if ! command -v glow >/dev/null 2>&1; then
         cat "$@"

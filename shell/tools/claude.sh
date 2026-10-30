@@ -47,12 +47,12 @@ fi
 alias clean-claude-snapshots='rm -rf ~/.claude/shell-snapshots/ ~/.zcompdump* && echo "Cleaned Claude snapshots and zsh cache"'
 
 # Claude CLI shortcuts
-alias cl='claude'                # New session
-alias clc='claude --continue'    # Continue last session
-alias clp='claude --print'       # One-off command (non-interactive)
-alias cla='claude agents'        # Agent view: background sessions
+alias cl='claude'              # Start a new Claude session
+alias clc='claude --continue'  # Continue the last Claude session
+alias clp='claude --print'     # Run a one-off Claude prompt
+alias cla='claude agents'      # Claude agent view: background sessions
 
 # Claude local-only (no global settings)
-alias cll='claude --setting-sources project,local'
-alias cllc='claude --setting-sources project,local --continue'
-alias cllp='claude --setting-sources project,local --print'
+alias cll='claude --setting-sources project,local'  # Claude with project and local settings only (no global ones)
+alias cllc='claude --setting-sources project,local --continue'  # Continue a Claude session with project and local settings only
+alias cllp='claude --setting-sources project,local --print'  # One-off Claude prompt with project and local settings only

@@ -1,0 +1,508 @@
+# What keys shows that no config states (bin/keys, issues/keys-tool.md §2.3).
+#
+# Most descriptions live next to what they describe: a tmux binding's bind -N, a
+# trailing comment on an alias or a WezTerm key, a Neovim map's desc, a script's
+# header. This file holds the rest, keyed by entry id (keys ls --tsv lists them):
+#
+#   [note."ID"]     summary for an entry; also = [more ids with the same words]
+#   [group.NAME]    match = an id glob; its entries show as one row, label and summary
+#   [tip.NAME]      something no config binds: label, layer, summary, and an anchor,
+#                   [file, literal], that keys check finds in the file (kind = command
+#                   for a subcommand)
+#   [hide]          ids = entries keys leaves out
+#
+# keys check fails when a note, group or hide matches no entry, or a tip's anchor is
+# gone from its file: the drift a hand-written list could never catch.
+
+# --- Groups --------------------------------------------------------------------------------------
+[group.window-n]
+match = "tmux:alt+[0-9]"
+label = "Alt+1…0"
+summary = "Jump to window 1-9; Alt+0 is window 10"
+
+# --- Line editing in the shells (entry/bash.sh, entry/zsh.sh) --------------------------------------
+[note."shell:ctrl+backspace"]
+summary = "Delete from the cursor back through the previous word"
+also = ["shell:ctrl+h"]
+
+[note."shell:ctrl+delete"]
+summary = "Delete from the cursor through the next word"
+
+[note."shell:ctrl+z"]
+summary = "Undo; never suspends (the terminal's suspend key is off; prefix Ctrl+Z suspends)"
+
+[note."shell:alt+backspace"]
+summary = "Delete from the cursor to the start of the line"
+also = ["shell:ctrl+alt+backspace", "shell:ctrl+alt+h"]
+
+[note."shell:alt+delete"]
+summary = "Delete from the cursor to the end of the line"
+
+[note."shell:shift+f1"]
+summary = "Ctrl+Shift+Backspace (WezTerm sends Shift+F1): cut the previous word into the tmux buffer"
+
+[note."shell:shift+f2"]
+summary = "Ctrl+Shift+Delete (WezTerm sends Shift+F2): cut the next word into the tmux buffer"
+
+[note."shell:shift+f3"]
+summary = "Alt+Shift+Backspace (WezTerm sends Shift+F3): cut to the start of the line into the tmux buffer"
+
+[note."shell:shift+f4"]
+summary = "Alt+Shift+Delete (WezTerm sends Shift+F4): cut to the end of the line into the tmux buffer"
+
+[note."shell:alt+i"]
+summary = "Turn the request typed at the prompt into a command (never run); again: correct it at refine>"
+
+[note."shell:alt+shift+i"]
+summary = "Start a new AI command conversation; the next Alt+I takes the line as a new request"
+
+[note."zsh:shift+tab"]
+summary = "Spell-correct the word at the cursor"
+
+[note."zsh:ctrl+x ctrl+e"]
+summary = "Edit the command line in $EDITOR"
+
+[note."zsh:ctrl+left"]
+summary = "Back a word"
+
+[note."zsh:ctrl+right"]
+summary = "Forward a word"
+
+# --- fzf (shell/fzf.sh) ------------------------------------------------------------------------------
+[note."fzf:ctrl+/"]
+summary = "Move the preview: below, hidden, beside"
+
+[note."fzf:ctrl+p"]
+summary = "Show or hide the preview"
+
+[note."fzf:ctrl+backspace"]
+summary = "Delete the word before the cursor, as in the shells"
+
+[note."fzf:ctrl+delete"]
+summary = "Delete the word after the cursor, as in the shells"
+
+[note."fzf:ctrl+right"]
+summary = "Forward a word"
+
+[note."fzf:ctrl+s"]
+summary = "fgl: sort by date or by match"
+
+[note."fzf:ctrl+m"]
+summary = "fgl: show the commit in the pager"
+
+[note."fzf:ctrl+v"]
+summary = "frg: open the match in VS Code"
+
+# --- Neovim (configs/init.vim; leader is comma) --------------------------------------------------
+[note."nvim:ctrl+p@n"]
+summary = "Fuzzy find files"
+
+[note."nvim:, f@n"]
+summary = "Fuzzy find files (same as Ctrl+P)"
+
+[note."nvim:, b@n"]
+summary = "Fuzzy switch open buffers"
+
+[note."nvim:, g@n"]
+summary = "Ripgrep search across the project"
+
+[note."nvim:, g s@n"]
+summary = "Git status split (Fugitive)"
+
+[note."nvim:, g d@n"]
+summary = "Side-by-side diff of the current file"
+
+[note."nvim:, g c@n"]
+summary = "Git commit editor"
+
+[note."nvim:, g b@n"]
+summary = "Git blame annotations"
+
+[note."nvim:, h n@n"]
+summary = "Jump to the next git hunk"
+
+[note."nvim:, h p@n"]
+summary = "Jump to the previous git hunk"
+
+[note."nvim:, h s@n"]
+summary = "Stage the git hunk under the cursor"
+
+[note."nvim:, h u@n"]
+summary = "Undo the git hunk under the cursor"
+
+[note."nvim:j k@i"]
+summary = "Leave insert mode"
+
+[note."nvim:alt+backspace@i"]
+summary = "Insert and command line: delete to the start of the line, as in the shells"
+
+[note."nvim:alt+delete@i"]
+summary = "Insert and command line: delete to the end of the line, as in the shells"
+
+[note."nvim:ctrl+backspace@i"]
+summary = "Insert mode: delete a word back, as in the shells and agents"
+also = ["nvim:ctrl+h@i"]
+
+[note."nvim:ctrl+delete@i"]
+summary = "Insert mode: delete a word forward, as in the shells and agents"
+
+[note."nvim:shift+pageup@n"]
+summary = "Scroll a few lines up (tmux @scroll-lines, default 3), as in tmux and review"
+also = ["nvim:shift+pageup@x"]
+
+[note."nvim:shift+pagedown@n"]
+summary = "Scroll a few lines down (tmux @scroll-lines, default 3), as in tmux and review"
+also = ["nvim:shift+pagedown@x"]
+
+[note."nvim:ctrl+z@n"]
+summary = "Undo, in normal mode as in insert and visual (visual leaves the selection)"
+also = ["nvim:ctrl+z@i", "nvim:ctrl+z@x"]
+
+[note."nvim:, /@n"]
+summary = "Comment or uncomment the line or selection"
+also = ["nvim:, /@x"]
+
+[note."nvim:, w@n"]
+summary = "Force-save the file"
+
+[note."nvim:, q@n"]
+summary = "Close the current window"
+
+[note."nvim:, Q@n"]
+summary = "Quit all windows, unsaved changes lost"
+
+[note."nvim:, n@n"]
+summary = "Line numbers on or off"
+
+[note."nvim:, s s@n"]
+summary = "Strip trailing whitespace from the file"
+
+[note."nvim:space@n"]
+summary = "Clear search highlighting"
+
+[note."nvim:ctrl+e@n"]
+summary = "Move to the split above (as tmux's Alt+E)"
+
+[note."nvim:ctrl+s@n"]
+summary = "Move to the split left (as tmux's Alt+S)"
+
+[note."nvim:ctrl+d@n"]
+summary = "Move to the split below (as tmux's Alt+D)"
+
+[note."nvim:ctrl+f@n"]
+summary = "Move to the split right (as tmux's Alt+F)"
+
+[note."nvim:c s@n"]
+summary = "Change surrounding quotes or brackets: cs\"' turns \" into '"
+
+[note."nvim:d s@n"]
+summary = "Delete surrounding quotes or brackets: ds\""
+
+[note."nvim:y s@n"]
+summary = "Surround a motion: ysiw\" wraps the word in quotes"
+
+# --- tmux copy mode keys tmux sets itself, used in review ----------------------------------------------
+[note."tmux-copy:pageup"]
+summary = "Review: page up"
+
+[note."tmux-copy:pagedown"]
+summary = "Review: page down"
+
+[note."tmux-copy:n"]
+summary = "Review: next search result (in the search's direction)"
+
+[note."tmux-copy:shift+n"]
+summary = "Review: previous search result"
+
+# --- The agents' keys we bind or lean on ---------------------------------------------------------------
+[note."claude:alt+m@Chat"]
+summary = "Pick a model (Alt+P unbound)"
+
+[note."claude:ctrl+pageup@Chat"]
+summary = "More effort (Shift+Up unbound)"
+
+[note."claude:ctrl+pagedown@Chat"]
+summary = "Less effort (Shift+Down unbound)"
+
+[note."codex:ctrl+g@global"]
+summary = "Open the composer in the external editor (compose pulls the box in)"
+
+[note."codex:f7@chat"]
+summary = "Next permission mode (Read Only, Ask, Approve for me; never Full Access); Alt+Shift+K and L press it"
+
+[note."codex:ctrl+pageup@chat"]
+summary = "More reasoning effort"
+
+[note."codex:ctrl+pagedown@chat"]
+summary = "Less reasoning effort"
+
+[note."codex:ctrl+backspace@editor"]
+summary = "Delete the word before the cursor, as in the shell (Ctrl+H is the same key in tmux)"
+also = ["codex:ctrl+h@editor"]
+
+[note."codex:ctrl+delete@editor"]
+summary = "Delete the word after the cursor, as in the shell"
+
+[note."codex:alt+backspace@editor"]
+summary = "Delete to the start of the line, as in the shell"
+
+[note."codex:alt+delete@editor"]
+summary = "Delete to the end of the line, as in the shell"
+
+[note."codex:backspace@editor"]
+summary = "Delete the character before the cursor (Ctrl+H no longer does)"
+
+[note."opencode:ctrl+home"]
+summary = "First message of the session"
+
+[note."opencode:ctrl+end"]
+summary = "Last message of the session"
+
+[note."opencode:home"]
+summary = "Start of the prompt line (not the session's first message)"
+
+[note."opencode:end"]
+summary = "End of the prompt line (not the session's last message)"
+
+[note."opencode:ctrl+tab"]
+summary = "Next session tab; Ctrl+Shift+Tab is the previous (Alt+Up belongs to tmux)"
+
+[note."opencode:alt+m"]
+summary = "Model list"
+
+[note."opencode:ctrl+pageup"]
+summary = "Cycle the model's effort variants"
+also = ["opencode:ctrl+pagedown"]
+
+[note."opencode:ctrl+z"]
+summary = "Undo typing (instead of suspending)"
+
+[note."opencode:ctrl+up"]
+summary = "Previous prompt you sent"
+
+[note."opencode:ctrl+down"]
+summary = "Next prompt you sent"
+
+[note."opencode:ctrl+c"]
+summary = "Clear the prompt; never exits (Ctrl+D or Ctrl+X Q do)"
+
+[note."pi:alt+m@app.model"]
+summary = "Pick a model"
+
+[note."pi:ctrl+pageup@app.thinking"]
+summary = "Cycle the thinking level"
+also = ["pi:ctrl+pagedown@app.thinking"]
+
+[note."pi:ctrl+z@tui.editor"]
+summary = "Undo typing (instead of suspending)"
+
+[note."pi:alt+z@app.session"]
+summary = "Session tree, to go back to an earlier turn"
+
+[note."pi:shift+pageup@tui.altScreen"]
+summary = "Scroll a line up (tmux presses it @scroll-lines times)"
+
+[note."pi:shift+pagedown@tui.altScreen"]
+summary = "Scroll a line down (tmux presses it @scroll-lines times)"
+
+[note."fn:pi"]
+summary = "Start a new pi session ($PI_FLAGS added)"
+
+[note."fn:claude"]
+summary = "Claude Code, with $CLAUDE_FLAGS added"
+
+[note."fn:codex"]
+summary = "Codex, with $CODEX_FLAGS and the default profile added"
+
+[note."fn:opencode"]
+summary = "OpenCode, with $OPENCODE_FLAGS added"
+
+# --- Tips: what no config binds ------------------------------------------------------------------
+[tip.compose-editor-key]
+label = "Ctrl+G / Ctrl+X E"
+layer = "tmux"
+apps = ["claude", "codex", "opencode"]
+summary = "In Claude and Codex Ctrl+G, in OpenCode Ctrl+X E: move the prompt box into the compose pane, opening it if needed"
+expands = "$VISUAL is bin/compose-editor, which runs tmux-compose editor"
+anchor = ["bin/compose-editor", "tmux-compose"]
+
+[tip.compose-return]
+label = ":q / :wq / :cq"
+layer = "nvim"
+apps = ["nvim", "claude", "codex", "opencode"]
+summary = "In compose on an agent: put the draft back in the agent's prompt box / keep it in the draft"
+expands = "tmux-compose return, through the agent's editor key"
+anchor = ["bin/tmux-compose", "tmux-compose return"]
+
+[tip.compose-send]
+label = "Ctrl+S"
+layer = "nvim"
+summary = "In compose: paste the draft into the agent and submit it without interrupting (shells: paste only)"
+expands = "Claude, OpenCode Ctrl+X Enter; Codex Tab"
+anchor = ["configs/nvim/lua/dotfiles/prose.lua", "deliver('send')"]
+
+[tip.compose-stage]
+label = "Ctrl+Shift+S / ,s"
+layer = "nvim"
+summary = "In compose: paste the draft into the agent without submitting"
+expands = "bin/tmux-compose stage"
+anchor = ["configs/nvim/lua/dotfiles/prose.lua", "deliver('stage')"]
+
+[tip.compose-scroll]
+label = "PgUp / PgDn / Ctrl+Home / Ctrl+End"
+layer = "nvim"
+summary = "In compose: scroll the agent's conversation from the compose pane"
+expands = "bin/tmux-compose forward"
+anchor = ["configs/nvim/lua/dotfiles/prose.lua", "forward('PPage')"]
+
+[tip.compose-fix-spelling]
+label = "Ctrl+L"
+layer = "nvim"
+summary = "In compose, insert mode: fix the last spelling or grammar mark before the cursor"
+expands = "Harper's suggestion, else Vim's first spelling suggestion"
+anchor = ["configs/nvim/lua/dotfiles/prose.lua", "fix_last()"]
+
+[tip.vim-comment-motion]
+label = "gc"
+layer = "nvim"
+summary = "Comment out a motion: gcap a paragraph, gcc a line (vim-commentary)"
+anchor = ["configs/init.vim", "vim-commentary"]
+
+[tip.vim-theme]
+label = ":Theme"
+layer = "nvim"
+summary = "Pin this editor to a theme (follow = the window's theme)"
+expands = ":Theme <name|follow>"
+anchor = ["configs/init.vim", "Theme call dotfiles#theme#set"]
+
+[tip.wezterm-select]
+label = "Shift+drag"
+layer = "wezterm"
+summary = "Select natively in WezTerm, past tmux"
+anchor = ["configs/tmux.conf", "Shift+drag"]
+
+[tip.opencode-ctrl-r]
+label = "Ctrl+R"
+layer = "opencode"
+summary = "Unbound, where the other agents search history (rename is in Ctrl+P)"
+expands = "cli.json keybinds session.rename none"
+anchor = ["configs/opencode-cli.defaults.json", "\"session.rename\": \"none\""]
+
+[tip.theme-window]
+label = "theme -w"
+kind = "command"
+summary = "Theme only this tmux window, or pick one"
+expands = "theme -w [name]"
+anchor = ["bin/theme-switcher", "-w|--window"]
+
+[tip.theme-window-clear]
+label = "theme -w clear"
+kind = "command"
+summary = "Make this window follow the global theme again"
+expands = "theme -w clear"
+anchor = ["bin/theme-switcher", "-w|--window"]
+
+[tip.theme-current]
+label = "theme --current"
+kind = "command"
+summary = "Show the global, window, and Neovim themes"
+anchor = ["bin/theme-switcher", "--current|-c"]
+
+[tip.theme-nvim]
+label = "theme --nvim"
+kind = "command"
+summary = "Pin new Neovim instances to a theme (follow = the window's theme)"
+expands = "theme --nvim [name|follow]"
+anchor = ["bin/theme-switcher", "--nvim)"]
+
+[tip.dotfiles-update]
+label = "dotfiles update"
+kind = "command"
+summary = "Pull upstream, apply the machine profile, refresh, then verify"
+expands = "dotfiles update [--dry-run] [--upgrade]"
+anchor = ["bin/dotfiles", "  update  "]
+
+[tip.dotfiles-apply]
+label = "dotfiles apply"
+kind = "command"
+summary = "Bring this machine to the checkout and its profile, no pull"
+expands = "dotfiles apply [--dry-run] [--only X,Y] [--upgrade]"
+anchor = ["bin/dotfiles", "  apply  "]
+
+[tip.dotfiles-upgrade]
+label = "dotfiles upgrade"
+kind = "command"
+summary = "Update installed AI CLIs now, leaving the profile as it is (then keys defaults)"
+expands = "dotfiles upgrade claude|codex|opencode|pi [--dry-run]"
+anchor = ["bin/dotfiles", "  upgrade CLI"]
+
+[tip.dotfiles-refresh]
+label = "dotfiles refresh"
+kind = "command"
+summary = "Bring tmux up to date with the disk; list what needs a restart"
+expands = "dotfiles refresh [-v]"
+anchor = ["bin/dotfiles", "  refresh  "]
+
+[tip.dotfiles-bump]
+label = "dotfiles bump"
+kind = "command"
+summary = "Move a pin in versions.lock to a checked release; never commits"
+expands = "dotfiles bump TOOL [VERSION]"
+anchor = ["bin/dotfiles", "  bump TOOL"]
+
+[tip.dotfiles-profile]
+label = "dotfiles profile"
+kind = "command"
+summary = "Show or change what dotfiles manages here"
+expands = "dotfiles profile [--add X|--remove X|--tier T|--propose]"
+anchor = ["bin/dotfiles", "  profile  "]
+
+[tip.dotfiles-verify]
+label = "dotfiles verify"
+kind = "command"
+summary = "Check this machine against the checkout and profile; changes nothing"
+expands = "dotfiles verify [-v] [--latest] [--tier T] [--all]"
+anchor = ["bin/dotfiles", "  verify  "]
+
+[tip.pip-editable]
+label = "pip install -e ."
+summary = "Install the package in editable (development) mode"
+tags = ["python"]
+
+[tip.uv-python-list]
+label = "uv python list"
+kind = "command"
+summary = "List installed and available Python versions"
+tags = ["python"]
+anchor = ["shell/tools/python.sh", "uv python list/install/pin"]
+
+[tip.uv-python-install]
+label = "uv python install"
+kind = "command"
+summary = "Install a Python version"
+expands = "uv python install <version>"
+tags = ["python"]
+anchor = ["shell/tools/python.sh", "uv python list/install/pin"]
+
+[tip.uv-python-pin]
+label = "uv python pin"
+kind = "command"
+summary = "Pin the Python version for the current project"
+expands = "uv python pin <version>"
+tags = ["python"]
+anchor = ["shell/tools/python.sh", "uv python list/install/pin"]
+
+[tip.uv-venv]
+label = "uv venv --python"
+kind = "command"
+summary = "Create a venv with a specific Python"
+expands = "uv venv --python <version>"
+tags = ["python"]
+anchor = ["shell/tools/python.sh", "`uv venv`"]
+
+[tip.graphviz-dot]
+label = "dot"
+kind = "command"
+summary = "Render a Graphviz DOT graph to an image"
+expands = "dot -Tpng input.dot -o output.png"
+tags = ["diagramming"]

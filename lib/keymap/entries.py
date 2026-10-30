@@ -18,10 +18,10 @@ NOTES = 'configs/keymap/notes.toml'
 KIND_ORDER = ['intent', 'chord', 'tip', 'alias', 'function', 'git-alias', 'command']
 LAYER_LABEL = {'tmux-prefix': 'tmux pfx', 'tmux-copy': 'copy', 'shell': 'bash', 'bin': 'command'}
 # Where each layer acts: an app id for the pane programs, all of them for the outer layers.
-OUTER = ('windows', 'wezterm', 'tmux', 'tmux-prefix')
+OUTER = ('windows', 'wezterm', 'tmux', 'tmux-prefix', 'tmux-mouse')
 LAYER_APP = {'tmux-copy': 'copy', 'zsh': 'shell', 'git': 'shell', 'bin': 'shell'}
 # What a reader's own note is called, for `via`.
-NOTE_VIA = {'tmux': 'tmux-N', 'tmux-prefix': 'tmux-N', 'tmux-copy': 'tmux-N', 'nvim': 'desc', 'opencode': 'desc',
+NOTE_VIA = {'tmux': 'tmux-N', 'tmux-prefix': 'tmux-N', 'tmux-copy': 'tmux-N', 'tmux-mouse': 'tmux-N', 'nvim': 'desc', 'opencode': 'desc',
             'pi': 'desc'}
 
 
@@ -98,7 +98,7 @@ def acts(r):
 
 
 def chord_id(layer, ch, ctx):
-    ctx = '' if layer in OUTER + ('tmux-copy', 'fzf', 'opencode', 'shell', 'zsh') else ctx
+    ctx = '' if layer in OUTER[:-1] + ('tmux-copy', 'fzf', 'opencode', 'shell', 'zsh') else ctx
     return f'{layer}:{ch}' + (f'@{ctx}' if ctx else '')
 
 
@@ -142,6 +142,8 @@ def from_bindings(bindings, data):
         if b.layer in ('windows', 'wezterm', 'tmux') and t:
             e.apps = {a: outcome(a, r, labels) for a, r in t.items()}
             e.scope = [a for a, r in t.items() if acts(r)] or list(t)
+        elif b.layer == 'tmux-mouse' and ctx == 'copy':
+            e.scope = ['copy']
         elif b.layer in OUTER:
             e.scope = list(route.APPS)
         else:
