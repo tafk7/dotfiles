@@ -51,6 +51,8 @@ def page_data(data, index, changes=None):
             x['scope'] = e['scope']
         if e['kind'] == 'intent':
             x['apps'] = e['apps']
+        if e['origin'] == 'stock' and e.get('via') == 'note':
+            x['noted'] = 1
         slim.append(x)
     out = dict(data, traces=None, routes=routes, routeTable=table, routeApps=list(next(iter(data['traces'].values()), {})),
                entries=slim, groups=index.get('groups', {}), changes=changes or {})

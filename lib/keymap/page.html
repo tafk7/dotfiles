@@ -879,7 +879,7 @@ table.names { border-collapse: collapse; width: 100%; min-width: 720px; font-siz
     if (!terms.length) return [];
     const out = [];
     E.forEach((e, i) => {
-      if (e.origin === 'stock' && !stock) return;
+      if (e.origin === 'stock' && !e.noted && !stock) return;
       if (!terms.every(t => hay[i].includes(t))) return;
       const label = e.label.toLowerCase(), joined = terms.join(' ');
       const rank = label === joined || e.key === joined ? 0 : label.startsWith(terms[0]) ? 1 :

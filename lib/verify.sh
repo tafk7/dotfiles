@@ -418,11 +418,11 @@ verify_environment() {
             outcome convergence "$section" delta "the Git config lacks the palette-based delta settings"
         fi
     fi
-    # The Python keymap runs on (lib/python.sh), where uv is installed to provide one.
+    # The Python keys runs on (lib/python.sh), where uv is installed to provide one.
     if verify_expects uv; then
         local python
         if python="$(dotfiles_python_find)"; then
-            outcome ok "$section" "Python $DOTFILES_PYTHON_MIN+" "$python, for keymap"
+            outcome ok "$section" "Python $DOTFILES_PYTHON_MIN+" "$python, for keys"
         else
             outcome convergence "$section" "Python $DOTFILES_PYTHON_MIN+" "none; setup installs one with uv (dotfiles apply)"
         fi

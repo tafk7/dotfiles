@@ -1,6 +1,7 @@
 # `keys`: one tool to remember, track and visualize key bindings
 
-**Status:** design, 2026-10-29; in progress on branch `keys`.
+**Status:** design, 2026-10-29; implemented on branch `keys` (phases 1–5, no quiz), not merged.
+Where the code differs from this design, and why: §9.
 
 **Core idea:** `keymap` already holds the truth: it parses every layer and traces every
 chord. `cheat` has the everyday UX: a fast fzf lookup that also covers aliases and
@@ -405,3 +406,57 @@ running on the generated TSV, so the switch is invisible.
 6. Should stock agent keys be searchable by default, or only behind Ctrl+T or `--stock`?
 7. Should `keys defaults` run from `ai-update` automatically?
 8. Is the quiz worth building, or are cards and changed markers enough?
+
+---
+
+## 9. As built (2026-10-30)
+
+The owner took every recommendation in §8's open questions: the name `keys`
+(`keymap` runs it; `alias cheat=keys` stays), Alt+? and prefix+? for the
+popup, a `bind -N` note on every tmux binding, system font stacks, `cheat
+tools` as `dotfiles tools`, stock agent keys behind Ctrl+T and `--stock`, a
+printed hint (not a run) after `dotfiles upgrade`, and no quiz.
+
+Where the code differs from the design:
+
+- **list-keys and notes.** No tmux tested (3.2a, 3.4, 3.8) prints a note in
+  plain `list-keys`, so `tmux_dump`'s regex is unchanged; notes come from
+  `list-keys -N -P '' -T TABLE`. Before 3.8 that leaves out mouse keys, so a
+  binding's `-N` is also read from `tmux.conf` itself.
+- **The popup.** `display-popup` expands no formats, so the binding is
+  `run-shell -b 'keys --popup PANE CLIENT'`, and keys asks tmux for the pane's
+  command, mode and directory before opening the popup (as `bin/tmux-review`
+  does).
+- **Hidden search fields.** fzf applies `--nth` after `--with-nth`, so it can't
+  search a field it doesn't show. App names, tags and expansions sit after 300
+  columns of padding instead (`--no-hscroll --ellipsis ''`).
+- **Reloads.** Scope and stock toggles reload from `index.tsv` through an awk
+  filter in bash (`keys _rows`), not Python's `keys ls --tsv`, which is the
+  scripting format with fixed columns. A background rebuild reloads a running
+  lookup through fzf's `--listen` socket (curl), and the first build of all is
+  the only one that blocks.
+- **WezTerm descriptions** are read from `wezterm.lua` by key and mods; the dump
+  is unchanged.
+- **The shells.** `entry/` files are protected and their trailing comments name
+  the key, not the action, so the line-editing wording is in `notes.toml`. A
+  zsh binding that does what bash's does on the same key is one entry, tagged
+  zsh.
+- **Neovim.** vimscript maps can't carry `desc`, so their wording is in
+  `notes.toml`. A map a plugin defines is stock. Notes on Neovim keys are
+  checked only where the plugins are installed: CI has none, and init.vim sets
+  those maps only for installed plugins.
+- **Mouse bindings** became entries (layer `tmux-mouse`) from their notes
+  rather than tips.
+- **Subcommands** come from a script header's usage lines
+  (`#   keys why CHORD   trace ...`); `bin/dotfiles`'s header has no
+  descriptions, so its subcommands are tips.
+- **A noted stock key** (the copy-mode keys review uses) shows by default.
+- **The baseline.** The first build becomes the seen baseline, so changes show
+  without a `keys seen` first.
+- **Alt+?** is Alt+Shift+/ on the keyboard. The keyboard model now presses a
+  shifted symbol with Shift when no key types it, and `keys free` counts a
+  chord taken when its typed form is bound.
+- **Counts.** The TSV had 344 rows, not 383 (its comments and headers made up
+  the rest); two were dropped (`,af` and `,an`, ALE maps init.vim no longer
+  has).
+

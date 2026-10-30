@@ -296,9 +296,9 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Exercise supported release without mutation
         run: su -s /bin/bash test -c "cd '$GITHUB_WORKSPACE' && bash tests/setup-safety.sh"
-      # 22.04's Python is 3.10; keymap needs 3.11+. Setup's step installs one
-      # with uv (pinned and checked against versions.lock), and keymap uses it.
-      - name: keymap on uv's Python where the system's is older
+      # 22.04's Python is 3.10; keys needs 3.11+. Setup's step installs one
+      # with uv (pinned and checked against versions.lock), and keys uses it.
+      - name: keys on uv's Python where the system's is older
         if: matrix.release == '22.04'
         shell: bash
         run: |

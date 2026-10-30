@@ -5,7 +5,7 @@ None of the four tools prints its defaults, so each is read from where it lives:
   codex     built_in_defaults() in codex-rs/tui/src/keymap.rs at the installed tag (fetched)
   opencode  the defaults table in the compiled binary
   pi        KeybindingsManager in the installed package (extract/pi.mjs, needs node)
-The saved files keep `keymap build` deterministic and runnable where the agents are not installed.
+The saved files keep `keys build` deterministic and runnable where the agents are not installed.
 """
 import json
 import os
