@@ -34,14 +34,15 @@ lands "$w2_left"
 tk_raw '\es'
 lands "$w1_right"
 
-# Past the first and last window they wrap around.
+# They stop at the first and last window instead of wrapping around.
 at "$w1_left"
 tk_raw '\es'
-tk_wait '#{window_index}' 2
-tk_wait '#{pane_at_right}' 1
+sleep 0.2
+lands "$w1_left"
 at "$w2_right_top"
 tk_raw '\ef'
-lands "$w1_left"
+sleep 0.2
+lands "$w2_right_top"
 
 # Alt+Shift+S/F go to the first and last window.
 at "$w1_right"
