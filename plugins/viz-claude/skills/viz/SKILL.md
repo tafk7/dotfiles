@@ -8,7 +8,8 @@ description: >
   without installing packages, and how to hand the user a URL with
   `viz open`. Use whenever you produce a visual artifact, or when a chart or
   diagram would explain data, results, architecture or flow better than
-  text. Pair with the dataviz skill for chart design. TRIGGERS: visualize,
+  text. Carries the page design and diagram guides (references/). Pair with
+  the dataviz skill for chart design. TRIGGERS: visualize,
   chart, plot, graph, diagram, dashboard, show me, render, figure, report.
 allowed-tools: Bash(viz:*)
 ---
@@ -35,13 +36,35 @@ tabs in a connected VS Code window.
    the page or a file it loaded (CSS, JS, images, data) changes; there is no
    need to open them again.
 
+## Design every page
+
+Every HTML page and diagram is designed, not just rendered. Before writing one, read:
+
+- [references/design.md](references/design.md) for any HTML page: the treatment the request
+  calls for, palette and type tokens in `:root`, light and dark themes, layout, the page's
+  name, its words, and one look before publishing.
+- [references/diagrams.md](references/diagrams.md) for any diagram: draw the mechanism, label
+  the arrows, hand-author inline SVG with `viewBox` and `currentColor`, one claim per figure.
+
+For charts, pair them with the dataviz skill. Where the guides and this skill differ, these
+rules hold for pages served by viz:
+
+- **Self-contained.** Inline CSS, JS and chart libraries (Plotly's `include_plotlyjs=True`) so
+  the page works through the ssh forward without a CDN. Load a library from a CDN, pinned as
+  design.md says, only when inlining is impractical, and tell the user it needs the network.
+  Web fonts may be linked, always with a real fallback stack.
+- **Diagrams are inline SVG** inside the HTML page, as diagrams.md says. Use a Mermaid `.md`
+  only when the user asks for Mermaid and a VS Code window is connected to preview it.
+- **One look.** Take one screenshot of the rendered page if this session can, fix what it
+  shows, then publish. Check a chart's data and labels in that look.
+
 ## Pick the format
 
 | Content | Format | Opens in |
 |---|---|---|
 | Interactive chart, dashboard, report | Self-contained `.html` | Browser |
 | Static chart | `.svg` (or `.png` for dense rasters) | Browser (PNG: VS Code tab when connected) |
-| Architecture, flow, sequence, state diagram | `.md` with a ```` ```mermaid ```` block | VS Code; tell the user Ctrl+Shift+V previews it. No VS Code: render to SVG or HTML instead |
+| Architecture, flow, sequence, state diagram | Inline SVG in an `.html` page (references/diagrams.md); a Mermaid `.md` only when the user asks for it | Browser; Mermaid in VS Code (Ctrl+Shift+V) |
 | Exploratory analysis with code and output | Executed `.ipynb` | VS Code notebook |
 
 Default to interactive HTML for data; hover and zoom are the point of this
@@ -65,8 +88,8 @@ uv run --no-project --with jupyter --with plotly jupyter nbconvert --to notebook
 - Hand-written HTML/JS: inline all CSS and JS, and use relative links between
   files. If a library must come from a CDN, say so, because the user's network
   may block it.
-- Mermaid: keep it to one diagram per fenced block; the VS Code preview renders
-  each block.
+- Mermaid, when asked for: one diagram per fenced block; the VS Code preview
+  renders each block.
 
 ## Boundaries
 
