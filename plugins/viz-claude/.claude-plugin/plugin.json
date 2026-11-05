@@ -1,6 +1,6 @@
 {
   "name": "viz",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Skill that tells Claude where to write charts and diagrams, how to design the pages and draw the diagrams, and how to show them through bin/viz (dotfiles' browser viewer over an ssh forward).",
   "author": { "name": "tafk7", "url": "https://github.com/tafk7" },
   "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/viz-claude",

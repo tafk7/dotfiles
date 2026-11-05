@@ -249,7 +249,15 @@ default port is `20000 + uid % 10000`, the same as the old `VIZ_PORT`, so an
 existing bookmark number stays. If you forward a different local port, set
 `VIZ_PORT` in `~/.shell.env` so printed URLs match.
 
-**Everyday setup:** add the forward to the host's existing block.
+**Superseded on 2026-11-05 by WezTerm's Ctrl+Alt+P** (README, viz section):
+`forwards` on the host lists the ports, and WezTerm runs them in one
+console-less `ssh -N` tunnel and opens viz signed in. Since every session's
+`LocalForward` warned `Address already in use`, and the one owning it printed
+`open failed` for each poll while the server was down, the `LocalForward`
+below is now the fallback without WezTerm. Still to check on the laptop: that
+the tunnel opens no console window, and whether it outlives WezTerm.
+
+**Everyday setup (before Ctrl+Alt+P):** add the forward to the host's existing block.
 
 ```
 Host devbox

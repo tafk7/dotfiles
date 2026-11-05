@@ -159,6 +159,17 @@ with tempfile.TemporaryDirectory() as tmp:
         out = run('status').stdout
         check(f'LocalForward 127.0.0.1:{port} {sock}' in out and secret not in out, f'status: {out!r}')
 
+        # `forwards` (WezTerm's Ctrl+Alt+P): one line for viz, signed in only with --open.
+        out = run('forward').stdout
+        check(out == f'viz\t{port}\t{sock}\thttp://127.0.0.1:{port}/\n', f'forward: {out!r}')
+        out = subprocess.run([str(root / 'bin/forwards'), '--open'], env=env, capture_output=True,
+                             text=True, timeout=20).stdout
+        fields = out.rstrip('\n').split('\t')
+        check(len(fields) == 4 and fields[:3] == ['viz', str(port), str(sock)], f'forwards --open: {out!r}')
+        code = re.fullmatch(rf'http://127\.0\.0\.1:{port}(/__viz/login\?code=[\w-]+)', fields[-1])
+        check(code is not None and request('GET', code.group(1))[0] == 303 and secret not in out,
+              f'forwards --open: no working sign-in link in {out!r}')
+
         # Signed in: pages, headers, gallery.
         status, headers, body = request('GET', f'/{today}/chart.html', cookie=session)
         check(status == 200 and body.index('/__viz/reload.js') < body.index('</body>'),

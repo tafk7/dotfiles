@@ -229,28 +229,28 @@ write output and how to render it.
 viz path report.html              # ~/viz/<today>/report.html
 viz open ~/viz/2026-09-28/report.html   # prints http://127.0.0.1:PORT/2026-09-28/report.html
 viz status                        # server, the ssh forward for this machine, VS Code
+forwards                          # the ports WezTerm's Ctrl+Alt+P forwards from this machine
 viz login                         # single-use link that signs a browser in (run it yourself)
 ```
 
-On Windows, add the forward that `viz status` prints to the host's block in
-`%USERPROFILE%\.ssh\config`, which these dotfiles don't manage:
+From WezTerm on Windows, press **Ctrl+Alt+P** in the host's tab (also in the
+command palette). It asks the host which ports its shell tools want
+(`forwards`; viz today), opens one background tunnel with all of them, and
+opens viz in your browser, signed in. The tunnel has no console, so nothing
+prints in your sessions, and pressing it again is harmless. Copy
+`configs/wezterm.lua` to `%USERPROFILE%\.wezterm.lua`, and take any viz
+`LocalForward` out of `%USERPROFILE%\.ssh\config`: it would hold the port
+first. The sign-in lasts 30 days, or until `viz login --reset`. Without
+WezTerm, use the forward `viz status` prints and sign in with `viz login`.
 
-```
-Host devbox
-    LocalForward 127.0.0.1:21001 /run/user/1001/viz/http.sock
-```
-
-The first `ssh devbox` owns the forward. Later sessions to the same host warn
-`Address already in use` and carry on. Open `http://127.0.0.1:21001/` and sign
-in once with `viz login`. The sign-in lasts 30 days, or until
-`viz login --reset`. Recopy `configs/wezterm.lua`, so image paste doesn't
-compete for the forward.
+Two hosts whose accounts share a uid share a default port, so one tunnel holds
+it for both; give one host another `VIZ_PORT` in `~/.shell.env`.
 
 Where systemd runs a user instance, setup installs `viz.service`, so the server
-comes back with your first login after a reboot. Without it, an open viz tab
-keeps polling a dead socket and ssh prints `channel N: open failed` once a
-second. The unit doesn't see `VIZ_DIR` from your shell; set it with
-`systemctl --user edit viz` too if you change it.
+comes back with your first login after a reboot. Open viz tabs retry less often
+while it is unreachable and say so in a corner banner. The unit doesn't see
+`VIZ_DIR` from your shell; set it with `systemctl --user edit viz` too if you
+change it.
 
 ### Themes
 

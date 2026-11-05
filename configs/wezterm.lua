@@ -14,7 +14,7 @@ local config = wezterm.config_builder()
 -- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
 -- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
 -- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
-local CONFIG_REVISION = '99bf3e36eeca'
+local CONFIG_REVISION = '9aba9c876641'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -154,6 +154,88 @@ local function paste_clipboard_image(window, pane)
 end
 
 -- ---------------------------------------------------------------------------
+-- Port forwards for the remote shell tools
+-- ---------------------------------------------------------------------------
+
+-- Ctrl+Alt+P (P for ports) asks the tab's SSH host which ports its shell tools
+-- want (bin/forwards there; viz today), opens one background `ssh -N` tunnel
+-- with all of them, and opens each tool's page, signed in, in the browser. The
+-- tunnel has no console, so a server that goes away prints nowhere. It is the
+-- only forward: a viz LocalForward left in the Windows ssh config takes the
+-- port first, and this tunnel exits. Pressing it again is harmless, since a
+-- second tunnel finds its ports taken and exits (ExitOnForwardFailure), and
+-- ServerAlive ends a tunnel whose network is gone. The host comes from the tab
+-- as for image paste, with the same PASTE_FALLBACK_HOST.
+local FORWARD_WAIT_SECONDS = 8
+
+local function forward_shell_tools(window, pane)
+  local function fail(msg)
+    window:toast_notification('Forward ports', msg, nil, 5000)
+  end
+
+  local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
+  if not host then
+    return fail('No SSH host for this tab (set PASTE_FALLBACK_HOST).')
+  end
+
+  -- A login shell puts the dotfiles' bin on PATH. --open makes the URLs
+  -- sign-in links, which only this keypress asks for.
+  local ok, out, err = wezterm.run_child_process {
+    'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host, 'bash -lc "forwards --open"',
+  }
+  local forwards = {}
+  for line in (out or ''):gmatch('[^\r\n]+') do
+    local name, port, target, url = line:match('^([^\t]+)\t(%d+)\t([^\t]+)\t([^\t]+)$')
+    if name then
+      table.insert(forwards, { name = name, port = port, target = target, url = url })
+    end
+  end
+  if #forwards == 0 then
+    return fail('No forwards from ' .. host .. ': ' .. (err or ''):gsub('%s+$', ''))
+  end
+
+  local tunnel = {
+    'ssh', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes',
+    '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
+  }
+  local ports, names = {}, {}
+  for _, f in ipairs(forwards) do
+    table.insert(tunnel, '-L')
+    table.insert(tunnel, '127.0.0.1:' .. f.port .. ':' .. f.target)
+    table.insert(ports, f.port)
+    table.insert(names, f.name .. ' ' .. f.port)
+  end
+  table.insert(tunnel, host)
+  wezterm.background_child_process(tunnel)
+
+  -- Open the pages once every port answers, from this tunnel or an earlier one.
+  local wait = table.concat({
+    '$deadline = (Get-Date).AddSeconds(' .. FORWARD_WAIT_SECONDS .. ')',
+    'foreach ($p in @(' .. table.concat(ports, ',') .. ')) { while ($true) {',
+    '$c = New-Object Net.Sockets.TcpClient',
+    "try { if ($c.ConnectAsync('127.0.0.1', $p).Wait(250)) { break } } catch {} finally { $c.Close() }",
+    'if ((Get-Date) -gt $deadline) { exit 1 }',
+    'Start-Sleep -Milliseconds 200 } }',
+  }, '; ')
+  if not wezterm.run_child_process { 'powershell.exe', '-NoProfile', '-NonInteractive', '-Command', wait } then
+    return fail('The tunnel to ' .. host .. ' did not come up within ' .. FORWARD_WAIT_SECONDS .. ' s.')
+  end
+  for _, f in ipairs(forwards) do
+    if f.url ~= '-' then
+      wezterm.open_with(f.url)
+    end
+  end
+  local note = ok and '' or ('; ' .. (err or ''):gsub('%s+$', ''))
+  window:toast_notification('Forward ports', host .. ': ' .. table.concat(names, ', ') .. note, nil, 4000)
+end
+
+wezterm.on('augment-command-palette', function()
+  return {
+    { brief = 'Forward ports for shell tools (Ctrl+Alt+P)', action = wezterm.action_callback(forward_shell_tools) },
+  }
+end)
+
+-- ---------------------------------------------------------------------------
 -- Keyboard
 -- ---------------------------------------------------------------------------
 
@@ -226,6 +308,12 @@ config.keys = {
     key = 'v',
     mods = 'CTRL|ALT',
     action = wezterm.action_callback(paste_clipboard_image),
+  },
+  -- Forward the tab's SSH host's shell tool ports and open their pages.
+  {
+    key = 'p',
+    mods = 'CTRL|ALT',
+    action = wezterm.action_callback(forward_shell_tools),
   },
 
   -- Ctrl+Shift+S as an extended key (xterm modifyOtherKeys), so it reaches

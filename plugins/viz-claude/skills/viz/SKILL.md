@@ -30,8 +30,9 @@ tabs in a connected VS Code window.
    re-run and edited.
 3. Render, then `viz open <path>`. Pass on the URL it prints in one sentence;
    do not describe the chart at length. If it adds that no browser has
-   reached viz yet, tell the user to run `viz status` for the ssh forward and
-   `viz login` to sign the browser in.
+   reached viz yet, tell the user to press Ctrl+Alt+P in WezTerm, which
+   forwards the port and signs the browser in (without WezTerm: `viz status`
+   for the ssh forward, `viz login` to sign in).
 4. On revision, rewrite the same file. Open pages reload by themselves when
    the page or a file it loaded (CSS, JS, images, data) changes; there is no
    need to open them again.
@@ -93,9 +94,10 @@ uv run --no-project --with jupyter --with plotly jupyter nbconvert --to notebook
 
 ## Boundaries
 
-- Never run `viz login` or paste its link into your output: the link signs a
-  browser in. The user runs it in their own terminal. `viz open` and
-  `viz status` print nothing secret.
+- Never run `viz login`, `viz forward --open` or `forwards --open`, or paste
+  their links into your output: the links sign a browser in. The user runs
+  them, or presses Ctrl+Alt+P. `viz open`, `viz status`, `viz forward` and
+  `forwards` print nothing secret.
 - Only the user's account and their signed-in browser can read what viz
   serves. Still keep credentials out of `~/viz`: every page viz serves can
   read every other one, and a page from an untrusted source runs with that

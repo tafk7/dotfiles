@@ -1,0 +1,31 @@
+#!/bin/bash
+# List the ports this machine's shell tools want forwarded to the ssh client.
+#
+# Usage: forwards [--open]
+#
+# WezTerm's Ctrl+Alt+P runs this over ssh, opens one background tunnel with
+# every forward listed, and opens each tool's URL in the Windows browser.
+# Each line is tab-separated: NAME, client PORT (bound on 127.0.0.1), the
+# TARGET on this machine (a Unix socket path or HOST:PORT), and a URL to open
+# (or -). Each tool listed below answers `TOOL forward [--open]` with its lines
+# and starts what it serves first.
+#
+# --open asks for URLs that sign the browser in. They are secrets, like
+# `viz login`'s link: only the person at the client should ask for them.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLS=(viz)
+
+case "${1:-}" in
+    ''|--open) ;;
+    -h|--help) sed -n '4,14s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "forwards: unknown argument: $1 (see forwards --help)" >&2; exit 64 ;;
+esac
+
+# One tool's failure leaves the others' forwards usable.
+rc=0
+for tool in "${TOOLS[@]}"; do
+    "$SCRIPT_DIR/$tool" forward "$@" || { echo "forwards: $tool forward failed" >&2; rc=1; }
+done
+exit "$rc"
