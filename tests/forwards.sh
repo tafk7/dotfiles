@@ -1,7 +1,7 @@
 #!/bin/bash
 # bin/forwards: a tunnel's hold sets tmux's @forwards while it lives, status
-# and close find it by its lock, toggle closes an open tunnel, and a client
-# that goes away ends the hold at the next heartbeat.
+# and close find it by its lock, toggle closes an open tunnel (its connection
+# included), and a client that goes away ends the hold at the next heartbeat.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -59,6 +59,29 @@ wait_for 'open: viz'
 touch "$TEST_ROOT/drop"
 wait_for closed
 [[ "$(last_set)" == 'set-option -gu @forwards' ]] || fail "tmux after a dropped client: $(last_set)"
+
+# A hold under a connection's sshd (no terminal) ends that connection as it
+# ends: ssh keeps a tunnel up while any forwarded connection is open. Under an
+# interactive session's sshd (@pts/N), it leaves the session alone.
+ln -s "$(command -v bash)" "$TEST_ROOT/bin/sshd"
+fake_sshd() {   # fake_sshd TITLE: a process named sshd running a hold
+    # Like sshd, it outlives the command it ran.
+    printf '"%s" hold viz | cat >/dev/null\nsleep 30\n' "$forwards" > "$TEST_ROOT/session"
+    ( exec -a "$1" "$TEST_ROOT/bin/sshd" < "$TEST_ROOT/session" ) &
+    sshd_pid=$!
+    wait_for 'open: viz'
+}
+fake_sshd 'sshd: tester@notty'
+"$forwards" close
+wait_for closed
+for _ in $(seq 30); do kill -0 "$sshd_pid" 2>/dev/null || break; sleep 0.1; done
+kill -0 "$sshd_pid" 2>/dev/null && fail "close left the connection's sshd running"
+fake_sshd 'sshd: tester@pts/3'
+"$forwards" close
+wait_for closed
+sleep 0.3
+kill -0 "$sshd_pid" 2>/dev/null || fail "close ended an interactive session's sshd"
+kill "$sshd_pid" 2>/dev/null || true
 
 # A hold killed outright leaves a file with a free lock: stale, not open.
 ( "$forwards" hold viz | cat >/dev/null ) &
