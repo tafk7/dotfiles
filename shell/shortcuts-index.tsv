@@ -134,7 +134,7 @@ tmux│Ctrl+a ?│List all keybindings│list-keys
 wezterm│Ctrl+Shift+Enter│Fullscreen (F11 on other keyboards)│ToggleFullScreen
 wezterm│Ctrl+Shift+= / Ctrl+Shift+- / Ctrl+Shift+0│Font size up / down / reset│Increase/Decrease/ResetFontSize
 wezterm│Image key (Ctrl+Alt+V)│Upload the Windows clipboard image to the tab's SSH host and paste its path│paste_clipboard_image
-wezterm│Ctrl+Alt+P│Toggle the tunnel for the tab's SSH host's shell tool ports (viz): open it and their pages, signed in, or close it; tmux's ⇅ lights while it is open│forward_shell_tools
+wezterm│Ctrl+Alt+P│Toggle the tunnel for the tab's SSH host's shell tool ports (viz); tmux's ⇅ lights while it is open, and `viz open` then opens pages, signed in│forward_shell_tools
 
 # Vim shortcuts (leader is comma)
 # File navigation (FZF)

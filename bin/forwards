@@ -1,17 +1,16 @@
 #!/bin/bash
 # The ports this machine's shell tools want forwarded to the ssh client, and whether they are.
 #
-# Usage: forwards [--open]      list them (WezTerm's Ctrl+Alt+P reads this)
-#        forwards toggle        close them if open, else list them with --open
+# Usage: forwards               list them
+#        forwards toggle        close them if open, else list them (WezTerm's Ctrl+Alt+P)
 #        forwards status        open or closed (exit 0 or 1); resyncs tmux
 #        forwards close         end every tunnel's hold, which ends the tunnel
 #        forwards hold NAME...  the tunnel's remote command (WezTerm runs it)
 #
 # Each listed line is tab-separated: NAME, client PORT (bound on 127.0.0.1),
-# the TARGET on this machine (a Unix socket path or HOST:PORT), and a URL to
-# open (or -). Each tool in TOOLS answers `TOOL forward [--open]` with its
-# lines and starts what it serves first. --open asks for URLs that sign the
-# browser in: secrets, like `viz login`'s link, for the person at the client.
+# the TARGET on this machine (a Unix socket path or HOST:PORT), and the tool's
+# URL (or -). Each tool in TOOLS answers `TOOL forward` with its lines and
+# starts what it serves first. Pages are opened by the tools (`viz open`).
 #
 # A tunnel's hold runs as long as its connection, which ssh opens only once its
 # forwards are bound, so a live hold means the ports are open. It sets tmux's
@@ -65,7 +64,7 @@ list() {
     # One tool's failure leaves the others' forwards usable.
     local tool rc=0
     for tool in "${TOOLS[@]}"; do
-        "$SCRIPT_DIR/$tool" forward "$@" || { echo "forwards: $tool forward failed" >&2; rc=1; }
+        "$SCRIPT_DIR/$tool" forward || { echo "forwards: $tool forward failed" >&2; rc=1; }
     done
     return "$rc"
 }
@@ -141,8 +140,8 @@ status() {
 }
 
 case "${1:-}" in
-    ''|--open) list "$@" ;;
-    toggle) if close; then echo closed; else list --open; fi ;;
+    '') list ;;
+    toggle) if close; then echo closed; else list; fi ;;
     status) status ;;
     close) close || echo 'forwards: none open' >&2 ;;
     hold) shift; hold "$@" ;;

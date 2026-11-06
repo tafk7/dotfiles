@@ -227,7 +227,7 @@ write output and how to render it.
 
 ```bash
 viz path report.html              # ~/viz/<today>/report.html
-viz open ~/viz/2026-09-28/report.html   # prints http://127.0.0.1:PORT/2026-09-28/report.html
+viz open ~/viz/2026-09-28/report.html   # prints http://127.0.0.1:PORT/2026-09-28/report.html; opens it from WezTerm
 viz status                        # server, the ssh forward for this machine, VS Code
 forwards status                   # whether WezTerm's Ctrl+Alt+P tunnel carries this machine's ports
 viz login                         # single-use link that signs a browser in (run it yourself)
@@ -235,14 +235,17 @@ viz login                         # single-use link that signs a browser in (run
 
 From WezTerm on Windows, press **Ctrl+Alt+P** in the host's tab (also in the
 command palette). It asks the host which ports its shell tools want
-(`forwards`; viz today), opens one background tunnel with all of them, and
-opens viz in your browser, signed in. Press it again to close the tunnel. The
-`⇅` at the left of tmux's status bar is lit while a tunnel carries the ports
-and dim otherwise; `forwards status` says the same, and `forwards close` closes
-them from the host. The tunnel has no console, so nothing prints in your
-sessions. Copy `configs/wezterm.lua` to `%USERPROFILE%\.wezterm.lua`, and take
-any viz `LocalForward` out of `%USERPROFILE%\.ssh\config`: it would hold the
-port first, and the tunnel would exit. The sign-in lasts 30 days, or until
+(`forwards`; viz today) and opens one background tunnel with all of them;
+press it again to close the tunnel. The `⇅` at the left of tmux's status bar
+is lit while a tunnel carries the ports and dim otherwise; `forwards status`
+says the same, and `forwards close` closes them from the host. Then `viz open`
+in your terminal opens a page in your browser, signed in, through WezTerm
+(`viz open` alone opens the index). Agents' `viz open` only prints the URL.
+
+The tunnel has no console, so nothing prints in your sessions. Copy
+`configs/wezterm.lua` to `%USERPROFILE%\.wezterm.lua`, and take any viz
+`LocalForward` out of `%USERPROFILE%\.ssh\config`: it would hold the port
+first, and the tunnel would exit. The sign-in lasts 30 days, or until
 `viz login --reset`. Without WezTerm, use the forward `viz status` prints and
 sign in with `viz login`.
 

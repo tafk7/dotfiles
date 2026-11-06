@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """bin/viz: path layout, private socket, sign-in, Host and cross-site checks, containment, reload, lifetime."""
 from pathlib import Path
+import base64
 import datetime
 import hashlib
 import hmac
 import http.client
 import os
+import pty
 import re
 import signal
 import socket
@@ -159,16 +161,53 @@ with tempfile.TemporaryDirectory() as tmp:
         out = run('status').stdout
         check(f'LocalForward 127.0.0.1:{port} {sock}' in out and secret not in out, f'status: {out!r}')
 
-        # `forwards` (WezTerm's Ctrl+Alt+P): one line for viz, signed in only with --open.
+        # `forwards` (WezTerm's Ctrl+Alt+P): one line for viz, nothing secret.
         out = run('forward').stdout
         check(out == f'viz\t{port}\t{sock}\thttp://127.0.0.1:{port}/\n', f'forward: {out!r}')
-        out = subprocess.run([str(root / 'bin/forwards'), '--open'], env=env, capture_output=True,
-                             text=True, timeout=20).stdout
-        fields = out.rstrip('\n').split('\t')
-        check(len(fields) == 4 and fields[:3] == ['viz', str(port), str(sock)], f'forwards --open: {out!r}')
-        code = re.fullmatch(rf'http://127\.0\.0\.1:{port}(/__viz/login\?code=[\w-]+)', fields[-1])
-        check(code is not None and request('GET', code.group(1))[0] == 303 and secret not in out,
-              f'forwards --open: no working sign-in link in {out!r}')
+        out = subprocess.run([str(root / 'bin/forwards')], env=env, capture_output=True, text=True, timeout=20).stdout
+        check(out == f'viz\t{port}\t{sock}\thttp://127.0.0.1:{port}/\n', f'forwards: {out!r}')
+
+        # A sign-in link lands on ?next= on this origin, and nowhere else.
+        def landing(land):
+            code = re.search(r'code=([\w-]+)', run('login').stdout).group(1)
+            status, headers, _ = request('GET', f'/__viz/login?code={code}&next={land}')
+            return status, headers.get('location')
+        check(landing(f'%2F{today}%2Fchart.html') == (303, f'/{today}/chart.html'), 'login: next ignored')
+        for bad in ('%2F%2Fevil.example%2F', '%2F%5Cevil.example', 'https%3A%2F%2Fevil.example%2F', '%2Fa%0D%0AX-Y%3A1'):
+            check(landing(bad) == (303, '/'), f'login: landed on {bad}')
+
+        # viz open in a terminal asks WezTerm (a user variable) to open the page
+        # signed in; in a pipe, as an agent runs it, it only prints the URL.
+        def open_in_terminal(*args, **overrides):
+            leader, follower = pty.openpty()
+            proc = subprocess.Popen([sys.executable, str(viz), 'open', *args], env=dict(env, **overrides),
+                                    stdin=subprocess.DEVNULL, stdout=follower, stderr=follower)
+            os.close(follower)
+            output = b''
+            while True:
+                try:
+                    chunk = os.read(leader, 4096)
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                output += chunk
+            proc.wait(timeout=20)
+            os.close(leader)
+            return output.decode()
+        out = open_in_terminal(str(tmp / 'viz' / today / 'chart.html'), TMUX='')
+        var = re.search(r'\x1b\]1337;SetUserVar=viz_open=([A-Za-z0-9+/=]+)\x07', out)
+        value = base64.b64decode(var.group(1)).decode() if var else ''
+        land = re.fullmatch(rf'{port} (/__viz/login\?code=[\w-]+&next=%2F{today}%2Fchart\.html)', value)
+        check(land is not None and request('GET', land.group(1))[1].get('location') == f'/{today}/chart.html',
+              f'open: no working user variable in {out!r}')
+        check('not forwarded: press Ctrl+Alt+P' in out and secret not in out, f'open: no forward hint in {out!r}')
+        out = open_in_terminal(TMUX='/tmp/tmux-1/default,1,0')
+        wrapped = re.search(r'\x1bPtmux;\x1b\x1b\]1337;SetUserVar=viz_open=([A-Za-z0-9+/=]+)\x07\x1b\\', out)
+        check(wrapped is not None and base64.b64decode(wrapped.group(1)).decode().startswith(f'{port} /__viz/login?code='),
+              f'open: no tmux-wrapped user variable for the index in {out!r}')
+        out = run('open', str(tmp / 'viz' / today / 'chart.html')).stdout
+        check('SetUserVar' not in out and 'code=' not in out and f'/{today}/chart.html' in out, f'open in a pipe: {out!r}')
 
         # Signed in: pages, headers, gallery.
         status, headers, body = request('GET', f'/{today}/chart.html', cookie=session)

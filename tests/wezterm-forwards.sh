@@ -1,6 +1,7 @@
 #!/bin/bash
 # WezTerm's Ctrl+Alt+P against a fake wezterm module, run by Neovim's LuaJIT:
-# the toggle query, the tunnel's command line, the wait, and what it opens.
+# the toggle query, the tunnel's command line and wait, and the user variable
+# that `viz open` sets to open a page on a forwarded port, and only there.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,17 +12,19 @@ driver="$(mktemp)"
 trap 'rm -f "$driver"' EXIT
 cat > "$driver" <<'EOF'
 local config_path = arg[1]
-local calls, opened, toasts, background, palette
+local calls, opened, toasts, background
+local handlers, GLOBAL = {}, {}   -- GLOBAL outlives config reloads, as in WezTerm
 
 local function reset(forwards_out, forwards_ok, port_ok)
   calls, opened, toasts, background = {}, {}, {}, nil
   package.loaded.wezterm = {
+    GLOBAL = GLOBAL,
     config_builder = function() return {} end,
     action = setmetatable({}, { __index = function(_, name)
       return setmetatable({ name = name }, { __call = function(self, a) return { name = self.name, arg = a } end })
     end }),
     action_callback = function(fn) return { callback = fn } end,
-    on = function(event, fn) if event == 'augment-command-palette' then palette = fn end end,
+    on = function(event, fn) handlers[event] = fn end,
     run_child_process = function(argv)
       table.insert(calls, argv)
       if argv[1] == 'ssh' then return forwards_ok, forwards_out, forwards_ok and '' or 'viz forward failed' end
@@ -71,16 +74,34 @@ if line:find('"', 1, true) or line:find('ClearAllForwardings', 1, true) then fai
 if not (calls[2] and calls[2][1] == 'powershell.exe' and calls[2][#calls[2]]:find('@(21001,21002)', 1, true)) then
   fail('no wait for both ports')
 end
-if #opened ~= 1 or opened[1] ~= 'http://127.0.0.1:21001/__viz/login?code=x' then
-  fail('opened: ' .. table.concat(opened, ' '))
-end
+if #opened ~= 0 then fail('opening the tunnel opened ' .. table.concat(opened, ' ')) end
 if not (toasts[1] or ''):find('devbox: viz 21001, other 21002', 1, true) then fail('toast: ' .. tostring(toasts[1])) end
 
--- Pressed while open: the host closed them; no tunnel, no page.
+-- `viz open` on the host: a page opens on a forwarded port, nothing else does.
+local function viz_open(value, name)
+  opened, toasts = {}, {}
+  handlers['user-var-changed'](window, pane, name or 'viz_open', value)
+end
+viz_open('21001 /__viz/login?code=x&next=%2F2026-11-06%2Fa.html')
+if opened[1] ~= 'http://127.0.0.1:21001/__viz/login?code=x&next=%2F2026-11-06%2Fa.html' then
+  fail('viz open: ' .. table.concat(opened, ' '))
+end
+viz_open('9999 /')
+if #opened ~= 0 or not (toasts[1] or ''):find('not forwarded', 1, true) then fail('opened an unforwarded port') end
+for _, bad in ipairs({ '21001 //evil.example/', '21001 /a b', '21001 /x"&calc', '21001', 'x /' }) do
+  viz_open(bad)
+  if #opened ~= 0 then fail('opened ' .. opened[1] .. ' for ' .. bad) end
+end
+viz_open('21001 /', 'other_var')
+if #opened ~= 0 then fail('acted on another user variable') end
+
+-- Pressed while open: the host closed them; no tunnel, and no page opens there.
 press(reset('closed\n', true, true))
 if background or #opened ~= 0 or not (toasts[1] or ''):find('devbox: closed', 1, true) then
   fail('toggle off: ' .. tostring(toasts[1]))
 end
+viz_open('21001 /')
+if #opened ~= 0 then fail('opened a page on a closed tunnel') end
 
 -- A line with cmd.exe metacharacters is not a forward.
 press(reset('viz\t21001\t/tmp/x&calc\thttp://127.0.0.1:21001/\n', true, true))
@@ -88,7 +109,7 @@ if background then fail('forwarded a target with & in it') end
 
 -- One tool failing still forwards the rest, and the toast says what failed.
 press(reset('viz\t21001\t/s\thttp://127.0.0.1:21001/\n', false, true))
-if not background or #opened ~= 1 or not (toasts[1] or ''):find('viz forward failed', 1, true) then
+if not background or not (toasts[1] or ''):find('viz forward failed', 1, true) then
   fail('partial failure: ' .. tostring(toasts[1]))
 end
 
@@ -98,14 +119,15 @@ if background or #opened ~= 0 or not (toasts[1] or ''):find('No forwards from de
   fail('empty forwards: ' .. tostring(toasts[1]))
 end
 
--- Ports that never answer: no page.
+-- Ports that never answer: not recorded as forwarded.
+GLOBAL.forwarded_ports = nil
 press(reset('viz\t21001\t/s\thttp://127.0.0.1:21001/\n', true, false))
-if #opened ~= 0 or not (toasts[1] or ''):find('did not come up', 1, true) then
-  fail('dead tunnel: ' .. tostring(toasts[1]))
-end
+if not (toasts[1] or ''):find('did not come up', 1, true) then fail('dead tunnel: ' .. tostring(toasts[1])) end
+viz_open('21001 /')
+if #opened ~= 0 then fail('opened a page on a tunnel that never came up') end
 
 -- The command palette lists it.
-local entries = palette and palette() or {}
+local entries = handlers['augment-command-palette'] and handlers['augment-command-palette']() or {}
 if not (entries[1] and entries[1].brief:find('Ctrl+Alt+P', 1, true) and entries[1].action.callback) then
   fail('no command palette entry')
 end

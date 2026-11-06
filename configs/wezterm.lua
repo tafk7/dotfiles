@@ -14,7 +14,7 @@ local config = wezterm.config_builder()
 -- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
 -- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
 -- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
-local CONFIG_REVISION = 'fe4d9993e390'
+local CONFIG_REVISION = 'f2a690f6beb2'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -159,16 +159,23 @@ end
 
 -- Ctrl+Alt+P (P for ports) toggles the tunnel for the tab's SSH host's shell
 -- tools (bin/forwards there; viz today). Opening asks the host for its
--- forwards, starts one background tunnel with all of them, and opens each
--- tool's page, signed in, in the browser; pressing it again closes the tunnel.
--- The tunnel's remote command, `forwards hold`, lights the ⇅ in tmux's status
--- bar for as long as it lives. It runs without a console, so a server that
+-- forwards and starts one background tunnel with all of them; pressing it
+-- again closes the tunnel. Pages open from the host: `viz open` there asks
+-- WezTerm through a user variable (below). The tunnel's remote command,
+-- `forwards hold`, lights the ⇅ in tmux's status bar for as long as it lives. It runs without a console, so a server that
 -- goes away prints nowhere, and its output (the hold's heartbeat) goes to NUL.
 -- It is the only forward: a viz LocalForward left in the Windows ssh config
 -- takes the port first, and this tunnel exits (ExitOnForwardFailure).
 -- ServerAlive ends a tunnel whose network is gone. The host comes from the tab
 -- as for image paste, with the same PASTE_FALLBACK_HOST.
 local FORWARD_WAIT_SECONDS = 8
+
+-- The client ports Ctrl+Alt+P's tunnels forward, by host: the only ports a
+-- page may be opened on. Kept across config reloads.
+local function forwarded_ports()
+  wezterm.GLOBAL.forwarded_ports = wezterm.GLOBAL.forwarded_ports or {}
+  return wezterm.GLOBAL.forwarded_ports
+end
 
 local function forward_shell_tools(window, pane)
   local function fail(msg)
@@ -186,18 +193,19 @@ local function forward_shell_tools(window, pane)
   end
 
   -- A login shell puts the dotfiles' bin on PATH. toggle closes open forwards
-  -- and prints "closed", or lists them with sign-in URLs (only this key asks).
+  -- and prints "closed", or lists them.
   local ok, out, err = wezterm.run_child_process {
     'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host, 'bash -lc "forwards toggle"',
   }
   if ok and (out or ''):match('^closed') then
+    forwarded_ports()[host] = nil
     return window:toast_notification('Forward ports', host .. ': closed', nil, 3000)
   end
   local forwards = {}
   for line in (out or ''):gmatch('[^\r\n]+') do
-    local name, port, target, url = line:match('^([%w%-]+)\t(%d+)\t([%w%._%-/:]+)\t([^\t]+)$')
+    local name, port, target = line:match('^([%w%-]+)\t(%d+)\t([%w%._%-/:]+)\t[^\t]+$')
     if name then
-      table.insert(forwards, { name = name, port = port, target = target, url = url })
+      table.insert(forwards, { name = name, port = port, target = target })
     end
   end
   if #forwards == 0 then
@@ -220,7 +228,7 @@ local function forward_shell_tools(window, pane)
   table.insert(tunnel, host .. " bash -lc 'forwards hold " .. table.concat(held, ' ') .. "' >NUL 2>&1")
   wezterm.background_child_process { 'cmd.exe', '/d', '/s', '/c', table.concat(tunnel, ' ') }
 
-  -- Open the pages once every port answers.
+  -- Report once every port answers.
   local wait = table.concat({
     '$deadline = (Get-Date).AddSeconds(' .. FORWARD_WAIT_SECONDS .. ')',
     'foreach ($p in @(' .. table.concat(ports, ',') .. ')) { while ($true) {',
@@ -232,14 +240,34 @@ local function forward_shell_tools(window, pane)
   if not wezterm.run_child_process { 'powershell.exe', '-NoProfile', '-NonInteractive', '-Command', wait } then
     return fail('The tunnel to ' .. host .. ' did not come up within ' .. FORWARD_WAIT_SECONDS .. ' s.')
   end
-  for _, f in ipairs(forwards) do
-    if f.url ~= '-' then
-      wezterm.open_with(f.url)
-    end
-  end
+  forwarded_ports()[host] = ports
   local note = ok and '' or ('; ' .. (err or ''):gsub('%s+$', ''))
   window:toast_notification('Forward ports', host .. ': ' .. table.concat(names, ', ') .. note, nil, 4000)
 end
+
+-- `viz open` on the host sets the user variable viz_open to "PORT PATH" (a
+-- sign-in path that lands on the page). Any program in a visible pane can
+-- set one, so WezTerm builds the URL itself, from a port Ctrl+Alt+P forwards
+-- and a path of URL characters only.
+wezterm.on('user-var-changed', function(window, pane, name, value)
+  if name ~= 'viz_open' then
+    return
+  end
+  local port, path = (value or ''):match('^(%d+) (/[%w%-%._~/%%?=&+:@!$,;]*)$')
+  if path and path:sub(2, 2) == '/' then
+    port = nil
+  end
+  local known = false
+  for _, ports in pairs(forwarded_ports()) do
+    for _, p in ipairs(ports) do
+      known = known or p == port
+    end
+  end
+  if not known then
+    return window:toast_notification('viz', 'Port ' .. tostring(port) .. ' is not forwarded: press Ctrl+Alt+P.', nil, 5000)
+  end
+  wezterm.open_with('http://127.0.0.1:' .. port .. path)
+end)
 
 wezterm.on('augment-command-palette', function()
   return {

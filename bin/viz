@@ -9,7 +9,8 @@ which no other account can open, and the client forwards a local port to it:
     ssh -L 127.0.0.1:PORT:/run/user/UID/viz/http.sock HOST
 
 WezTerm's Ctrl+Alt+P opens that forward (through `forwards`, which runs `viz
-forward`) and signs the browser in; `viz status` prints it for this machine. HTML, SVG and PDF are served
+forward`), and `viz open` in your terminal then opens a page in that browser,
+signed in; `viz status` prints the forward for this machine. HTML, SVG and PDF are served
 (and images, when no VS Code window is connected); a page reloads when it or an
 asset it loaded changes.
 
@@ -41,6 +42,7 @@ Environment:
                (default ~/projects:~/ref)
 """
 import argparse
+import base64
 import datetime
 import fcntl
 import glob
@@ -579,13 +581,18 @@ class Handler(BaseHTTPRequestHandler):
                 and self.headers.get('Sec-Fetch-Dest') == 'document')
 
     def _login(self, query):
-        code = urllib.parse.parse_qs(query).get('code', [''])[0]
+        query = urllib.parse.parse_qs(query)
+        code = query.get('code', [''])[0]
+        # Only a path on this origin: not //host, \\host, or a header break.
+        land = query.get('next', ['/'])[0]
+        if not re.fullmatch(r'/(?![/\\])[\x21-\x7e]*', land):
+            land = '/'
         if not self.server.redeem(code):
             return self._page(403, page('viz: sign in', SIGN_IN_AGAIN))
         value = self.server.cookie_value(int(time.time()))
         self.send_response(303)
         self.send_header('Set-Cookie', f'{self.cookie}={value}; Max-Age={COOKIE_AGE}; Path=/; HttpOnly; SameSite=Lax')
-        self.send_header('Location', '/')
+        self.send_header('Location', land)
         self.send_header('Content-Length', '0')
         self.end_headers()
 
@@ -699,8 +706,9 @@ def _file_key(path):
         return None
 
 
-SIGN_IN = ('<h1>viz: sign in</h1><p>In your ssh session on this machine, run <code>viz login</code> '
-           'and open the link it prints. The browser then stays signed in to this port.</p>')
+SIGN_IN = ('<h1>viz: sign in</h1><p>In your ssh session on this machine, run <code>viz open</code> '
+           '(through WezTerm), or <code>viz login</code> and open the link it prints. The browser then '
+           'stays signed in to this port.</p>')
 SIGN_IN_AGAIN = ('<h1>viz: sign in</h1><p>This sign-in link is used or expired. '
                  'Run <code>viz login</code> for a new one.</p>')
 
@@ -888,8 +896,8 @@ def url_for(path):
 
 def connect_hint(info):
     if info.get('browser') is None:
-        print('no browser has reached viz yet: Ctrl+Alt+P in WezTerm forwards and signs in '
-              '(or `viz status` shows the ssh forward, `viz login` signs in)')
+        print('no browser has reached viz yet: Ctrl+Alt+P in WezTerm forwards the port, and `viz open` '
+              'in your terminal opens it signed in (or `viz status` shows the ssh forward, `viz login` signs in)')
 
 
 # ---------------------------------------------------------------------------
@@ -907,12 +915,16 @@ def cmd_path(args):
 
 def cmd_open(args):
     info = None
-    for arg in args.files:
+    # Run in a terminal (yours, not an agent's), pages open in the client's
+    # browser too. Everything else only prints the URL.
+    show = sys.stdout.isatty()
+    shown = False
+    for arg in args.files or [str(ROOT)]:
         path = Path(arg).expanduser().resolve()
         if not path.exists():
             die(f'no such file: {arg}')
         suffix = path.suffix.lower()
-        browser = args.browser or (not args.vscode and suffix in BROWSER_SUFFIXES)
+        browser = args.browser or (not args.vscode and (path.is_dir() or suffix in BROWSER_SUFFIXES))
         if not browser:
             if vscode('--reuse-window', str(path)):
                 print(f'opened in VS Code: {path}')
@@ -935,8 +947,14 @@ def cmd_open(args):
             if not path.is_dir():
                 remember(path)
         info = ensure_server()
-        print(url_for(path))
-    if info:
+        url = url_for(path)
+        print(url)
+        if show:
+            wezterm_open(urllib.parse.urlsplit(url).path)
+            shown = True
+    if shown and not forwarded():
+        print('the ports are not forwarded: press Ctrl+Alt+P in WezTerm, then viz open again')
+    elif info and not shown:
         connect_hint(info)
 
 
@@ -951,11 +969,40 @@ def cmd_diff(args):
         print(f'no connected VS Code window; run: code --diff {left} {right}')
 
 
-def login_url():
+def login_path(land='/'):
+    """A single-use sign-in path on this origin that lands on LAND."""
     reply = ask('POST', '/__viz/login')
     if not reply or reply[0] != 200:
         die('the server gave no sign-in code; see `viz status`')
-    return f'http://{URL_HOST}:{PORT}/__viz/login?code={reply[1]}'
+    path = f'/__viz/login?code={reply[1]}'
+    return path if land == '/' else path + '&next=' + urllib.parse.quote(land, safe='')
+
+
+def login_url():
+    return f'http://{URL_HOST}:{PORT}' + login_path()
+
+
+def wezterm_open(land):
+    """Ask the WezTerm this terminal runs in to open LAND, signed in, in its browser.
+
+    A user variable (OSC 1337 SetUserVar), wrapped for tmux's passthrough. WezTerm
+    opens only 127.0.0.1 on a port its Ctrl+Alt+P tunnel forwards, and builds the
+    URL itself (configs/wezterm.lua). The sign-in code goes to the terminal, never
+    to the screen or the output.
+    """
+    value = base64.b64encode(f'{PORT} {login_path(land)}'.encode()).decode()
+    sequence = f'\033]1337;SetUserVar=viz_open={value}\007'
+    if os.environ.get('TMUX'):
+        sequence = '\033Ptmux;' + sequence.replace('\033', '\033\033') + '\033\\'
+    sys.stdout.write(sequence)
+    sys.stdout.flush()
+
+
+def forwarded():
+    """Whether a WezTerm tunnel carries this machine's ports (bin/forwards status)."""
+    forwards = Path(__file__).resolve().parent / 'forwards'
+    return subprocess.run([str(forwards), 'status'], stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode == 0
 
 
 def cmd_login(args):
@@ -967,10 +1014,9 @@ def cmd_login(args):
 
 
 def cmd_forward(args):
-    """One `forwards` line: the client port, this socket, and the page to open."""
+    """One `forwards` line: the client port, this socket, and the index."""
     ensure_server()
-    url = login_url() if args.open else f'http://{URL_HOST}:{PORT}/'
-    print(f'viz\t{PORT}\t{socket_path()}\t{url}')
+    print(f'viz\t{PORT}\t{socket_path()}\thttp://{URL_HOST}:{PORT}/')
 
 
 def cmd_start(args):
@@ -1042,7 +1088,7 @@ def cmd_status(args):
     else:
         print(f'server:   stopped (viz start, viz open or viz login starts it on {path})')
     print(f'url:      http://{URL_HOST}:{PORT}/')
-    print('forward:  Ctrl+Alt+P in WezTerm (forwards and signs in), or by hand:')
+    print('forward:  Ctrl+Alt+P in WezTerm (then `viz open` opens pages, signed in), or by hand:')
     print(f'          ssh -o ExitOnForwardFailure=yes -L {URL_HOST}:{PORT}:{path} {socket.gethostname()}')
     print(f'          or, in the client\'s ssh config: LocalForward {URL_HOST}:{PORT} {path}')
     print('sign in:  run `viz login` yourself and open its single-use link')
@@ -1076,11 +1122,12 @@ def main():
     p = sub.add_parser('path', help="print (and create the directory of) today's path for NAME")
     p.add_argument('name')
     p.set_defaults(func=cmd_path)
-    p = sub.add_parser('open', help='print the browser URL of files, or open them in the connected VS Code')
+    p = sub.add_parser('open', help='print the browser URL of files (the index without any), open them in '
+                                    "the client's browser from a terminal in WezTerm, or in the connected VS Code")
     target = p.add_mutually_exclusive_group()
     target.add_argument('--browser', action='store_true', help='always serve to the browser')
     target.add_argument('--vscode', action='store_true', help='always open as a VS Code tab')
-    p.add_argument('files', nargs='+')
+    p.add_argument('files', nargs='*')
     p.set_defaults(func=cmd_open)
     p = sub.add_parser('diff', help='open a side-by-side diff of two files in the connected VS Code')
     p.add_argument('left')
@@ -1089,9 +1136,8 @@ def main():
     p = sub.add_parser('login', help='print a single-use link that signs a browser in')
     p.add_argument('--reset', action='store_true', help='new secret first: signs every browser out')
     p.set_defaults(func=cmd_login)
-    p = sub.add_parser('forward', help='print the forward line `forwards` collects for WezTerm')
-    p.add_argument('--open', action='store_true', help="the URL signs the browser in, like viz login's")
-    p.set_defaults(func=cmd_forward)
+    sub.add_parser('forward', help='print the forward line `forwards` collects for WezTerm').set_defaults(
+        func=cmd_forward)
     sub.add_parser('start', help='start the background server').set_defaults(func=cmd_start)
     sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
     sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
