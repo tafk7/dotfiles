@@ -1,6 +1,6 @@
 #!/bin/bash
 # WezTerm's Ctrl+Alt+P against a fake wezterm module, run by Neovim's LuaJIT:
-# the forwards query, the tunnel's arguments, the wait, and what it opens.
+# the toggle query, the tunnel's command line, the wait, and what it opens.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,23 +48,26 @@ local function press(config)
   fail('Ctrl+Alt+P is not bound')
 end
 
--- Two tools: one tunnel with both forwards, then the pages that have a URL.
+-- Two tools: one tunnel with both forwards and a hold, then the pages that have a URL.
 local config = reset('viz\t21001\t/run/user/1001/viz/http.sock\thttp://127.0.0.1:21001/__viz/login?code=x\r\n'
   .. 'other\t21002\tlocalhost:8080\t-\n', true, true)
 press(config)
 local query = calls[1]
 if not (query[1] == 'ssh' and has(query, 'BatchMode=yes') and has(query, 'ClearAllForwardings=yes')
-        and query[#query - 1] == 'devbox' and query[#query] == 'bash -lc "forwards --open"') then
+        and query[#query - 1] == 'devbox' and query[#query] == 'bash -lc "forwards toggle"') then
   fail('forwards query: ' .. table.concat(query, ' '))
 end
 if not background then fail('no tunnel started') end
-local tunnel = table.concat(background, ' ')
-for _, want in ipairs({ '-N', 'ExitOnForwardFailure=yes', 'BatchMode=yes', 'ServerAliveInterval=15',
-                        '127.0.0.1:21001:/run/user/1001/viz/http.sock', '127.0.0.1:21002:localhost:8080' }) do
-  if not has(background, want) then fail('tunnel lacks ' .. want .. ': ' .. tunnel) end
+if not (background[1] == 'cmd.exe' and has(background, '/s') and has(background, '/c')) then
+  fail('tunnel not run through cmd /s /c: ' .. table.concat(background, ' '))
 end
-if has(background, 'ClearAllForwardings=yes') then fail('the tunnel clears its own forwards: ' .. tunnel) end
-if background[#background] ~= 'devbox' then fail('tunnel host: ' .. tunnel) end
+local line = background[#background]
+for _, want in ipairs({ 'ssh -n -T ', 'ExitOnForwardFailure=yes', 'BatchMode=yes', 'ServerAliveInterval=15',
+                        '-L 127.0.0.1:21001:/run/user/1001/viz/http.sock', '-L 127.0.0.1:21002:localhost:8080',
+                        " devbox bash -lc 'forwards hold viz other' >NUL 2>&1" }) do
+  if not line:find(want, 1, true) then fail('tunnel lacks ' .. want .. ': ' .. line) end
+end
+if line:find('"', 1, true) or line:find('ClearAllForwardings', 1, true) then fail('tunnel command: ' .. line) end
 if not (calls[2] and calls[2][1] == 'powershell.exe' and calls[2][#calls[2]]:find('@(21001,21002)', 1, true)) then
   fail('no wait for both ports')
 end
@@ -72,6 +75,16 @@ if #opened ~= 1 or opened[1] ~= 'http://127.0.0.1:21001/__viz/login?code=x' then
   fail('opened: ' .. table.concat(opened, ' '))
 end
 if not (toasts[1] or ''):find('devbox: viz 21001, other 21002', 1, true) then fail('toast: ' .. tostring(toasts[1])) end
+
+-- Pressed while open: the host closed them; no tunnel, no page.
+press(reset('closed\n', true, true))
+if background or #opened ~= 0 or not (toasts[1] or ''):find('devbox: closed', 1, true) then
+  fail('toggle off: ' .. tostring(toasts[1]))
+end
+
+-- A line with cmd.exe metacharacters is not a forward.
+press(reset('viz\t21001\t/tmp/x&calc\thttp://127.0.0.1:21001/\n', true, true))
+if background then fail('forwarded a target with & in it') end
 
 -- One tool failing still forwards the rest, and the toast says what failed.
 press(reset('viz\t21001\t/s\thttp://127.0.0.1:21001/\n', false, true))

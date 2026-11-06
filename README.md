@@ -229,19 +229,22 @@ write output and how to render it.
 viz path report.html              # ~/viz/<today>/report.html
 viz open ~/viz/2026-09-28/report.html   # prints http://127.0.0.1:PORT/2026-09-28/report.html
 viz status                        # server, the ssh forward for this machine, VS Code
-forwards                          # the ports WezTerm's Ctrl+Alt+P forwards from this machine
+forwards status                   # whether WezTerm's Ctrl+Alt+P tunnel carries this machine's ports
 viz login                         # single-use link that signs a browser in (run it yourself)
 ```
 
 From WezTerm on Windows, press **Ctrl+Alt+P** in the host's tab (also in the
 command palette). It asks the host which ports its shell tools want
 (`forwards`; viz today), opens one background tunnel with all of them, and
-opens viz in your browser, signed in. The tunnel has no console, so nothing
-prints in your sessions, and pressing it again is harmless. Copy
-`configs/wezterm.lua` to `%USERPROFILE%\.wezterm.lua`, and take any viz
-`LocalForward` out of `%USERPROFILE%\.ssh\config`: it would hold the port
-first. The sign-in lasts 30 days, or until `viz login --reset`. Without
-WezTerm, use the forward `viz status` prints and sign in with `viz login`.
+opens viz in your browser, signed in. Press it again to close the tunnel. The
+`⇅` at the left of tmux's status bar is lit while a tunnel carries the ports
+and dim otherwise; `forwards status` says the same, and `forwards close` closes
+them from the host. The tunnel has no console, so nothing prints in your
+sessions. Copy `configs/wezterm.lua` to `%USERPROFILE%\.wezterm.lua`, and take
+any viz `LocalForward` out of `%USERPROFILE%\.ssh\config`: it would hold the
+port first, and the tunnel would exit. The sign-in lasts 30 days, or until
+`viz login --reset`. Without WezTerm, use the forward `viz status` prints and
+sign in with `viz login`.
 
 Two hosts whose accounts share a uid share a default port, so one tunnel holds
 it for both; give one host another `VIZ_PORT` in `~/.shell.env`.

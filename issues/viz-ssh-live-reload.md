@@ -251,7 +251,8 @@ existing bookmark number stays. If you forward a different local port, set
 
 **Superseded on 2026-11-05 by WezTerm's Ctrl+Alt+P** (README, viz section):
 `forwards` on the host lists the ports, and WezTerm runs them in one
-console-less `ssh -N` tunnel and opens viz signed in. Since every session's
+console-less tunnel (whose `forwards hold` lights tmux's ⇅) and opens viz
+signed in; a second press closes it. Since every session's
 `LocalForward` warned `Address already in use`, and the one owning it printed
 `open failed` for each poll while the server was down, the `LocalForward`
 below is now the fallback without WezTerm. Still to check on the laptop: that

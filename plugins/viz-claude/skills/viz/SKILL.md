@@ -94,10 +94,11 @@ uv run --no-project --with jupyter --with plotly jupyter nbconvert --to notebook
 
 ## Boundaries
 
-- Never run `viz login`, `viz forward --open` or `forwards --open`, or paste
-  their links into your output: the links sign a browser in. The user runs
-  them, or presses Ctrl+Alt+P. `viz open`, `viz status`, `viz forward` and
-  `forwards` print nothing secret.
+- Never run `viz login`, `viz forward --open`, `forwards --open` or
+  `forwards toggle`, or paste their links into your output: the links sign a
+  browser in. The user runs them, or presses Ctrl+Alt+P. Leave `forwards
+  close` to the user too: it closes their tunnel. `viz open`, `viz status`,
+  `viz forward`, `forwards` and `forwards status` print nothing secret.
 - Only the user's account and their signed-in browser can read what viz
   serves. Still keep credentials out of `~/viz`: every page viz serves can
   read every other one, and a page from an untrusted source runs with that

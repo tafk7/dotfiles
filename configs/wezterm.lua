@@ -14,7 +14,7 @@ local config = wezterm.config_builder()
 -- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
 -- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
 -- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
-local CONFIG_REVISION = '9aba9c876641'
+local CONFIG_REVISION = 'fe4d9993e390'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -157,13 +157,15 @@ end
 -- Port forwards for the remote shell tools
 -- ---------------------------------------------------------------------------
 
--- Ctrl+Alt+P (P for ports) asks the tab's SSH host which ports its shell tools
--- want (bin/forwards there; viz today), opens one background `ssh -N` tunnel
--- with all of them, and opens each tool's page, signed in, in the browser. The
--- tunnel has no console, so a server that goes away prints nowhere. It is the
--- only forward: a viz LocalForward left in the Windows ssh config takes the
--- port first, and this tunnel exits. Pressing it again is harmless, since a
--- second tunnel finds its ports taken and exits (ExitOnForwardFailure), and
+-- Ctrl+Alt+P (P for ports) toggles the tunnel for the tab's SSH host's shell
+-- tools (bin/forwards there; viz today). Opening asks the host for its
+-- forwards, starts one background tunnel with all of them, and opens each
+-- tool's page, signed in, in the browser; pressing it again closes the tunnel.
+-- The tunnel's remote command, `forwards hold`, lights the ⇅ in tmux's status
+-- bar for as long as it lives. It runs without a console, so a server that
+-- goes away prints nowhere, and its output (the hold's heartbeat) goes to NUL.
+-- It is the only forward: a viz LocalForward left in the Windows ssh config
+-- takes the port first, and this tunnel exits (ExitOnForwardFailure).
 -- ServerAlive ends a tunnel whose network is gone. The host comes from the tab
 -- as for image paste, with the same PASTE_FALLBACK_HOST.
 local FORWARD_WAIT_SECONDS = 8
@@ -177,15 +179,23 @@ local function forward_shell_tools(window, pane)
   if not host then
     return fail('No SSH host for this tab (set PASTE_FALLBACK_HOST).')
   end
+  -- The tunnel's command line goes through cmd.exe, so every part of it is
+  -- checked against cmd's metacharacters.
+  if not host:match('^[%w%.%-_@]+$') then
+    return fail('Unexpected characters in the SSH host: ' .. host)
+  end
 
-  -- A login shell puts the dotfiles' bin on PATH. --open makes the URLs
-  -- sign-in links, which only this keypress asks for.
+  -- A login shell puts the dotfiles' bin on PATH. toggle closes open forwards
+  -- and prints "closed", or lists them with sign-in URLs (only this key asks).
   local ok, out, err = wezterm.run_child_process {
-    'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host, 'bash -lc "forwards --open"',
+    'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host, 'bash -lc "forwards toggle"',
   }
+  if ok and (out or ''):match('^closed') then
+    return window:toast_notification('Forward ports', host .. ': closed', nil, 3000)
+  end
   local forwards = {}
   for line in (out or ''):gmatch('[^\r\n]+') do
-    local name, port, target, url = line:match('^([^\t]+)\t(%d+)\t([^\t]+)\t([^\t]+)$')
+    local name, port, target, url = line:match('^([%w%-]+)\t(%d+)\t([%w%._%-/:]+)\t([^\t]+)$')
     if name then
       table.insert(forwards, { name = name, port = port, target = target, url = url })
     end
@@ -195,20 +205,22 @@ local function forward_shell_tools(window, pane)
   end
 
   local tunnel = {
-    'ssh', '-N', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes',
+    'ssh', '-n', '-T', '-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes',
     '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
   }
-  local ports, names = {}, {}
+  local ports, names, held = {}, {}, {}
   for _, f in ipairs(forwards) do
-    table.insert(tunnel, '-L')
-    table.insert(tunnel, '127.0.0.1:' .. f.port .. ':' .. f.target)
+    table.insert(tunnel, '-L 127.0.0.1:' .. f.port .. ':' .. f.target)
     table.insert(ports, f.port)
     table.insert(names, f.name .. ' ' .. f.port)
+    table.insert(held, f.name)
   end
-  table.insert(tunnel, host)
-  wezterm.background_child_process(tunnel)
+  -- ssh joins the words after the host into the remote command. No double
+  -- quotes: Windows quotes this argument for cmd.exe in a way cmd doesn't read.
+  table.insert(tunnel, host .. " bash -lc 'forwards hold " .. table.concat(held, ' ') .. "' >NUL 2>&1")
+  wezterm.background_child_process { 'cmd.exe', '/d', '/s', '/c', table.concat(tunnel, ' ') }
 
-  -- Open the pages once every port answers, from this tunnel or an earlier one.
+  -- Open the pages once every port answers.
   local wait = table.concat({
     '$deadline = (Get-Date).AddSeconds(' .. FORWARD_WAIT_SECONDS .. ')',
     'foreach ($p in @(' .. table.concat(ports, ',') .. ')) { while ($true) {',
@@ -231,7 +243,7 @@ end
 
 wezterm.on('augment-command-palette', function()
   return {
-    { brief = 'Forward ports for shell tools (Ctrl+Alt+P)', action = wezterm.action_callback(forward_shell_tools) },
+    { brief = 'Toggle the port forwards for shell tools (Ctrl+Alt+P)', action = wezterm.action_callback(forward_shell_tools) },
   }
 end)
 
@@ -309,7 +321,7 @@ config.keys = {
     mods = 'CTRL|ALT',
     action = wezterm.action_callback(paste_clipboard_image),
   },
-  -- Forward the tab's SSH host's shell tool ports and open their pages.
+  -- Toggle the tunnel for the tab's SSH host's shell tool ports.
   {
     key = 'p',
     mods = 'CTRL|ALT',

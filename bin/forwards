@@ -1,31 +1,133 @@
 #!/bin/bash
-# List the ports this machine's shell tools want forwarded to the ssh client.
+# The ports this machine's shell tools want forwarded to the ssh client, and whether they are.
 #
-# Usage: forwards [--open]
+# Usage: forwards [--open]      list them (WezTerm's Ctrl+Alt+P reads this)
+#        forwards toggle        close them if open, else list them with --open
+#        forwards status        open or closed (exit 0 or 1); resyncs tmux
+#        forwards close         end every tunnel's hold, which ends the tunnel
+#        forwards hold NAME...  the tunnel's remote command (WezTerm runs it)
 #
-# WezTerm's Ctrl+Alt+P runs this over ssh, opens one background tunnel with
-# every forward listed, and opens each tool's URL in the Windows browser.
-# Each line is tab-separated: NAME, client PORT (bound on 127.0.0.1), the
-# TARGET on this machine (a Unix socket path or HOST:PORT), and a URL to open
-# (or -). Each tool listed below answers `TOOL forward [--open]` with its lines
-# and starts what it serves first.
+# Each listed line is tab-separated: NAME, client PORT (bound on 127.0.0.1),
+# the TARGET on this machine (a Unix socket path or HOST:PORT), and a URL to
+# open (or -). Each tool in TOOLS answers `TOOL forward [--open]` with its
+# lines and starts what it serves first. --open asks for URLs that sign the
+# browser in: secrets, like `viz login`'s link, for the person at the client.
 #
-# --open asks for URLs that sign the browser in. They are secrets, like
-# `viz login`'s link: only the person at the client should ask for them.
+# A tunnel's hold runs as long as its connection, which ssh opens only once its
+# forwards are bound, so a live hold means the ports are open. It sets tmux's
+# @forwards to the names it carries (the status bar's symbol) and clears it
+# when the last hold ends. Its heartbeat byte makes a client that went away
+# (asleep, off the network) reset the connection, so a hold doesn't outlive
+# its tunnel by more than a few heartbeats once the client is reachable again.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS=(viz)
+HEARTBEAT="${FORWARDS_HEARTBEAT:-15}"
+
+state_dir() {
+    local base="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    [[ -d "$base" && -O "$base" ]] || base="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+    mkdir -p "$base"
+    mkdir -m 700 "$base/forwards" 2>/dev/null || [[ -d "$base/forwards" ]]
+    printf '%s\n' "$base/forwards"
+}
+
+# Live holds' names, one line each; a hold file whose lock is free is stale.
+live_holds() {
+    local file
+    for file in "$(state_dir)"/hold.*; do
+        [[ -e "$file" ]] || continue
+        if flock -n "$file" true 2>/dev/null; then
+            rm -f "$file"
+        else
+            cat "$file"
+        fi
+    done
+}
+
+# tmux's @forwards: the names every live hold carries, or unset.
+sync_tmux() {
+    local names client
+    names="$(live_holds | tr ' ' '\n' | sort -u | paste -sd, -)"
+    command -v tmux >/dev/null 2>&1 || return 0
+    if [[ -n "$names" ]]; then
+        tmux set-option -g @forwards "$names" 2>/dev/null || return 0
+    else
+        tmux set-option -gu @forwards 2>/dev/null || return 0
+    fi
+    while read -r client; do
+        tmux refresh-client -S -t "$client" 2>/dev/null || true
+    done < <(tmux list-clients -F '#{client_name}' 2>/dev/null || true)
+}
+
+list() {
+    # One tool's failure leaves the others' forwards usable.
+    local tool rc=0
+    for tool in "${TOOLS[@]}"; do
+        "$SCRIPT_DIR/$tool" forward "$@" || { echo "forwards: $tool forward failed" >&2; rc=1; }
+    done
+    return "$rc"
+}
+
+hold() {
+    (( $# )) || { echo 'forwards: hold needs the forwarded names' >&2; return 64; }
+    # Global: the EXIT trap runs after this function has returned.
+    local parent="$PPID" dir
+    dir="$(state_dir)"
+    HOLD_FILE="$dir/hold.$$" HOLD_NEW="$dir/.hold.$$"
+    # Locked and written under a name live_holds doesn't list, then renamed:
+    # a hold file it sees unlocked is stale, never one still starting.
+    exec {HOLD_LOCK}>"$HOLD_NEW"
+    trap 'exec {HOLD_LOCK}>&-; rm -f "$HOLD_FILE" "$HOLD_NEW"; sync_tmux' EXIT
+    flock -n "$HOLD_LOCK"
+    printf '%s\n' "$*" >&"$HOLD_LOCK"
+    mv "$HOLD_NEW" "$HOLD_FILE"
+    trap 'exit 0' HUP INT TERM PIPE
+    sync_tmux
+    # The session's sshd is the parent; it exits when the connection does.
+    while kill -0 "$parent" 2>/dev/null; do
+        printf '\n' 2>/dev/null || exit 0
+        sleep "$HEARTBEAT" & wait $! || true
+    done
+}
+
+close() {
+    local file pid closed=0
+    for file in "$(state_dir)"/hold.*; do
+        [[ -e "$file" ]] || continue
+        pid="${file##*.}"
+        if ! flock -n "$file" true 2>/dev/null && kill "$pid" 2>/dev/null; then
+            closed=1
+        fi
+    done
+    # Each hold clears its own state as it exits; wait for that, briefly.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        [[ -z "$(live_holds)" ]] && break
+        sleep 0.1
+    done
+    sync_tmux
+    (( closed ))
+}
+
+status() {
+    local names
+    names="$(live_holds | paste -sd' ' -)"
+    sync_tmux
+    if [[ -n "$names" ]]; then
+        echo "open: $names"
+    else
+        echo 'closed'
+        return 1
+    fi
+}
 
 case "${1:-}" in
-    ''|--open) ;;
-    -h|--help) sed -n '4,14s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    ''|--open) list "$@" ;;
+    toggle) if close; then echo closed; else list --open; fi ;;
+    status) status ;;
+    close) close || echo 'forwards: none open' >&2 ;;
+    hold) shift; hold "$@" ;;
+    -h|--help) sed -n '4,21s/^# \{0,1\}//p' "${BASH_SOURCE[0]}" ;;
     *) echo "forwards: unknown argument: $1 (see forwards --help)" >&2; exit 64 ;;
 esac
-
-# One tool's failure leaves the others' forwards usable.
-rc=0
-for tool in "${TOOLS[@]}"; do
-    "$SCRIPT_DIR/$tool" forward "$@" || { echo "forwards: $tool forward failed" >&2; rc=1; }
-done
-exit "$rc"
