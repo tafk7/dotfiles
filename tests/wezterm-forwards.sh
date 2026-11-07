@@ -46,7 +46,7 @@ local pane = { get_foreground_process_info = function()
 end }
 local function press(config)
   for _, k in ipairs(config.keys) do
-    if k.key == 'p' and k.mods == 'CTRL|ALT' then return k.action.callback(window, pane) end
+    if k.key == 'phys:P' and k.mods == 'CTRL|ALT' then return k.action.callback(window, pane) end
   end
   fail('Ctrl+Alt+P is not bound')
 end
