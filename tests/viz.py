@@ -204,8 +204,10 @@ with tempfile.TemporaryDirectory() as tmp:
         check('not forwarded: press Ctrl+Alt+P' in out and secret not in out, f'open: no forward hint in {out!r}')
         out = open_in_terminal(TMUX='/tmp/tmux-1/default,1,0')
         wrapped = re.search(r'\x1bPtmux;\x1b\x1b\]1337;SetUserVar=viz_open=([A-Za-z0-9+/=]+)\x07\x1b\\', out)
-        check(wrapped is not None and base64.b64decode(wrapped.group(1)).decode().startswith(f'{port} /__viz/login?code='),
+        index = base64.b64decode(wrapped.group(1)).decode() if wrapped else ''
+        check(re.fullmatch(rf'{port} /__viz/login\?code=[\w-]+', index) is not None,
               f'open: no tmux-wrapped user variable for the index in {out!r}')
+        check(f'http://127.0.0.1:{port}/\r\n' in out, f'open: index URL in {out!r}')
         out = run('open', str(tmp / 'viz' / today / 'chart.html')).stdout
         check('SetUserVar' not in out and 'code=' not in out and f'/{today}/chart.html' in out, f'open in a pipe: {out!r}')
 

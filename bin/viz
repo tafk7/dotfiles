@@ -337,7 +337,8 @@ def resolve(parts):
 
 def url_path(path):
     """URL path of PATH, a path under ROOT (linked files through their link)."""
-    return '/' + urllib.parse.quote(path.relative_to(ROOT).as_posix())
+    rel = path.relative_to(ROOT)
+    return '/' + urllib.parse.quote(rel.as_posix()) if rel.parts else ''
 
 
 def opened_files():
