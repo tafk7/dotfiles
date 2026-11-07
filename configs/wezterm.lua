@@ -14,7 +14,7 @@ local config = wezterm.config_builder()
 -- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
 -- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
 -- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
-local CONFIG_REVISION = 'ee02d750464a'
+local CONFIG_REVISION = '63a3ebd81e6b'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -344,9 +344,10 @@ config.keys = {
     action = act.PasteFrom 'Clipboard',
   },
   -- Clipboard image -> upload to the tab's SSH host -> paste its remote path.
-  -- Ctrl+Alt chords match the physical key: Windows reads Ctrl+Alt as AltGr,
-  -- so the letter it maps to varies (layouts, Caps Lock), and an unmatched
-  -- chord reaches the program (Ctrl+Alt+P as Claude Code's previous prompt).
+  -- Ctrl+Alt chords match the physical key, whatever the layout maps it to
+  -- (Windows reads Ctrl+Alt as AltGr). A chord whose letter goes down before
+  -- Alt is Ctrl+letter by then, and reaches the program: Ctrl+P is the
+  -- previous prompt in Claude Code and bash.
   {
     key = 'phys:V',
     mods = 'CTRL|ALT',
