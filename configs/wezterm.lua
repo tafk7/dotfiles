@@ -9,12 +9,10 @@ local act = wezterm.action
 
 local config = wezterm.config_builder()
 
--- This file's revision, for the hosts you SSH into: `dotfiles verify` there
--- compares it with the repo's copy and says when this one needs copying again.
--- It goes out as LC_TAFK_WEZTERM, which sshd accepts like any LC_ variable, once
--- the Windows ssh config's Host block has `SendEnv LC_TAFK_WEZTERM`. The value
--- is this file's own hash (lib/wezterm.sh), kept current by the pre-commit hook.
-local CONFIG_REVISION = '63a3ebd81e6b'
+-- This file's revision. With `SendEnv LC_TAFK_WEZTERM` in the Windows ssh
+-- config's Host block, `dotfiles verify` on the host says when this copy is
+-- out of date and needs copying again.
+local CONFIG_REVISION = 'df2957ab948c'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -128,7 +126,7 @@ local function paste_clipboard_image(window, pane)
   end
 
   -- Private upload dir; prune old pastes; print the absolute path to paste.
-  -- ClearAllForwardings: the host's LocalForward (viz) belongs to the tab's
+  -- ClearAllForwardings: forwards in the ssh config belong to the tab's
   -- session, not to this command (scp clears forwards by itself).
   local ok, remote_dir, err = wezterm.run_child_process {
     'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host,
@@ -157,17 +155,13 @@ end
 -- Port forwards for the remote shell tools
 -- ---------------------------------------------------------------------------
 
--- Ctrl+Alt+P (P for ports) toggles the tunnel for the tab's SSH host's shell
--- tools (bin/forwards there; viz today). Opening asks the host for its
--- forwards and starts one background tunnel with all of them; pressing it
--- again closes the tunnel. Pages open from the host: `viz open` there asks
--- WezTerm through a user variable (below). The tunnel's remote command,
--- `forwards hold`, lights the ⇅ in tmux's status bar for as long as it lives. It runs without a console, so a server that
--- goes away prints nowhere, and its output (the hold's heartbeat) goes to NUL.
--- It is the only forward: a viz LocalForward left in the Windows ssh config
--- takes the port first, and this tunnel exits (ExitOnForwardFailure).
--- ServerAlive ends a tunnel whose network is gone. The host comes from the tab
--- as for image paste, with the same PASTE_FALLBACK_HOST.
+-- Ctrl+Alt+P (P for ports) toggles a tunnel to the tab's SSH host for the
+-- ports its shell tools serve (`forwards` on the host lists them; viz
+-- today). tmux's ⇅ is lit while it is open, and `viz open` on the host opens
+-- pages through it (below). The tunnel runs in the background, without a
+-- console, and outlives WezTerm. A LocalForward for the same port in the
+-- Windows ssh config stops it from starting. The host comes from the tab, as
+-- for image paste, with the same PASTE_FALLBACK_HOST.
 local FORWARD_WAIT_SECONDS = 8
 
 -- The client ports Ctrl+Alt+P's tunnels forward, by host: the only ports a
@@ -344,10 +338,7 @@ config.keys = {
     action = act.PasteFrom 'Clipboard',
   },
   -- Clipboard image -> upload to the tab's SSH host -> paste its remote path.
-  -- Ctrl+Alt chords match the physical key, whatever the layout maps it to
-  -- (Windows reads Ctrl+Alt as AltGr). A chord whose letter goes down before
-  -- Alt is Ctrl+letter by then, and reaches the program: Ctrl+P is the
-  -- previous prompt in Claude Code and bash.
+  -- Ctrl+Alt chords match the physical key, whatever the layout maps it to.
   {
     key = 'phys:V',
     mods = 'CTRL|ALT',
@@ -368,9 +359,7 @@ config.keys = {
     action = act.SendString '\x1b[27;6;83~',
   },
   -- Ctrl+Shift+E/D/F likewise: in tmux review, Ctrl+Shift+E/S/D/F extend the
-  -- selection by a prompt or a word. WezTerm's own search is gone from
-  -- Ctrl+Shift+F: under tmux it sees only the screen, and review searches the
-  -- whole conversation.
+  -- selection by a prompt or a word.
   {
     key = 'e',
     mods = 'CTRL|SHIFT',
@@ -436,8 +425,7 @@ config.keys = {
     action = act.SendString '\x1b[1;2S',
   },
 
-  -- ScrollLock and Pause, by Windows key code: WezTerm has no names for them,
-  -- but offers every key to its bindings by code before it names it.
+  -- ScrollLock and Pause, by Windows key code (WezTerm has no names for them).
   -- ScrollLock reviews the pane (Shift+F5 to tmux), with Shift reviews and
   -- searches (Shift+F7); Pause, the Break key, stops whatever runs (Shift+F9).
   -- Shift+F keys, clear of the Shift+F1-F4 cut transport above.
