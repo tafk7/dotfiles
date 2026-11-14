@@ -440,6 +440,14 @@ verify_environment() {
     else
         outcome advisory "$section" EDITOR "also set in${editor_files}; only shell/env.sh should set it"
     fi
+    # A minimal image ships no vi, so env.sh's last resort can name nothing.
+    local editor
+    editor="$(unset _DOTFILES_ENV_LOADED EDITOR VISUAL
+              source "$DOTFILES_DIR/shell/env.sh" >/dev/null 2>&1
+              printf '%s' "$EDITOR")"
+    if ! command -v "$editor" >/dev/null 2>&1; then
+        outcome advisory "$section" editor "no editor installed (EDITOR=${editor:-unset}); run ./setup.sh --dev for nvim, or: sudo apt install vim-tiny"
+    fi
 }
 
 # What an agent's non-interactive login shell carries: no dotfiles

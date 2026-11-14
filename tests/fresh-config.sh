@@ -17,9 +17,21 @@ process_git_config "$ROOT/configs/gitconfig" "$HOME/.gitconfig" >/dev/null
 if git config --global --get core.editor >/dev/null; then fail "config-only Git requires nvim"; fi
 if git config --global --get core.pager >/dev/null; then fail "config-only Git requires delta"; fi
 if git config --global --get interactive.diffFilter >/dev/null; then fail "config-only Git requires delta filter"; fi
+# A standard base image ships vim-tiny; a minimal one ships no editor at all.
+printf '#!/bin/sh\n' > "$TEST_ROOT/bin/vim"; chmod +x "$TEST_ROOT/bin/vim"
 unset EDITOR VISUAL _DOTFILES_ENV_LOADED
 source "$ROOT/shell/env.sh"
-command -v "$EDITOR" >/dev/null || fail "default editor unavailable"
+[[ "$EDITOR" == vim ]] || fail "default editor is $EDITOR, not the base image's vim"
+source "$ROOT/lib/outcomes.sh"
+source "$ROOT/lib/verify.sh"
+[[ "$(verify_environment)" != *$'\teditor\t'* ]] || fail "verify flagged an installed editor"
+rm "$TEST_ROOT/bin/vim"
+command() {
+    if [[ "$1" == -v && "$2" =~ ^(nvim|delta|vim|nano|vi)$ ]]; then return 1; fi
+    builtin command "$@"
+}
+[[ "$(verify_environment)" == *$'advisory\tEnvironment\teditor\t'* ]] \
+    || fail "verify missed a machine with no editor"
 unset -f command
 
 # Config root is outside fixture HOME; --force must still preserve displaced data.
