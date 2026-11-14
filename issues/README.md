@@ -5,6 +5,9 @@ note's own **Status** line is the authority; this index is updated with it.
 
 ## Open
 
+- [Agent badge for background sessions](agent-badge-background-sessions.md): a
+  `claude attach` window on a `--bg` session shows no badge; find the attached
+  pane from the session.
 - [Agent parity](agent-parity.md): how far pi and OpenCode should follow Claude
   and Codex in review, last-reply, the badge and the compose editor.
 - [Scheduled review on the desktop](scheduled-review-desktop.md): where the

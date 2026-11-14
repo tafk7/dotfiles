@@ -55,4 +55,25 @@ tk_until grep -q 'm' "$app_log" || fail "Ctrl+click never reached the app"
 [[ "$(tk_input "$app_log")" == '^[[<16;'*M'^[[<16;'*m ]] || fail "Ctrl+click: $(tk_input "$app_log")"
 assert_eq "$(ti display-message -p -t "$right" '#{pane_index}')" 2 "Ctrl+click swapped panes"
 
+# A stale client can still send movement reports over SSH to a plain pane.
+# They must be parsed and discarded, even when SSH splits the escape prefix
+# from its payload. A raw-input stub without mouse mode exposes any bytes that
+# would otherwise be interpreted or echoed by a shell's line editor.
+plain_log="$TEST_ROOT/plain.log"
+plain=$(ti split-window -v -t "$right" -P -F '#{pane_id}' "$(tk_stub plain "$plain_log")")
+tk_ready "$plain_log"
+tk_wait '#{mouse_any_flag}' 0 "$plain"
+col=$(( $(ti display-message -p -t "$plain" '#{pane_left}') + 4 ))
+row=$(( $(ti display-message -p -t "$plain" '#{pane_top}') + 3 ))
+# Startup terminal queries temporarily impose a 500 ms minimum escape timeout;
+# wait for their five-second grace period so this tests the configured value.
+sleep 6
+tk_raw "\\e[<35;$col;${row}M"
+tk_raw '\e['
+sleep 0.08
+tk_raw "<35;$col;${row}M"
+tk_raw z
+tk_until grep -q z "$plain_log" || fail "plain stub got no input"
+assert_eq "$(tk_input "$plain_log")" z "a fragmented movement report reached a plain pane"
+
 printf 'tmux-mouse: ok\n'
