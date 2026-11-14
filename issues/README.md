@@ -5,6 +5,9 @@ note's own **Status** line is the authority; this index is updated with it.
 
 ## Open
 
+- [Claude statusline review](claude-statusline-review.md): verify the whole
+  display against current Claude Code features, settings, and pitfalls; propose
+  a design that preserves the operator's intent.
 - [Agent badge for background sessions](agent-badge-background-sessions.md): a
   `claude attach` window on a `--bg` session shows no badge; find the attached
   pane from the session.
