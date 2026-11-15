@@ -16,6 +16,7 @@
 #
 # The optional [pane] argument exists because an agent hook inherits $TMUX_PANE,
 # but a tmux-spawned hook gets only $TMUX, so tmux passes #{pane_id} explicitly.
+# A background Claude session has neither, and sets AGENT_BADGE_SESSION=<id>.
 #
 # Contract: never block the agent, never write to stdout (hook stdout can be
 # interpreted), always exit 0.
@@ -27,6 +28,35 @@ AGENT_CMDS="claude codex"
 
 state="$1"
 pane="${2:-$TMUX_PANE}"
+
+# A background session (`claude --bg`) runs outside tmux and names itself in
+# AGENT_BADGE_SESSION instead of a pane. Write the same state to every pane
+# viewing it right now -- `claude attach`, or the agent view showing it -- on
+# the default tmux server, looked up afresh each event because viewers come and
+# go. No viewer: nothing to badge, as for any session outside tmux.
+if [[ -z "$pane" && -n "${AGENT_BADGE_SESSION:-}" ]]; then
+    sock="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/default"
+    [[ -S "$sock" ]] || exit 0
+    payload=""
+    [[ -t 0 ]] || payload=$(timeout 2 cat 2>/dev/null)
+    here="$(dirname -- "${BASH_SOURCE[0]}")"
+    export TMUX="$sock,0,0"
+    viewers=$(bash "$here/agent-viewers.sh" panes "$AGENT_BADGE_SESSION" 2>/dev/null)
+    [[ -n "$viewers" ]] || exit 0
+    # The session's own SessionStart had no pane to wire from, and a server
+    # where only background sessions run may never have been wired: repair the
+    # formats and hooks here (idempotent; one `show` in the steady state).
+    bash "$here/../agent-badge.tmux" >/dev/null 2>&1
+    while read -r p view; do
+        [[ "$p" == %* ]] || continue
+        # Tag the pane with what it shows, so the reconciler can demote it and
+        # the agent view's title hook can tell a session change from a redraw.
+        tmux set -p -t "$p" @cc_pane_session "$AGENT_BADGE_SESSION" 2>/dev/null
+        tmux set -p -t "$p" @cc_pane_view "$view" 2>/dev/null
+        printf '%s' "$payload" | AGENT_BADGE_SESSION='' bash "${BASH_SOURCE[0]}" "$state" "$p"
+    done <<<"$viewers"
+    exit 0
+fi
 
 [[ -n "$TMUX" && -n "$pane" ]] || exit 0
 
@@ -186,6 +216,8 @@ if [[ "$state" == gone ]]; then
     tmux set -pu -t "$pane" @cc_pane_state 2>/dev/null
     tmux set -pu -t "$pane" @cc_pane_since 2>/dev/null
     tmux set -pu -t "$pane" @cc_pane_agents 2>/dev/null
+    tmux set -pu -t "$pane" @cc_pane_view 2>/dev/null
+    tmux set -pu -t "$pane" @cc_pane_session 2>/dev/null
 fi
 
 # Window focused: demote every done pane in it, not just the focused one, which
@@ -285,6 +317,8 @@ while IFS= read -r line; do
         tmux set -pu -t "$p" @cc_pane_state 2>/dev/null
         tmux set -pu -t "$p" @cc_pane_since 2>/dev/null
         tmux set -pu -t "$p" @cc_pane_agents 2>/dev/null
+        tmux set -pu -t "$p" @cc_pane_view 2>/dev/null
+        tmux set -pu -t "$p" @cc_pane_session 2>/dev/null
         continue
     fi
 
@@ -323,6 +357,11 @@ else
 fi
 
 # status-interval is 15s; without this the badge would lag by up to that long.
-tmux refresh-client -S 2>/dev/null
+# A write for a background session has no client of its own ("no current
+# client"), so redraw every attached client instead.
+tmux refresh-client -S 2>/dev/null \
+    || tmux list-clients -F '#{client_name}' 2>/dev/null | while IFS= read -r c; do
+           tmux refresh-client -S -t "$c" 2>/dev/null
+       done
 
 exit 0

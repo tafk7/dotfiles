@@ -5,12 +5,15 @@ note's own **Status** line is the authority; this index is updated with it.
 
 ## Open
 
-- [Claude statusline review](claude-statusline-review.md): verify the whole
-  display against current Claude Code features, settings, and pitfalls; propose
-  a design that preserves the operator's intent.
-- [Agent badge for background sessions](agent-badge-background-sessions.md): a
-  `claude attach` window on a `--bg` session shows no badge; find the attached
-  pane from the session.
+- [Claude statusline review](claude-statusline-review.md): reviewed
+  2026-11-14. The proposal: take the compaction threshold from the engine
+  through a small mod, not a second settings resolver; drop the subagent
+  fallback; fix the unknown, sanitizing and `CLAUDE_CONFIG_DIR` defects. Not
+  implemented.
+- [Agent badge for background sessions](agent-badge-background-sessions.md):
+  `claude attach` and agent-view panes on a `--bg` session are badged and
+  seeded. Implemented on branch `agent-badge-bg-viewers` (agent-badge 1.2.0);
+  manual checks on the operator's tmux are open.
 - [Agent parity](agent-parity.md): how far pi and OpenCode should follow Claude
   and Codex in review, last-reply, the badge and the compose editor.
 - [Scheduled review on the desktop](scheduled-review-desktop.md): where the

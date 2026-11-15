@@ -3,7 +3,8 @@
 #
 # Installs two things into the running tmux server:
 #   1. the badge placeholder #{E:@cc_win_badge} in the window status formats
-#   2. the pane-focus-in / pane-exited hooks that keep badges honest
+#   2. the pane-focus-in / pane-exited / pane-title-changed / pane-shell-prompt
+#      hooks that keep badges honest
 #
 # Called by agent-status.sh on SessionStart and when a focus event notices
 # that the badge is missing from window-status-format. Base tmux configuration has no
@@ -20,7 +21,7 @@ set -u
 SELF_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 STATUS="$SELF_DIR/scripts/agent-status.sh"
 RECONCILE="$SELF_DIR/scripts/agent-reconcile.sh"
-WIRING_VERSION=2
+WIRING_VERSION=3   # 3: viewer seeding (pane-title-changed) and pane-shell-prompt
 
 BADGE='#{E:@cc_win_badge}'
 FORMATS="window-status-format window-status-current-format"
@@ -71,6 +72,23 @@ hook_cmds() {
         pane-exited)
             hook_run "$STATUS" 'reap #{pane_id}'
             ;;
+        pane-title-changed)
+            # The agent view titles its pane with the session it shows, so a
+            # retitle there means it opened, switched or closed a session; see
+            # agent-reconcile.sh. Fork only for a claude pane that is unbadged or
+            # a viewer: interactive panes retitle often and cost a format
+            # evaluation, no process.
+            printf 'if-shell -F "%s" { %s }\n' \
+                '#{&&:#{==:#{pane_current_command},claude},#{||:#{==:#{@cc_pane_state},},#{@cc_pane_view}}}' \
+                "$(hook_run "$RECONCILE" 'seed #{pane_id}')"
+            ;;
+        pane-shell-prompt)
+            # A shell prompt (OSC 133;A) in a badged pane: the agent or viewer
+            # has gone, e.g. Ctrl+Z out of `claude attach`, which ends no
+            # session. Recompute now instead of at the next focus change.
+            printf 'if-shell -F "%s" { %s }\n' '#{@cc_pane_state}' \
+                "$(hook_run "$STATUS" 'reap #{pane_id}')"
+            ;;
     esac
 }
 
@@ -102,10 +120,15 @@ wire_formats() {
     done
 }
 
+HOOK_EVENTS="pane-focus-in pane-exited pane-title-changed pane-shell-prompt"
+
 wire_hooks() {
     local event cmd
-    for event in pane-focus-in pane-exited; do
+    for event in $HOOK_EVENTS; do
         drop_ours "$event"
+        # A tmux without this hook rejects it (pane-shell-prompt is recent):
+        # wire what this server has rather than gate the badge on a version.
+        tmux show-hooks -g "$event" >/dev/null 2>&1 || continue
         while IFS= read -r cmd; do
             [[ -n "$cmd" ]] || continue
             tmux set-hook -ga "$event" "$cmd" 2>/dev/null
@@ -139,7 +162,7 @@ unwire)
     # Neither harness fires a hook on plugin uninstall, so this has to be run by
     # hand. Without it the tmux server keeps invoking a deleted path on every
     # pane focus until the server is restarted.
-    for event in pane-focus-in pane-exited; do drop_ours "$event"; done
+    for event in $HOOK_EVENTS; do drop_ours "$event"; done
     for opt in $FORMATS; do
         cur=$(tmux show -gv "$opt" 2>/dev/null) || continue
         tmux set -g "$opt" "${cur//"$BADGE"/}" 2>/dev/null
@@ -157,6 +180,8 @@ unwire)
         tmux set -pu -t "$p" @cc_pane_since 2>/dev/null
         tmux set -pu -t "$p" @cc_pane_agents 2>/dev/null
         tmux set -pu -t "$p" @cc_pane_prev 2>/dev/null
+        tmux set -pu -t "$p" @cc_pane_view 2>/dev/null
+        tmux set -pu -t "$p" @cc_pane_session 2>/dev/null
     done < <(tmux list-panes -a -F '#{pane_id}' 2>/dev/null)
     tmux refresh-client -S 2>/dev/null
     ;;

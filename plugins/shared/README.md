@@ -100,8 +100,10 @@ From 1.1.0 the Claude plugin drives the badge from a Claude Code mod
 (`hooks/register.ts`) instead of settings hooks, so it needs **Claude Code
 2.1.287 or newer**; `bin/ai-config --check --plugins` reports an older client.
 The mod still calls `scripts/agent-status.sh`, so tmux wiring and the Codex
-plugin are unchanged. It does nothing outside tmux and in headless (`claude -p`)
-sessions, so child agents no longer flip the parent's badge.
+plugin are unchanged. It does nothing in headless (`claude -p`) sessions, so
+child agents no longer flip the parent's badge, and nothing outside tmux except
+for a background session viewed from a tmux pane (see
+[Background sessions](#background-sessions)).
 
 ## Why two plugins
 
@@ -155,8 +157,36 @@ The badge is pre-rendered in shell rather than assembled in the format string
 because a tmux format cannot iterate over panes.
 
 Options written, all prefixed `@cc_`: `@cc_pane_state`, `@cc_pane_since`,
-`@cc_pane_agents`, `@cc_pane_prev` (pane scope); `@cc_win_state`,
-`@cc_win_badge` (window scope); `@cc_badge_wired` (server scope).
+`@cc_pane_agents`, `@cc_pane_prev`, `@cc_pane_session`, `@cc_pane_view` (pane
+scope); `@cc_win_state`, `@cc_win_badge` (window scope); `@cc_badge_wired`,
+`@cc_badge_wiring_version` (server scope).
+
+### Background sessions
+
+A `claude --bg` session runs under Claude Code's background daemon, outside
+tmux, so it has no pane. The pane belongs to whatever is showing the session:
+`claude attach <id|name>`, or the agent view (`claude agents`) with that
+session open. The mod passes the session id (`AGENT_BADGE_SESSION`) instead of
+a pane. `scripts/agent-viewers.sh` then finds the panes on the default tmux
+server whose foreground process is viewing that session, afresh at each event,
+and each one is badged as an interactive pane would be:
+
+- `claude attach <arg>` resolves the way the CLI resolves it: the short id, a
+  session-id prefix, the exact name, or a unique part of the name.
+- The agent view titles its pane with the open session's name, which is matched
+  exactly.
+- A part of a name that matches two live sessions badges nothing: a missing
+  badge is better than a wrong one.
+
+Nothing fires when a viewer attaches, so such a pane is **seeded** from the
+session file: busy → working, idle → idle, waiting → needs, never done. This is
+the reconciler's one write that is not a demotion, and it only fills a pane the
+hooks have not written. It runs on any pane's focus, and on
+`pane-title-changed`. That hook fires when the agent view opens or switches a
+session, and when a busy session retitles an attached pane. When the agent view
+returns to its list, the seeded state is cleared. A `pane-shell-prompt` hook
+(tmux versions that have it, and shells that emit OSC 133) clears a pane as
+soon as its viewer exits, as Ctrl+Z out of `claude attach` does.
 
 ### Keeping it honest
 
@@ -201,3 +231,6 @@ A badge stuck on "working" is worse than no badge.
   *window*, in different panes, is fine and shows both glyphs.
 - Badges update on hook activity or on focus, not continuously. There is no
   polling daemon, by choice.
+- Background sessions are found on the default tmux socket only
+  (`$TMUX_TMPDIR/tmux-$UID/default`, as the background daemon sees it). A
+  viewer on a `-L`/`-S` server gets no badge.

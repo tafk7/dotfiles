@@ -1,6 +1,6 @@
 {
   "name": "agent-badge",
-  "version": "1.1.0+codex.20261007135817",
+  "version": "1.2.0+codex.20261115004338",
   "description": "Per-window tmux status badges showing what every Claude Code and Codex session in your tmux server is doing.",
   "author": {
     "name": "tafk7",

@@ -1,11 +1,13 @@
 import { expect, test } from 'claude-code/testing'
 
-type Run = { state: string; pane: string; stdin: string }
+type Run = { state: string; pane: string; stdin: string; env?: Record<string, string> }
 
-function wire(on, runs: Run[], pane: string | null = '%7') {
-  on('env.get', () => ({ value: pane ?? undefined }))
+function wire(on, runs: Run[], pane: string | null = '%7', kind: string | null = null) {
+  const vars = { TMUX_PANE: pane ?? undefined, CLAUDE_CODE_SESSION_KIND: kind ?? undefined }
+  on('env.get', ($, e) => ({ value: vars[e.name] }))
+  on('session.id', () => ({ value: 'sess-bg-1' }))
   on('process.run', ($, e) => {
-    runs.push({ state: e.argv[2], pane: e.argv[3], stdin: e.init?.stdin ?? '' })
+    runs.push({ state: e.argv[2], pane: e.argv[3], stdin: e.init?.stdin ?? '', env: e.init?.env })
     return { value: { exitCode: 0, stdout: '', stderr: '' } }
   })
   on('session.start', () => ({ cwd: '/work' }))
@@ -43,6 +45,26 @@ test('no tmux pane means no calls', async ($, on) => {
   await start($)
   await $.turn.start({ turnId: 't' })
   expect(runs).toEqual([])
+})
+
+test('a background session sends its session id instead of a pane', async ($, on) => {
+  const runs: Run[] = []
+  wire(on, runs, null, 'bg')
+  await start($)
+  await $.turn.start({ turnId: 't' })
+  await complete($)
+  expect(states(runs)).toEqual(['working', 'done'])
+  expect(runs[0].pane).toBe('')
+  expect(runs[0].env).toEqual({ AGENT_BADGE_SESSION: 'sess-bg-1' })
+})
+
+test('a pane wins over the background route and sets no env', async ($, on) => {
+  const runs: Run[] = []
+  wire(on, runs, '%7', 'bg')
+  await start($)
+  await $.turn.start({ turnId: 't' })
+  expect(runs[0].pane).toBe('%7')
+  expect(runs[0].env).toBeUndefined()
 })
 
 test('dialog -> needs -> working, then done', async ($, on) => {

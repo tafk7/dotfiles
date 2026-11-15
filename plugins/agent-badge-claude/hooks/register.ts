@@ -4,14 +4,24 @@ let interactive = false
 let needs = false
 let root = ''
 
+// A `claude --bg` session runs under the background daemon, outside tmux: it
+// has no TMUX_PANE, and its viewers (`claude attach`, the agent view) are
+// other processes. It passes its session id instead, and agent-status.sh
+// writes to whichever panes are viewing it at that moment.
 async function send($, state, payload) {
   if (!interactive) return
   try {
-    const pane = await $.env.get('TMUX_PANE')
-    if (!pane || root === '') return
+    if (root === '') return
+    const pane = (await $.env.get('TMUX_PANE')) ?? ''
+    let env
+    if (pane === '') {
+      if ((await $.env.get('CLAUDE_CODE_SESSION_KIND')) !== 'bg') return
+      env = { AGENT_BADGE_SESSION: await $.session.id() }
+    }
     await $.process.run(['bash', root + '/scripts/agent-status.sh', state, pane], {
       stdin: JSON.stringify(payload ?? {}),
       timeoutMs: 5000,
+      ...(env ? { env } : {}),
     })
   } catch {
     // The badge must never disturb the session.
