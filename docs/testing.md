@@ -21,6 +21,7 @@ python3 tests/theme-contrast.py
 python3 tests/documentation.py
 python3 tests/eget-selection.py
 python3 tests/ai-config.py
+python3 tests/testbed-frame.py
 ```
 
 ## Startup performance
