@@ -264,7 +264,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
-          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+          # A new branch has no "before"; a force-push's "before" is no longer in the history.
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == 0000000000000000000000000000000000000000 ]] \
+             || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
             BASE_SHA="$(git rev-parse HEAD^)"
           fi
           mkdir -p /tmp/dotfiles-baseline
