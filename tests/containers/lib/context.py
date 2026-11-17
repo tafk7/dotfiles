@@ -78,7 +78,7 @@ class Context:
         self.baseline = baseline
         self.repo = repo
         self.binaries = binaries
-        self.log = log
+        self.log = docker.emit  # LOG, with every registered secret redacted
         self._images = image_cache if image_cache is not None else {}
         self._image_lock = image_lock or threading.Lock()
 

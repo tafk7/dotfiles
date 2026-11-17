@@ -8,7 +8,13 @@ checked before `docker` is called, so a scenario cannot ask for more by mistake:
 - a mount that is writable, or whose source is not a declared input (or inside one);
 - a declared input that is `/`, the caller's home, a parent of it, or a Docker socket;
 - `--privileged`, the host's network or PID namespace;
-- a network other than `none`, unless the scenario declared it needs one.
+- a network other than `none`, unless the scenario declared it needs one;
+- a registered secret anywhere on a docker command line (`-e`, a label, a script).
+
+Secrets: a value given to `Docker.secret()` never reaches a docker command line, so it is in neither
+the run's log nor `docker inspect`. `Container.put_secret()` writes it into the container through
+`docker exec -i`'s stdin, into a file the container user alone can read; and every line this module
+logs, and every error it raises, has each registered secret replaced by `<redacted>`.
 """
 
 import json
@@ -72,13 +78,32 @@ class Docker:
         self.docker = docker
         self.log = log or (lambda text: None)
         self.images: dict[str, str] = {}
+        self.secrets: list[str] = []
+
+    def secret(self, value: str) -> str:
+        """Register VALUE as a secret: it is refused on command lines and redacted from the log."""
+        if len(value) < 8:
+            raise Refused("a secret shorter than 8 characters cannot be told apart from ordinary text")
+        if value not in self.secrets:
+            self.secrets.append(value)
+        return value
+
+    def scrub(self, text: str) -> str:
+        for value in self.secrets:
+            text = text.replace(value, "<redacted>")
+        return text
+
+    def emit(self, text: str) -> None:
+        self.log(self.scrub(text))
 
     def _call(self, args, check=True, timeout=None, input=None):
-        self.log("$ docker " + shlex.join(args))
+        if any(value in arg for value in self.secrets for arg in args):
+            raise Refused("a secret on a docker command line; use Container.put_secret")
+        self.emit("$ docker " + shlex.join(args))
         result = subprocess.run([self.docker, *args], capture_output=True, text=True, timeout=timeout,
                                 input=input, stdin=None if input is not None else subprocess.DEVNULL)
         if check and result.returncode != 0:
-            raise RuntimeError(f"docker {args[0]} failed ({result.returncode}): {result.stderr.strip()[-2000:]}")
+            raise RuntimeError(self.scrub(f"docker {args[0]} failed ({result.returncode}): {result.stderr.strip()[-2000:]}"))
         return result
 
     def declare(self, path) -> Path:
@@ -151,9 +176,9 @@ class Container:
         result = self.docker._call(command + [self.id, "bash", "-c", script], check=False, timeout=timeout,
                                    input=input)
         shown = f"[{len(result.stdout)} bytes of output]" if quiet else result.stdout
-        self.docker.log(shown + (("\n[stderr]\n" + result.stderr) if result.stderr else ""))
+        self.docker.emit(shown + (("\n[stderr]\n" + result.stderr) if result.stderr else ""))
         if check and result.returncode != 0:
-            raise ExecFailed(script, result)
+            raise ExecFailed(script, result, self.docker.scrub)
         return result
 
     def background(self, script: str, *, user=None, env=None):
@@ -170,6 +195,14 @@ class Container:
         self.docker._call(["cp", str(source), f"{self.id}:{target}"])
         if owner:
             self.docker._call(["exec", "--user", "root", self.id, "chown", "-R", owner, target])
+
+    def put_secret(self, path: str, value: str, user: str):
+        """Write VALUE to PATH in the container, readable by USER alone, through stdin: it is on no
+        command line, so neither the log nor `docker inspect` shows it."""
+        self.docker.secret(value)
+        self.docker._call(["exec", "-i", "--user", user, self.id, "sh", "-c",
+                           f"umask 077; mkdir -p \"$(dirname {shlex.quote(path)})\"; cat > {shlex.quote(path)}"],
+                          input=value)
 
     def copy_out(self, source: str, target: Path):
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -188,13 +221,13 @@ class Container:
             if result.returncode == 0:
                 return last
             if time.monotonic() > deadline:
-                self.docker.log(f"[wait_for timed out after {timeout}s]\n{last}")
-                raise TimeoutError(last)
+                self.docker.emit(f"[wait_for timed out after {timeout}s]\n{last}")
+                raise TimeoutError(self.docker.scrub(last))
             time.sleep(interval)
 
 
 class ExecFailed(Exception):
-    def __init__(self, script, result):
+    def __init__(self, script, result, scrub=lambda text: text):
         tail = (result.stdout + result.stderr).strip().splitlines()[-15:]
-        super().__init__(f"exit {result.returncode}: {script.strip().splitlines()[0][:120]}\n" + "\n".join(tail))
+        super().__init__(scrub(f"exit {result.returncode}: {script.strip().splitlines()[0][:120]}\n" + "\n".join(tail)))
         self.result = result

@@ -29,6 +29,12 @@ cp`. Containers run without capabilities unless a scenario needs `sudo`, with CP
 memory and process limits. Everything a run creates carries the label
 `testbed.run=RUN` and is removed at its end (`--keep-images` keeps the images).
 
+A secret (a credential a scenario needs) is registered with `Docker.secret()` and
+written into the container with `Container.put_secret()`, through stdin: it is on
+no docker command line, so neither the log nor `docker inspect` shows it, and a
+command line that contains it is refused. Everything logged, and every error, has
+each registered secret replaced by `<redacted>`.
+
 ## Agents without a model
 
 Scenarios that start Claude Code or Codex mount the given binaries read-only and

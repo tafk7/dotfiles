@@ -20,7 +20,7 @@ sys.path.insert(0, str(CONTAINERS))
 sys.path.insert(0, str(CONTAINERS / "scenarios"))  # their shared helpers (`_install`)
 
 from lib import results  # noqa: E402
-from lib.container import Docker, Refused, check_input, check_mount, check_network  # noqa: E402
+from lib.container import Container, Docker, ExecFailed, Refused, check_input, check_mount, check_network  # noqa: E402
 from lib.fakes import messages, responses  # noqa: E402
 
 
@@ -83,6 +83,59 @@ class Refusals(unittest.TestCase):
             docker.start("image", "x", network="host", network_allowed=True)
         with self.assertRaises(RuntimeError):  # allowed: reaches docker, which here is /bin/false
             docker.start("image", "x", mounts=[(self.input, "/in/repo.bundle")])
+
+
+FAKE_DOCKER = """#!/bin/sh
+# Records its arguments; `exec -i` keeps its stdin; any other exec prints what was kept (a command that
+# reads the secret back), and fails if its script says so.
+dir=$(dirname "$0")
+printf '%s\\n' "$*" >> "$dir/calls.log"
+case " $* " in
+    *" exec -i "*) cat > "$dir/stdin.txt" ;;
+    *" exec "*) cat "$dir/stdin.txt" 2>/dev/null; case "$*" in *fail-now*) exit 3 ;; esac ;;
+    *) echo container-id ;;
+esac
+"""
+
+
+class Secrets(unittest.TestCase):
+    SECRET = "s3cr3t-value-for-the-frame-test"
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="testbed-secrets-"))
+        self.fake = self.tmp / "docker"
+        self.fake.write_text(FAKE_DOCKER)
+        self.fake.chmod(0o755)
+        self.logged = []
+        self.docker = Docker("secrets", docker=str(self.fake), log=self.logged.append)
+        self.container = Container(self.docker, "cid", "x")
+
+    def tearDown(self):
+        subprocess.run(["rm", "-rf", str(self.tmp)])
+
+    def test_a_secret_reaches_the_container_but_no_command_line_or_log(self):
+        self.container.put_secret("/home/ada/.key", self.SECRET, "ada")
+        self.assertEqual((self.tmp / "stdin.txt").read_text(), self.SECRET)
+        self.container.exec("cat ~/.key")
+        with self.assertRaises(ExecFailed) as failed:
+            self.container.exec("cat ~/.key; fail-now")
+        self.assertNotIn(self.SECRET, str(failed.exception))
+        self.assertNotIn(self.SECRET, (self.tmp / "calls.log").read_text())
+        log = "\n".join(self.logged)
+        self.assertNotIn(self.SECRET, log)
+        self.assertIn("<redacted>", log)
+
+    def test_a_secret_on_a_command_line_is_refused(self):
+        self.docker.secret(self.SECRET)
+        with self.assertRaises(Refused):
+            self.docker.start("image", "x", env={"KEY": self.SECRET})
+        with self.assertRaises(Refused):
+            self.container.exec(f"echo {self.SECRET}")
+        self.assertFalse((self.tmp / "calls.log").exists())
+
+    def test_short_secrets_are_refused(self):
+        with self.assertRaises(Refused):
+            self.docker.secret("abc")
 
 
 class Results(unittest.TestCase):

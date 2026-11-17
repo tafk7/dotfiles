@@ -51,7 +51,7 @@ def load_scenarios() -> dict:
     return found
 
 
-def run_one(module, make_context, out: Path) -> dict:
+def run_one(module, make_context, out: Path, scrub=lambda text: text) -> dict:
     name = module.NAME
     log_rel = f"logs/{name.replace('/', '-')}.log"
     log_path = out / log_rel
@@ -59,7 +59,7 @@ def run_one(module, make_context, out: Path) -> dict:
     started = time.monotonic()
     with log_path.open("w") as log_file:
         def log(text):
-            log_file.write(text.rstrip("\n") + "\n")
+            log_file.write(scrub(text).rstrip("\n") + "\n")
             log_file.flush()
         try:
             if getattr(module, "INTERFACE", None) != results.INTERFACE:
@@ -74,7 +74,7 @@ def run_one(module, make_context, out: Path) -> dict:
         except Exception as error:  # an error is a result too: never a skip
             result, detail = "error", f"{type(error).__name__}: {error}"
             log("[error]\n" + traceback.format_exc())
-    return results.scenario_line(name, result, time.monotonic() - started, detail.splitlines()[0][:300], log_rel)
+    return results.scenario_line(name, result, time.monotonic() - started, scrub(detail).splitlines()[0][:300], log_rel)
 
 
 def main(argv=None) -> int:
@@ -155,7 +155,7 @@ def main(argv=None) -> int:
             lines = []
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-                    futures = [pool.submit(run_one, module, make_context, out) for module in chosen]
+                    futures = [pool.submit(run_one, module, make_context, out, docker.scrub) for module in chosen]
                     for future in futures:
                         line = future.result()
                         lines.append(line)
