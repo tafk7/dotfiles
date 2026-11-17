@@ -30,6 +30,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE / "scenarios"))  # their shared helpers (`_install`)
 from lib import results  # noqa: E402
 from lib.bundle import make_bundle, resolve  # noqa: E402
 from lib.container import Docker  # noqa: E402
@@ -147,7 +148,8 @@ def main(argv=None) -> int:
                 scenario_docker = Docker.__new__(Docker)
                 scenario_docker.__dict__.update(docker.__dict__)
                 scenario_docker.log = log
-                return Context(scenario_docker, work=work, bundle=bundle, commit=commit, baseline=baseline,
+                scenario_docker.inputs = list(docker.inputs)
+                return Context(scenario_docker, work=work, bundle=bundle, commit=commit, baseline=baseline, repo=repo,
                                binaries=binaries, log=log, image_cache=image_cache, image_lock=image_lock)
 
             lines = []

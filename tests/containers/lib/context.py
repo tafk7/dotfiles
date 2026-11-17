@@ -69,13 +69,14 @@ def tool_version(path: Path) -> str:
 
 
 class Context:
-    def __init__(self, docker: Docker, *, work: Path, bundle: Path, commit: str, baseline: str | None,
+    def __init__(self, docker: Docker, *, work: Path, bundle: Path, commit: str, baseline: str | None, repo: Path,
                  binaries: dict, log, image_cache=None, image_lock=None):
         self.docker = docker
         self.work = work
         self.bundle = bundle
         self.commit = commit
         self.baseline = baseline
+        self.repo = repo
         self.binaries = binaries
         self.log = log
         self._images = image_cache if image_cache is not None else {}
@@ -91,9 +92,25 @@ class Context:
                 self._images[key] = tag
         return self._images[key]
 
+    def copy_bundle(self, container) -> str:
+        """Copy the run's bundle into the container; return its path there."""
+        container.copy_in(self.bundle, "/tmp/repo.bundle")  # keeps the host's owner; readable by all (bundle.py)
+        return "/tmp/repo.bundle"
+
+    def file_at(self, path: str) -> Path:
+        """PATH as it is in the commit, written on the host and declared, for copy_in."""
+        target = self.work / "files" / self.commit[:12] / path
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(subprocess.run(["git", "-C", str(self.repo), "show", f"{self.commit}:{path}"],
+                                             capture_output=True, text=True, check=True).stdout)
+            target.chmod(0o644)
+        self.docker.declare(target)
+        return target
+
     def clone(self, container, user: str, dest: str, rev: str | None = None):
         """Clone the run's bundle into the container and check out REV (default: the commit)."""
-        container.copy_in(self.bundle, "/tmp/repo.bundle")  # keeps the host's owner; readable by all (bundle.py)
+        self.copy_bundle(container)
         container.exec(f"set -e; mkdir -p \"$(dirname {dest})\"; git clone -q /tmp/repo.bundle {dest}; "
                        f"git -C {dest} checkout -q --detach {rev or self.commit}", user=user)
 
