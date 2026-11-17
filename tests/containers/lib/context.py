@@ -13,6 +13,7 @@ Anything else a scenario raises is an `error`.
 """
 
 import hashlib
+import re
 import subprocess
 import threading
 from pathlib import Path
@@ -62,21 +63,22 @@ def tool_version(path: Path) -> str:
     with open(path, "rb") as binary:
         for chunk in iter(lambda: binary.read(1 << 20), b""):
             digest.update(chunk)
-    version = subprocess.run([str(path), "--version"], capture_output=True, text=True, timeout=30,
-                             stdin=subprocess.DEVNULL).stdout.strip().split()
-    return f"{version[-1] if version and version[0].endswith('codex-cli') else (version[0] if version else '?')}" \
-           f" sha256:{digest.hexdigest()[:16]}"
+    output = subprocess.run([str(path), "--version"], capture_output=True, text=True, timeout=30,
+                            stdin=subprocess.DEVNULL).stdout
+    found = re.search(r"\bv?(\d+\.\d+[\w.+-]*)", output)  # "2.1.321 (Claude Code)", "codex-cli 0.169.0", "opencode v2.2.2"
+    return f"{found.group(1) if found else '?'} sha256:{digest.hexdigest()[:16]}"
 
 
 class Context:
     def __init__(self, docker: Docker, *, work: Path, bundle: Path, commit: str, baseline: str | None, repo: Path,
-                 binaries: dict, log, image_cache=None, image_lock=None):
+                 binaries: dict, log, image_cache=None, image_lock=None, extras=None):
         self.docker = docker
         self.work = work
         self.bundle = bundle
         self.commit = commit
         self.baseline = baseline
         self.repo = repo
+        self.extras = extras or {}  # NAME -> (bundle, commit): other repositories the scenarios clone
         self.binaries = binaries
         self.log = docker.emit  # LOG, with every registered secret redacted
         self._images = image_cache if image_cache is not None else {}
@@ -92,10 +94,15 @@ class Context:
                 self._images[key] = tag
         return self._images[key]
 
-    def copy_bundle(self, container) -> str:
-        """Copy the run's bundle into the container; return its path there."""
-        container.copy_in(self.bundle, "/tmp/repo.bundle")  # keeps the host's owner; readable by all (bundle.py)
-        return "/tmp/repo.bundle"
+    def copy_bundle(self, container, repo: str | None = None) -> str:
+        """Copy the run's bundle (or REPO's, given with --with) into the container; return its path there."""
+        if repo is None:
+            container.copy_in(self.bundle, "/tmp/repo.bundle")  # keeps the host's owner; readable by all
+            return "/tmp/repo.bundle"
+        if repo not in self.extras:
+            raise RuntimeError(f"needs the {repo} repository (--with {repo}=PATH[@REV])")
+        container.copy_in(self.extras[repo][0], f"/tmp/{repo}.bundle")
+        return f"/tmp/{repo}.bundle"
 
     def file_at(self, path: str) -> Path:
         """PATH as it is in the commit, written on the host and declared, for copy_in."""
@@ -108,29 +115,38 @@ class Context:
         self.docker.declare(target)
         return target
 
-    def clone(self, container, user: str, dest: str, rev: str | None = None):
-        """Clone the run's bundle into the container and check out REV (default: the commit)."""
-        self.copy_bundle(container)
-        container.exec(f"set -e; mkdir -p \"$(dirname {dest})\"; git clone -q /tmp/repo.bundle {dest}; "
-                       f"git -C {dest} checkout -q --detach {rev or self.commit}", user=user)
+    def clone(self, container, user: str, dest: str, rev: str | None = None, repo: str | None = None):
+        """Clone the run's bundle (or REPO's) into the container and check out REV (default: its commit)."""
+        bundle = self.copy_bundle(container, repo)
+        commit = rev or (self.commit if repo is None else self.extras[repo][1])
+        container.exec(f"set -e; mkdir -p \"$(dirname {dest})\"; git clone -q {bundle} {dest}; "
+                       f"git -C {dest} checkout -q --detach {commit}", user=user)
 
-    def start_agents(self, name: str, *, network="none") -> "object":
-        """A container of the agents image as `ada`, with the agent CLIs, the stand-in servers
-        running, Claude's onboarding done and Codex pointed at its stand-in."""
-        mounts = [(self.binaries["claude"], "/opt/agents/claude")] if "claude" in self.binaries else []
+    def start_agents(self, name: str, *, network="none", configured=True) -> "object":
+        """A container of the agents image as `ada`, with the agent CLIs and the stand-in servers
+        running. CONFIGURED (default): Claude's onboarding done and Codex pointed at its stand-in;
+        False: a clean home, for scenarios that install the configuration themselves."""
+        mounts = [(self.binaries[tool], f"/opt/agents/{tool}") for tool in ("claude", "opencode")
+                  if tool in self.binaries]
         if "codex" in self.binaries:
             package = codex_package(self.binaries["codex"])
             mounts.append((package, "/opt/codex") if package else (self.binaries["codex"], "/opt/agents/codex"))
         container = self.docker.start(self.image("agents"), name, mounts=mounts, network=network,
                                       network_allowed=network != "none", user="ada",
-                                      env={"HOME": "/home/ada", **AGENT_ENV})
+                                      env={"HOME": "/home/ada", **(AGENT_ENV if configured else {})})
+        if configured:
+            container.exec(f"echo '{CLAUDE_JSON}' > ~/.claude.json; mkdir -p ~/.codex; "
+                           f"cat > ~/.codex/config.toml <<'EOF'\n{CODEX_CONFIG}EOF")
+        self.start_stand_ins(container)
+        return container
+
+    def start_stand_ins(self, container):
+        """The Messages and Responses stand-ins, on MESSAGES_PORT and RESPONSES_PORT, logging to
+        /tmp/messages.jsonl and /tmp/responses.jsonl (scripts: /tmp/scripts)."""
         container.copy_in(FAKES, "/testbed-fakes")
-        container.exec(f"echo '{CLAUDE_JSON}' > ~/.claude.json; mkdir -p ~/.codex; "
-                       f"cat > ~/.codex/config.toml <<'EOF'\n{CODEX_CONFIG}EOF")
         container.background(f"python3 /testbed-fakes/messages.py --port {MESSAGES_PORT} --log /tmp/messages.jsonl "
                              f"--scripts /tmp/scripts > /tmp/messages.out 2>&1")
         container.background(f"python3 /testbed-fakes/responses.py --port {RESPONSES_PORT} --log /tmp/responses.jsonl "
                              f"> /tmp/responses.out 2>&1")
         container.wait_for(f"curl -sf http://127.0.0.1:{MESSAGES_PORT}/ >/dev/null && "
                            f"curl -sf http://127.0.0.1:{RESPONSES_PORT}/ >/dev/null", timeout=20)
-        return container
