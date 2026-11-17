@@ -64,8 +64,8 @@ def run(ctx):
         if result.returncode != 0:
             raise Failure(f"{release}: setup.sh --bash --dry-run exited {result.returncode}")
         container.exec(f"sudo bash -c \"{LISTING}\" > /tmp/after.txt")
-        before = listing(container.exec("cat /tmp/before.txt").stdout)
-        after = listing(container.exec("cat /tmp/after.txt").stdout)
+        before = listing(container.exec("cat /tmp/before.txt", quiet=True).stdout)
+        after = listing(container.exec("cat /tmp/after.txt", quiet=True).stdout)
         changed = unexpected_changes(before, after)
         if changed:
             raise Failure(f"{release}: the dry run changed the filesystem: " + "; ".join(changed[:5]))

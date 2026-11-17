@@ -138,8 +138,9 @@ class Container:
     def __init__(self, docker: Docker, container_id: str, name: str):
         self.docker, self.id, self.name = docker, container_id, name
 
-    def exec(self, script: str, *, user=None, env=None, timeout=600, check=True, input=None, workdir=None):
-        """Run a bash script inside; its output goes to the run's log."""
+    def exec(self, script: str, *, user=None, env=None, timeout=600, check=True, input=None, workdir=None,
+             quiet=False):
+        """Run a bash script inside; its output goes to the run's log (QUIET: only its size)."""
         command = ["exec"] + (["-i"] if input is not None else [])
         if user:
             command += ["--user", user]
@@ -149,7 +150,8 @@ class Container:
             command += ["-e", f"{key}={value}"]
         result = self.docker._call(command + [self.id, "bash", "-c", script], check=False, timeout=timeout,
                                    input=input)
-        self.docker.log(result.stdout + (("\n[stderr]\n" + result.stderr) if result.stderr else ""))
+        shown = f"[{len(result.stdout)} bytes of output]" if quiet else result.stdout
+        self.docker.log(shown + (("\n[stderr]\n" + result.stderr) if result.stderr else ""))
         if check and result.returncode != 0:
             raise ExecFailed(script, result)
         return result
