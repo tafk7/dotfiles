@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONTAINERS = ROOT / "tests" / "containers"
 sys.path.insert(0, str(CONTAINERS))
+sys.path.insert(0, str(CONTAINERS / "scenarios"))  # their shared helpers (`_install`)
 
 from lib import results  # noqa: E402
 from lib.container import Docker, Refused, check_input, check_mount, check_network  # noqa: E402
@@ -166,6 +167,8 @@ class Scenarios(unittest.TestCase):
         names = [line.split("\t")[0] for line in listed]
         self.assertIn("dotfiles/dry-run", names)
         for path in (CONTAINERS / "scenarios").glob("*.py"):
+            if path.name.startswith("_"):
+                continue  # a helper the scenarios share, not a scenario (run.py skips it too)
             module = load(path)
             self.assertEqual(module.INTERFACE, results.INTERFACE, path.name)
 
