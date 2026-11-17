@@ -33,7 +33,7 @@ sys.path.insert(0, str(HERE))
 from lib import results  # noqa: E402
 from lib.bundle import make_bundle, resolve  # noqa: E402
 from lib.container import Docker  # noqa: E402
-from lib.context import Context, tool_version  # noqa: E402
+from lib.context import Context, codex_package, tool_version  # noqa: E402
 
 REPO = HERE.parents[1]
 
@@ -127,7 +127,10 @@ def main(argv=None) -> int:
             def run_logger(text):
                 run_file.write(text.rstrip("\n") + "\n")
                 run_file.flush()
-            docker = Docker(run_id, inputs=[bundle, HERE / "lib", *binaries.values()], log=run_logger)
+            inputs = [bundle, HERE / "lib", *binaries.values()]
+            if "codex" in binaries and codex_package(binaries["codex"]):
+                inputs.append(codex_package(binaries["codex"]))
+            docker = Docker(run_id, inputs=inputs, log=run_logger)
             tools = {"docker": docker._call(["version", "--format", "{{.Server.Version}}"]).stdout.strip()}
             tools.update({tool: tool_version(path) for tool, path in binaries.items()})
             header = {"repo": "dotfiles", "commit": commit, "baseline": baseline, "tools": tools, "run": run_id,

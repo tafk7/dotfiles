@@ -32,4 +32,5 @@ def make_bundle(repo: Path, dest: Path, refs: dict[str, str]) -> Path:
         first = next(iter(refs))
         git("-C", str(clone), "symbolic-ref", "HEAD", f"refs/heads/{first}")
         git("-C", str(clone), "bundle", "create", str(dest), "HEAD", *(f"refs/heads/{name}" for name in refs))
+    dest.chmod(0o644)  # docker cp keeps the host's owner; a container user must still read it
     return dest

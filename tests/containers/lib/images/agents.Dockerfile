@@ -1,6 +1,6 @@
 # The image agent scenarios run in: the tools a session needs and a user who is not root
 # (Claude refuses bypass mode as root). The agent CLIs are not in it: a run mounts the
-# binaries it was given, read-only, at /opt/agents.
+# binaries it was given, read-only, at /opt/agents (a Codex package directory at /opt/codex).
 ARG BASE
 FROM ${BASE}
 RUN apt-get update \
@@ -10,4 +10,4 @@ RUN apt-get update \
  && (userdel -r ubuntu 2>/dev/null || true) \
  && useradd -m -u 1000 -s /bin/bash ada \
  && sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen >/dev/null
-ENV LANG=en_US.UTF-8 PATH=/opt/agents:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV LANG=en_US.UTF-8 PATH=/opt/codex/bin:/opt/agents:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

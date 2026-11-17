@@ -49,6 +49,13 @@ wire_api = "responses"
 CLAUDE_JSON = '{"hasCompletedOnboarding": true, "customApiKeyResponses": {"approved": ["dummy"], "rejected": []}}'
 
 
+def codex_package(binary: Path) -> Path | None:
+    """The package directory a Codex binary was installed in (its interactive mode needs the whole
+    package: bin/, codex-package.json, resources), or None for a bare binary."""
+    package = Path(binary).resolve().parent.parent
+    return package if (package / "codex-package.json").exists() else None
+
+
 def tool_version(path: Path) -> str:
     """`VERSION sha256:PREFIX` of an agent binary."""
     digest = hashlib.sha256()
@@ -86,16 +93,17 @@ class Context:
 
     def clone(self, container, user: str, dest: str, rev: str | None = None):
         """Clone the run's bundle into the container and check out REV (default: the commit)."""
-        container.copy_in(self.bundle, "/tmp/repo.bundle")
-        container.exec(f"chmod 0644 /tmp/repo.bundle", user="root")
+        container.copy_in(self.bundle, "/tmp/repo.bundle")  # keeps the host's owner; readable by all (bundle.py)
         container.exec(f"set -e; mkdir -p \"$(dirname {dest})\"; git clone -q /tmp/repo.bundle {dest}; "
                        f"git -C {dest} checkout -q --detach {rev or self.commit}", user=user)
 
     def start_agents(self, name: str, *, network="none") -> "object":
         """A container of the agents image as `ada`, with the agent CLIs, the stand-in servers
         running, Claude's onboarding done and Codex pointed at its stand-in."""
-        mounts = [(self.binaries[tool], f"/opt/agents/{tool}") for tool in ("claude", "codex")
-                  if tool in self.binaries]
+        mounts = [(self.binaries["claude"], "/opt/agents/claude")] if "claude" in self.binaries else []
+        if "codex" in self.binaries:
+            package = codex_package(self.binaries["codex"])
+            mounts.append((package, "/opt/codex") if package else (self.binaries["codex"], "/opt/agents/codex"))
         container = self.docker.start(self.image("agents"), name, mounts=mounts, network=network,
                                       network_allowed=network != "none", user="ada",
                                       env={"HOME": "/home/ada", **AGENT_ENV})
