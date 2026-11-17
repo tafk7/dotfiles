@@ -23,11 +23,14 @@ NEEDS = ("claude", "codex")
 INTERFACE = 1
 
 TRUSTED, CONTROL = "/home/ada/work/trusted", "/home/ada/work/control"
-# What each CLI shows: its trust question, and a line that only appears past it.
+# What each CLI shows: its trust question, and a line it draws only once past it. Codex draws its whole
+# input box ("Ask Codex to do anything") before deciding to ask, then replaces it with the question 5 to 10
+# seconds later (checked 2026-11-17, 0.169.0); only a session that started shows the footer naming the
+# model, which the stand-in config calls "stand-in". Claude asks before drawing anything else.
 SCREENS = {
     "claude": {"command": "claude", "question": "Is this a project you created or one you trust",
                "ready": "Claude Code v"},
-    "codex": {"command": "codex", "question": "Trust this folder?", "ready": "OpenAI Codex"},
+    "codex": {"command": "codex", "question": "Trust this folder?", "ready": "stand-in default"},
 }
 
 
@@ -35,9 +38,9 @@ def pane(container, session: str) -> str:
     return container.exec(f"tmux capture-pane -p -t {session} 2>/dev/null || true", check=False).stdout
 
 
-def screen_of(container, session: str, agent: str, timeout=60, settle=6) -> str:
-    """Wait until the pane shows the agent's trust question or its ready line, then SETTLE seconds
-    more (a CLI may draw its banner before the question); the question wins if it showed at all."""
+def screen_of(container, session: str, agent: str, timeout=90, settle=5) -> str:
+    """Wait until the pane shows the agent's trust question or its past-the-question line, then SETTLE
+    seconds more and read it again: the question wins if it showed at either read."""
     question, ready = SCREENS[agent]["question"], SCREENS[agent]["ready"]
     try:
         text = container.wait_for(
