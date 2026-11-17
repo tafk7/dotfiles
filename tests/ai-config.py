@@ -68,7 +68,7 @@ custom_binding = "ctrl-k"
         d = json.loads(claude.read_text())
         self.assertEqual(d['env'], {'LOCAL_VALUE': 'keep', 'DISABLE_TELEMETRY': '1', 'DISABLE_ERROR_REPORTING': '1',
                                     'ENABLE_TOOL_SEARCH': 'true'})
-        self.assertEqual(d['permissions'], {'defaultMode': 'manual'})
+        self.assertEqual(d['permissions'], {'defaultMode': 'manual', 'deny': ['Bash(agent-trust*)']})
         self.assertTrue(d['enabledPlugins']['unrelated'])
         self.assertTrue(list((self.home / '.codex/backups').glob('*/config.toml')))
         self.assertTrue(list((self.home / '.claude/backups').glob('*/settings.json')))

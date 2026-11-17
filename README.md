@@ -204,6 +204,11 @@ dotfiles upgrade claude           # explicit update through the official install
 dotfiles upgrade opencode         # opencode only notifies about new releases
 ```
 
+`bin/agent-trust PATH` trusts a folder in Claude Code and Codex, so neither
+asks again there; `--revoke`, `--list` and `--prune` (entries of folders that
+are gone) manage the rest. It asks on your terminal and refuses to run in an
+agent's shell. See [folder trust](docs/customization.md#folder-trust-agent-trust).
+
 `dotfiles upgrade` updates installed CLIs (claude, codex, opencode, pi) and
 leaves the machine profile alone; `dotfiles profile --add CLI` is what makes
 dotfiles install and manage one. `bin/ai-update` is its older name.

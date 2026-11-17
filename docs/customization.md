@@ -332,6 +332,44 @@ else
 fi
 ```
 
+## Folder trust (agent-trust)
+
+Claude Code and Codex each ask before working in a folder you haven't
+trusted. `bin/agent-trust` answers for both from your own terminal:
+
+```bash
+agent-trust ~/src/project           # trust it in Claude Code and Codex
+agent-trust --codex ~/src/project   # one agent only (or --claude)
+agent-trust --revoke ~/src/project  # each agent asks again
+agent-trust --list                  # trusted folders; (gone) marks missing ones
+agent-trust --prune                 # remove the entries of folders that are gone
+agent-trust --dry-run ...           # show the change, write nothing
+```
+
+It shows the change, asks on the terminal, writes each file atomically, and
+reads it back. A path resolves without symlinks, and a folder inside a linked
+git worktree stands for its main repository, which both agents consult for
+every worktree of it.
+
+- **Claude Code:** `hasTrustDialogAccepted` in the folder's entry of
+  `~/.claude.json` (`$CLAUDE_CONFIG_DIR/.claude.json` when set), written under
+  the lock Claude takes for that file, so running sessions keep the change. A
+  new entry gets Claude's default project fields; revoking clears the flag and
+  keeps the entry. Inside a git repository Claude counts the folders from the
+  working directory up to the repository root; outside one, a trusted folder
+  covers its subfolders.
+- **Codex:** `trust_level = "trusted"` in `[projects."PATH"]` of
+  `~/.codex/config.toml` (`$CODEX_HOME`), edited as text so the rest of the
+  file keeps its formatting and comments; the result is parsed and compared
+  before it is written. Revoking removes the key, and the table when nothing
+  else is in it. `bin/ai-config` never touches these tables.
+
+It refuses your home folder (Claude never keeps its trust), its parents, `/`
+and `/tmp`. It also refuses to run in an agent's command shell (`CLAUDECODE`,
+`AI_AGENT`, `CODEX_THREAD_ID`, `CODEX_SANDBOX`, `OPENCODE` and similar are
+set there) and, to change anything, without a terminal to ask on. The Claude
+defaults also deny `Bash(agent-trust*)`.
+
 ## Adding a theme
 
 See [adding a theme](theme-system.md#adding-a-theme).

@@ -1,0 +1,582 @@
+#!/usr/bin/env python3
+# Trust a folder in Claude Code and Codex, from your own terminal only.
+"""Trust a folder in Claude Code and Codex, so neither asks again there.
+
+    agent-trust [--claude | --codex] [--dry-run] PATH...
+    agent-trust --revoke [--claude | --codex] [--dry-run] PATH...
+    agent-trust --prune [--claude | --codex] [--dry-run]
+    agent-trust --list [--claude | --codex]
+
+Each PATH is resolved to an absolute path without symlinks; a folder inside a
+linked git worktree stands for its main repository, which is the record both
+agents consult for every worktree. The tool shows the change, asks on the
+terminal, writes each file atomically, and reads it back.
+
+Claude Code: "hasTrustDialogAccepted" in the folder's entry of ~/.claude.json
+($CLAUDE_CONFIG_DIR/.claude.json when set), under the lock Claude takes. A new
+entry gets Claude's default project fields. Revoking clears the flag and keeps
+the entry. Outside a git repository a trusted folder covers its subfolders.
+Codex: trust_level = "trusted" in [projects."PATH"] of ~/.codex/config.toml
+($CODEX_HOME/config.toml), edited as text so the rest of the file keeps its
+formatting. Revoking removes the key. Either agent then asks again.
+
+--prune removes the entries of folders that no longer exist, trusted or not.
+
+Refused: your home folder (Claude never keeps its trust), its parents, / and
+/tmp; and any run from an agent's command shell, or, to change anything,
+without a terminal to ask on. Errors are one line on stderr, exit status 1
+(2 for usage errors); an interrupt exits 130.
+"""
+
+import argparse
+import contextlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import tomllib
+from pathlib import Path
+
+# Set in the command shells of coding agents: Claude Code (CLAUDECODE, and
+# AI_AGENT, a cross-agent convention), Codex (CODEX_THREAD_ID for every
+# command it runs; CODEX_SANDBOX* when sandboxed), and OpenCode.
+AGENT_MARKERS = ("CLAUDECODE", "AI_AGENT", "CODEX_THREAD_ID", "CODEX_SANDBOX",
+                 "CODEX_SANDBOX_NETWORK_DISABLED", "OPENCODE", "OPENCODE_SESSION_ID")
+
+# The fields Claude Code gives a project entry it creates when trust is
+# accepted; an existing entry is kept as it is.
+CLAUDE_PROJECT_DEFAULTS = {
+    "allowedTools": [],
+    "mcpContextUris": [],
+    "mcpServers": {},
+    "enabledMcpjsonServers": [],
+    "disabledMcpjsonServers": [],
+    "hasTrustDialogAccepted": False,
+    "hasClaudeMdExternalIncludesApproved": False,
+    "hasClaudeMdExternalIncludesWarningShown": False,
+}
+
+# Claude Code saves its configuration under a proper-lockfile lock, a
+# directory beside the file, which counts as abandoned after 10 seconds.
+LOCK_STALE_SECONDS = 10
+LOCK_WAIT_SECONDS = 15
+
+
+class Failure(Exception):
+    """A one-line error for the user."""
+
+
+def home():
+    return Path(os.environ.get("HOME") or Path.home())
+
+
+def shown(path):
+    """A path for display, with the home folder as ~."""
+    text, base = str(path), str(home())
+    if text == base:
+        return "~"
+    return "~" + text[len(base):] if text.startswith(base.rstrip("/") + "/") else text
+
+
+def agent_shell():
+    """The marker that shows this runs in an agent's command shell, or None."""
+    return next((name for name in AGENT_MARKERS if os.environ.get(name)), None)
+
+
+# --- Folders.
+
+def main_repository(folder):
+    """The main repository's root when FOLDER is inside a linked worktree."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        proc = subprocess.run(["git", "-C", str(folder), "rev-parse", "--path-format=absolute",
+                               "--git-dir", "--git-common-dir"],
+                              capture_output=True, text=True, env=env, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    lines = proc.stdout.splitlines()
+    if proc.returncode != 0 or len(lines) != 2:
+        return None
+    git_dir, common = (Path(line) for line in lines)
+    if git_dir == common or common.name != ".git":
+        return None  # the main checkout itself, or a bare repository's worktree
+    return Path(os.path.realpath(common.parent))
+
+
+def resolve(argument, must_exist):
+    """(folder, note): the folder to record for ARGUMENT, and why it differs."""
+    path = Path(os.path.expanduser(argument))
+    if path.exists():
+        folder = Path(os.path.realpath(path))
+        if not folder.is_dir():
+            raise Failure(f"not a folder: {argument}")
+    elif must_exist:
+        raise Failure(f"no such folder: {argument}")
+    else:
+        return Path(os.path.normpath(os.path.abspath(path))), None
+    main = main_repository(folder)
+    if main is not None and main != folder:
+        return main, f"main repository of {shown(folder)}"
+    return folder, None
+
+
+def refused(folder):
+    """Why FOLDER may not be trusted, or None."""
+    base = Path(os.path.realpath(home()))
+    if folder == base:
+        return "your home folder (Claude never keeps its trust)"
+    if folder in base.parents:
+        return "a parent of your home folder"
+    if folder == Path("/") or folder == Path(os.path.realpath("/tmp")):
+        return "a system-wide folder"
+    return None
+
+
+# --- Writing files.
+
+def write_atomically(path, text, mode):
+    """Replace PATH with TEXT through a temporary file in its folder."""
+    fd, temp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            os.fchmod(handle.fileno(), mode)
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temp)
+        raise
+
+
+def plain_file(path):
+    """Refuse a symlinked or non-regular configuration file."""
+    if path.is_symlink():
+        raise Failure(f"{shown(path)} is a symlink; edit its target by hand")
+    if path.exists() and not path.is_file():
+        raise Failure(f"{shown(path)} is not a regular file")
+
+
+@contextlib.contextmanager
+def claude_lock(path):
+    """Hold the lock Claude Code takes while it saves PATH."""
+    lock = path.with_name(path.name + ".lock")
+    deadline = time.monotonic() + LOCK_WAIT_SECONDS
+    while True:
+        try:
+            os.mkdir(lock)
+            break
+        except FileExistsError:
+            try:
+                stale = time.time() - lock.stat().st_mtime > LOCK_STALE_SECONDS
+            except FileNotFoundError:
+                continue
+            if stale:
+                with contextlib.suppress(OSError):
+                    os.rmdir(lock)
+                continue
+            if time.monotonic() > deadline:
+                raise Failure(f"{shown(path)} stays locked by Claude Code; try again") from None
+            time.sleep(0.05)
+    try:
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            os.rmdir(lock)
+
+
+# --- Claude Code.
+
+class Claude:
+    key, name = "claude", "Claude Code"
+
+    def __init__(self):
+        self.path = Path(os.environ.get("CLAUDE_CONFIG_DIR") or home()) / ".claude.json"
+
+    def present(self):
+        return self.path.exists() or self.path.is_symlink()
+
+    def read(self):
+        plain_file(self.path)
+        try:
+            text = self.path.read_text(encoding="utf-8")
+            data = json.loads(text)
+        except OSError as error:
+            raise Failure(f"cannot read {shown(self.path)}: {error.strerror}") from None
+        except ValueError as error:
+            raise Failure(f"{shown(self.path)} is not valid JSON: {error}") from None
+        if not isinstance(data, dict) or not isinstance(data.get("projects", {}), dict):
+            raise Failure(f"{shown(self.path)} does not hold a projects object")
+        return data
+
+    def projects(self):
+        return self.read().get("projects", {})
+
+    @staticmethod
+    def trusted(entry):
+        return isinstance(entry, dict) and entry.get("hasTrustDialogAccepted") is True
+
+    def plan(self, action, folders):
+        """The keys ACTION would change, given the file as it is now."""
+        projects = self.projects()
+        if action == "prune":
+            return [key for key in projects if not Path(key).is_dir()]
+        want = action == "trust"
+        return [str(f) for f in folders if self.trusted(projects.get(str(f))) != want]
+
+    def apply(self, action, keys):
+        """Change KEYS under Claude's lock, on the file as it is then."""
+        with claude_lock(self.path):
+            data = self.read()
+            projects = data.setdefault("projects", {})
+            for key in keys:
+                entry = projects.get(key)
+                if action == "trust":
+                    base = entry if isinstance(entry, dict) else CLAUDE_PROJECT_DEFAULTS
+                    projects[key] = {**base, "hasTrustDialogAccepted": True}
+                elif action == "revoke" and isinstance(entry, dict):
+                    projects[key] = {**entry, "hasTrustDialogAccepted": False}
+                elif action == "prune":
+                    projects.pop(key, None)
+            mode = self.path.stat().st_mode & 0o777
+            write_atomically(self.path, json.dumps(data, indent=2, ensure_ascii=False), mode)
+
+    def check(self, action, keys):
+        """The keys the file, read back, does not show changed."""
+        projects = self.projects()
+        if action == "prune":
+            return [key for key in keys if key in projects]
+        want = action == "trust"
+        return [key for key in keys if self.trusted(projects.get(key)) != want]
+
+    def listing(self):
+        return [key for key, entry in self.projects().items() if self.trusted(entry)]
+
+
+# --- Codex.
+
+def toml_key(key):
+    """KEY as a TOML basic string (JSON's escapes are TOML's)."""
+    return json.dumps(key, ensure_ascii=False)
+
+
+def project_header(line):
+    """The folder of a [projects."FOLDER"] header line, or None."""
+    stripped = line.strip()
+    if not stripped.startswith("[") or stripped.startswith("[["):
+        return None
+    try:
+        parsed = tomllib.loads(stripped)
+    except tomllib.TOMLDecodeError:
+        return None
+    projects = parsed.get("projects") if list(parsed) == ["projects"] else None
+    if isinstance(projects, dict) and len(projects) == 1:
+        (key, value), = projects.items()
+        if value == {}:
+            return key
+    return None
+
+
+def header_line(line):
+    stripped = line.strip()
+    if not stripped.startswith("["):
+        return False
+    try:
+        tomllib.loads(stripped)
+    except tomllib.TOMLDecodeError:
+        return False
+    return True
+
+
+def table_span(lines, key):
+    """(start, end) of KEY's [projects."KEY"] table in LINES, or None.
+
+    The table runs to the next header, less the comments just above that
+    header, which belong to it."""
+    start = next((i for i, line in enumerate(lines) if project_header(line) == key), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(lines)) if header_line(lines[i])), len(lines))
+    if end < len(lines):
+        while end - 1 > start and lines[end - 1].lstrip().startswith("#"):
+            end -= 1
+    return start, end
+
+
+def is_trust_line(line):
+    name, equals, _ = line.partition("=")
+    return bool(equals) and name.strip() in ("trust_level", '"trust_level"', "'trust_level'")
+
+
+def only_blank_or_comment(lines):
+    return all(not line.strip() or line.lstrip().startswith("#") for line in lines)
+
+
+def normalized(data):
+    """DATA without empty project tables, for comparing parsed files."""
+    data = dict(data)
+    projects = {k: v for k, v in data.get("projects", {}).items() if v != {}}
+    if projects:
+        data["projects"] = projects
+    else:
+        data.pop("projects", None)
+    return data
+
+
+class Codex:
+    key, name = "codex", "Codex"
+
+    def __init__(self):
+        self.root = Path(os.environ.get("CODEX_HOME") or home() / ".codex")
+        self.path = self.root / "config.toml"
+
+    def present(self):
+        return self.root.is_dir()
+
+    def read_text(self):
+        plain_file(self.path)
+        try:
+            return self.path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return ""
+        except OSError as error:
+            raise Failure(f"cannot read {shown(self.path)}: {error.strerror}") from None
+        except UnicodeDecodeError:
+            raise Failure(f"{shown(self.path)} is not UTF-8 text") from None
+
+    def parse(self, text):
+        try:
+            data = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as error:
+            raise Failure(f"{shown(self.path)} is not valid TOML: {error}") from None
+        if not isinstance(data.get("projects", {}), dict):
+            raise Failure(f"{shown(self.path)}: projects is not a table")
+        return data
+
+    def projects(self):
+        return self.parse(self.read_text()).get("projects", {})
+
+    @staticmethod
+    def trusted(entry):
+        return isinstance(entry, dict) and entry.get("trust_level") == "trusted"
+
+    def plan(self, action, folders):
+        projects = self.projects()
+        if action == "prune":
+            return [key for key in projects if not Path(key).is_dir()]
+        if action == "trust":
+            return [str(f) for f in folders if not self.trusted(projects.get(str(f)))]
+        return [str(f) for f in folders
+                if isinstance(projects.get(str(f)), dict) and "trust_level" in projects[str(f)]]
+
+    def edit(self, text, action, keys):
+        """TEXT with ACTION applied to KEYS, checked against the parsed result."""
+        expected = self.parse(text)
+        projects = expected.setdefault("projects", {})
+        lines = text.splitlines(keepends=True)
+        for key in keys:
+            span = table_span(lines, key)
+            if span is None and key in projects:
+                raise Failure(f"{shown(self.path)} holds {key} outside a "
+                              f"[projects.\"...\"] table; edit it by hand")
+            if action == "trust":
+                projects[key] = {**projects.get(key, {}), "trust_level": "trusted"}
+                if span is None:
+                    if lines and not lines[-1].endswith("\n"):
+                        lines[-1] += "\n"
+                    lines += (["\n"] if lines else []) + [f"[projects.{toml_key(key)}]\n",
+                                                          'trust_level = "trusted"\n']
+                    continue
+                start, end = span
+                at = next((i for i in range(start + 1, end) if is_trust_line(lines[i])), None)
+                if at is None:
+                    lines.insert(start + 1, 'trust_level = "trusted"\n')
+                else:
+                    lines[at] = 'trust_level = "trusted"\n'
+            elif span is None:
+                continue
+            else:
+                start, end = span
+                if action == "revoke":
+                    projects[key].pop("trust_level", None)
+                    rest = [line for line in lines[start + 1:end] if not is_trust_line(line)]
+                    if not only_blank_or_comment(rest):
+                        lines[start + 1:end] = rest
+                        continue
+                else:
+                    projects.pop(key, None)
+                del lines[start:end]
+                while lines and not lines[-1].strip():
+                    lines.pop()
+        result = "".join(lines)
+        if result and not result.endswith("\n"):
+            result += "\n"
+        try:
+            parsed = tomllib.loads(result)
+        except tomllib.TOMLDecodeError:
+            parsed = None
+        if parsed is None or normalized(parsed) != normalized(expected):
+            raise Failure(f"could not edit {shown(self.path)} safely; edit it by hand")
+        return result
+
+    def apply(self, action, keys):
+        for _ in range(3):
+            text = self.read_text()
+            result = self.edit(text, action, keys)
+            mode = self.path.stat().st_mode & 0o777 if self.path.exists() else 0o600
+            if self.read_text() != text:
+                continue  # Codex saved it meanwhile: start again from its version
+            write_atomically(self.path, result, mode)
+            return
+        raise Failure(f"{shown(self.path)} keeps changing; try again")
+
+    def check(self, action, keys):
+        projects = self.projects()
+        if action == "prune":
+            return [key for key in keys if key in projects]
+        if action == "trust":
+            return [key for key in keys if not self.trusted(projects.get(key))]
+        return [key for key in keys if "trust_level" in projects.get(key, {})]
+
+    def listing(self):
+        return [key for key, entry in self.projects().items() if self.trusted(entry)]
+
+
+# --- Commands.
+
+VERBS = {"trust": "trust", "revoke": "revoke", "prune": "remove"}
+
+
+def ask(question):
+    """True if the user answers yes on the terminal."""
+    try:
+        fd = os.open("/dev/tty", os.O_RDWR | os.O_NOCTTY)
+    except OSError:
+        raise Failure("needs a terminal to ask on; run it yourself") from None
+    try:
+        os.write(fd, f"{question} [y/N] ".encode())
+        answer = b""
+        while not answer.endswith(b"\n"):
+            chunk = os.read(fd, 256)
+            if not chunk:
+                break
+            answer += chunk
+    finally:
+        os.close(fd)
+    return answer.decode(errors="replace").strip().lower() in ("y", "yes")
+
+
+def list_trusted(agents):
+    for agent in agents:
+        if not agent.present():
+            print(f"{agent.name}: not set up ({shown(agent.path)})")
+            continue
+        keys = sorted(agent.listing())
+        print(f"{agent.name} ({shown(agent.path)}): {len(keys)} trusted")
+        for key in keys:
+            print(f"  {shown(key)}{'' if Path(key).is_dir() else '  (gone)'}")
+    return 0
+
+
+def change(args, agents):
+    action = "prune" if args.prune else "revoke" if args.revoke else "trust"
+    folders, notes = [], {}
+    for argument in args.paths:
+        folder, note = resolve(argument, must_exist=action == "trust")
+        if action == "trust" and (reason := refused(folder)) is not None:
+            raise Failure(f"refusing to trust {shown(folder)}: {reason}")
+        if folder not in folders:
+            folders.append(folder)
+            if note:
+                notes[str(folder)] = note
+
+    plans = []
+    for agent in agents:
+        if not agent.present():
+            if args.only:
+                raise Failure(f"{agent.name} is not set up here ({shown(agent.path)} not found)")
+            print(f"{agent.name}: not set up ({shown(agent.path)}), skipped")
+            continue
+        keys = agent.plan(action, folders)
+        print(f"{agent.name} ({shown(agent.path)}):")
+        for key in keys:
+            note = f"  ({notes[key]})" if key in notes else ""
+            print(f"  {VERBS[action]:<7} {shown(key)}{note}")
+        if action != "prune":
+            settled = "already trusted" if action == "trust" else "not trusted"
+            for folder in folders:
+                if str(folder) not in keys:
+                    print(f"  {settled}: {shown(folder)}")
+        elif not keys:
+            print("  no entries of missing folders")
+        if keys:
+            plans.append((agent, keys))
+
+    if not plans:
+        print("Nothing to change.")
+        return 0
+    if args.dry_run:
+        print("Dry run: nothing written.")
+        return 0
+    count = sum(len(keys) for _, keys in plans)
+    names = " and ".join(agent.name for agent, _ in plans)
+    question = {"trust": f"Trust these in {names}?",
+                "revoke": f"Revoke trust in {names}?",
+                "prune": f"Remove {count} {'entry' if count == 1 else 'entries'} from {names}?"}[action]
+    if not ask(question):
+        print("Nothing changed.")
+        return 1
+
+    status = 0
+    for agent, keys in plans:
+        agent.apply(action, keys)
+        missed = agent.check(action, keys)
+        if missed:
+            status = 1
+            print(f"agent-trust: {agent.name}: {shown(agent.path)} does not show the change "
+                  f"for {', '.join(shown(k) for k in missed)}; run it again", file=sys.stderr)
+        else:
+            print(f"{agent.name}: done, read back from {shown(agent.path)}")
+    return status
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--list", action="store_true", help="list trusted folders")
+    mode.add_argument("--revoke", action="store_true", help="revoke trust for PATH...")
+    mode.add_argument("--prune", action="store_true", help="remove the entries of folders that are gone")
+    only = parser.add_mutually_exclusive_group()
+    only.add_argument("--claude", dest="only", action="store_const", const="claude", help="Claude Code only")
+    only.add_argument("--codex", dest="only", action="store_const", const="codex", help="Codex only")
+    parser.add_argument("-n", "--dry-run", action="store_true", help="show the change; write nothing")
+    parser.add_argument("paths", nargs="*", metavar="PATH", help="folders to trust or revoke")
+    args = parser.parse_args()
+    if (args.list or args.prune) and args.paths:
+        parser.error("--list and --prune take no PATH")
+    if not (args.list or args.prune or args.paths):
+        parser.error("name a folder to trust (PATH), or use --list, --revoke or --prune")
+    return args
+
+
+def main():
+    try:
+        args = parse_args()
+        marker = agent_shell()
+        if marker is not None:
+            raise Failure(f"refusing to run in an agent's shell ({marker} is set); run it yourself")
+        agents = [cls() for cls in (Claude, Codex) if args.only in (None, cls.key)]
+        return list_trusted(agents) if args.list else change(args, agents)
+    except Failure as failure:
+        print(f"agent-trust: {failure}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("agent-trust: cancelled", file=sys.stderr)
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main())
