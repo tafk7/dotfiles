@@ -6,6 +6,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_REPO_ROOT="$ROOT"
 source "$ROOT/tests/lib/harness.sh"
 trap 'pkill -P $$ 2>/dev/null || true; fixture_cleanup' EXIT
+# What verify reports depends on the machine: nothing of the caller's session
+# or of the host's own tools may reach it.
+fixture_clean_environment
 fixture_init
 unset DOTFILES_OPERATION
 export NO_COLOR=1 DOTFILES_TEST_PLATFORM=ubuntu DOTFILES_TEST_ARCH=x86_64 DOTFILES_TEST_OS_VERSION=24.04
@@ -13,7 +16,7 @@ export DOTFILES_TEST_SYSTEMD_RUNNING=0 DOTFILES_OPERATION_WAIT=1
 # Nothing here may consult the host's packages.
 printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/bin/dpkg-query"
 chmod +x "$TEST_ROOT/bin/dpkg-query"
-export PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
+export PATH="$TEST_ROOT/bin:$(fixture_system_path)"
 
 verify() {
     local rc=0

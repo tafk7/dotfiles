@@ -31,6 +31,42 @@ fixture_init() {
     unset NVM_DIR NVM_BIN NVM_INC CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN
 }
 
+# For a test whose result depends on what the machine has, as `dotfiles verify`
+# does: drop what the caller's session hands down (a terminal's revision over
+# SSH, the operator's DOTFILES_* settings, their XDG directories). Call it before
+# fixture_init, which sets its own XDG and DOTFILES_ variables.
+fixture_clean_environment() {
+    local name
+    unset SSH_CONNECTION SSH_CLIENT SSH_TTY
+    for name in $(compgen -v LC_TAFK_) $(compgen -v DOTFILES_) $(compgen -v XDG_); do
+        unset "$name"
+    done
+}
+
+# A system PATH without the tools dotfiles manages: the directories of
+# TEST_SYSTEM_PATH as links in one directory, less every registered
+# component's command (lib/registry.sh). A test on it sees what a machine
+# without them sees, whatever the developer has installed (an rg in /usr/bin).
+fixture_system_path() {
+    local dir="$TEST_ROOT/system-bin" directory entry name
+    local -A hidden=() linked=()
+    while IFS= read -r name; do
+        [[ -z "$name" ]] || hidden[$name]=1
+    done < <(bash -c 'source "$1/lib/registry.sh" && printf "%s\n" "${TOOL_BINARY[@]}"' _ "$TEST_REPO_ROOT")
+    (( ${#hidden[@]} > 0 )) || { echo "fixture_system_path: no components in the registry" >&2; return 1; }
+    mkdir -p "$dir"
+    local IFS=:
+    for directory in $TEST_SYSTEM_PATH; do
+        for entry in "$directory"/*; do
+            name="${entry##*/}"
+            [[ -x "$entry" && ! -d "$entry" && -z "${hidden[$name]:-}" && -z "${linked[$name]:-}" ]] || continue
+            ln -s "$entry" "$dir/$name"
+            linked[$name]=1
+        done
+    done
+    printf '%s\n' "$dir"
+}
+
 fixture_cleanup() {
     [[ -n "${TEST_ROOT:-}" && "$TEST_ROOT" == /tmp/* ]] && /bin/rm -rf -- "$TEST_ROOT"
 }
