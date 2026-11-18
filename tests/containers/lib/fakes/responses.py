@@ -14,16 +14,20 @@ Point Codex at it with a provider in its config.toml:
     wire_api = "responses"
 
 Every request is logged (without credentials); every turn is answered with REPLY as one
-assistant message. No model is called and no credential is needed.
+assistant message. A request whose text carries `[[testbed:fail:MESSAGE]]` (a brief, say) is refused
+with HTTP 400 and MESSAGE as the API's error, as the real API refuses one it cannot take. No model is
+called and no credential is needed.
 """
 
 import argparse
 import json
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 SECRET_WORDS = ("key", "auth", "token", "secret")
+FAIL = re.compile(r"\[\[testbed:fail:(.*?)\]\]")
 
 
 def secret(header: str) -> bool:
@@ -65,6 +69,13 @@ def make_handler(log_path: Path, reply: str):
             headers = {k: ("<redacted>" if secret(k) else v) for k, v in self.headers.items()}
             self._log({"method": "POST", "path": self.path, "model": request.get("model"), "headers": headers})
             number = next(counter)
+            failure = FAIL.search(json.dumps(request))
+            if failure:  # a scripted failure: the API refuses the request, as it does one it cannot take
+                error = {"message": json.loads(f'"{failure.group(1)}"'), "type": "invalid_request_error",
+                         "code": None, "param": None}
+                self._log({"failed": error["message"]})
+                self._send(400, "application/json", json.dumps({"error": error}).encode())
+                return
             item = {"type": "message", "id": f"msg_testbed_{number}", "role": "assistant", "status": "completed",
                     "content": [{"type": "output_text", "text": reply, "annotations": []}]}
             usage = {"input_tokens": 10, "input_tokens_details": {"cached_tokens": 0}, "output_tokens": 2,

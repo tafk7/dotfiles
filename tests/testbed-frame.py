@@ -11,6 +11,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -211,6 +212,11 @@ class Stand_ins(unittest.TestCase):
                              ["response.created", "response.output_item.done", "response.completed"])
             self.assertEqual(events[1]["item"]["content"][0]["text"], "hello")
             self.assertNotIn("secret-value", log.read_text())
+            brief = {"model": "m", "input": [{"role": "user", "content": 'go [[testbed:fail:too many "images"]]'}]}
+            with self.assertRaises(urllib.error.HTTPError) as refused:
+                self.post(url, brief)
+            self.assertEqual(refused.exception.code, 400)
+            self.assertEqual(json.loads(refused.exception.read())["error"]["message"], 'too many "images"')
 
 
 class Scenarios(unittest.TestCase):

@@ -126,7 +126,7 @@ class Context:
         """A container of the agents image as `ada`, with the agent CLIs and the stand-in servers
         running. CONFIGURED (default): Claude's onboarding done and Codex pointed at its stand-in;
         False: a clean home, for scenarios that install the configuration themselves."""
-        mounts = [(self.binaries[tool], f"/opt/agents/{tool}") for tool in ("claude", "opencode")
+        mounts = [(self.binaries[tool], f"/opt/agents/{tool}") for tool in ("claude", "opencode", "bd")
                   if tool in self.binaries]
         if "codex" in self.binaries:
             package = codex_package(self.binaries["codex"])

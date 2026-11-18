@@ -4,7 +4,7 @@ repository's (`--name`, `--scenarios`), which uses this file as its plumbing.
 
     python3 tests/containers/run.py --list
     python3 tests/containers/run.py --out DIR [--only NAME…] [--slow] [--commit REV] [--baseline REV]
-                                    [--claude PATH] [--codex PATH] [--opencode PATH] [--keep-images] [--jobs N]
+                                    [--claude PATH] [--codex PATH] [--opencode PATH] [--bd PATH] [--keep-images] [--jobs N]
                                     [--name NAME --scenarios DIR] [--with NAME=PATH[@REV]…]
 
 Another repository's scenarios run through this file: `--name` names the repository in the results,
@@ -95,6 +95,7 @@ def main(argv=None) -> int:
     parser.add_argument("--claude", type=Path, default=shutil.which("claude"))
     parser.add_argument("--codex", type=Path, default=shutil.which("codex"))
     parser.add_argument("--opencode", type=Path, default=shutil.which("opencode"))
+    parser.add_argument("--bd", type=Path, default=shutil.which("bd"), help="the Beads binary (scriv's scenarios)")
     parser.add_argument("--name", default="dotfiles", help="the repository under test, as results name it")
     parser.add_argument("--scenarios", type=Path, default=HERE / "scenarios")
     parser.add_argument("--with", dest="extra", action="append", default=[], metavar="NAME=PATH[@REV]",
@@ -129,7 +130,8 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     run_id = uuid.uuid4().hex[:10]
     binaries = {tool: path.resolve() for tool, path in
-                (("claude", args.claude), ("codex", args.codex), ("opencode", args.opencode)) if path}
+                (("claude", args.claude), ("codex", args.codex), ("opencode", args.opencode), ("bd", args.bd))
+                if path}
     extras = {}
     for value in args.extra:
         name, _, rest = value.partition("=")
