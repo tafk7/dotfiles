@@ -16,7 +16,8 @@ export DOTFILES_TEST_SYSTEMD_RUNNING=0 DOTFILES_OPERATION_WAIT=1
 # Nothing here may consult the host's packages.
 printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/bin/dpkg-query"
 chmod +x "$TEST_ROOT/bin/dpkg-query"
-export PATH="$TEST_ROOT/bin:$(fixture_system_path)"
+system_path="$(fixture_system_path)" || exit 1
+export PATH="$TEST_ROOT/bin:$system_path"
 
 verify() {
     local rc=0
