@@ -100,6 +100,10 @@ uv run --no-project --with jupyter --with plotly jupyter nbconvert --to notebook
   `forwards toggle` and `forwards close` to the user too: they close their
   tunnel. Your `viz open` only prints the URL; it, `viz status`, `forwards`
   and `forwards status` print nothing secret.
+- Never run `viz stop`: the server is the account's, shared by every session,
+  and stopping it signs the user's browser out. If `viz open` says the running
+  server "has another VIZ_DIR or secret", report it to the user and give the
+  file's path; do not stop the server or change its secret.
 - Only the user's account and their signed-in browser can read what viz
   serves. Still keep credentials out of `~/viz`: every page viz serves can
   read every other one, and a page from an untrusted source runs with that
