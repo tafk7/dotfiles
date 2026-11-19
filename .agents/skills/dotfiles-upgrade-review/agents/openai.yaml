@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dotfiles Upgrade Review"
+  short_description: "Review machine drift and remote main upgrade risks"
+  default_prompt: "Use $dotfiles-upgrade-review to compare this machine and its active dotfiles installation with remote main, then suggest an upgrade path and flag risks without making changes."

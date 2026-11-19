@@ -22,6 +22,15 @@ Claude invariant guard rules in `.agents/invariants.json`) read
 
 ## Updates and ownership
 
+For a read-only, machine-specific upgrade plan, invoke the
+[repo skill](../.agents/skills/dotfiles-upgrade-review/SKILL.md) from this repo:
+`$dotfiles-upgrade-review` in Codex, `/dotfiles-upgrade-review` in Claude Code
+(through the `.claude/skills` link). It compares the
+active install, machine profile, local overrides, and installed artifacts with
+an exact remote `main` revision, then reports risks, adoption steps, and
+recovery limits. It inspects remote changes in temporary storage and leaves
+the installation unchanged; executing the plan is a separate task.
+
 `dotfiles update` brings a machine up to its checkout's upstream: it takes
 the operation lock, checks that this checkout is the install path, on a branch
 with an upstream and without uncommitted changes, fetches and shows the

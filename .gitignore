@@ -58,3 +58,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.code-workspace
+
+# Claude Code session worktrees (repo skills under .claude/skills are tracked)
+.claude/worktrees/
