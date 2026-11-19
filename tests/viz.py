@@ -59,7 +59,8 @@ with tempfile.TemporaryDirectory() as tmp:
     name = f"viz-{port}-{hashlib.sha256(socket.gethostname().encode()).hexdigest()[:6]}"   # the cookie
     project = tmp / 'project'
     env = dict(os.environ, HOME=str(tmp / 'home'), VIZ_DIR=str(tmp / 'viz'), VIZ_PORT=str(port),
-               XDG_STATE_HOME=str(tmp / 'state'), XDG_RUNTIME_DIR=str(tmp / 'run'),
+               VIZ_STATE=str(tmp / 'state' / 'viz'), XDG_STATE_HOME=str(tmp / 'xdg-state'),
+               XDG_RUNTIME_DIR=str(tmp / 'run'),
                VIZ_DIFF_ROOTS=str(project))
     env.pop('VSCODE_IPC_HOOK_CLI', None)
     (tmp / 'home').mkdir()
@@ -335,6 +336,9 @@ with tempfile.TemporaryDirectory() as tmp:
         # Lifetime: one server per socket, another VIZ_DIR is refused, stop kills only viz.
         result = run('serve')
         check(result.returncode == 1 and 'already serving' in result.stderr, f'serve: second server {result.stderr!r}')
+        result = run('open', str(chart), XDG_STATE_HOME=str(tmp / 'root-state'))
+        check(result.returncode == 0, f'open: a shell with its own XDG_STATE_HOME should reach the server {result.stderr!r}')
+        check(not (tmp / 'root-state' / 'viz').exists(), 'state: XDG_STATE_HOME should not be used')
         result = run('open', str(chart), VIZ_DIR=str(tmp / 'other'))
         check(result.returncode != 0 and 'VIZ_DIR' in result.stderr, f'open: other VIZ_DIR {result.stderr!r}')
         sleeper = subprocess.Popen(['sleep', '30'])

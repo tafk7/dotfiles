@@ -40,6 +40,8 @@ Environment:
                (default 20000 + uid % 10000, stable per account)
     VIZ_DIFF_ROOTS  colon-separated directories whose files a page may diff
                (default ~/projects:~/ref)
+    VIZ_STATE  the account's secret, sign-ins and logs (default ~/.local/state/viz;
+               XDG_STATE_HOME is ignored, so every shell reaches the one server)
 """
 import argparse
 import base64
@@ -71,7 +73,10 @@ from pathlib import Path
 
 ROOT = Path(os.environ.get('VIZ_DIR') or '~/viz').expanduser().resolve()
 PORT = int(os.environ.get('VIZ_PORT') or 20000 + os.getuid() % 10000)
-STATE = Path(os.environ.get('XDG_STATE_HOME') or '~/.local/state').expanduser() / 'viz'
+# Per account, like the socket in the account's runtime directory: one server and one secret for every
+# shell of this account. XDG_STATE_HOME is not used, so a shell that points it elsewhere (a scriv root does)
+# still reaches the account's server instead of finding "another VIZ_DIR or secret".
+STATE = Path(os.environ.get('VIZ_STATE') or '~/.local/state/viz').expanduser()
 TOKEN = STATE / 'token'      # the account's secret, 0600; never printed or sent to a browser
 OPENED = STATE / 'opened'    # files opened from linked directories, for the gallery
 BROWSER_SUFFIXES = {'.html', '.htm', '.svg', '.pdf'}
