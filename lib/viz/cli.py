@@ -35,7 +35,10 @@ opens a side-by-side diff of two existing files under VIZ_DIFF_ROOTS.
 A page is drafted in a folder `viz path` makes, with a page.toml manifest
 (title, summary, where it came from), and published with `viz publish PAGE
 --to TARGET`; `viz targets` lists the targets, who sees each, and its rules.
-Publishing is a command only: the server never publishes.
+Publishing is a command only: the server never publishes. A live page
+(`viz publish --to live`) stays at VIZ_DIR/live/NAME/ and is rewritten by its
+collector, a command `viz collect` runs every interval (the viz-collect user
+service runs it); `viz status` shows each one's last run.
 
 Environment:
     VIZ_DIR    served root and home of `viz path` output (default ~/viz)
@@ -61,7 +64,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
-from . import manifest, targets
+from . import collect, manifest, targets
 from .access import (
     CODE_TTL,
     ensure_server,
@@ -303,6 +306,7 @@ def cmd_status(args):
     if legacy:
         print(f'old:      a TCP server from an earlier viz still runs (pid {legacy}); viz stop ends it')
     print('targets:  ' + targets.status_line())
+    print('collect:  ' + '\n          '.join(collect.status_lines()))
     sock, cli = vscode_socket(), vscode_cli()
     print('vscode:   ' + ('connected' if sock and cli else
                           'no VS Code server installed' if not cli else 'no connected window'))
@@ -338,7 +342,10 @@ def main():
     sub.add_parser('start', help='start the background server').set_defaults(func=cmd_start)
     sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
     sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
-    sub.add_parser('status', help='show the server, how to forward to it, and VS Code').set_defaults(func=cmd_status)
+    sub.add_parser('status', help='show the server, how to forward to it, the targets, the collectors and VS Code'
+                   ).set_defaults(func=cmd_status)
+    sub.add_parser('collect', help="run the live pages' collectors in the foreground (what viz-collect.service "
+                                   'runs)').set_defaults(func=collect.cmd_collect)
     p = sub.add_parser('targets', help='list where pages can be published, for whom, and under which rules')
     p.add_argument('name', nargs='?', help='one target, with its rules in full')
     p.add_argument('--json', action='store_true', help='as JSON, for tools')

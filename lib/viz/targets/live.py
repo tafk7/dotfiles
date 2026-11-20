@@ -155,10 +155,7 @@ def install(dest, text, bundle_dir=None):
         os.chmod(staged, 0o755)
         s = collect.spec(dest.name, staged, data)
         s.folder.joinpath(s.entry).parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryFile() as output:
-            result = collect.run(s, output)
-            output.seek(0)
-            said = output.read().decode(errors='replace')
+        result, said, state = collect.run_logged(s, by='publish')
         if not result.ok:
             lines = said.rstrip('\n').splitlines()
             shown = '\n'.join('  ' + line for line in lines[-TAIL:]) or '  (it printed nothing)'
@@ -167,6 +164,10 @@ def install(dest, text, bundle_dir=None):
                               f'{" (the last " + str(TAIL) + " lines)" if len(lines) > TAIL else ""}:\n{shown}')
         print(f'viz: the collector\'s first run: {result.describe(s)}', file=sys.stderr)
         swap(staged, dest)
+        collect.save_state(dest.name, state)   # viz collect runs it again one interval later
+        if not collect.collector_pid():
+            print('viz: viz collect is not running, so the page stays as it is: systemctl --user start '
+                  'viz-collect, or run viz collect', file=sys.stderr)
     finally:
         shutil.rmtree(staged, ignore_errors=True)
 

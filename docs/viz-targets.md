@@ -128,6 +128,19 @@ it up itself (`. ~/env.sh && make-usage-page "$VIZ_OUT"`); no ssh agent is
 passed. It should write the page atomically (a temporary file, then a
 rename), so a reload never sees half a page.
 
+`viz collect` runs the collectors, in the foreground. It looks in `~/viz/live`
+every 15 seconds, only at folders that are real, yours and closed to other
+accounts, and runs each collector that is due in a thread of its own. A page
+is due one interval after its last run started; a run still going when the
+next is due makes that one skipped, never two at once, and a run past its
+timeout is stopped with everything it started. One `viz collect` runs per
+account. Each run's output goes to `~/.local/state/viz/collect/NAME.log`
+(under `VIZ_STATE`; kept under 1 MB with one older copy) and its outcome to
+`NAME.json`, which `viz status` shows for every live page, with whether
+`viz collect` runs. A collector that needs something the bare environment
+lacks (an ssh agent, a variable from your shell) fails there, and its log says
+why.
+
 ## Configured targets
 
 A target of your own is a file, `~/.config/viz/targets.d/NAME.toml` (or under

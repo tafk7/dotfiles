@@ -16,20 +16,33 @@ sets it up itself (`. ~/env.sh && make-report "$VIZ_OUT"`), so what works at reg
 service. It should write its page atomically (a temporary file, then a rename): the server reloads an open
 page whenever the file changes.
 
-A collector is a command run on a schedule, not a process kept alive: the runner owns timing, timeouts,
-overlap and logs. The server never imports this module (it serves pages a browser can script).
+A collector is a command run on a schedule, not a process kept alive. `viz collect` (what the
+viz-collect user service runs) looks in VIZ_DIR/live every 15 seconds, at folders that are real, this
+account's and closed to other accounts, and runs each collector that is due in a thread of its own. A run
+still going when the next is due makes that one skipped, never a second at once; a run past its timeout is
+stopped. Each run's output goes to VIZ_STATE/collect/NAME.log (kept under 1 MB, with one older copy) and its
+outcome to NAME.json, which `viz status` shows. The server never imports this module: it serves pages a
+browser can script, and those must never start a command.
 """
+import datetime
+import fcntl
+import json
+import math
 import os
 import pwd
 import re
 import signal
+import stat
 import subprocess
+import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from . import manifest
-from .config import ROOT
+from .config import ROOT, STATE, die
+from .paths import others_can_write
 
 LIVE = ROOT / 'live'
 KEYS = {'run', 'cwd', 'every', 'timeout', 'paused'}
@@ -38,6 +51,9 @@ SHORTEST = 30              # the shortest interval
 LONGEST_DEFAULT_TIMEOUT = 30 * 60
 GRACE = 5                  # seconds between TERM and KILL when a run times out
 PATH = '{home}/.local/bin:/usr/local/bin:/usr/bin:/bin'
+STATE_DIR = STATE / 'collect'
+SCAN = 15                  # seconds between looks at VIZ_DIR/live
+LOG_MAX = 1 << 20          # a log past this is moved to NAME.log.1 before the next run
 
 
 class SpecError(ValueError):
@@ -228,3 +244,296 @@ def stop(proc):
     except ProcessLookupError:
         pass
     proc.wait()
+
+
+# ---------------------------------------------------------------------------
+# Logs and the last run's outcome
+# ---------------------------------------------------------------------------
+
+def stamp(when):
+    return datetime.datetime.fromtimestamp(when).strftime('%Y-%m-%d %H:%M:%S')  # noqa: DTZ006
+
+
+def state_dir():
+    STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return STATE_DIR
+
+
+def load_state(name):
+    """What NAME.json says of the collector's last run; {} when there is none."""
+    try:
+        data = json.loads((STATE_DIR / f'{name}.json').read_text())
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_state(name, data):
+    path = state_dir() / f'{name}.json'
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f'.{path.name}.')
+    with os.fdopen(fd, 'w') as f:
+        json.dump(data, f, indent=1)
+    os.replace(tmp, path)
+
+
+def open_log(name):
+    """NAME.log for appending, moved to NAME.log.1 first when it has grown past LOG_MAX."""
+    path = state_dir() / f'{name}.log'
+    try:
+        if path.stat().st_size > LOG_MAX:
+            os.replace(path, path.with_name(path.name + '.1'))
+    except FileNotFoundError:
+        pass
+    return open(path, 'ab')
+
+
+def run_logged(s, started=None, by='collect'):
+    """Run collector S once, logged to NAME.log; (Result, the run's output, the state it leaves).
+
+    The state is not saved here: `viz collect` saves every run's, a first run from viz publish only a
+    successful one.
+    """
+    with open_log(s.name) as log:
+        begin = time.time()
+        log.write(f'== {stamp(begin)} ({by}) {s.run}\n== in {s.workdir()}\n'.encode())
+        log.flush()
+        offset = os.fstat(log.fileno()).st_size
+        result = run(s, log, started)
+        end = time.time()
+        size = os.fstat(log.fileno()).st_size
+        log.write(f'== {stamp(end)} {result.describe(s)}\n'.encode())
+    with open(log.name, 'rb') as f:
+        f.seek(offset)
+        output = f.read(max(0, size - offset)).decode(errors='replace')
+    state = {'run': s.run, 'every': short(s.every), 'started': begin, 'finished': end,
+             'seconds': round(result.seconds, 3), 'exit': result.exit, 'timed_out': result.timed_out,
+             'error': result.error, 'ok': result.ok, 'by': by, 'outcome': result.describe(s)}
+    return result, output, state
+
+
+def next_due(state, every):
+    """When a collector whose last run STATE describes is due again: the first interval boundary after that
+    run's start that is not before its end (the boundaries it overran were skipped)."""
+    start = state.get('started')
+    if not isinstance(start, (int, float)):
+        return 0
+    end = state.get('finished')
+    end = end if isinstance(end, (int, float)) and end >= start else start
+    return start + max(1, math.ceil((end - start) / every)) * every
+
+
+# ---------------------------------------------------------------------------
+# Finding the live pages
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Problem:
+    """A live page whose collector cannot run, and why."""
+    name: str
+    error: str
+
+
+def closed(path, kind):
+    """True for PATH a real KIND (stat.S_ISDIR or S_ISREG) that this account owns and no other can write."""
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return False
+    return kind(info.st_mode) and info.st_uid == os.getuid() and not others_can_write(info)
+
+
+def found():
+    """Every live page in VIZ_DIR/live, by name: its Spec, or a Problem."""
+    if not closed(LIVE, stat.S_ISDIR):
+        return []
+    pages = []
+    for folder in sorted(LIVE.iterdir()):
+        name = folder.name
+        if name.startswith('.'):
+            continue
+        if not closed(folder, stat.S_ISDIR):
+            pages.append(Problem(name, 'not a real folder of this account, closed to others'))
+            continue
+        page = folder / manifest.NAME
+        if not page.exists() and not page.is_symlink():
+            pages.append(Problem(name, 'no page.toml'))
+            continue
+        if not closed(page, stat.S_ISREG):
+            pages.append(Problem(name, 'page.toml is not a real file of this account, closed to others'))
+            continue
+        try:
+            pages.append(spec(name, folder, manifest.read(page)))
+        except ValueError as error:   # SpecError too
+            pages.append(Problem(name, str(error)))
+    return pages
+
+
+# ---------------------------------------------------------------------------
+# viz collect
+# ---------------------------------------------------------------------------
+
+def say(text):
+    print(f'{stamp(time.time())} {text}', flush=True)
+
+
+class Collector:
+    """The service: each due collector run in a thread of its own, never two of one at once."""
+
+    def __init__(self):
+        self.threads = {}     # name -> the Thread running it
+        self.procs = {}       # name -> its Popen, to stop on shutdown
+        self.problems = {}    # name -> the problem last reported
+        self.stopping = threading.Event()
+
+    def tick(self, now=None):
+        """Start every collector that is due; the names started."""
+        now = time.time() if now is None else now
+        begun = []
+        pages = found()
+        for page in pages:
+            if isinstance(page, Problem):
+                if self.problems.get(page.name) != page.error:
+                    say(f'{page.name}: cannot run: {page.error}')
+                    self.problems[page.name] = page.error
+                continue
+            self.problems.pop(page.name, None)
+            thread = self.threads.get(page.name)
+            if page.paused or (thread and thread.is_alive()) or self.stopping.is_set():
+                continue
+            if now < next_due(load_state(page.name), page.every):
+                continue
+            thread = threading.Thread(target=self.one, args=(page,), name=f'collect-{page.name}', daemon=True)
+            self.threads[page.name] = thread
+            thread.start()
+            begun.append(page.name)
+        names = {p.name for p in pages}
+        for name in [n for n in self.threads if n not in names and not self.threads[n].is_alive()]:
+            del self.threads[name]
+        return begun
+
+    def one(self, s):
+        earlier = load_state(s.name)
+        save_state(s.name, {**earlier, 'running': True, 'started': time.time()})
+        try:
+            result, _, state = run_logged(s, started=lambda proc: self.procs.__setitem__(s.name, proc))
+        except OSError as error:   # the log or state cannot be written
+            say(f'{s.name}: {error}')
+            return
+        finally:
+            self.procs.pop(s.name, None)
+        overran = max(1, math.ceil((state['finished'] - state['started']) / s.every)) - 1
+        state['skipped'] = earlier.get('skipped', 0) + overran
+        save_state(s.name, state)
+        skipped = f'; {overran} run{"s" * (overran > 1)} skipped while it went on' if overran else ''
+        say(f'{s.name}: {result.describe(s)}{skipped}')
+
+    def wait(self, timeout=None):
+        """Wait for the running collectors; True when none is left."""
+        deadline = None if timeout is None else time.monotonic() + timeout
+        for thread in list(self.threads.values()):
+            thread.join(None if deadline is None else max(0, deadline - time.monotonic()))
+        return not any(t.is_alive() for t in self.threads.values())
+
+    def shutdown(self):
+        """Stop starting runs and end the ones going: TERM to each, KILL to what is left after GRACE."""
+        self.stopping.set()
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            for proc in list(self.procs.values()):
+                try:
+                    os.killpg(proc.pid, sig)
+                except (ProcessLookupError, PermissionError):
+                    pass
+            if self.wait(GRACE):
+                return
+
+
+def hold_lock():
+    """The lock one `viz collect` per account holds, or None when another holds it."""
+    lock = open(state_dir() / 'lock', 'a+')  # noqa: SIM115
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock.close()
+        return None
+    lock.truncate(0)
+    lock.write(str(os.getpid()))
+    lock.flush()
+    return lock
+
+
+def collector_pid():
+    """The pid of the running `viz collect`, or None."""
+    try:
+        lock = open(STATE_DIR / 'lock')  # noqa: SIM115
+    except OSError:
+        return None
+    with lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError:
+            text = lock.read().strip()
+            return int(text) if text.isdigit() else -1
+        return None
+
+
+def cmd_collect(args):
+    lock = hold_lock()
+    if lock is None:
+        die(f'viz collect already runs (pid {collector_pid()})')
+    collector = Collector()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda *_: collector.stopping.set())
+    say(f'viz collect: the live pages in {LIVE}, looked at every {SCAN}s; logs in {STATE_DIR}')
+    while not collector.stopping.is_set():
+        try:
+            collector.tick()
+        except Exception as error:  # noqa: BLE001  (one bad look must not end the service)
+            say(f'looking at {LIVE} failed: {error}')
+        collector.stopping.wait(SCAN)
+    say('viz collect: stopping')
+    collector.shutdown()
+    lock.close()
+
+
+# ---------------------------------------------------------------------------
+# viz status
+# ---------------------------------------------------------------------------
+
+def when(t):
+    moment = datetime.datetime.fromtimestamp(t)  # noqa: DTZ006
+    return moment.strftime('%H:%M' if moment.date() == datetime.date.today() else '%Y-%m-%d %H:%M')  # noqa: DTZ011
+
+
+def status_lines():
+    """For `viz status`: whether viz collect runs, and each live page's last run."""
+    pages = found()
+    pid = collector_pid()
+    if not pages:
+        head = f'running (pid {pid}); ' if pid else ''
+        return [head + 'no live pages (viz publish --to live makes one)']
+    count = f'{len(pages)} live page{"s" * (len(pages) > 1)}'
+    if pid:
+        lines = [f'running (pid {pid}); {count}; logs in {home_relative(STATE_DIR)}']
+    else:
+        lines = [f'not running, so nothing rewrites {count}: systemctl --user start viz-collect, or viz collect']
+    width = max(len(p.name) for p in pages)
+    for page in pages:
+        if isinstance(page, Problem):
+            lines.append(f'{page.name:<{width}}  BROKEN: {page.error}')
+            continue
+        state = load_state(page.name)
+        what = f'every {short(page.every)}'
+        if page.paused:
+            what += ', paused'
+        if state.get('running') and pid:
+            what += f'; running since {when(state["started"])}'
+        elif isinstance(state.get('finished'), (int, float)):
+            what += f'; last {when(state["started"])}, {state.get("outcome", "?")}'
+            if not state.get('ok'):
+                what += f' (see {page.name}.log)'
+        else:
+            what += '; not run yet'
+        if pid and not page.paused and not state.get('running'):
+            what += f'; next {when(max(time.time(), next_due(state, page.every)))}'
+        lines.append(f'{page.name:<{width}}  {what}')
+    return lines

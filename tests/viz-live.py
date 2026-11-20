@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """The live target and its collectors: viz publish --to live and viz collect. Offline, on temporary homes."""
+import contextlib
 import datetime
+import io
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -32,6 +37,7 @@ from viz import collect
 
 ROOT = Path(BASE_ENV['VIZ_DIR'])
 LIVE = ROOT / 'live'
+STATE = Path(BASE_ENV['VIZ_STATE'])
 TODAY = datetime.date.today().isoformat()  # noqa: DTZ011
 
 
@@ -322,6 +328,181 @@ class PublishDraft(Fresh):
         self.assertFalse(LIVE.exists())
         self.assertFalse((self.work / 'ran').exists())
         self.assertEqual((folder / 'page.toml').read_bytes(), before)
+
+
+# ---------------------------------------------------------------------------
+# viz collect (slice b)
+# ---------------------------------------------------------------------------
+
+def quietly(fn, *args):
+    """FN(*ARGS) with what it prints captured; (its result, the text)."""
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        result = fn(*args)
+    return result, out.getvalue()
+
+
+def spec_of(case, name, run, every=30, timeout=10):
+    """A Spec for a live page made by hand, past the 30s minimum the [live] table enforces."""
+    folder = LIVE / name
+    folder.mkdir(parents=True, exist_ok=True)
+    return collect.Spec(name=name, folder=folder, run=run, every=every, timeout=timeout, cwd=str(case.work))
+
+
+class Found(Fresh):
+    def test_what_is_looked_at(self):
+        self.register('good', 'true', '1m')
+        LIVE.joinpath('.staged').mkdir()
+        LIVE.joinpath('empty').mkdir()
+        LIVE.joinpath('open').mkdir(mode=0o777)
+        LIVE.joinpath('open').chmod(0o777)
+        (LIVE / 'open' / 'page.toml').write_text((LIVE / 'good' / 'page.toml').read_text())
+        LIVE.joinpath('linked').symlink_to(LIVE / 'good')
+        LIVE.joinpath('wrong').mkdir()
+        (LIVE / 'wrong' / 'page.toml').write_text('[live]\nrun = "true"\nevery = "often"\n')
+        LIVE.joinpath('alias').mkdir()
+        (LIVE / 'alias' / 'page.toml').symlink_to(LIVE / 'good' / 'page.toml')
+        LIVE.joinpath('plain').mkdir()
+        (LIVE / 'plain' / 'page.toml').write_text('title = "no collector"\n')
+        pages = {p.name: p for p in collect.found()}
+        self.assertEqual(sorted(pages), ['alias', 'empty', 'good', 'linked', 'open', 'plain', 'wrong'])
+        self.assertIsInstance(pages['good'], collect.Spec)
+        self.assertEqual(pages['good'].every, 60)
+        for name, why in (('empty', 'no page.toml'), ('open', 'closed to others'), ('linked', 'real folder'),
+                          ('wrong', 'duration'), ('alias', 'real file'), ('plain', 'no [live]')):
+            with self.subTest(name=name):
+                self.assertIsInstance(pages[name], collect.Problem)
+                self.assertIn(why, pages[name].error)
+        LIVE.chmod(0o777)
+        try:
+            self.assertEqual(collect.found(), [])   # a live folder others can write is not looked in at all
+        finally:
+            LIVE.chmod(0o755)
+
+    def test_next_due(self):
+        self.assertEqual(collect.next_due({}, 60), 0)
+        self.assertEqual(collect.next_due({'started': 1000, 'finished': 1002}, 60), 1060)
+        self.assertEqual(collect.next_due({'started': 1000, 'finished': 1060}, 60), 1060)
+        self.assertEqual(collect.next_due({'started': 1000, 'finished': 1130}, 60), 1180)   # two skipped
+        self.assertEqual(collect.next_due({'started': 1000, 'finished': 900, 'running': True}, 60), 1060)
+
+
+class Schedule(Fresh):
+    def test_due_after_the_first_run_and_logged(self):
+        self.register('clock', 'echo tick; date > "$VIZ_OUT"', '1m')
+        first = collect.load_state('clock')
+        self.assertEqual((first['by'], first['ok'], first['every']), ('publish', True, '1m'))
+        collector = collect.Collector()
+        self.assertEqual(quietly(collector.tick, first['started'] + 30)[0], [])          # not due yet
+        begun, _ = quietly(lambda: (collector.tick(first['started'] + 60), collector.wait(10))[0])
+        self.assertEqual(begun, ['clock'])
+        state = collect.load_state('clock')
+        self.assertEqual((state['by'], state['exit'], state['ok'], state['skipped']), ('collect', 0, True, 0))
+        self.assertGreater(state['started'], first['started'])
+        log = (STATE / 'collect' / 'clock.log').read_text()
+        self.assertEqual(log.count('tick\n'), 2)
+        self.assertIn('(publish) echo tick', log)
+        self.assertIn('(collect) echo tick', log)
+        self.assertEqual(log.count(' ok in '), 2)
+
+    def test_paused_and_problems(self):
+        self.register('clock', 'echo tick', '1m')
+        page = LIVE / 'clock' / 'page.toml'
+        page.write_text(page.read_text().replace('# paused = true', 'paused = true'))
+        collector = collect.Collector()
+        self.assertEqual(quietly(collector.tick, 1e12)[0], [])
+        page.write_text(page.read_text().replace('every = "1m"', 'every = "1x"'))
+        said = quietly(collector.tick, 1e12)[1] + quietly(collector.tick, 1e12)[1]
+        self.assertEqual(said.count('clock: cannot run'), 1)      # said once, not every look
+
+    def test_no_overlap_and_skips_counted(self):
+        s = spec_of(self, 'slow', 'sleep 2.5', every=1)
+        collector = collect.Collector()
+        thread = threading.Thread(target=quietly, args=(collector.one, s))
+        collector.threads['slow'] = thread
+        thread.start()
+        time.sleep(0.5)
+        self.assertTrue(collect.load_state('slow')['running'])
+        (LIVE / 'slow' / 'page.toml').write_text('entry = "index.html"\n[live]\nrun = "true"\nevery = "30s"\n')
+        self.assertEqual(quietly(collector.tick, 1e12)[0], [])     # due, but its run is still going
+        thread.join(10)
+        state = collect.load_state('slow')
+        self.assertFalse(state.get('running'))
+        self.assertEqual((state['ok'], state['skipped']), (True, 2))
+
+    def test_timeout_stops_the_whole_group(self):
+        pidfile = self.work / 'child.pid'
+        s = spec_of(self, 'stuck', f'sleep 60 & echo $! > {pidfile}; wait', timeout=1)
+        quietly(collect.Collector().one, s)
+        state = collect.load_state('stuck')
+        self.assertTrue(state['timed_out'])
+        self.assertFalse(state['ok'])
+        self.assertIn('timed out after 1s', (STATE / 'collect' / 'stuck.log').read_text())
+        self.assertFalse(alive(int(pidfile.read_text())))
+
+    def test_log_keeps_one_old_copy(self):
+        s = spec_of(self, 'chatty', 'echo fresh')
+        log = STATE / 'collect' / 'chatty.log'
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_bytes(b'x' * (collect.LOG_MAX + 1))
+        quietly(collect.Collector().one, s)
+        self.assertEqual(Path(str(log) + '.1').stat().st_size, collect.LOG_MAX + 1)
+        self.assertLess(log.stat().st_size, 1000)
+        self.assertIn('fresh', log.read_text())
+
+    def test_shutdown_ends_running_collectors(self):
+        pidfile = self.work / 'child.pid'
+        s = spec_of(self, 'long', f'sleep 60 & echo $! > {pidfile}; wait', timeout=120)
+        collector = collect.Collector()
+        thread = threading.Thread(target=quietly, args=(collector.one, s))
+        collector.threads['long'] = thread
+        thread.start()
+        for _ in range(100):
+            if pidfile.exists() and 'long' in collector.procs:
+                break
+            time.sleep(0.05)
+        begin = time.monotonic()
+        collector.shutdown()
+        self.assertLess(time.monotonic() - begin, collect.GRACE)
+        self.assertFalse(thread.is_alive())
+        self.assertFalse(alive(int(pidfile.read_text())))
+        self.assertIn('killed by signal 15', collect.load_state('long')['outcome'])
+
+
+class Service(Fresh):
+    def test_viz_collect_runs_once_per_account_and_status_shows_it(self):
+        self.assertIn('collect:  no live pages', viz('status').stdout)
+        result = self.register('clock', 'date > "$VIZ_OUT"', '1m')
+        self.assertIn('viz collect is not running', result.stderr)
+        (STATE / 'collect' / 'clock.json').unlink()        # never run: due at once
+        status = viz('status').stdout
+        self.assertIn('collect:  not running, so nothing rewrites 1 live page: systemctl', status)
+        self.assertIn('clock  every 1m; not run yet', status)
+        proc = subprocess.Popen([sys.executable, str(VIZ), 'collect'], cwd=SANDBOX, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True)
+        try:
+            for _ in range(200):
+                if collect.load_state('clock').get('by') == 'collect' and 'finished' in collect.load_state('clock'):
+                    break
+                time.sleep(0.05)
+            self.assertTrue(collect.load_state('clock')['ok'])
+            again = viz('collect')
+            self.assertNotEqual(again.returncode, 0)
+            self.assertIn(f'already runs (pid {proc.pid})', again.stderr)
+            status = viz('status').stdout
+            self.assertIn(f'collect:  running (pid {proc.pid}); 1 live page', status)
+            self.assertRegex(status, r'clock  every 1m; last \d\d:\d\d, ok in [\d.]+s; next \d\d:\d\d')
+            self.assertNotIn('is not running', self.register('other', 'true', '1m').stderr)
+        finally:
+            proc.send_signal(signal.SIGTERM)
+            out, _ = proc.communicate(timeout=20)
+        self.assertEqual(proc.returncode, 0, out)
+        self.assertIn('clock: ok in', out)
+        self.assertIn('viz collect: stopping', out)
+        self.assertIn('collect:  not running', viz('status').stdout)
+        broken = LIVE / 'other' / 'page.toml'
+        broken.write_text(broken.read_text().replace("run = 'true'", 'run = ""'))
+        self.assertIn('other  BROKEN: [live] run', viz('status').stdout)
 
 
 if __name__ == '__main__':
