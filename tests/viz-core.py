@@ -974,6 +974,21 @@ class GitTarget(Fresh):
         self.assertEqual((folder / 'page.toml').read_bytes(), before)
         self.assertEqual(self.remote_subjects(), ['start'])
 
+    def test_place_through_a_link_is_refused(self):
+        self.target()
+        folder = draft(self)
+        outside = self.work / 'outside'
+        (outside / 'report').mkdir(parents=True)
+        (outside / 'report' / 'keep.txt').write_text('keep')
+        (self.pages / TODAY).symlink_to(outside, target_is_directory=True)     # a committed link to a folder
+        git(self.pages, 'add', '-A')
+        git(self.pages, 'commit', '-q', '-m', 'link')
+        result = self.publish(folder, ok=False)
+        self.assertIn('through a link', result.stderr)
+        self.assertEqual(sorted(p.name for p in outside.rglob('*')), ['keep.txt', 'report'])
+        self.assertEqual(git(self.pages, 'status', '--porcelain'), '')
+        self.assertEqual(self.records(folder), [])
+
     def test_after(self):
         self.target(after=['sh', '-c', 'echo "$VIZ_PLACE $VIZ_TARGET $VIZ_URL" > after.txt'])
         folder = draft(self)

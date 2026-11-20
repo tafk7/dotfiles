@@ -216,10 +216,10 @@ class GitTarget(Target):
         try:
             self.check_checkout()
             self.pull()
-            dest = self.checkout / job.place
+            dest = self.destination(job.place)
             try:
-                if dest.exists() or dest.is_symlink():
-                    if dest.is_symlink() or not dest.is_dir():
+                if dest.exists():
+                    if not dest.is_dir():
                         raise TargetError(f'{dest} exists and is not a folder')
                     shutil.rmtree(dest)
                 shutil.copytree(bundle_dir, dest)
@@ -240,6 +240,20 @@ class GitTarget(Target):
             return {'commit': self.git('rev-parse', '--short', 'HEAD').stdout.strip(), 'pushed': pushed}
         finally:
             handle.close()
+
+    def destination(self, place):
+        """The folder PLACE names in the checkout; refused when any part of the way is a link, or .git."""
+        path = self.checkout
+        for part in Path(place).parts:
+            if part in ('.', '..', '.git'):
+                raise TargetError(f'{place!r} is not a folder inside the checkout')
+            path = path / part
+            if path.is_symlink():
+                raise TargetError(f'{self.name}: {path} is a link; viz will not publish through a link, which '
+                                  f'could lead out of {self.checkout}')
+        if not path.resolve().is_relative_to(self.checkout.resolve()):
+            raise TargetError(f'{self.name}: {path} is not inside {self.checkout}')
+        return path
 
     def run_after(self, job):
         argv = self.config.get('after')
