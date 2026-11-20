@@ -6,7 +6,7 @@ A live page (`viz publish --to live`) is a folder VIZ_DIR/live/NAME/ whose page.
     run = 'make-report "$VIZ_OUT"'   # run by sh -c, in cwd
     cwd = "~/src/proj"               # default: the page's folder
     every = "5m"                     # 30s, 5m, 1h, 1d; at least 30s
-    timeout = "10m"                  # default: the interval, at most 30m
+    timeout = "10m"                  # default: the interval; at most 30m
     paused = false                   # true stops collecting; the page stays
 
 A collector gets VIZ_OUT (the page's entry, NAME/index.html by default), VIZ_PAGE_DIR and VIZ_LIVE_NAME, and
@@ -17,13 +17,15 @@ service. It should write its page atomically (a temporary file, then a rename): 
 page whenever the file changes.
 
 A collector is a command run on a schedule, not a process kept alive. `viz collect` (what the
-viz-collect user service runs) looks in VIZ_DIR/live every 15 seconds, at folders that are real, this
-account's and closed to other accounts, and runs each collector that is due in a thread of its own. A run
-still going when the next is due makes that one skipped, never a second at once; a run past its timeout is
-stopped. Each run's output goes to VIZ_STATE/collect/NAME.log (kept under 1 MB, with one older copy) and its
-outcome to NAME.json, which `viz status` shows. The server never imports this module: it serves pages a
-browser can script, and those must never start a command.
+viz-collect user service runs) looks in VIZ_DIR/live every 15 seconds, at folders and page.toml files that
+are real, this account's and writable by nobody else (no group write either), and runs each collector that
+is due in a thread of its own. A run still going when the next is due makes that one skipped, never a
+second at once; a run past its timeout is stopped. Each run's output goes to VIZ_STATE/collect/NAME.log (at
+most 1 MB a run; the log moves to NAME.log.1 past 1 MB) and its outcome to NAME.json, which `viz status`
+shows. The server never imports this module: it serves pages a browser can script, and those must never
+start a command.
 """
+import contextlib
 import datetime
 import fcntl
 import json
@@ -42,7 +44,6 @@ from pathlib import Path
 
 from . import manifest
 from .config import ROOT, STATE, die
-from .paths import others_can_write
 
 LIVE = ROOT / 'live'
 KEYS = {'run', 'cwd', 'every', 'timeout', 'paused'}
@@ -54,6 +55,9 @@ PATH = '{home}/.local/bin:/usr/local/bin:/usr/bin:/bin'
 STATE_DIR = STATE / 'collect'
 SCAN = 15                  # seconds between looks at VIZ_DIR/live
 LOG_MAX = 1 << 20          # a log past this is moved to NAME.log.1 before the next run
+RUN_OUTPUT_MAX = 1 << 20   # what one run may write to its log; the rest is dropped and the cut noted
+TAIL_MAX = 16 << 10        # the end of a run's output kept in memory (a failed first run shows it)
+LINGER = 2                 # seconds to wait for output after the shell has exited
 
 
 class SpecError(ValueError):
@@ -119,6 +123,8 @@ def spec(name, folder, data):
         raise SpecError(f'[live] every is {short(every)}; the shortest is {SHORTEST}s')
     timeout = (seconds(live['timeout'], 'timeout') if 'timeout' in live
                else min(every, LONGEST_DEFAULT_TIMEOUT))
+    if timeout > LONGEST_DEFAULT_TIMEOUT:
+        raise SpecError(f'[live] timeout is {short(timeout)}; it is at most {short(LONGEST_DEFAULT_TIMEOUT)}')
     cwd = live.get('cwd', '')
     if not isinstance(cwd, str):
         raise SpecError('[live] cwd is a directory path')
@@ -200,22 +206,26 @@ class Result:
 
 
 def run(s, output, started=None, clock=None):
-    """Run collector S once, its output (stdout and stderr) appended to the open binary file OUTPUT.
+    """Run collector S once; (Result, the end of its output). Its output (stdout and stderr) is appended to
+    the open binary file OUTPUT, at most RUN_OUTPUT_MAX bytes of it, and its last TAIL_MAX bytes returned.
 
     STARTED, if given, is called with the Popen as soon as the command runs (the service keeps it to stop it).
-    A run past its timeout is sent TERM, then KILL GRACE seconds later, across its whole process group.
+    A run past its timeout is sent TERM, then KILL GRACE seconds later, across its whole process group; so is
+    one whose wait is cut short by anything else (Ctrl-C at viz publish), before that goes on.
     """
     clock = clock or time.monotonic
     workdir = s.workdir()
     if not workdir.is_dir():
-        return Result(error=f'its cwd, {s.cwd or workdir}, is not a directory')
+        return Result(error=f'its cwd, {s.cwd or workdir}, is not a directory'), b''
     begin = clock()
     try:
         proc = subprocess.Popen(['/bin/sh', '-c', s.run], cwd=workdir, env=environment(s),
-                                stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 start_new_session=True)
     except OSError as error:
-        return Result(error=f'could not start /bin/sh: {error}')
+        return Result(error=f'could not start /bin/sh: {error}'), b''
+    copier = Copier(proc.stdout, output)
+    copier.start()
     if started:
         started(proc)
     result = Result()
@@ -224,8 +234,54 @@ def run(s, output, started=None, clock=None):
     except subprocess.TimeoutExpired:
         result.timed_out = True
         stop(proc)
+    except BaseException:
+        stop(proc)
+        copier.finish(LINGER)
+        raise
     result.seconds = clock() - begin
-    return result
+    # Something the command left running may hold its output open: wait a little, then stop reading.
+    copier.finish(LINGER)
+    return result, copier.tail()
+
+
+class Copier(threading.Thread):
+    """Copies a run's output from PIPE to the log OUTPUT, up to RUN_OUTPUT_MAX bytes, keeping its end."""
+
+    def __init__(self, pipe, output):
+        super().__init__(daemon=True)
+        self.pipe, self.output = pipe, output
+        self.written = 0
+        self.cut = False
+        self.end = bytearray()
+        self.lock = threading.Lock()
+        self.done = False
+
+    def run(self):
+        while chunk := self.pipe.read1(65536):
+            with self.lock:
+                if self.done:
+                    continue
+                self.end += chunk
+                del self.end[:-TAIL_MAX]
+                room = RUN_OUTPUT_MAX - self.written
+                if room > 0:
+                    self.output.write(chunk[:room])
+                    self.written += min(room, len(chunk))
+                self.cut = self.cut or len(chunk) > room
+        self.pipe.close()
+
+    def finish(self, linger):
+        """Wait up to LINGER seconds for the output to end; from then on nothing more is written."""
+        self.join(linger)
+        with self.lock:
+            self.done = True
+            if self.cut:
+                self.output.write(f'\n[output cut at {RUN_OUTPUT_MAX >> 10} KB]\n'.encode())
+            self.output.flush()
+
+    def tail(self):
+        with self.lock:
+            return bytes(self.end)
 
 
 def stop(proc):
@@ -288,7 +344,7 @@ def open_log(name):
 
 
 def run_logged(s, started=None, by='collect'):
-    """Run collector S once, logged to NAME.log; (Result, the run's output, the state it leaves).
+    """Run collector S once, logged to NAME.log; (Result, the end of its output, the state it leaves).
 
     The state is not saved here: `viz collect` saves every run's, a first run from viz publish only a
     successful one.
@@ -297,18 +353,28 @@ def run_logged(s, started=None, by='collect'):
         begin = time.time()
         log.write(f'== {stamp(begin)} ({by}) {s.run}\n== in {s.workdir()}\n'.encode())
         log.flush()
-        offset = os.fstat(log.fileno()).st_size
-        result = run(s, log, started)
+        result, tail = run(s, log, started)
         end = time.time()
-        size = os.fstat(log.fileno()).st_size
         log.write(f'== {stamp(end)} {result.describe(s)}\n'.encode())
-    with open(log.name, 'rb') as f:
-        f.seek(offset)
-        output = f.read(max(0, size - offset)).decode(errors='replace')
     state = {'run': s.run, 'every': short(s.every), 'started': begin, 'finished': end,
              'seconds': round(result.seconds, 3), 'exit': result.exit, 'timed_out': result.timed_out,
              'error': result.error, 'ok': result.ok, 'by': by, 'outcome': result.describe(s)}
-    return result, output, state
+    return result, tail.decode(errors='replace'), state
+
+
+@contextlib.contextmanager
+def page_lock(name):
+    """Hold NAME's lock while it is run or (re)published; yields False when someone else holds it."""
+    with open(state_dir() / f'{name}.lock', 'a') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def next_due(state, every):
@@ -334,38 +400,57 @@ class Problem:
 
 
 def closed(path, kind):
-    """True for PATH a real KIND (stat.S_ISDIR or S_ISREG) that this account owns and no other can write."""
+    """True for PATH a real KIND (stat.S_ISDIR or S_ISREG) that this account owns and nobody else can write.
+
+    Stricter than what linking allows (paths.others_can_write): no group write bit at all, even for this
+    account's own group, which may be shared, since a command in these files runs as this account.
+    """
     try:
         info = os.lstat(path)
     except OSError:
         return False
-    return kind(info.st_mode) and info.st_uid == os.getuid() and not others_can_write(info)
+    return kind(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o022
+
+
+def tops_closed():
+    """Whether VIZ_DIR and VIZ_DIR/live are closed (VIZ_DIR is the resolved path, never a link)."""
+    return closed(ROOT, stat.S_ISDIR) and closed(LIVE, stat.S_ISDIR)
 
 
 def found():
     """Every live page in VIZ_DIR/live, by name: its Spec, or a Problem."""
-    if not closed(LIVE, stat.S_ISDIR):
+    if not tops_closed():
         return []
+    try:
+        folders = sorted(LIVE.iterdir())
+    except OSError as error:
+        return [Problem(str(LIVE), f'cannot be read: {error.strerror}')]
     pages = []
-    for folder in sorted(LIVE.iterdir()):
-        name = folder.name
-        if name.startswith('.'):
-            continue
-        if not closed(folder, stat.S_ISDIR):
-            pages.append(Problem(name, 'not a real folder of this account, closed to others'))
-            continue
-        page = folder / manifest.NAME
-        if not page.exists() and not page.is_symlink():
-            pages.append(Problem(name, 'no page.toml'))
-            continue
-        if not closed(page, stat.S_ISREG):
-            pages.append(Problem(name, 'page.toml is not a real file of this account, closed to others'))
+    for folder in folders:
+        if folder.name.startswith('.'):
             continue
         try:
-            pages.append(spec(name, folder, manifest.read(page)))
-        except ValueError as error:   # SpecError too
-            pages.append(Problem(name, str(error)))
+            pages.append(look_at(folder))
+        except OSError as error:
+            pages.append(Problem(folder.name, f'cannot be read: {error.strerror or error}'))
     return pages
+
+
+def look_at(folder):
+    """The Spec of the live page in FOLDER, or a Problem."""
+    name = folder.name
+    if not closed(folder, stat.S_ISDIR):
+        return Problem(name, 'not a real folder of this account, closed to others (no group or world write)')
+    page = folder / manifest.NAME
+    if not os.path.lexists(page):
+        return Problem(name, 'no page.toml')
+    if not closed(page, stat.S_ISREG):
+        return Problem(name, 'page.toml is not a real file of this account, closed to others '
+                             '(no group or world write)')
+    try:
+        return spec(name, folder, manifest.read(page))
+    except ValueError as error:   # SpecError too
+        return Problem(name, str(error))
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +497,13 @@ class Collector:
         return begun
 
     def one(self, s):
+        with page_lock(s.name) as held:
+            if not held:
+                say(f'{s.name}: skipped: it is being published')
+                return
+            self.locked(s)
+
+    def locked(self, s):
         earlier = load_state(s.name)
         save_state(s.name, {**earlier, 'running': True, 'started': time.time()})
         try:

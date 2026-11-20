@@ -10,6 +10,8 @@ registration stays as it was.
 """
 import os
 import shutil
+import signal
+import stat
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -19,7 +21,7 @@ import tomllib
 
 from .. import collect, manifest
 from ..config import die
-from ..paths import others_can_write, url_for
+from ..paths import url_for
 from . import Target, TargetError, check_slug, order
 from .file import ours
 
@@ -132,45 +134,72 @@ def refusal(dest):
     live = dest.parent
     if live.is_symlink() or (live.exists() and not live.is_dir()):
         raise TargetError(f'{live} is not a real folder; live pages go in one')
-    if live.is_dir():
-        info = live.stat()
-        if info.st_uid != os.getuid() or others_can_write(info):
-            raise TargetError(f'{live} is owned or writable by another account')
+    for top in (live.parent, live):
+        if top.is_dir() and not collect.closed(top, stat.S_ISDIR):
+            raise TargetError(f'{top} is owned or writable by another account, or by a group (chmod g-w,o-w '
+                              'it): viz collect runs nothing from there')
     if dest.is_symlink() or (dest.exists() and not dest.is_dir()):
         raise TargetError(f'{dest} exists and is not a folder')
     if dest.is_dir() and any(dest.iterdir()) and not ours(dest):
         raise TargetError(f'{dest} is a folder viz did not publish; move it, or pick another --as')
 
 
+class Interrupted(Exception):
+    """viz publish was stopped (Ctrl-C, TERM, a closed terminal) during the first run."""
+
+
+def _interrupted(signum, frame):
+    raise Interrupted(signal.Signals(signum).name)
+
+
 def install(dest, text, bundle_dir=None):
     """Stage the page (BUNDLE_DIR's files and the manifest TEXT), run its collector once there, then put it at
-    DEST. A failing run leaves DEST as it was and raises TargetError with the run's output."""
+    DEST. A failing or interrupted run leaves DEST as it was and raises TargetError with the run's output.
+
+    NAME's lock is held throughout, so viz collect never runs the page while it is replaced.
+    """
     refusal(dest)
     data = tomllib.loads(text)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    staged = Path(tempfile.mkdtemp(prefix=f'.{dest.name}.viz-', dir=dest.parent))
+    for folder in (dest.parent.parent, dest.parent):
+        if not folder.exists():
+            folder.mkdir(parents=True)
+            os.chmod(folder, 0o755)   # whatever the umask: viz collect looks only in folders closed to others
+    handlers = {sig: signal.signal(sig, _interrupted) for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)}
+    staged = None
     try:
-        if bundle_dir is not None:
-            shutil.copytree(bundle_dir, staged, dirs_exist_ok=True)
-        (staged / manifest.NAME).write_text(text)
-        os.chmod(staged, 0o755)
-        s = collect.spec(dest.name, staged, data)
-        s.folder.joinpath(s.entry).parent.mkdir(parents=True, exist_ok=True)
-        result, said, state = collect.run_logged(s, by='publish')
-        if not result.ok:
-            lines = said.rstrip('\n').splitlines()
-            shown = '\n'.join('  ' + line for line in lines[-TAIL:]) or '  (it printed nothing)'
-            raise TargetError(f'the collector\'s first run failed: {result.describe(s)}; nothing was published.\n'
-                              f'It ran: {s.run}\nin {s.workdir()}, with VIZ_OUT={s.out}; its output'
-                              f'{" (the last " + str(TAIL) + " lines)" if len(lines) > TAIL else ""}:\n{shown}')
-        print(f'viz: the collector\'s first run: {result.describe(s)}', file=sys.stderr)
-        swap(staged, dest)
-        collect.save_state(dest.name, state)   # viz collect runs it again one interval later
-        if not collect.collector_pid():
-            print('viz: viz collect is not running, so the page stays as it is: systemctl --user start '
-                  'viz-collect, or run viz collect', file=sys.stderr)
+        with collect.page_lock(dest.name) as held:
+            if not held:
+                raise TargetError(f'{dest.name} is being collected or published right now (viz status shows a '
+                                  'run); publish again when it ends')
+            staged = Path(tempfile.mkdtemp(prefix=f'.{dest.name}.viz-', dir=dest.parent))
+            if bundle_dir is not None:
+                shutil.copytree(bundle_dir, staged, dirs_exist_ok=True)
+            (staged / manifest.NAME).write_text(text)
+            os.chmod(staged / manifest.NAME, 0o644)
+            os.chmod(staged, 0o755)
+            s = collect.spec(dest.name, staged, data)
+            s.folder.joinpath(s.entry).parent.mkdir(parents=True, exist_ok=True)
+            result, said, state = collect.run_logged(s, by='publish')
+            if not result.ok:
+                lines = said.rstrip('\n').splitlines()
+                shown = '\n'.join('  ' + line for line in lines[-TAIL:]) or '  (it printed nothing)'
+                raise TargetError(f'the collector\'s first run failed: {result.describe(s)}; nothing was '
+                                  f'published.\nIt ran: {s.run}\nin {s.workdir()}, with VIZ_OUT={s.out}; its output'
+                                  f'{" (the last " + str(TAIL) + " lines)" if len(lines) > TAIL else ""}:\n{shown}')
+            print(f'viz: the collector\'s first run: {result.describe(s)}', file=sys.stderr)
+            swap(staged, dest)
+            collect.save_state(dest.name, state)   # viz collect runs it again one interval later
+    except Interrupted as error:
+        raise TargetError(f'stopped by {error} during the collector\'s first run, which was stopped too; nothing '
+                          'was published') from None
     finally:
-        shutil.rmtree(staged, ignore_errors=True)
+        for sig, handler in handlers.items():
+            signal.signal(sig, handler)
+        if staged is not None:
+            shutil.rmtree(staged, ignore_errors=True)
+    if not collect.collector_pid():
+        print('viz: viz collect is not running, so the page stays as it is: systemctl --user start '
+              'viz-collect, or run viz collect', file=sys.stderr)
 
 
 def swap(staged, dest):

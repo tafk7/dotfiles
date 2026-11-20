@@ -123,8 +123,8 @@ class Spec(unittest.TestCase):
         self.assertEqual(s.workdir(), Path.home() / 'w')
         self.assertEqual(collect.spec('n', Path('/p'), {'live': {'run': 'x', 'every': '5m'}}).timeout, 300)
         self.assertEqual(collect.spec('n', Path('/p'), {'live': {'run': 'x', 'every': '5m'}}).workdir(), Path('/p'))
-        self.assertEqual(collect.spec('n', Path('/p'), {'live': {'run': 'x', 'every': '5m', 'timeout': '1h'}})
-                         .timeout, 3600)
+        self.assertEqual(collect.spec('n', Path('/p'), {'live': {'run': 'x', 'every': '5m', 'timeout': '20m'}})
+                         .timeout, 1200)
         for live, why in (({}, 'run'), ({'run': ' ', 'every': '5m'}, 'run'), ({'run': 'x'}, 'every is missing'),
                           ({'run': 'x', 'every': '10s'}, 'shortest'), ({'run': 'x', 'every': '5m', 'when': 1}, 'unknown'),
                           ({'run': 'x', 'every': '5m', 'paused': 'yes'}, 'paused'),
@@ -513,6 +513,117 @@ class Service(Fresh):
         broken = LIVE / 'other' / 'page.toml'
         broken.write_text(broken.read_text().replace("run = 'true'", 'run = ""'))
         self.assertIn('other  BROKEN: [live] run', viz('status').stdout)
+
+
+# ---------------------------------------------------------------------------
+# Review findings
+# ---------------------------------------------------------------------------
+
+class Hardening(Fresh):
+    def test_an_unreadable_page_is_a_problem_not_a_crash(self):
+        self.register('good', 'true', '1m')
+        self.register('locked', 'true', '1m')
+        self.register('sealed', 'true', '1m')
+        (LIVE / 'locked').chmod(0)
+        (LIVE / 'sealed' / 'page.toml').chmod(0)
+        try:
+            pages = {p.name: p for p in collect.found()}
+            self.assertIsInstance(pages['good'], collect.Spec)
+            self.assertIsInstance(pages['locked'], collect.Problem)
+            self.assertIsInstance(pages['sealed'], collect.Problem)
+            self.assertEqual(quietly(collect.Collector().tick, 1e12)[0], ['good'])
+            status = viz('status')
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertIn('locked  BROKEN:', status.stdout)
+            self.assertIn('sealed  BROKEN:', status.stdout)
+        finally:
+            (LIVE / 'locked').chmod(0o755)
+            (LIVE / 'sealed' / 'page.toml').chmod(0o644)
+
+    def test_no_group_write_anywhere_on_the_way(self):
+        self.register('good', 'true', '1m')
+        self.register('shared', 'true', '1m')
+        (LIVE / 'shared' / 'page.toml').chmod(0o664)
+        self.register('roomy', 'true', '1m')
+        (LIVE / 'roomy').chmod(0o775)
+        pages = {p.name: p for p in collect.found()}
+        self.assertIsInstance(pages['good'], collect.Spec)
+        self.assertIn('closed to others', pages['shared'].error)
+        self.assertIn('closed to others', pages['roomy'].error)
+        for top in (LIVE, ROOT):
+            with self.subTest(top=top):
+                top.chmod(0o775)
+                try:
+                    self.assertEqual(collect.found(), [])
+                    self.assertIn('writable by another account', self.register('more', 'true', '1m', ok=False).stderr)
+                finally:
+                    top.chmod(0o755)
+
+    def test_published_files_pass_the_check_under_a_loose_umask(self):
+        result = subprocess.run(
+            [sys.executable, str(VIZ), 'publish', '--to', 'live', '--as', 'loose', '--every', '1m', '--summary', 's',
+             '--run', 'touch "$VIZ_PAGE_DIR/made"'],
+            cwd=self.work, capture_output=True, text=True, timeout=60, check=False, preexec_fn=lambda: os.umask(0o002))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIsInstance(collect.found()[0], collect.Spec)
+        self.assertEqual(LIVE.stat().st_mode & 0o777, 0o755)
+
+    def interrupt(self, sig):
+        pidfile = self.work / 'child.pid'
+        proc = subprocess.Popen(
+            [sys.executable, str(VIZ), 'publish', '--to', 'live', '--as', 'slow', '--every', '5m', '--summary', 's',
+             '--run', f'sleep 60 & echo $! > {pidfile}; wait'],
+            cwd=self.work, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for _ in range(200):
+            if pidfile.exists() and pidfile.read_text().strip():
+                break
+            time.sleep(0.05)
+        proc.send_signal(sig)
+        proc.communicate(timeout=20)
+        self.assertNotEqual(proc.returncode, 0)
+        time.sleep(0.2)
+        self.assertFalse(alive(int(pidfile.read_text())), 'the first run outlived viz publish')
+        self.assertEqual(self.leftovers(), [])
+        self.assertFalse((LIVE / 'slow').exists())
+
+    def test_interrupted_first_run_is_stopped_and_cleaned(self):
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(sig=sig):
+                self.interrupt(sig)
+
+    def test_a_run_is_bounded(self):
+        with self.assertRaisesRegex(collect.SpecError, 'at most 30m'):
+            collect.spec('n', Path('/p'), {'live': {'run': 'x', 'every': '1h', 'timeout': '31m'}})
+        self.assertEqual(collect.spec('n', Path('/p'), {'live': {'run': 'x', 'every': '1h', 'timeout': '30m'}})
+                         .timeout, 1800)
+        s = spec_of(self, 'flood', f'head -c {3 * collect.RUN_OUTPUT_MAX} /dev/zero | tr "\\\\0" x; echo; echo last')
+        _, said, state = collect.run_logged(s)
+        log = STATE / 'collect' / 'flood.log'
+        self.assertLess(log.stat().st_size, collect.RUN_OUTPUT_MAX + 4096)
+        self.assertIn('output cut', log.read_text())
+        self.assertLessEqual(len(said), collect.TAIL_MAX + 200)
+        self.assertTrue(said.rstrip().endswith('last'))          # the tail is kept, for the error message
+        self.assertTrue(state['ok'])
+
+    def test_a_lingering_child_does_not_hold_the_run(self):
+        s = spec_of(self, 'linger', 'sleep 30 & echo started')
+        begin = time.monotonic()
+        result, said, _ = collect.run_logged(s)
+        self.assertLess(time.monotonic() - begin, 10)
+        self.assertTrue(result.ok)
+        self.assertIn('started', said)
+
+    def test_publish_and_the_service_never_run_one_page_at_once(self):
+        self.register('busy', 'true', '1m')
+        with collect.page_lock('busy') as held:
+            self.assertTrue(held)
+            refused = self.register('busy', 'true', '1m', ok=False)
+            self.assertIn('busy is being collected or published', refused.stderr)
+            before = collect.load_state('busy')
+            said = quietly(collect.Collector().one, collect.found()[0])[1]
+            self.assertIn('busy: skipped', said)
+            self.assertEqual(collect.load_state('busy'), before)
+        self.register('busy', 'true', '1m')
 
 
 if __name__ == '__main__':

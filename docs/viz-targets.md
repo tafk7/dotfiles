@@ -140,7 +140,7 @@ The page's own `page.toml` is the registration:
 run = 'make-usage-page "$VIZ_OUT"'   # run by sh -c, in cwd
 cwd = "~/src/proj"                   # default: where viz publish ran
 every = "5m"                         # 30s, 5m, 1h, 1d; at least 30s
-timeout = "10m"                      # default: the interval, at most 30m
+timeout = "10m"                      # default: the interval; at most 30m
 paused = false                       # true stops collecting; the page stays
 ```
 
@@ -171,18 +171,30 @@ rename), so a reload never sees half a page.
 `viz collect` runs the collectors, in the foreground; where systemd runs a user
 instance, setup installs `viz-collect.service` to run it beside `viz.service`
 (`systemctl --user status viz-collect`; its own messages are in the journal).
-It looks in `~/viz/live`
-every 15 seconds, only at folders that are real, yours and closed to other
-accounts, and runs each collector that is due in a thread of its own. A page
-is due one interval after its last run started; a run still going when the
-next is due makes that one skipped, never two at once, and a run past its
-timeout is stopped with everything it started. One `viz collect` runs per
-account. Each run's output goes to `~/.local/state/viz/collect/NAME.log`
-(under `VIZ_STATE`; kept under 1 MB with one older copy) and its outcome to
+It looks in `~/viz/live` every 15 seconds and runs each collector that is due
+in a thread of its own. It runs nothing from a folder or `page.toml` that is a
+link, another account's, or writable by anyone but you (no group or world
+write bit, even for your own group), and only when `~/viz` and `~/viz/live`
+are closed the same way; `viz publish` makes them so. A page is due one
+interval after its last run started; a run still going when the next is due
+makes that one skipped, never two at once, and a run past its timeout is
+stopped with everything it started. A page being republished is not run until
+the publish ends, and a page being run cannot be republished until the run
+ends. One `viz collect` runs per account.
+
+Each run's output goes to `~/.local/state/viz/collect/NAME.log` (under
+`VIZ_STATE`): at most 1 MB per run, the rest cut and the cut noted, and the
+log moves to `NAME.log.1` once it passes 1 MB. Its outcome goes to
 `NAME.json`, which `viz status` shows for every live page, with whether
 `viz collect` runs. A collector that needs something the bare environment
 lacks (an ssh agent, a variable from your shell) fails there, and its log says
-why.
+why. Stopping `viz publish` during the first run (Ctrl-C, a closed terminal)
+stops the collector too and publishes nothing.
+
+The service sets neither `VIZ_DIR` nor `VIZ_STATE`: it looks in `~/viz/live`
+and logs to `~/.local/state/viz`. A shell that sets either publishes live pages
+where the service does not look; set the same in the unit
+(`systemctl --user edit viz-collect`) if you change them.
 
 ## Configured targets
 
