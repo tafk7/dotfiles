@@ -265,7 +265,11 @@ Where systemd runs a user instance, setup installs `viz.service`, so the server
 comes back with your first login after a reboot. Open viz tabs retry less often
 while it is unreachable and say so in a corner banner. The unit doesn't see
 `VIZ_DIR` from your shell; set it with `systemctl --user edit viz` too if you
-change it.
+change it (and in `viz-collect`, below).
+
+Beside it, `viz-collect.service` runs `viz collect`, which keeps live pages
+current: `viz publish --to live` registers a command that rewrites a page at
+`~/viz/live/NAME/` every interval, and `viz status` shows each one's last run.
 
 ### Themes
 

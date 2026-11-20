@@ -35,7 +35,10 @@ opens a side-by-side diff of two existing files under VIZ_DIFF_ROOTS.
 A page is drafted in a folder `viz path` makes, with a page.toml manifest
 (title, summary, where it came from), and published with `viz publish PAGE
 --to TARGET`; `viz targets` lists the targets, who sees each, and its rules.
-Publishing is a command only: the server never publishes.
+Publishing is a command only: the server never publishes. A live page
+(`viz publish --to live`) stays at VIZ_DIR/live/NAME/ and is rewritten by its
+collector, a command `viz collect` runs every interval (the viz-collect user
+service runs it); `viz status` shows each one's last run.
 
 Environment:
     VIZ_DIR    served root and home of `viz path` output (default ~/viz)
@@ -61,7 +64,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
-from . import bundle, manifest, targets
+from . import bundle, collect, manifest, targets
 from .access import (
     CODE_TTL,
     ensure_server,
@@ -303,6 +306,7 @@ def cmd_status(args):
     if legacy:
         print(f'old:      a TCP server from an earlier viz still runs (pid {legacy}); viz stop ends it')
     print('targets:  ' + targets.status_line())
+    print('collect:  ' + '\n          '.join(collect.status_lines()))
     sock, cli = vscode_socket(), vscode_cli()
     print('vscode:   ' + ('connected' if sock and cli else
                           'no VS Code server installed' if not cli else 'no connected window'))
@@ -338,7 +342,10 @@ def main():
     sub.add_parser('start', help='start the background server').set_defaults(func=cmd_start)
     sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
     sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
-    sub.add_parser('status', help='show the server, how to forward to it, and VS Code').set_defaults(func=cmd_status)
+    sub.add_parser('status', help='show the server, how to forward to it, the targets, the collectors and VS Code'
+                   ).set_defaults(func=cmd_status)
+    sub.add_parser('collect', help="run the live pages' collectors in the foreground (what viz-collect.service "
+                                   'runs)').set_defaults(func=collect.cmd_collect)
     p = sub.add_parser('bundle', help="write a page's portable form and list what keeps it from being portable")
     p.add_argument('page', help='a page folder, its page.toml, or a file')
     p.add_argument('--format', metavar='FMT', help="the form to make (default: the page's own; pdf exports html)")
@@ -365,7 +372,7 @@ def main():
     p = sub.add_parser('publish', help='publish a page to a target (run viz targets first: who sees it, the rules)')
     p.add_argument('page', nargs='?', help="a page folder, its page.toml, or a file (a loose file's manifest is "
                                            'FILE.page.toml)')
-    p.add_argument('--to', required=True, metavar='TARGET', help='where: preview, file, or a configured target')
+    p.add_argument('--to', required=True, metavar='TARGET', help='where: preview, file, live, or a configured target')
     p.add_argument('--as', dest='as_name', metavar='SLUG',
                    help='the name in its place (default: the folder name, or where it was published last)')
     p.add_argument('--format', metavar='FMT', help="publish as FMT, exported if it is not the page's own")
@@ -374,6 +381,12 @@ def main():
     p.add_argument('--out', metavar='PATH', help='file target: the folder (or FILE.pdf) to write')
     p.add_argument('--dry-run', action='store_true', help='print the place, URL, files and manifest; change nothing')
     p.add_argument('--push', action='store_true', help="a git target's pending commits: push them (at a terminal)")
+    p.add_argument('--run', metavar='COMMAND', help='live target: the collector, run by sh -c every interval; '
+                                                   'it writes the page at $VIZ_OUT')
+    p.add_argument('--every', metavar='INTERVAL', help='live target: how often the collector runs (30s, 5m, 1h)')
+    p.add_argument('--cwd', metavar='DIR', help='live target: where the collector runs (default: here)')
+    p.add_argument('--title', help='live target without a page: the title (default: the --as NAME)')
+    p.add_argument('--summary', help='live target without a page: what the page shows, in a sentence or two')
     p.set_defaults(func=targets.cmd_publish)
     args = parser.parse_args()
     args.func(args)

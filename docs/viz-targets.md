@@ -118,6 +118,83 @@ asks you to run.
 |---|---|---|
 | `preview` | you, in your browser over the ssh forward | `viz publish PAGE --to preview` is `viz open PAGE` |
 | `file` | whoever you hand the file to | `--out PATH`: a folder, or one `FILE.pdf` for a pdf |
+| `live` | you, at a fixed address in your browser | `~/viz/live/NAME/`, rewritten by a collector ([below](#live-pages)) |
+
+## Live pages
+
+A live page has a fixed, undated place, `~/viz/live/NAME/`, served at
+`/live/NAME/`, and a **collector**: a command run every interval that
+rewrites the page (or the data it loads). An open page reloads when its file
+changes.
+
+```bash
+viz publish --to live --as usage --every 5m --cwd ~/src/proj \
+    --summary "Token usage over time." --run 'make-usage-page "$VIZ_OUT"'
+viz publish DRAFT --to live              # the draft's page.toml has a [live] table
+```
+
+The page's own `page.toml` is the registration:
+
+```toml
+[live]
+run = 'make-usage-page "$VIZ_OUT"'   # run by sh -c, in cwd
+cwd = "~/src/proj"                   # default: where viz publish ran
+every = "5m"                         # 30s, 5m, 1h, 1d; at least 30s
+timeout = "10m"                      # default: the interval; at most 30m
+paused = false                       # true stops collecting; the page stays
+```
+
+A draft published here is bundled as for any target, except that it may load
+from outside (`network`), as it does in `~/viz`: a live page is as private as
+`preview`. A CDN script must still name an exact version.
+
+Edit it in place to change the command or the interval; delete the folder to
+retire the page. `--run`, `--every` and `--cwd` override a draft's `[live]`
+table. Without a draft, `--as`, `--run`, `--every` and `--summary` are needed
+(`--title` defaults to the name, and the command is the page's generator).
+
+Publishing runs the collector once, in the foreground and with the same
+timeout, in a staged copy of the page, and puts the page in place only when
+that run succeeds. A broken command fails then, with its output, and an
+earlier registration stays as it was. A republish replaces the page whole,
+and only a folder viz published.
+
+A collector gets `VIZ_OUT` (the page's entry, `index.html` unless the draft
+names another), `VIZ_PAGE_DIR` and `VIZ_LIVE_NAME`, and otherwise a bare
+environment: `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `TZ`,
+`XDG_RUNTIME_DIR` and `PATH=~/.local/bin:/usr/local/bin:/usr/bin:/bin`. The
+first run and every later one see the same, so a command that needs more sets
+it up itself (`. ~/env.sh && make-usage-page "$VIZ_OUT"`); no ssh agent is
+passed. It should write the page atomically (a temporary file, then a
+rename), so a reload never sees half a page.
+
+`viz collect` runs the collectors, in the foreground; where systemd runs a user
+instance, setup installs `viz-collect.service` to run it beside `viz.service`
+(`systemctl --user status viz-collect`; its own messages are in the journal).
+It looks in `~/viz/live` every 15 seconds and runs each collector that is due
+in a thread of its own. It runs nothing from a folder or `page.toml` that is a
+link, another account's, or writable by anyone but you (no group or world
+write bit, even for your own group), and only when `~/viz` and `~/viz/live`
+are closed the same way; `viz publish` makes them so. A page is due one
+interval after its last run started; a run still going when the next is due
+makes that one skipped, never two at once, and a run past its timeout is
+stopped with everything it started. A page being republished is not run until
+the publish ends, and a page being run cannot be republished until the run
+ends. One `viz collect` runs per account.
+
+Each run's output goes to `~/.local/state/viz/collect/NAME.log` (under
+`VIZ_STATE`): at most 1 MB per run, the rest cut and the cut noted, and the
+log moves to `NAME.log.1` once it passes 1 MB. Its outcome goes to
+`NAME.json`, which `viz status` shows for every live page, with whether
+`viz collect` runs. A collector that needs something the bare environment
+lacks (an ssh agent, a variable from your shell) fails there, and its log says
+why. Stopping `viz publish` during the first run (Ctrl-C, a closed terminal)
+stops the collector too and publishes nothing.
+
+The service sets neither `VIZ_DIR` nor `VIZ_STATE`: it looks in `~/viz/live`
+and logs to `~/.local/state/viz`. A shell that sets either publishes live pages
+where the service does not look; set the same in the unit
+(`systemctl --user edit viz-collect`) if you change them.
 
 ## Configured targets
 
