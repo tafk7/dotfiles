@@ -327,8 +327,8 @@ class Bundler:
 
 
 def bundle(page, out, policy, include=(), exclude=()):
-    entry, files = copy_page(page, out, include, exclude)
     b = Bundler(out, policy)
+    entry, files = copy_page(page, out, include, exclude, problems=b.problems)
     for rel in files:
         if not rel.lower().endswith(TEXT_SUFFIXES):
             continue

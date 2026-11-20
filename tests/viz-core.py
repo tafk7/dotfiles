@@ -712,6 +712,27 @@ class Bundle(Fresh):
         self.assertTrue((self.out / 'fonts' / 'font').is_file())
         self.assertIn('url(font)', (self.out / 'fonts' / 'fonts.css').read_text())
 
+    def test_links_out_of_the_page_are_not_followed(self):
+        secret = self.work / 'secret'
+        secret.mkdir()
+        (secret / 'id_key.txt').write_text('PRIVATE')
+        (secret / 'notes.css').write_text('PRIVATE')
+        page = self.page()
+        (page.folder / 'key.txt').symlink_to(secret / 'id_key.txt')
+        (page.folder / 'img' / 'outside').symlink_to(secret, target_is_directory=True)
+        (page.folder / 'same.css').symlink_to(page.folder / 'style.css')       # inside the page: copied
+        report = self.bundle(page)
+        self.assertNotIn('PRIVATE', ''.join(p.read_text(errors='replace') for p in self.out.rglob('*')
+                                            if p.is_file()))
+        self.assertFalse((self.out / 'key.txt').exists())
+        self.assertFalse((self.out / 'img' / 'outside').exists())
+        found = [str(p) for p in report.problems]
+        for rel in ('key.txt', 'img/outside'):
+            with self.subTest(rel=rel):
+                self.assertIn(f'{rel}: is a link to outside the page; not copied', found)
+        self.assertFalse((self.out / 'same.css').is_symlink())
+        self.assertIn('img/dot.png', (self.out / 'same.css').read_text())
+
     def test_vendor_manifest_merge(self):
         page = self.page(f'<script src="{D3}"></script><script src="vendor/old.js"></script>')
         (page.folder / 'vendor').mkdir()

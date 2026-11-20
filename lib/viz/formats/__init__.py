@@ -5,6 +5,7 @@ formats it can become. A format without one (pptx, typst, latex today) is pass-t
 the entry file itself. Authoring guidance for a format lives in the plugin (references/formats/<fmt>.md).
 """
 import fnmatch
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -50,12 +51,13 @@ def module(fmt):
     return MODULES.get(fmt)
 
 
-def copy_page(page, out, include=(), exclude=()):
+def copy_page(page, out, include=(), exclude=(), problems=None):
     """Copy what a browser reads from PAGE's folder into OUT; a loose html file is copied alone as index.html.
 
     Hidden files and folders, generators (*.py), page.toml and anything EXCLUDE matches are skipped; INCLUDE
     adds files of any other suffix. Patterns are globs on the path within the folder (data/*.parquet).
-    Returns the bundle's entry and its files.
+    A symbolic link is copied as the file it points to when that is inside the folder; one that leads
+    outside it is not copied, and is a Problem added to PROBLEMS. Returns the bundle's entry and its files.
     """
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
@@ -64,9 +66,16 @@ def copy_page(page, out, include=(), exclude=()):
         shutil.copy2(page.entry, out / name)
         return name, [name]
     files = []
-    for path in sorted(page.folder.rglob('*')):
+    root = page.folder.resolve()
+    for path in _walk(page.folder):
         rel = path.relative_to(page.folder).as_posix()
-        if not path.is_file() or any(part.startswith('.') for part in Path(rel).parts):
+        if any(part.startswith('.') for part in Path(rel).parts):
+            continue
+        if path.is_symlink() and not path.resolve().is_relative_to(root):
+            if problems is not None:
+                problems.append(Problem(rel, 'is a link to outside the page; not copied'))
+            continue
+        if not path.is_file():
             continue
         if path.parent == page.folder and (path.name == 'page.toml' or path.name.endswith('.page.toml')):
             continue
@@ -77,6 +86,14 @@ def copy_page(page, out, include=(), exclude=()):
         shutil.copy2(path, out / rel)
         files.append(rel)
     return page.entry.relative_to(page.folder).as_posix(), files
+
+
+def _walk(folder):
+    """Every path under FOLDER, sorted, without descending into linked folders."""
+    found = []
+    for top, dirs, names in os.walk(folder, followlinks=False):
+        found += [Path(top) / name for name in dirs + names]
+    return sorted(found)
 
 
 def _matches(rel, patterns):
