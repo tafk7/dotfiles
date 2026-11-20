@@ -33,6 +33,7 @@ from . import Target, TargetError
 PLACEHOLDERS = ('date', 'slug', 'project', 'year')
 POLICIES = ('auto', 'ask', 'never')
 LOCK_WAIT = 120   # seconds another publish to the same checkout may hold the lock
+GIT_TIMEOUT = 120   # seconds for one git command (a pull or push over a slow network)
 
 
 def terminal():
@@ -134,9 +135,13 @@ class GitTarget(Target):
 
     # -- git ---------------------------------------------------------------------------------
 
-    def git(self, *args, check=True, timeout=120):
-        result = subprocess.run(['git', '-C', str(self.checkout), *args], capture_output=True, text=True,
-                                timeout=timeout, check=False, stdin=subprocess.DEVNULL)
+    def git(self, *args, check=True, timeout=None):
+        timeout = timeout or GIT_TIMEOUT
+        try:
+            result = subprocess.run(['git', '-C', str(self.checkout), *args], capture_output=True, text=True,
+                                    timeout=timeout, check=False, stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            raise TargetError(f'git {" ".join(args)} in {self.checkout} ran past {timeout} s') from None
         if check and result.returncode != 0:
             raise TargetError(f'git {" ".join(args)} in {self.checkout} failed:\n'
                               + (result.stderr or result.stdout).strip())
@@ -182,20 +187,31 @@ class GitTarget(Target):
             self.git('pull', '--ff-only', '--quiet', self.remote, self.branch)
 
     def push(self):
-        """Push BRANCH; on a rejection, one pull --rebase and a retry. True when it went."""
-        if self.git('push', '--quiet', self.remote, f'HEAD:{self.branch}', check=False).returncode == 0:
-            return True
-        rebase = self.git('pull', '--rebase', '--quiet', self.remote, self.branch, check=False)
-        if rebase.returncode != 0:
-            self.git('rebase', '--abort', check=False)
-            print(f'viz: the push to {self.remote} was rejected and rebasing onto it failed; the commit is kept '
-                  f'in {self.checkout}:\n{(rebase.stderr or rebase.stdout).strip()}', file=sys.stderr)
+        """Push BRANCH; on a rejection, one pull --rebase and a retry. True when it went; on any failure
+        (a timeout included) the checkout is left on its own commits, with no rebase open."""
+        try:
+            if self.git('push', '--quiet', self.remote, f'HEAD:{self.branch}', check=False).returncode == 0:
+                return True
+            rebase = self.git('pull', '--rebase', '--quiet', self.remote, self.branch, check=False)
+            if rebase.returncode != 0:
+                raise TargetError(f'the push to {self.remote} was rejected and rebasing onto it failed:\n'
+                                  + (rebase.stderr or rebase.stdout).strip())
+            if self.git('push', '--quiet', self.remote, f'HEAD:{self.branch}', check=False).returncode == 0:
+                return True
+            raise TargetError(f'the push to {self.remote} was rejected twice')
+        except TargetError as error:
+            kept = f'the commit is kept in {self.checkout}'
+            try:
+                if self.rebasing():
+                    self.git('rebase', '--abort', check=False)
+            except TargetError as stuck:
+                kept += f', but a rebase is still open there ({stuck}): git rebase --abort'
+            print(f'viz: {error}\n{kept}', file=sys.stderr)
             return False
-        if self.git('push', '--quiet', self.remote, f'HEAD:{self.branch}', check=False).returncode == 0:
-            return True
-        print(f'viz: the push to {self.remote} was rejected twice; the commit is kept in {self.checkout}',
-              file=sys.stderr)
-        return False
+
+    def rebasing(self):
+        gitdir = Path(self.git('rev-parse', '--absolute-git-dir').stdout.strip())
+        return (gitdir / 'rebase-merge').exists() or (gitdir / 'rebase-apply').exists()
 
     def waiting(self):
         """The commits a push would send: those on HEAD the remote's copy of BRANCH lacks."""

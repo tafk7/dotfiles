@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """bin/viz beyond the server: viz path, page.toml, viz bundle and look, viz targets and viz publish. Offline, on temporary homes and repositories."""
 import ast
+import contextlib
 import datetime
 import fcntl
 import hashlib
+import io
 import json
 import os
 import pty
@@ -1110,6 +1112,38 @@ class GitTarget(Fresh):
         self.assertIs(self.records(folder)[-1]['pushed'], False)
         self.assertEqual(git(self.pages, 'log', '-1', '--format=%s'), f'Publish {self.place}: report\n')
         self.assertFalse((Path(git(self.pages, 'rev-parse', '--absolute-git-dir').strip()) / 'rebase-merge').exists())
+        self.assertEqual(git(self.pages, 'status', '--porcelain'), '')
+
+    def test_a_hung_rebase_is_aborted(self):
+        # A push is rejected and the rebase onto the remote hangs (here, a hook that sleeps): viz gives up
+        # on it cleanly, aborting the rebase and keeping the commit, instead of leaving the checkout mid-rebase.
+        from viz import targets
+        from viz.targets import git as git_type
+        self.target()
+        (self.other / 'theirs.txt').write_text('theirs')
+        git(self.other, 'add', '-A')
+        git(self.other, 'commit', '-q', '-m', 'theirs')
+        git(self.other, 'push', '-q')
+        (self.pages / 'ours.txt').write_text('ours')
+        git(self.pages, 'add', '-A')
+        git(self.pages, 'commit', '-q', '-m', 'ours')
+        hook = self.pages / '.git' / 'hooks' / 'post-checkout'
+        hook.write_text('#!/bin/sh\nexec sleep 30 </dev/null >/dev/null 2>&1\n')
+        hook.chmod(0o755)
+        target = targets.find('team')
+        self.assertIsInstance(target, git_type.GitTarget)
+        saved = git_type.GIT_TIMEOUT
+        git_type.GIT_TIMEOUT = 3
+        try:
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                pushed = target.push()
+        finally:
+            git_type.GIT_TIMEOUT = saved
+        self.assertIs(pushed, False)
+        self.assertIn('the commit is kept', err.getvalue())
+        gitdir = self.pages / '.git'
+        self.assertFalse((gitdir / 'rebase-merge').exists() or (gitdir / 'rebase-apply').exists())
+        self.assertEqual(git(self.pages, 'log', '-1', '--format=%s'), 'ours\n')
         self.assertEqual(git(self.pages, 'status', '--porcelain'), '')
 
     def test_dry_run_listing_and_config(self):
