@@ -113,7 +113,8 @@ class Job:
 
 def types():
     """Configurable target types: type name -> Target subclass."""
-    return {}
+    from .git import GitTarget
+    return {'git': GitTarget}
 
 
 def builtins():
