@@ -956,6 +956,13 @@ class GitTarget(Fresh):
         (self.pages / 'stray.txt').write_text('untracked')
         self.assertIn('has changes', self.publish(folder, ok=False).stderr)
         self.assertEqual((self.pages / 'stray.txt').read_text(), 'untracked')   # never cleaned away
+        git(self.pages, 'config', 'status.showUntrackedFiles', 'no')    # hidden from a plain git status
+        (self.pages / 'drafts').mkdir()
+        (self.pages / 'drafts' / 'private.txt').write_text('untracked')
+        self.assertIn('has changes', self.publish(folder, ok=False).stderr)
+        self.assertEqual((self.pages / 'drafts' / 'private.txt').read_text(), 'untracked')
+        shutil.rmtree(self.pages / 'drafts')
+        git(self.pages, 'config', '--unset', 'status.showUntrackedFiles')
         (self.pages / 'stray.txt').unlink()
         git(self.pages, 'checkout', '-q', '-b', 'elsewhere')
         self.assertIn('is on elsewhere, not gh-pages', self.publish(folder, ok=False).stderr)

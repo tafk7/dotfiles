@@ -152,7 +152,7 @@ class GitTarget(Target):
         if branch != self.branch:
             raise TargetError(f'{self.name}: {self.checkout} is on {branch or "a detached HEAD"}, not '
                               f'{self.branch}; viz never switches a checkout')
-        status = self.git('status', '--porcelain').stdout
+        status = self.git('status', '--porcelain', '--untracked-files=all').stdout
         if status.strip():
             raise TargetError(f'{self.name}: {self.checkout} has changes; viz publishes only into a clean '
                               f'checkout and never stashes or resets work it found:\n{status.rstrip()}')
