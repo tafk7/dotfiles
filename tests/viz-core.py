@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""bin/viz beyond the server: viz path, page.toml, viz targets and viz publish. Offline, on temporary homes and repositories."""
+"""bin/viz beyond the server: viz path, page.toml, viz bundle, viz targets and viz publish. Offline, on temporary homes and repositories."""
 import ast
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 
 import tomllib
@@ -32,7 +34,7 @@ for name in ('CLAUDE_CODE_SESSION_ID', 'VSCODE_IPC_HOOK_CLI', 'PROJECT_DIR'):
 (SANDBOX / 'home').mkdir()
 sys.path.insert(0, str(REPO / 'lib'))
 
-from viz import manifest
+from viz import formats, manifest
 
 ROOT = Path(BASE_ENV['VIZ_DIR']).resolve()
 TODAY = datetime.date.today().isoformat()  # noqa: DTZ011
@@ -309,12 +311,15 @@ def draft(case, name='report.html', summary='What the page shows.', generator='b
         (folder / 'build.py').write_text('print()')
         (folder / 'notes.md').write_text('notes')
     elif entry.suffix:
-        entry.write_bytes(b'%PDF-1.4\n%%EOF\n')
+        entry.write_bytes(PDF)
     text = (folder / 'page.toml').read_text()
     text = text.replace('summary = ""', f'summary = "{summary}"', 1)
     text = text.replace('generator = ""', f'generator = "{generator}"', 1)
     (folder / 'page.toml').write_text(text)
     return folder
+
+
+PDF = b'%PDF-1.4\n1 0 obj << /Type /Page >> endobj\n%%EOF\n'
 
 
 def targets_dir():
@@ -445,6 +450,7 @@ class PublishFile(Fresh):
         self.assertEqual(record[0]['at'].tzinfo, datetime.UTC)
         # Republished without --out: the same place, replaced whole.
         (folder / 'style.css').unlink()
+        (folder / 'index.html').write_text('<html><body>r, without its stylesheet</body></html>')
         self.assertEqual(self.publish(str(folder / 'index.html'), '--to', 'file').stdout.strip(), str(out))
         self.assertFalse((out / 'style.css').exists())
         self.assertEqual(len(tomllib.loads((folder / 'page.toml').read_text())['published']), 2)
@@ -522,6 +528,206 @@ class PublishPreview(Fresh):
         finally:
             viz('stop')
         self.assertEqual((folder / 'page.toml').read_bytes(), before)
+
+
+
+FIXTURES = SANDBOX / 'fixtures'
+FONT_CSS = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap'
+MONO_CSS = 'https://fonts.googleapis.com/css2?family=Mono'
+D3 = 'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js'
+PLOT = 'https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/dist/plot.umd.min.js'
+HLJS = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css'
+PLOTLY = 'https://cdn.plot.ly/plotly-2.27.0.min.js'
+KATEX = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css'
+
+
+def record(url, body):
+    FIXTURES.mkdir(exist_ok=True)
+    (FIXTURES / urllib.parse.quote(url, safe='')).write_bytes(body if isinstance(body, bytes) else body.encode())
+
+
+def record_all():
+    shutil.rmtree(FIXTURES, ignore_errors=True)
+    record(FONT_CSS, "@font-face { font-family: 'Inter'; font-weight: 400;\n"
+                     '  src: url(https://fonts.gstatic.com/s/inter/v13/inter-400.woff2) format("woff2"); }\n'
+                     "@font-face { font-family: 'Inter'; font-weight: 700;\n"
+                     '  src: url(https://fonts.gstatic.com/s/inter/v13/inter-700.woff2) format("woff2"); }\n')
+    record(MONO_CSS, "@font-face { font-family: 'Mono'; src: url('https://fonts.gstatic.com/s/mono/v2/mono.woff2'); }")
+    for face in ('inter/v13/inter-400', 'inter/v13/inter-700', 'mono/v2/mono'):
+        record(f'https://fonts.gstatic.com/s/{face}.woff2', b'wOF2' + face.encode())
+    record(D3, '/* d3 */')
+    record(PLOT, '/* plot */')
+    record(HLJS, '.hljs{}')
+    record(PLOTLY, '/* plotly */')
+    record(KATEX, '@font-face{src:url(fonts/KaTeX_Main-Regular.woff2) format("woff2")}')
+    record('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/fonts/KaTeX_Main-Regular.woff2', b'wOF2katex')
+
+
+PORTABLE_PAGE = f"""<!doctype html><html><head>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="{FONT_CSS.replace('&', '&amp;')}" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="{HLJS}">
+<link rel="stylesheet" href="{KATEX}">
+<link rel="canonical" href="https://example.com/report/">
+<script src="{D3}" integrity="sha384-x" crossorigin="anonymous"></script>
+<script src="{PLOT}"></script>
+<script src="{PLOTLY}"></script>
+</head><body>
+<a href="https://example.com/elsewhere">a link out is fine</a>
+<a href="parts/b.html">part b</a> <a href="parts/">the parts</a>
+<img src="img/dot.png" alt="">
+<script>fetch('data/points.json').then(r => r.json());</script>
+</body></html>
+"""
+
+
+class Bundle(Fresh):
+    def setUp(self):
+        super().setUp()
+        record_all()
+        os.environ['VIZ_FETCH_FIXTURES'] = str(FIXTURES)
+        shutil.rmtree(SANDBOX / 'home' / '.cache', ignore_errors=True)
+        self.out = SANDBOX / 'work' / 'bundle'
+
+    def tearDown(self):
+        os.environ.pop('VIZ_FETCH_FIXTURES', None)
+
+    def page(self, body=PORTABLE_PAGE, **files):
+        folder = draft(self)
+        (folder / 'index.html').write_text(body)
+        (folder / 'style.css').write_text(f"@import url('{MONO_CSS}');\nbody {{ background: url(img/dot.png); }}\n")
+        (folder / 'img').mkdir(exist_ok=True)
+        (folder / 'img' / 'dot.png').write_bytes(b'\x89PNG')
+        (folder / 'parts').mkdir(exist_ok=True)
+        (folder / 'parts' / 'index.html').write_text('<a href="b.html">b</a>')
+        (folder / 'parts' / 'b.html').write_text(f'<link rel="stylesheet" href="{FONT_CSS.replace("&", "&amp;")}">'
+                                                 '<a href="../index.html">back</a>')
+        for name, text in files.items():
+            (folder / name.replace('__', '/')).write_text(text)
+        return manifest.locate(folder)
+
+    def bundle(self, page, policy=None):
+        shutil.rmtree(self.out, ignore_errors=True)
+        return formats.bundle(page, page.format, self.out, policy)
+
+    def test_portable_page(self):
+        report = self.bundle(self.page())
+        self.assertEqual(report.problems, [])
+        out = self.out
+        index = (out / 'index.html').read_text()
+        self.assertNotIn('fonts.g', index)                      # preconnects gone, link pointed at the copy
+        self.assertIn('<link rel="stylesheet" href="fonts/fonts.css">', index)
+        self.assertIn('href="../fonts/fonts.css"', (out / 'parts' / 'b.html').read_text())
+        self.assertIn('@import url("fonts/fonts.css");', (out / 'style.css').read_text())
+        css = (out / 'fonts' / 'fonts.css').read_text()
+        self.assertIn('url(inter-400.woff2)', css)
+        self.assertIn('url(mono.woff2)', css)
+        self.assertNotIn('gstatic', css)
+        fonts = json.loads((out / 'fonts' / 'MANIFEST.json').read_text())
+        faces = {f['file']: f for f in fonts if f['file'] != 'fonts.css'}
+        self.assertEqual(sorted(faces), ['inter-400.woff2', 'inter-700.woff2', 'mono.woff2'])
+        self.assertEqual(faces['mono.woff2']['sha256'], hashlib.sha256(b'wOF2mono/v2/mono').hexdigest())
+        self.assertEqual((out / 'fonts' / 'inter-700.woff2').read_bytes(), b'wOF2inter/v13/inter-700')
+        for url, local in ((D3, 'vendor/d3@7.9.0/dist/d3.min.js'),
+                           (PLOT, 'vendor/@observablehq__plot@0.6.16/dist/plot.umd.min.js'),
+                           (HLJS, 'vendor/highlight.js@11.9.0/styles/github.min.css'),
+                           (PLOTLY, 'vendor/plotly@2.27.0/plotly-2.27.0.min.js'),
+                           (KATEX, 'vendor/katex@0.16.9/dist/katex.min.css')):
+            with self.subTest(url=url):
+                self.assertNotIn(url, index)
+                self.assertIn(f'"{local}"', index)
+                self.assertTrue((out / local).is_file())
+        self.assertIn('integrity="sha384-x"', index)
+        self.assertTrue((out / 'vendor/katex@0.16.9/dist/fonts/KaTeX_Main-Regular.woff2').is_file())
+        vendor = {e['name']: e for e in json.loads((out / 'vendor' / 'MANIFEST.json').read_text())}
+        self.assertEqual(vendor['d3']['version'], '7.9.0')
+        self.assertEqual(vendor['d3']['url'], D3)
+        self.assertEqual(vendor['d3']['sha256'], hashlib.sha256(b'/* d3 */').hexdigest())
+        self.assertIn('https://example.com/elsewhere', index)   # links out are left alone
+        self.assertNotIn('build.py', report.files)
+
+    def test_font_cache(self):
+        self.bundle(self.page())
+        os.environ['VIZ_FETCH_FIXTURES'] = str(SANDBOX / 'no-fixtures')   # nothing recorded: no network at all
+        report = self.bundle(self.page())
+        self.assertEqual(report.problems, [])
+        self.assertTrue((self.out / 'fonts' / 'inter-400.woff2').is_file())
+        shutil.rmtree(SANDBOX / 'home' / '.cache')
+        report = self.bundle(self.page())
+        self.assertTrue(any('cannot download' in p.what for p in report.problems), report.problems)
+
+    def test_refusals(self):
+        body = (
+            '<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>\n'
+            '<script src="https://unpkg.com/vega@latest"></script>\n'
+            '<script src="https://example.com/lib.js"></script>\n'
+            '<img src="https://example.com/a.png">\n'
+            "<script>fetch('https://api.example.com/v1/x'); fetch('data/none.json');</script>\n"
+            '<a href="missing.html">gone</a> <a href="../other/">sibling</a> <link rel="stylesheet" href="/abs.css">\n'
+            '<style>body { background: url(https://example.com/bg.png) }</style>\n')
+        report = self.bundle(self.page(body))
+        found = [str(p) for p in report.problems]
+        for line, words in ((1, 'd3@7, not an exact version'), (2, 'vega@latest, not an exact version'),
+                            (3, 'loads https://example.com/lib.js'), (4, 'loads https://example.com/a.png'),
+                            (5, 'loads https://api.example.com/v1/x'), (5, 'data/none.json is not in the bundle'),
+                            (6, 'missing.html is not in the bundle'), (6, '../other/ points outside'),
+                            (6, '/abs.css is relative to the site root'), (7, 'loads https://example.com/bg.png')):
+            with self.subTest(words=words):
+                self.assertTrue(any(f.startswith(f'index.html:{line}:') and words in f for f in found), found)
+        relaxed = self.bundle(self.page(body), formats.Policy(network=True))
+        self.assertFalse(any('loads' in p.what for p in relaxed.problems), relaxed.problems)
+        self.assertTrue(any('not an exact version' in p.what for p in relaxed.problems))
+
+    def test_vendor_manifest_merge(self):
+        page = self.page(f'<script src="{D3}"></script><script src="vendor/old.js"></script>')
+        (page.folder / 'vendor').mkdir()
+        (page.folder / 'vendor' / 'old.js').write_text('//')
+        (page.folder / 'vendor' / 'MANIFEST.json').write_text('[{"name": "old", "url": "https://example.com/old"}]')
+        self.bundle(page)
+        names = [e['name'] for e in json.loads((self.out / 'vendor' / 'MANIFEST.json').read_text())]
+        self.assertEqual(names, ['old', 'd3'])
+        (page.folder / 'vendor' / 'MANIFEST.json').write_text('{"old": {}}')
+        report = self.bundle(page)
+        self.assertTrue(any('not a JSON list' in p.what for p in report.problems))
+
+    def test_pdf_and_svg(self):
+        folder = draft(self, 'deck.pdf')
+        (folder / 'deck.pdf').write_bytes(b'%PDF-1.4\n%%EOF')
+        page = manifest.locate(folder)
+        self.assertIn('no pages', str(self.bundle(page).problems))
+        (folder / 'deck.pdf').write_bytes(PDF)
+        self.assertEqual(self.bundle(page).problems, [])
+        folder = draft(self, 'fig.svg')
+        (folder / 'fig.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg">\n'
+                                        '<image href="https://example.com/x.png"/></svg>')
+        problems = [str(p) for p in self.bundle(manifest.locate(folder)).problems]
+        self.assertEqual(problems, ['fig.svg:2: loads https://example.com/x.png from outside the page'])
+
+    def test_viz_bundle_command(self):
+        page = self.page()
+        default = SANDBOX / 'state' / 'bundles' / 'report'
+        result = viz('bundle', str(page.folder))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[0], str(default))
+        self.assertTrue((default / 'fonts' / 'fonts.css').is_file())
+        self.assertTrue((default / 'page.toml').read_text().startswith('# Bundled by viz bundle'))
+        (page.folder / 'index.html').write_text('<img src="https://example.com/a.png">')
+        result = viz('bundle', str(page.folder))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('problem: index.html:1: loads https://example.com/a.png', result.stdout)
+        self.assertFalse((default / 'vendor').exists())       # replaced whole, each run
+        refused = viz('publish', str(page.folder), '--to', 'file', '--out', str(self.work / 'pub'))
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('is not portable', refused.stderr)
+        self.assertFalse((self.work / 'pub').exists())
+        mine = self.work / 'mine'
+        mine.mkdir()
+        (mine / 'notes.txt').write_text('keep')
+        self.assertIn('not a bundle viz wrote', viz('bundle', str(page.folder), '--out', str(mine)).stderr)
+        self.assertEqual((mine / 'notes.txt').read_text(), 'keep')
+        self.assertIn('inside the page', viz('bundle', str(page.folder), '--out', str(page.folder / 'b')).stderr)
 
 
 class ServerNeverPublishes(unittest.TestCase):

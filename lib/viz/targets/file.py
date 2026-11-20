@@ -59,9 +59,9 @@ class FileTarget(Target):
 
 
 def ours(folder):
-    """True for a folder viz publish wrote: its page.toml starts with viz's mark."""
+    """True for a folder viz publish or viz bundle wrote: its page.toml starts with their mark."""
     try:
         with open(folder / manifest.NAME) as f:
-            return f.readline().startswith(MARK)
+            return f.readline().startswith((MARK, '# Bundled by viz bundle'))
     except OSError:
         return False

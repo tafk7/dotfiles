@@ -45,10 +45,8 @@ class Policy:
     network: bool = False
 
 
-MODULES = {}   # format name -> module; html.py registers itself (slice by slice, as they are built)
-
-
 def module(fmt):
+    """The module of format FMT, or None for a pass-through format."""
     return MODULES.get(fmt)
 
 
@@ -88,9 +86,9 @@ def _matches(rel, patterns):
 def bundle(page, fmt, out, policy=None):
     """Write PAGE's portable form in format FMT into OUT (a new or empty folder); a Report.
 
-    The page's own format is bundled by its module, or copied as it is (a folder of html is copied whole, a
-    loose html file becomes index.html, any other format is its entry file alone). Another format must be an
-    export of the page's. Raises BundleError when the page cannot be made portable.
+    The page's own format is bundled by its module (html.py, pdf.py, image.py); a format without one is
+    pass-through, its entry file alone. Another format must be an export of the page's. Problems are in the
+    Report; BundleError means there is nothing to bundle.
     """
     policy = policy or Policy()
     source = page.format
@@ -106,16 +104,18 @@ def bundle(page, fmt, out, policy=None):
     mod = module(fmt)
     if mod is not None:
         return mod.bundle(page, out, policy, include=include, exclude=exclude)
-    if fmt == 'html':
-        entry, files = copy_page(page, out, include, exclude)
-    else:
-        Path(out).mkdir(parents=True, exist_ok=True)
-        entry = page.entry.name
-        shutil.copy2(page.entry, Path(out) / entry)
-        files = [entry]
-    return Report(entry=entry, format=fmt, files=files)
+    Path(out).mkdir(parents=True, exist_ok=True)
+    entry = page.entry.name
+    shutil.copy2(page.entry, Path(out) / entry)
+    return Report(entry=entry, format=fmt, files=[entry])
 
 
 def exports(fmt):
     """The formats a page of format FMT can be exported to."""
     return sorted(getattr(module(fmt), 'EXPORTS', {}))
+
+
+# Imported last: the modules use Problem, Report and copy_page from here.
+from . import html, image, pdf
+
+MODULES = {html.NAME: html, pdf.NAME: pdf, **dict.fromkeys(image.NAMES, image)}

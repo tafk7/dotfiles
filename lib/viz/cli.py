@@ -61,7 +61,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
-from . import manifest, targets
+from . import bundle, manifest, targets
 from .access import (
     CODE_TTL,
     ensure_server,
@@ -339,6 +339,11 @@ def main():
     sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
     sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
     sub.add_parser('status', help='show the server, how to forward to it, and VS Code').set_defaults(func=cmd_status)
+    p = sub.add_parser('bundle', help="write a page's portable form and list what keeps it from being portable")
+    p.add_argument('page', help='a page folder, its page.toml, or a file')
+    p.add_argument('--format', metavar='FMT', help="the form to make (default: the page's own; pdf exports html)")
+    p.add_argument('--out', metavar='DIR', help='where (default: $VIZ_STATE/bundles/NAME, replaced each run)')
+    p.set_defaults(func=bundle.cmd_bundle)
     p = sub.add_parser('targets', help='list where pages can be published, for whom, and under which rules')
     p.add_argument('name', nargs='?', help='one target, with its rules in full')
     p.add_argument('--json', action='store_true', help='as JSON, for tools')

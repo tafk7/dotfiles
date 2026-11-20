@@ -55,12 +55,10 @@ viz publish PAGE --to file --out ~/outbox/report
 ```
 
 `viz publish` refuses a page without `title`, `summary` and
-`source.generator`, and any field the target `required`s. It copies the page
-into a temporary folder (what a browser reads: HTML, CSS, scripts, data,
-images, fonts; not generators, hidden files or the draft's manifest), writes
-the published manifest, hands both to the target, and records where the page
-went. `--dry-run` prints the place, the files and the manifest, and changes
-nothing.
+`source.generator`, and any field the target `required`s. It makes the page's
+portable form in a temporary folder (below), writes the published manifest,
+hands both to the target, and records where the page went. `--dry-run` prints
+the place, the files and the manifest, and changes nothing.
 
 The published manifest is built from, lowest first: `author` in
 `config.toml`, the target's `[manifest]`, the draft's fields, the draft's
@@ -75,6 +73,32 @@ never moves; `--as SLUG` picks a new one.
 Publishing is a command only. The viz server never publishes: any page it
 serves can call it, so a publish endpoint would let one page copy another
 draft to a shared site.
+
+## The portable form
+
+`viz bundle PAGE` writes it to `$VIZ_STATE/bundles/NAME/` (or `--out DIR`),
+prints the path and lists what keeps the page from being portable; it exits 1
+when anything does. `viz publish` runs the same code and stops on any problem.
+
+An html page becomes one folder that loads nothing from outside itself:
+
+- What a browser reads is copied (HTML, CSS, scripts, data, images, fonts,
+  PDF, text); generators (`*.py`), hidden files and the draft's `page.toml`
+  are not. A loose html file becomes `index.html`.
+- Google Fonts the page links or `@import`s are downloaded into `fonts/`, with
+  `fonts/fonts.css` and `fonts/MANIFEST.json` (each file's URL and sha256).
+- A script or stylesheet from a CDN whose URL names an exact version
+  (`d3@7.9.0`, `/ajax/libs/highlight.js/11.9.0/`, `plotly-2.27.0.min.js`) is
+  downloaded into `vendor/PACKAGE@VERSION/` and recorded in
+  `vendor/MANIFEST.json`. A range or tag (`@7`, `@latest`) is refused.
+- Anything else loaded from outside (an API `fetch`, an unpinned script, an
+  image URL) is refused, unless the target sets `network = true`. Links that
+  navigate (`<a href>`) are fine.
+- Relative links must resolve inside the bundle.
+
+Downloads are cached in `~/.cache/viz/`, so bundling again needs no network.
+A pdf is copied as it is, once viz has seen it has pages; an svg is checked
+for outside loads like html; other formats are copied as they are.
 
 ## Built-in targets
 
