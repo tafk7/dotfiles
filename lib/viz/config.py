@@ -29,3 +29,28 @@ URL_HOST = '127.0.0.1'
 def die(message):
     print(f'viz: {message}', file=sys.stderr)
     sys.exit(1)
+
+
+# Personal settings and targets: config.toml and targets.d/*.toml. Like VIZ_STATE, XDG_CONFIG_HOME is not
+# used, so every shell of the account reads the same targets.
+CONFIG = Path(os.environ.get('VIZ_CONFIG') or '~/.config/viz').expanduser()
+_settings = None
+
+
+def read_toml(path):
+    """PATH parsed as TOML; dies naming the file when it does not parse."""
+    import tomllib
+    try:
+        with open(path, 'rb') as f:
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as error:
+        die(f'{path}: {error}')
+
+
+def settings():
+    """config.toml (optional): author, [provenance] env, session_env, project_from; {} without one."""
+    global _settings
+    if _settings is None:
+        path = CONFIG / 'config.toml'
+        _settings = read_toml(path) if path.is_file() else {}
+    return _settings

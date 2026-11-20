@@ -57,12 +57,13 @@ showcase, in a quieter treatment.
 
 ## Deliver with viz
 
-1. `viz path NAME.ext` prints `~/viz/<today>/NAME.ext` and creates its directory. A page with
-   parts (generator, data, assets, several pages) gets a directory: `viz path NAME/index.html`.
-   Use the project's own directory instead when the user wants the page there.
+1. `viz path NAME.html` makes the folder `~/viz/<today>/NAME/` with a `page.toml` manifest and
+   prints `.../NAME/index.html` (`viz path NAME.pdf` prints `.../NAME/NAME.pdf`). Fill in the
+   manifest's `title`, `summary` and `source.generator`. Use the project's own directory instead
+   when the user wants the page there.
 2. Keep the source beside the output (`NAME.py`, its data) so the page can be rebuilt and edited.
 3. Render, look once, then `viz open PATH`. It prints a URL such as
-   `http://127.0.0.1:23526/2026-10-27/report.html`; pass it on, without describing the page at
+   `http://127.0.0.1:23526/2026-10-27/report/index.html`; pass it on, without describing the page at
    length. If it adds that no browser has reached viz yet, tell the user to press Ctrl+Alt+P in
    WezTerm, which forwards the port, and to run `viz open PATH` in their own terminal, which
    opens the page signed in (without WezTerm: `viz status` for the ssh forward, `viz login` to

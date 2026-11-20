@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bin/viz: path layout, private socket, sign-in, Host and cross-site checks, containment, reload, lifetime."""
+"""bin/viz: the server: private socket, sign-in, Host and cross-site checks, containment, reload, lifetime."""
 from pathlib import Path
 import base64
 import datetime
@@ -91,12 +91,14 @@ with tempfile.TemporaryDirectory() as tmp:
 
     try:
         today = datetime.date.today().isoformat()
+        # viz path makes a draft folder with its manifest (tests/viz-core.py covers the layout and the stub).
         out = run('path', 'chart.html').stdout.strip()
-        check(out == str(tmp / 'viz' / today / 'chart.html'), f'path: unexpected {out!r}')
-        check((tmp / 'viz' / today).is_dir(), 'path: directory not created')
+        check(out == str(tmp / 'viz' / today / 'chart' / 'index.html'), f'path: unexpected {out!r}')
+        check((tmp / 'viz' / today / 'chart' / 'page.toml').is_file(), 'path: no page.toml')
         check(run('path', '../escape.html').returncode != 0, 'path: accepted ..')
 
-        chart = Path(out)
+        # The server tests use a loose page, as drafts were filed before folders.
+        chart = tmp / 'viz' / today / 'chart.html'
         chart.write_text('<html><body><p>chart-marker</p></body></html>')
         (tmp / 'secret.txt').write_text('secret')
         (tmp / 'viz' / 'link.txt').symlink_to(tmp / 'secret.txt')

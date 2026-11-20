@@ -43,7 +43,6 @@ Environment:
 """
 import argparse
 import base64
-import datetime
 import fcntl
 import os
 import signal
@@ -55,6 +54,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
+from . import manifest
 from .access import (
     CODE_TTL,
     ensure_server,
@@ -91,11 +91,33 @@ def connect_hint(info):
 
 
 def cmd_path(args):
+    """A draft folder ROOT/DATE/FOLDER/ with a page.toml stub; prints the path NAME asked for.
+
+    NAME's first component names the folder. An html file at the top becomes the folder's index.html, any
+    other file keeps its name, and a NAME without a suffix is the folder itself.
+    """
     name = Path(args.name)
-    if name.is_absolute() or '..' in name.parts:
+    if name.is_absolute() or '..' in name.parts or not name.parts:
         die('NAME must be a relative path without ..')
-    path = ROOT / datetime.date.today().isoformat() / name  # noqa: DTZ011
-    path.parent.mkdir(parents=True, exist_ok=True)
+    day = manifest.today()
+    if len(name.parts) == 1 and name.suffix:
+        folder = ROOT / day.isoformat() / name.stem
+        entry = 'index.html' if manifest.format_of(name) == 'html' else name.name
+        path = folder / entry
+    else:
+        folder = ROOT / day.isoformat() / name.parts[0]
+        entry = Path(*name.parts[1:]).as_posix() if len(name.parts) > 1 else None
+        path = folder / entry if entry else folder
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        folder.mkdir(exist_ok=True)
+    except (FileExistsError, NotADirectoryError):
+        die(f'{folder} exists and is not a directory; pick another NAME')
+    source = manifest.provenance(Path.cwd())
+    text = manifest.stub(args.title or folder.name, entry=entry, kind=args.kind,
+                         project=args.project or manifest.project_name(source), source=source, day=day)
+    if not manifest.create(folder / manifest.NAME, text) and (args.title or args.kind or args.project):
+        print(f'viz: {folder / manifest.NAME} exists and is left as it is', file=sys.stderr)
     print(path)
 
 
@@ -283,8 +305,11 @@ def main():
     parser = argparse.ArgumentParser(
         prog='viz', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='command', required=True)
-    p = sub.add_parser('path', help="print (and create the directory of) today's path for NAME")
-    p.add_argument('name')
+    p = sub.add_parser('path', help="make today's draft folder for NAME, with its page.toml, and print the path")
+    p.add_argument('name', help='report (the folder), report.html (its index.html), report.pdf, report/data.json')
+    p.add_argument('--title', help='the title in a new page.toml (default: the folder name)')
+    p.add_argument('--kind', help='the form: answer, explainer, report, dashboard, ...')
+    p.add_argument('--project', help='the project (default: from config.toml, else the repository name)')
     p.set_defaults(func=cmd_path)
     p = sub.add_parser('open', help='print the browser URL of files (the index without any), open them in '
                                     "the client's browser from a terminal in WezTerm, or in the connected VS Code")
