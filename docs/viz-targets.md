@@ -177,10 +177,15 @@ Then `push` decides:
 
 - `auto` pushes. A rejected push is rebased once onto the remote and retried;
   if that fails too, the commit stays in the checkout and viz says so.
-- `ask` shows the commit and asks at a terminal. Without one (an agent's
-  shell), viz commits and stops; a person pushes later with
-  `viz publish --to NAME --push`, which shows what waits and asks.
+- `ask` shows every commit the push would send and asks at a terminal.
+  Without one (an agent's shell), viz commits and stops; a person pushes
+  later with `viz publish --to NAME --push`, which shows what waits and asks.
 - `never` commits only; pushing is yours.
+
+`ask` keeps an agent from pushing by accident, not on purpose: viz can only
+tell that stdin and stdout are a terminal, and a program that runs viz in a
+pseudo-terminal can answer the question itself. Where a person must approve
+every push, use `never` and push by hand.
 
 The record in the draft's `page.toml` names the place, the URL, the commit
 and whether it was pushed.
