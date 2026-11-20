@@ -440,6 +440,29 @@ class PublishFile(Fresh):
         self.assertIn('loose.html.page.toml lacks title', result.stderr)
         self.assertIn('does not exist yet', result.stderr)
 
+    def test_out_through_links(self):
+        folder = draft(self)
+        before = (folder / 'page.toml').read_bytes()
+        into = self.work / 'into-page'
+        into.symlink_to(folder, target_is_directory=True)
+        elsewhere = self.work / 'elsewhere'
+        elsewhere.mkdir()
+        linked = self.work / 'linked-out'
+        linked.symlink_to(elsewhere, target_is_directory=True)
+        for args, said in (((str(into / 'copy'),), 'inside the page'), ((str(linked),), 'is a link')):
+            with self.subTest(said=said):
+                result = self.publish(str(folder), '--to', 'file', '--out', *args, ok=False)
+                self.assertIn(said, result.stderr)
+                result = viz('bundle', str(folder), '--out', *args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(said, result.stderr)
+                self.assertNotIn('Traceback', result.stderr)
+        self.assertEqual(sorted(p.name for p in folder.iterdir() if not p.name.startswith('.')),
+                         ['build.py', 'data', 'index.html', 'notes.md', 'page.toml', 'style.css'])
+        self.assertEqual(list(elsewhere.iterdir()), [])
+        self.assertEqual(sorted(p.name for p in self.work.iterdir()), ['elsewhere', 'into-page', 'linked-out'])
+        self.assertEqual((folder / 'page.toml').read_bytes(), before)
+
     def test_folder_publish_record_and_republish(self):
         repo = make_repo(self.work / 'proj')
         folder = draft(self, cwd=repo)

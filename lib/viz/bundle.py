@@ -8,7 +8,7 @@ from pathlib import Path
 from . import browser, formats, manifest
 from .config import STATE, die
 from .targets import default_slug
-from .targets.file import ours
+from .targets.file import inside_page, ours
 
 MARK = '# Bundled by viz bundle'
 
@@ -26,7 +26,9 @@ def page_at(arg):
 
 def make(page, fmt, out):
     """PAGE's portable form in format FMT, written to OUT (replaced if viz wrote it); the Report."""
-    if page.folder and (out == page.folder or page.folder in out.parents):
+    if out.is_symlink():
+        die(f'{out} is a link; give --out the path it leads to, or a new one')
+    if inside_page(out, page):
         die(f'{out} is inside the page itself; bundle it somewhere else')
     if out.exists() and (not out.is_dir() or (any(out.iterdir()) and not ours(out))):
         die(f'{out} exists and is not a bundle viz wrote; give --out a new or empty folder')

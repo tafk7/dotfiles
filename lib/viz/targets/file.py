@@ -25,8 +25,9 @@ class FileTarget(Target):
             raise TargetError('--to file needs --out PATH (a folder, or FILE.pdf for a pdf)')
         dest = Path(out).expanduser().absolute()
         again = bool(last) and Path(str(last.get('place', ''))).expanduser().absolute() == dest
-        page = job.page
-        if page.folder and (dest == page.folder or page.folder in dest.parents):
+        if dest.is_symlink():
+            raise TargetError(f'{dest} is a link; give --out the path it leads to, or a new one')
+        if inside_page(dest, job.page):
             raise TargetError(f'{dest} is inside the page itself; write it somewhere else')
         if manifest.format_of(dest) == job.format and job.format != 'html':
             if dest.is_dir():
@@ -50,12 +51,23 @@ class FileTarget(Target):
             Path(str(dest) + manifest.SIDECAR).write_text(text)
             return {}
         staged = dest.with_name(f'.{dest.name}.viz-{os.getpid()}')
-        shutil.copytree(bundle_dir, staged)
-        (staged / manifest.NAME).write_text(text)
-        if dest.exists():
-            shutil.rmtree(dest)
-        staged.rename(dest)
+        try:
+            shutil.copytree(bundle_dir, staged)
+            (staged / manifest.NAME).write_text(text)
+            if dest.exists():
+                shutil.rmtree(dest)
+            staged.rename(dest)
+        finally:
+            shutil.rmtree(staged, ignore_errors=True)
         return {}
+
+
+def inside_page(dest, page):
+    """Whether DEST, with any links on the way followed, is PAGE's folder or inside it."""
+    if not page.folder:
+        return False
+    real, folder = Path(dest).resolve(), page.folder.resolve()
+    return real == folder or folder in real.parents
 
 
 def ours(folder):
