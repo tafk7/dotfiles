@@ -128,7 +128,10 @@ it up itself (`. ~/env.sh && make-usage-page "$VIZ_OUT"`); no ssh agent is
 passed. It should write the page atomically (a temporary file, then a
 rename), so a reload never sees half a page.
 
-`viz collect` runs the collectors, in the foreground. It looks in `~/viz/live`
+`viz collect` runs the collectors, in the foreground; where systemd runs a user
+instance, setup installs `viz-collect.service` to run it beside `viz.service`
+(`systemctl --user status viz-collect`; its own messages are in the journal).
+It looks in `~/viz/live`
 every 15 seconds, only at folders that are real, yours and closed to other
 accounts, and runs each collector that is due in a thread of its own. A page
 is due one interval after its last run started; a run still going when the

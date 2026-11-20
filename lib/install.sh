@@ -439,7 +439,8 @@ setup_wsl_ssh_agent() {
 # and with no server behind the client's LocalForward each poll makes ssh print
 # "open failed". Generated, not tracked: ExecStart names this checkout. Starts
 # with the user manager (the first login after boot) and stops with it, which
-# viz does anyway when logout removes its runtime directory.
+# viz does anyway when logout removes its runtime directory. Beside it,
+# viz-collect.service runs the live pages' collectors (viz publish --to live).
 setup_viz_service() {
     # The manager must be this HOME's: one serving another HOME would never
     # load the unit written here. Its socket is checked first so a runtime
@@ -456,8 +457,8 @@ setup_viz_service() {
 
     # ExecStartPre hands an on-demand server over to the unit; otherwise the
     # unit's server finds the lock held and fails.
-    local unit="$HOME/.config/systemd/user/viz.service" content
-    content="[Unit]
+    local failed=false
+    install_viz_unit viz.service "[Unit]
 Description=viz: serve ~/viz to the ssh client's browser
 
 [Service]
@@ -468,28 +469,49 @@ Restart=on-failure
 RestartSec=30
 
 [Install]
-WantedBy=default.target"
+WantedBy=default.target" "viz server runs as a user service (viz.service)" || failed=true
+    # A collector runs with a bare environment of its own (viz collect sets
+    # it), so the unit passes nothing; one that needs more sources it.
+    install_viz_unit viz-collect.service "[Unit]
+Description=viz: run the live pages' collectors (viz collect)
+
+[Service]
+Type=simple
+ExecStart=\"$DOTFILES_DIR/bin/viz\" collect
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target" "viz collectors run as a user service (viz-collect.service)" || failed=true
+    [[ "$failed" == false ]]
+}
+
+# Write user unit NAME with CONTENT and (re)start it, unless it is already
+# that, enabled and running. MESSAGE is the success line.
+install_viz_unit() {
+    local name="$1" content="$2" message="$3"
+    local unit="$HOME/.config/systemd/user/$name"
     if [[ -f "$unit" && "$(<"$unit")" == "$content" ]] \
-       && systemctl --user is-enabled viz.service >/dev/null 2>&1 \
-       && systemctl --user is-active viz.service >/dev/null 2>&1; then
+       && systemctl --user is-enabled "$name" >/dev/null 2>&1 \
+       && systemctl --user is-active "$name" >/dev/null 2>&1; then
         return 0
     fi
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
-        log "[DRY RUN] Would install and start viz.service"
+        log "[DRY RUN] Would install and start $name"
         return 0
     fi
 
     local staged
     mkdir -p "${unit%/*}" || return 1
-    staged="$(mktemp "${unit%/*}/.viz.service.XXXXXX")" || return 1
+    staged="$(mktemp "${unit%/*}/.$name.XXXXXX")" || return 1
     printf '%s\n' "$content" > "$staged" && mv -f "$staged" "$unit" || { rm -f "$staged"; return 1; }
 
     systemctl --user daemon-reload || { warn "viz: systemd user daemon-reload failed"; return 1; }
-    if systemctl --user enable viz.service >/dev/null 2>&1 \
-       && systemctl --user restart viz.service >/dev/null 2>&1; then
-        success "viz server runs as a user service (viz.service)"
+    if systemctl --user enable "$name" >/dev/null 2>&1 \
+       && systemctl --user restart "$name" >/dev/null 2>&1; then
+        success "$message"
     else
-        warn "viz: could not enable or start viz.service; see: systemctl --user status viz"
+        warn "viz: could not enable or start $name; see: systemctl --user status ${name%.service}"
         return 1
     fi
 }
