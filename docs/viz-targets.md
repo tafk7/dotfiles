@@ -144,6 +144,10 @@ timeout = "10m"                      # default: the interval, at most 30m
 paused = false                       # true stops collecting; the page stays
 ```
 
+A draft published here is bundled as for any target, except that it may load
+from outside (`network`), as it does in `~/viz`: a live page is as private as
+`preview`. A CDN script must still name an exact version.
+
 Edit it in place to change the command or the interval; delete the folder to
 retire the page. `--run`, `--every` and `--cwd` override a draft's `[live]`
 table. Without a draft, `--as`, `--run`, `--every` and `--summary` are needed

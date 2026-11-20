@@ -314,6 +314,16 @@ class PublishDraft(Fresh):
         self.assertEqual(len(self.manifest_of(folder)['published']), 2)
         self.assertEqual(self.leftovers(), [])
 
+    def test_a_live_draft_may_load_from_outside(self):
+        folder = draft(self, "run = 'true'\nevery = \"5m\"\n")
+        (folder / 'index.html').write_text('<html><body><img src="https://img.example.com/a.png">'
+                                           '<script>fetch("https://api.example.com/data")</script></body></html>')
+        refused = self.publish(str(folder), '--to', 'file', '--out', str(self.work / 'out'), ok=False)
+        self.assertIn('loads https://api.example.com/data from outside the page', refused.stderr)
+        self.publish(str(folder), '--to', 'live')          # as private as preview: the network is allowed
+        self.assertIn('api.example.com', (LIVE / 'report' / 'index.html').read_text())
+        self.assertTrue(json.loads(viz('targets', 'live', '--json').stdout)['network'])
+
     def test_draft_without_a_collector_and_dry_run(self):
         folder = draft(self)
         self.assertIn('needs a collector', self.publish(str(folder), '--to', 'live', ok=False).stderr)

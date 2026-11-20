@@ -35,6 +35,7 @@ class LiveTarget(Target):
     description: str = ('A fixed, undated place in the private browser, VIZ_DIR/live/NAME/, rewritten by a '
                         'collector: a command viz collect runs every interval')
     audience: str = 'you, at a fixed address in your browser; a collector keeps it current'
+    network: bool = True   # as private as preview: a live draft may load from outside, as it does in ~/viz
     builtin = True
     usage = ("viz publish --to live --as NAME --run 'COMMAND' --every 5m [--cwd DIR] --summary TEXT, "
              'or viz publish DRAFT --to live with a [live] table in its page.toml')
