@@ -197,8 +197,15 @@ class GitTarget(Target):
               file=sys.stderr)
         return False
 
+    def waiting(self):
+        """The commits a push would send: those on HEAD the remote's copy of BRANCH lacks."""
+        tracking = f'{self.remote}/{self.branch}'
+        if self.git('rev-parse', '--verify', '--quiet', f'refs/remotes/{tracking}', check=False).returncode == 0:
+            return [f'{tracking}..HEAD']
+        return ['HEAD', '--not', f'--remotes={self.remote}']
+
     def ask(self, what):
-        print(self.git('log', '--stat', '--format=%h %s', what).stdout.rstrip())
+        print(self.git('log', '--stat', '--format=%h %s', *what).stdout.rstrip())
         answer = input(f'push to {self.remote} {self.branch}? [y/N] ').strip().lower()
         return answer in ('y', 'yes')
 
@@ -266,7 +273,7 @@ class GitTarget(Target):
                 job.notes.append(f'committed {commit} in {self.checkout}; it waits for a person to push it: '
                                  f'viz publish --to {self.name} --push, in their own terminal')
                 return False
-            if not self.ask('-1'):
+            if not self.ask(self.waiting()):
                 job.notes.append(f'committed {commit} in {self.checkout}, not pushed; later: '
                                  f'viz publish --to {self.name} --push')
                 return False
@@ -285,8 +292,8 @@ class GitTarget(Target):
         try:
             self.check_checkout()
             self.git('fetch', '--quiet', self.remote, self.branch)
-            what = f'{self.remote}/{self.branch}..HEAD'
-            count = self.git('rev-list', '--count', what).stdout.strip()
+            what = self.waiting()
+            count = self.git('rev-list', '--count', *what).stdout.strip()
             if count == '0':
                 print(f'nothing waits to be pushed in {self.checkout}')
                 return 0

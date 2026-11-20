@@ -1061,11 +1061,19 @@ class GitTarget(Fresh):
         self.assertEqual(code, 0, out)
         self.assertEqual(len(self.remote_subjects()), 2)
         (folder / 'index.html').write_text('<p>no</p>')
-        code, out = in_terminal(['publish', str(folder), '--to', 'team'], answer='n')
+        code, out = in_terminal(['publish', str(folder), '--to', 'team', '-m', 'the waiting one'], answer='n')
         self.assertEqual(code, 0, out)
         self.assertIn('not pushed', out)
         self.assertEqual(len(self.remote_subjects()), 2)
         self.assertIs(self.records(folder)[-1]['pushed'], False)
+        # The question shows every commit the push would send, not only the newest.
+        (folder / 'index.html').write_text('<p>yes</p>')
+        code, out = in_terminal(['publish', str(folder), '--to', 'team', '-m', 'the new one'], answer='y')
+        self.assertEqual(code, 0, out)
+        asked = out.split('[y/N]')[0]
+        self.assertIn('the waiting one', asked)
+        self.assertIn('the new one', asked)
+        self.assertEqual(self.remote_subjects()[:2], ['the new one', 'the waiting one'])
 
     def race(self, path, text):
         """An after command that pushes PATH from another clone while viz publishes: a rejected push."""
