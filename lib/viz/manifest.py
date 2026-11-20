@@ -282,6 +282,8 @@ def value(v):
         return repr(v)
     if isinstance(v, str):
         return json.dumps(v, ensure_ascii=False)   # a TOML basic string
+    if isinstance(v, datetime.datetime) and v.utcoffset() == datetime.timedelta(0):
+        return v.replace(tzinfo=None).isoformat() + 'Z'
     if isinstance(v, (datetime.date, datetime.datetime, datetime.time)):
         return v.isoformat()
     if isinstance(v, (list, tuple)):
@@ -315,3 +317,79 @@ def _table(lines, path, data):
             for item in v:
                 lines += ['', f'[[{".".join(name)}]]']
                 _table(lines, name, item)
+
+
+# ---------------------------------------------------------------------------
+# The published copy
+# ---------------------------------------------------------------------------
+
+DRAFT_ONLY = ('to', 'live', 'published', 'bundle')   # never leave the draft
+DEFAULT_PROVENANCE = ('commit', 'generator')        # what a published copy keeps of [source]
+
+
+def merge(low, high):
+    """HIGH over LOW, tables merged key by key."""
+    out = dict(low)
+    for key, val in high.items():
+        out[key] = merge(out[key], val) if isinstance(val, dict) and isinstance(out.get(key), dict) else val
+    return out
+
+
+def set_dotted(data, dotted, val):
+    *path, last = dotted.split('.')
+    for key in path:
+        if not isinstance(data.get(key), dict):
+            data[key] = {}
+        data = data[key]
+    data[last] = val
+
+
+def first_published(draft, target):
+    """The local day DRAFT was first published to TARGET, or None."""
+    days = [r['at'].astimezone().date() if isinstance(r.get('at'), datetime.datetime) else r.get('at')
+            for r in draft.get('published', []) if isinstance(r, dict) and r.get('target') == target]
+    days = [d for d in days if isinstance(d, datetime.date)]
+    return min(days) if days else None
+
+
+def last_record(draft, target):
+    """DRAFT's last [[published]] record for TARGET, or None."""
+    records = [r for r in draft.get('published', []) if isinstance(r, dict) and r.get('target') == target]
+    return records[-1] if records else None
+
+
+def compose(draft, target, defaults=(), provenance=DEFAULT_PROVENANCE, sets=(), day=None, entry=None,
+            fmt=None):
+    """The published copy's manifest for DRAFT going to TARGET.
+
+    From low to high: DEFAULTS (config.toml's author, then the target's [manifest]), the draft's fields, the
+    draft's [to.TARGET], then SETS (dotted KEY, VALUE pairs). viz then sets `date` (the first publication to
+    this target), `updated` (today), `entry` and `format` (the bundle's), keeps only the [source] fields
+    PROVENANCE lists, and drops what belongs to the draft alone ([to], [live], [bundle], [[published]]) and
+    fields left empty.
+    """
+    day = day or today()
+    data = {}
+    for layer in defaults:
+        data = merge(data, layer)
+    data = merge(data, draft)
+    own = draft.get('to', {}).get(target) if isinstance(draft.get('to'), dict) else None
+    if isinstance(own, dict):
+        data = merge(data, own)
+    for key, val in sets:
+        set_dotted(data, key, val)
+    for key in DRAFT_ONLY:
+        data.pop(key, None)
+    data = {k: v for k, v in data.items() if v not in ('', [], {})}   # the stub's unfilled fields
+    data['date'] = first_published(draft, target) or day
+    data['updated'] = day
+    if entry:
+        data['entry'] = entry
+    if fmt:
+        data['format'] = fmt
+    source = data.pop('source', None)
+    if isinstance(source, dict):
+        kept = {k: v for k, v in source.items() if k in provenance}
+        if kept:
+            data['source'] = kept
+    return data

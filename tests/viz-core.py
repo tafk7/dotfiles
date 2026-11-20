@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""bin/viz beyond the server: viz path and page.toml. Offline, on temporary homes and repositories."""
+"""bin/viz beyond the server: viz path, page.toml, viz targets and viz publish. Offline, on temporary homes and repositories."""
+import ast
 import datetime
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -288,6 +291,277 @@ class Writing(unittest.TestCase):
         self.assertEqual(manifest.warnings({'kind': 'report'}), [])
         self.assertEqual(manifest.warnings({'kind': ''}), [])
         self.assertEqual(len(manifest.warnings({'kind': 'poster'})), 1)
+
+
+
+def draft(case, name='report.html', summary='What the page shows.', generator='build.py', cwd=None):
+    """A filled-in draft folder made by viz path, with a page, an asset and a generator."""
+    entry = case.path(name, cwd=cwd or case.work)
+    folder = entry.parent if entry.suffix else entry
+    if entry.suffix in ('.html', '.htm'):
+        entry.write_text('<html><head><link rel="stylesheet" href="style.css"></head><body>r</body></html>')
+        (folder / 'style.css').write_text('body {}')
+        (folder / 'data').mkdir(exist_ok=True)
+        (folder / 'data' / 'points.json').write_text('[1, 2]')
+        (folder / 'data' / 'raw.parquet').write_bytes(b'PAR1')
+        (folder / '.shots').mkdir(exist_ok=True)
+        (folder / '.shots' / 'light.png').write_bytes(b'png')
+        (folder / 'build.py').write_text('print()')
+        (folder / 'notes.md').write_text('notes')
+    elif entry.suffix:
+        entry.write_bytes(b'%PDF-1.4\n%%EOF\n')
+    text = (folder / 'page.toml').read_text()
+    text = text.replace('summary = ""', f'summary = "{summary}"', 1)
+    text = text.replace('generator = ""', f'generator = "{generator}"', 1)
+    (folder / 'page.toml').write_text(text)
+    return folder
+
+
+def targets_dir():
+    path = SANDBOX / 'config' / 'targets.d'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+class Targets(Fresh):
+    def test_builtins(self):
+        result = viz('targets')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertTrue(lines[0].startswith('preview') and 'built in' in lines[0], lines)
+        self.assertTrue(lines[1].startswith('file') and 'whoever you hand the file to' in lines[1], lines)
+        listed = json.loads(viz('targets', '--json').stdout)
+        self.assertEqual([t['name'] for t in listed], ['preview', 'file'])
+        self.assertEqual(listed[1]['required'], ['title', 'summary', 'source.generator'])
+        one = viz('targets', 'file')
+        self.assertIn('--out PATH', one.stdout)
+        self.assertIn('whoever you hand', json.loads(viz('targets', 'file', '--json').stdout)['audience'])
+        missing = viz('targets', 'nowhere')
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn('no target named nowhere', missing.stderr)
+
+    def test_broken_files_are_listed_not_fatal(self):
+        conf = targets_dir()
+        (conf / 'preview.toml').write_text('type = "git"\n')
+        (conf / 'bad.toml').write_text('type = \n')
+        (conf / 'odd.toml').write_text('type = "ftp"\naudience = "someone"\n')
+        (conf / '.hidden.toml').write_text('type = "ftp"\n')
+        result = viz('targets')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = result.stdout
+        self.assertIn('cannot be redefined', text)
+        self.assertIn('bad.toml', text)
+        self.assertIn("type 'ftp' is not a configurable target type", text)
+        self.assertNotIn('hidden', text)
+        self.assertEqual(sum(1 for line in text.splitlines() if line.startswith('preview')), 2)
+        self.assertIn('BROKEN', viz('targets', 'odd').stdout)
+        status = viz('status')
+        self.assertIn('targets:  2 (preview, file)', status.stdout)
+        self.assertIn('broken:', status.stdout)
+        refused = viz('publish', str(draft(self)), '--to', 'odd')
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('cannot be used', refused.stderr)
+
+
+class Compose(unittest.TestCase):
+    def test_order_and_what_viz_sets(self):
+        day = datetime.date(2026, 11, 22)
+        first = datetime.datetime(2026, 11, 20, 12, 0, tzinfo=datetime.UTC)
+        draft_data = {
+            'title': 'Draft title', 'summary': 's', 'kind': '', 'state': 'draft-state', 'author': 'Draft Author',
+            'date': datetime.date(2026, 11, 1), 'format': 'html', 'entry': 'main.html',
+            'source': {'dir': '/home/me/src/proj', 'repo': '/home/me/src/proj', 'commit': 'abc1234', 'dirty': True,
+                       'remote': 'git@example.com:me/proj.git', 'host': 'box1', 'session': 'sess',
+                       'env': {'ROLE': 'r'}, 'generator': 'build.py', 'run': '77'},
+            'to': {'team': {'state': 'current', 'alias': 'pr51'}, 'other': {'state': 'never'}},
+            'live': {'run': 'x'}, 'bundle': {'exclude': ['*.csv']},
+            'published': [{'target': 'other', 'at': datetime.datetime(2026, 11, 2, tzinfo=datetime.UTC)},
+                          {'target': 'team', 'at': first, 'place': '2026-11-20/report'}],
+        }
+        data = manifest.compose(draft_data, 'team',
+                                defaults=[{'author': 'Config Author', 'license': 'cc'},
+                                          {'author': 'Target Author', 'state': 'shared', 'audience': 'team'}],
+                                provenance=['commit', 'generator', 'remote'],
+                                sets=[('alias', 'set-alias'), ('source.run', '99')],
+                                day=day, entry='index.html', fmt='html')
+        self.assertEqual(data['author'], 'Draft Author')          # the draft over the target's [manifest]
+        self.assertEqual(data['license'], 'cc')                   # config.toml's defaults stay underneath
+        self.assertEqual(data['audience'], 'team')                # target defaults fill what the draft lacks
+        self.assertEqual(data['state'], 'current')                # [to.team] over the draft
+        self.assertEqual(data['alias'], 'set-alias')              # --set over everything
+        self.assertEqual(data['date'], first.astimezone().date())  # the first publication to this target
+        self.assertEqual(data['updated'], day)
+        self.assertEqual((data['entry'], data['format']), ('index.html', 'html'))
+        self.assertEqual(data['source'], {'commit': 'abc1234', 'remote': 'git@example.com:me/proj.git',
+                                          'generator': 'build.py'})   # run was set, but is not listed
+        for gone in ('to', 'live', 'bundle', 'published', 'kind'):
+            self.assertNotIn(gone, data)
+        fresh = manifest.compose({'title': 't', 'source': {'host': 'h'}}, 'new', day=day)
+        self.assertEqual(fresh['date'], day)
+        self.assertNotIn('source', fresh)                          # nothing listed survived
+
+
+class PublishFile(Fresh):
+    def publish(self, *args, ok=True):
+        result = viz('publish', *args, cwd=self.work)
+        if ok:
+            self.assertEqual(result.returncode, 0, result.stderr)
+        else:
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+        return result
+
+    def test_refuses_without_the_minimum(self):
+        folder = self.path('bare')
+        (folder / 'index.html').write_text('<p>x</p>')
+        before = (folder / 'page.toml').read_bytes()
+        result = self.publish(str(folder), '--to', 'file', '--out', str(self.work / 'out'), ok=False)
+        self.assertIn('lacks summary, source.generator', result.stderr)
+        self.assertFalse((self.work / 'out').exists())
+        self.assertEqual((folder / 'page.toml').read_bytes(), before)
+        loose = self.work / 'loose.html'
+        loose.write_text('<p>l</p>')
+        result = self.publish(str(loose), '--to', 'file', '--out', str(self.work / 'out'), ok=False)
+        self.assertIn('loose.html.page.toml lacks title', result.stderr)
+        self.assertIn('does not exist yet', result.stderr)
+
+    def test_folder_publish_record_and_republish(self):
+        repo = make_repo(self.work / 'proj')
+        folder = draft(self, cwd=repo)
+        out = self.work / 'out'
+        self.assertEqual(self.publish(str(folder), '--to', 'file', '--out', str(out)).stdout.strip(), str(out))
+        self.assertEqual(sorted(p.relative_to(out).as_posix() for p in out.rglob('*') if p.is_file()),
+                         ['data/points.json', 'index.html', 'page.toml', 'style.css'])
+        published = (out / 'page.toml').read_text()
+        self.assertTrue(published.startswith('# Published by viz publish'))
+        data = tomllib.loads(published)
+        self.assertEqual(data['source'], {'commit': git(repo, 'rev-parse', '--short', 'HEAD').strip(),
+                                          'generator': 'build.py'})
+        for private in (str(self.work), 'host', 'session', 'dirty'):
+            self.assertNotIn(private, published)
+        self.assertEqual(data['entry'], 'index.html')
+        record = tomllib.loads((folder / 'page.toml').read_text())['published']
+        self.assertEqual(len(record), 1)
+        self.assertEqual((record[0]['target'], record[0]['place']), ('file', str(out)))
+        self.assertEqual(record[0]['at'].tzinfo, datetime.UTC)
+        # Republished without --out: the same place, replaced whole.
+        (folder / 'style.css').unlink()
+        self.assertEqual(self.publish(str(folder / 'index.html'), '--to', 'file').stdout.strip(), str(out))
+        self.assertFalse((out / 'style.css').exists())
+        self.assertEqual(len(tomllib.loads((folder / 'page.toml').read_text())['published']), 2)
+
+    def test_bundle_include_and_exclude(self):
+        folder = draft(self)
+        with open(folder / 'page.toml', 'r+') as f:
+            text = f.read().replace('\n[source]\n', '\n[bundle]\ninclude = ["data/*.parquet"]\n'
+                                    'exclude = ["data/points.json"]\n\n[source]\n')
+            f.seek(0)
+            f.write(text)
+        out = self.work / 'out'
+        self.publish(str(folder), '--to', 'file', '--out', str(out))
+        self.assertTrue((out / 'data' / 'raw.parquet').is_file())
+        self.assertFalse((out / 'data' / 'points.json').exists())
+        self.assertNotIn('bundle', tomllib.loads((out / 'page.toml').read_text()))
+
+    def test_dry_run_changes_nothing(self):
+        folder = draft(self)
+        before = (folder / 'page.toml').read_bytes()
+        out = self.work / 'out'
+        result = self.publish(str(folder), '--to', 'file', '--out', str(out), '--dry-run', '--set', 'state=current')
+        for expected in (f'place:    {out}', 'index.html', 'style.css', 'state = "current"', 'dry run'):
+            self.assertIn(expected, result.stdout)
+        self.assertNotIn('build.py\n', result.stdout.split('manifest:')[0])
+        self.assertFalse(out.exists())
+        self.assertEqual((folder / 'page.toml').read_bytes(), before)
+
+    def test_where_it_will_not_write(self):
+        folder = draft(self)
+        foreign = self.work / 'mine'
+        foreign.mkdir()
+        (foreign / 'keep.txt').write_text('mine')
+        for out, why in ((foreign, 'did not publish'), (folder / 'copy', 'inside the page'),
+                         (self.work / 'page.html', 'as a folder'), (foreign / 'keep.txt', 'not a folder')):
+            with self.subTest(out=out):
+                self.assertIn(why, self.publish(str(folder), '--to', 'file', '--out', str(out), ok=False).stderr)
+        self.assertEqual((foreign / 'keep.txt').read_text(), 'mine')
+        self.assertIn('needs --out', self.publish(str(folder), '--to', 'file', ok=False).stderr)
+        self.assertIn('cannot make pdf from html',
+                      self.publish(str(folder), '--to', 'file', '--out', str(self.work / 'r.pdf'), '--format', 'pdf',
+                                   ok=False).stderr)
+
+    def test_loose_html_and_single_pdf(self):
+        loose = self.work / 'chart.html'
+        loose.write_text('<p>c</p>')
+        (self.work / 'chart.html.page.toml').write_text(
+            'title = "Chart"\nsummary = "s"\n[source]\ngenerator = "by hand"\nhost = "box1"\n')
+        out = self.work / 'out'
+        self.publish(str(loose), '--to', 'file', '--out', str(out))
+        self.assertEqual(sorted(p.name for p in out.iterdir()), ['index.html', 'page.toml'])
+        self.assertIn('[[published]]', (self.work / 'chart.html.page.toml').read_text())
+        folder = draft(self, 'deck.pdf')
+        pdf = self.work / 'deck-for-mail.pdf'
+        self.publish(str(folder), '--to', 'file', '--out', str(pdf))
+        self.assertTrue(pdf.read_bytes().startswith(b'%PDF'))
+        self.assertEqual(tomllib.loads(Path(str(pdf) + '.page.toml').read_text())['format'], 'pdf')
+        self.publish(str(folder), '--to', 'file')   # republish over its own earlier copy
+        other = self.work / 'other.pdf'
+        other.write_bytes(b'%PDF other')
+        self.assertIn('exists', self.publish(str(folder), '--to', 'file', '--out', str(other), ok=False).stderr)
+
+
+class PublishPreview(Fresh):
+    def test_preview_is_viz_open(self):
+        folder = draft(self)
+        before = (folder / 'page.toml').read_bytes()
+        dry = viz('publish', str(folder), '--to', 'preview', '--dry-run')
+        self.assertIn(f'would open {folder}', dry.stdout)
+        (SANDBOX / 'run').mkdir(mode=0o700, exist_ok=True)
+        try:
+            result = viz('publish', str(folder), '--to', 'preview')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f'/{TODAY}/report/', result.stdout)
+        finally:
+            viz('stop')
+        self.assertEqual((folder / 'page.toml').read_bytes(), before)
+
+
+class ServerNeverPublishes(unittest.TestCase):
+    """The server reads files a browser page can reach, so it must never be able to publish (design 12)."""
+
+    def imports(self, module):
+        path = REPO / 'lib' / 'viz' / (module.replace('.', '/') + '.py')
+        if not path.exists():
+            path = path.with_suffix('') / '__init__.py'
+        found = set()
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.ImportFrom) and node.level:
+                base = module.split('.')[:len(module.split('.')) - node.level + (path.name == '__init__.py')]
+                if node.module:
+                    found.add('.'.join([*base, node.module]))
+                else:   # from . import x: x is a module of the package
+                    found |= {'.'.join([*base, a.name]) for a in node.names}
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                names = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module]
+                found |= {n[4:] for n in names if n and n.startswith('viz.')}
+        return found
+
+    def test_import_graph(self):
+        seen, todo = set(), ['serve']
+        while todo:
+            module = todo.pop()
+            if module in seen or not ((REPO / 'lib/viz' / (module.replace('.', '/') + '.py')).exists()
+                                      or (REPO / 'lib/viz' / module.replace('.', '/')).is_dir()):
+                continue
+            seen.add(module)
+            todo += self.imports(module)
+        self.assertIn('access', seen)
+        for forbidden in ('targets', 'collect', 'formats', 'bundle', 'cli'):
+            self.assertFalse(any(m == forbidden or m.startswith(forbidden + '.') for m in seen),
+                             f'serve.py reaches {forbidden}: {sorted(seen)}')
+
+    def test_endpoints(self):
+        text = (REPO / 'lib' / 'viz' / 'serve.py').read_text()
+        paths = set(re.findall(r"'/__viz/([\w.]*)", text)) - {''}
+        self.assertEqual(paths, {'ping', 'version', 'reload.js', 'login', 'diff'})
 
 
 if __name__ == '__main__':

@@ -32,6 +32,11 @@ Markdown with mermaid, ...) open in it as tabs, and `viz diff` or a page (a link
 to ``/__viz/diff?left=PATH&right=PATH``, which viz turns into a same-origin POST)
 opens a side-by-side diff of two existing files under VIZ_DIFF_ROOTS.
 
+A page is drafted in a folder `viz path` makes, with a page.toml manifest
+(title, summary, where it came from), and published with `viz publish PAGE
+--to TARGET`; `viz targets` lists the targets, who sees each, and its rules.
+Publishing is a command only: the server never publishes.
+
 Environment:
     VIZ_DIR    served root and home of `viz path` output (default ~/viz)
     VIZ_PORT   client port in printed URLs and forwards
@@ -40,6 +45,8 @@ Environment:
                (default ~/projects:~/ref)
     VIZ_STATE  the account's secret, sign-ins and logs (default ~/.local/state/viz;
                XDG_STATE_HOME is ignored, so every shell reaches the one server)
+    VIZ_CONFIG config.toml and the publishing targets in targets.d/
+               (default ~/.config/viz; XDG_CONFIG_HOME is ignored too)
 """
 import argparse
 import base64
@@ -54,7 +61,7 @@ import threading
 import urllib.parse
 from pathlib import Path
 
-from . import manifest
+from . import manifest, targets
 from .access import (
     CODE_TTL,
     ensure_server,
@@ -295,6 +302,7 @@ def cmd_status(args):
     legacy = server_pid(STATE / 'serve.pid')
     if legacy:
         print(f'old:      a TCP server from an earlier viz still runs (pid {legacy}); viz stop ends it')
+    print('targets:  ' + targets.status_line())
     sock, cli = vscode_socket(), vscode_cli()
     print('vscode:   ' + ('connected' if sock and cli else
                           'no VS Code server installed' if not cli else 'no connected window'))
@@ -331,6 +339,23 @@ def main():
     sub.add_parser('serve', help='run the server in the foreground').set_defaults(func=cmd_serve)
     sub.add_parser('stop', help='stop the background server').set_defaults(func=cmd_stop)
     sub.add_parser('status', help='show the server, how to forward to it, and VS Code').set_defaults(func=cmd_status)
+    p = sub.add_parser('targets', help='list where pages can be published, for whom, and under which rules')
+    p.add_argument('name', nargs='?', help='one target, with its rules in full')
+    p.add_argument('--json', action='store_true', help='as JSON, for tools')
+    p.set_defaults(func=targets.cmd_targets)
+    p = sub.add_parser('publish', help='publish a page to a target (run viz targets first: who sees it, the rules)')
+    p.add_argument('page', nargs='?', help="a page folder, its page.toml, or a file (a loose file's manifest is "
+                                           'FILE.page.toml)')
+    p.add_argument('--to', required=True, metavar='TARGET', help='where: preview, file, or a configured target')
+    p.add_argument('--as', dest='as_name', metavar='SLUG',
+                   help='the name in its place (default: the folder name, or where it was published last)')
+    p.add_argument('--format', metavar='FMT', help="publish as FMT, exported if it is not the page's own")
+    p.add_argument('--set', action='append', metavar='KEY=VALUE', help='a field of the published manifest')
+    p.add_argument('-m', '--message', help="a git target's commit message")
+    p.add_argument('--out', metavar='PATH', help='file target: the folder (or FILE.pdf) to write')
+    p.add_argument('--dry-run', action='store_true', help='print the place, URL, files and manifest; change nothing')
+    p.add_argument('--push', action='store_true', help="a git target's pending commits: push them (at a terminal)")
+    p.set_defaults(func=targets.cmd_publish)
     args = parser.parse_args()
     args.func(args)
 

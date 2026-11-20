@@ -257,6 +257,10 @@ sign in with `viz login`.
 Two hosts whose accounts share a uid share a default port, so one tunnel holds
 it for both; give one host another `VIZ_PORT` in `~/.shell.env`.
 
+A page drafted with `viz path` carries a `page.toml` manifest, and `viz publish
+PAGE --to TARGET` copies it somewhere others can see it; `viz targets` lists
+the targets and who sees each. See [docs/viz-targets.md](docs/viz-targets.md).
+
 Where systemd runs a user instance, setup installs `viz.service`, so the server
 comes back with your first login after a reboot. Open viz tabs retry less often
 while it is unreachable and say so in a corner banner. The unit doesn't see
