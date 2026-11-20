@@ -231,8 +231,8 @@ connected VS Code Remote-SSH window. Claude's `viz` skill tells it where to
 write output and how to render it.
 
 ```bash
-viz path report.html              # ~/viz/<today>/report.html
-viz open ~/viz/2026-09-28/report.html   # prints http://127.0.0.1:PORT/2026-09-28/report.html; opens it from WezTerm
+viz path report.html              # ~/viz/<today>/report/index.html, beside its page.toml
+viz open ~/viz/2026-09-28/report/       # prints http://127.0.0.1:PORT/2026-09-28/report/; opens it from WezTerm
 viz status                        # server, the ssh forward for this machine, VS Code
 forwards status                   # whether WezTerm's Ctrl+Alt+P tunnel carries this machine's ports
 viz login                         # single-use link that signs a browser in (run it yourself)
@@ -256,6 +256,10 @@ sign in with `viz login`.
 
 Two hosts whose accounts share a uid share a default port, so one tunnel holds
 it for both; give one host another `VIZ_PORT` in `~/.shell.env`.
+
+A page drafted with `viz path` carries a `page.toml` manifest, and `viz publish
+PAGE --to TARGET` copies it somewhere others can see it; `viz targets` lists
+the targets and who sees each. See [docs/viz-targets.md](docs/viz-targets.md).
 
 Where systemd runs a user instance, setup installs `viz.service`, so the server
 comes back with your first login after a reboot. Open viz tabs retry less often

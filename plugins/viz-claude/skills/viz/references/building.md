@@ -4,12 +4,14 @@ How a page is put together on disk, fed with data, given libraries, and kept reb
 
 ## On disk
 
-A one-off page is one file: `viz path NAME.html`, with its generator `NAME.py` beside it. A page
-with parts gets a directory:
+Every page is a folder: `viz path NAME.html` makes `~/viz/<today>/NAME/` with its manifest,
+`page.toml`, and prints the path of its `index.html`. The generator and everything else the page
+needs go in the same folder:
 
 ```text
 NAME/
   index.html        the page (generated; viz open NAME/ opens it)
+  page.toml         its manifest: title, summary, where it came from (viz path writes it)
   build.py          the generator: reads data/, writes index.html
   template.html     the page's HTML and CSS with placeholders, when they are long
   data/             inputs, as JSON or CSV: a snapshot of exactly what the page shows
