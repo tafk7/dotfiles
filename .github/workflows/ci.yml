@@ -110,6 +110,7 @@ jobs:
           python3 tests/bump.py
           python3 tests/viz.py
           python3 tests/viz-core.py
+          python3 tests/viz-live.py
           python3 tests/keymap.py
           python3 tests/testbed-frame.py
 

@@ -346,7 +346,7 @@ def main():
     p = sub.add_parser('publish', help='publish a page to a target (run viz targets first: who sees it, the rules)')
     p.add_argument('page', nargs='?', help="a page folder, its page.toml, or a file (a loose file's manifest is "
                                            'FILE.page.toml)')
-    p.add_argument('--to', required=True, metavar='TARGET', help='where: preview, file, or a configured target')
+    p.add_argument('--to', required=True, metavar='TARGET', help='where: preview, file, live, or a configured target')
     p.add_argument('--as', dest='as_name', metavar='SLUG',
                    help='the name in its place (default: the folder name, or where it was published last)')
     p.add_argument('--format', metavar='FMT', help="publish as FMT, exported if it is not the page's own")
@@ -355,6 +355,12 @@ def main():
     p.add_argument('--out', metavar='PATH', help='file target: the folder (or FILE.pdf) to write')
     p.add_argument('--dry-run', action='store_true', help='print the place, URL, files and manifest; change nothing')
     p.add_argument('--push', action='store_true', help="a git target's pending commits: push them (at a terminal)")
+    p.add_argument('--run', metavar='COMMAND', help='live target: the collector, run by sh -c every interval; '
+                                                   'it writes the page at $VIZ_OUT')
+    p.add_argument('--every', metavar='INTERVAL', help='live target: how often the collector runs (30s, 5m, 1h)')
+    p.add_argument('--cwd', metavar='DIR', help='live target: where the collector runs (default: here)')
+    p.add_argument('--title', help='live target without a page: the title (default: the --as NAME)')
+    p.add_argument('--summary', help='live target without a page: what the page shows, in a sentence or two')
     p.set_defaults(func=targets.cmd_publish)
     args = parser.parse_args()
     args.func(args)

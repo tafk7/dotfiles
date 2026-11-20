@@ -82,6 +82,51 @@ draft to a shared site.
 |---|---|---|
 | `preview` | you, in your browser over the ssh forward | `viz publish PAGE --to preview` is `viz open PAGE` |
 | `file` | whoever you hand the file to | `--out PATH`: a folder, or one `FILE.pdf` for a pdf |
+| `live` | you, at a fixed address in your browser | `~/viz/live/NAME/`, rewritten by a collector ([below](#live-pages)) |
+
+## Live pages
+
+A live page has a fixed, undated place, `~/viz/live/NAME/`, served at
+`/live/NAME/`, and a **collector**: a command run every interval that
+rewrites the page (or the data it loads). An open page reloads when its file
+changes.
+
+```bash
+viz publish --to live --as usage --every 5m --cwd ~/src/proj \
+    --summary "Token usage over time." --run 'make-usage-page "$VIZ_OUT"'
+viz publish DRAFT --to live              # the draft's page.toml has a [live] table
+```
+
+The page's own `page.toml` is the registration:
+
+```toml
+[live]
+run = 'make-usage-page "$VIZ_OUT"'   # run by sh -c, in cwd
+cwd = "~/src/proj"                   # default: where viz publish ran
+every = "5m"                         # 30s, 5m, 1h, 1d; at least 30s
+timeout = "10m"                      # default: the interval, at most 30m
+paused = false                       # true stops collecting; the page stays
+```
+
+Edit it in place to change the command or the interval; delete the folder to
+retire the page. `--run`, `--every` and `--cwd` override a draft's `[live]`
+table. Without a draft, `--as`, `--run`, `--every` and `--summary` are needed
+(`--title` defaults to the name, and the command is the page's generator).
+
+Publishing runs the collector once, in the foreground and with the same
+timeout, in a staged copy of the page, and puts the page in place only when
+that run succeeds. A broken command fails then, with its output, and an
+earlier registration stays as it was. A republish replaces the page whole,
+and only a folder viz published.
+
+A collector gets `VIZ_OUT` (the page's entry, `index.html` unless the draft
+names another), `VIZ_PAGE_DIR` and `VIZ_LIVE_NAME`, and otherwise a bare
+environment: `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `TZ`,
+`XDG_RUNTIME_DIR` and `PATH=~/.local/bin:/usr/local/bin:/usr/bin:/bin`. The
+first run and every later one see the same, so a command that needs more sets
+it up itself (`. ~/env.sh && make-usage-page "$VIZ_OUT"`); no ssh agent is
+passed. It should write the page atomically (a temporary file, then a
+rename), so a reload never sees half a page.
 
 ## Configured targets
 

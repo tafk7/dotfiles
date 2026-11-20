@@ -7,6 +7,7 @@ which `viz targets NAME` shows, so an agent learns before publishing who will se
 Publishing is a command only. The server never imports this package: a page it serves could otherwise copy
 any private draft to a shared site.
 """
+import argparse
 import datetime
 import json
 import shutil
@@ -107,6 +108,7 @@ class Job:
     url: str = ''
     notes: list = field(default_factory=list)
     first: datetime.date | None = None  # the first publication's day (today for a first one)
+    args: argparse.Namespace | None = None   # the command line, for a target's own options (live's --run)
 
 
 def types():
@@ -116,8 +118,9 @@ def types():
 
 def builtins():
     from .file import FileTarget
+    from .live import LiveTarget
     from .preview import PreviewTarget
-    return {'preview': PreviewTarget(), 'file': FileTarget()}
+    return {'preview': PreviewTarget(), 'file': FileTarget(), 'live': LiveTarget()}
 
 
 def load(path):
@@ -278,13 +281,21 @@ def check_slug(slug):
     return slug
 
 
+LIVE_OPTIONS = ('run', 'every', 'cwd', 'title', 'summary')
+
+
 def cmd_publish(args):
     target = find(args.to)
     if args.push:
         if not hasattr(target, 'push_pending'):
             die(f'--push is for a git target; {target.name} is {target.type}')
         sys.exit(target.push_pending(args))
+    own = [f'--{k}' for k in LIVE_OPTIONS if getattr(args, k, None)]
+    if own and target.name != 'live':
+        die(f'{own[0]} is for --to live')
     if not args.page:
+        if hasattr(target, 'register'):
+            return target.register(args)
         die('viz publish PAGE --to TARGET: which page?')
     path = Path(args.page).expanduser()
     if not path.exists():
@@ -295,7 +306,7 @@ def cmd_publish(args):
         die(str(error))
     if target.name == 'preview':
         return target.open(page, args)
-    job = Job(page=page, target=target, out=args.out, message=args.message)
+    job = Job(page=page, target=target, out=args.out, message=args.message, args=args)
     try:
         return publish(job, args)
     except (TargetError, formats.BundleError) as error:
