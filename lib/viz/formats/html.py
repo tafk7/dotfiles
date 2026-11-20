@@ -13,6 +13,7 @@ import html
 import json
 import posixpath
 import re
+import tempfile
 import urllib.parse
 from pathlib import Path
 
@@ -334,5 +335,31 @@ def check(page, out, policy):
     return bundle(page, out, policy).problems
 
 
-# Other formats an html page can become (pdf arrives with viz look).
-EXPORTS = {}
+def to_pdf(page, out, policy):
+    """PAGE printed to OUT/NAME.pdf by Chromium: its print CSS, the light theme, the paper config.toml names
+    (`paper = "Letter"`; A4 by default). The page is bundled first and printed offline."""
+    from .. import browser
+    from ..config import settings
+    from . import BundleError, pdf
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    name = (page.folder.name if page.folder else page.entry.stem) + '.pdf'
+    paper = settings().get('paper', 'A4')
+    with tempfile.TemporaryDirectory(prefix='viz-pdf-') as tmp:
+        report = bundle(page, tmp, policy)
+        if report.problems:
+            return Report(entry=name, format='pdf', problems=report.problems)
+        try:
+            result = browser.run(['--offline', f'--pdf={out / name}', f'--paper={paper}', f'--root={tmp}',
+                                  str(Path(tmp) / report.entry)], capture=True)
+        except browser.BrowserError as error:
+            raise BundleError(str(error)) from None
+        if result.returncode != 0 or not (out / name).is_file():
+            raise BundleError(f'printing {page.entry} to pdf failed:\n{(result.stderr or result.stdout).strip()}')
+    found = [Problem(name, line.strip().removeprefix('problem: '))
+             for line in result.stdout.splitlines() if line.strip().startswith('problem:')]
+    return Report(entry=name, format='pdf', files=[name], problems=found + pdf.problems(out / name))
+
+
+# Other formats an html page can become.
+EXPORTS = {'pdf': to_pdf}

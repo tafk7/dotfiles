@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bin/viz beyond the server: viz path, page.toml, viz bundle, viz targets and viz publish. Offline, on temporary homes and repositories."""
+"""bin/viz beyond the server: viz path, page.toml, viz bundle and look, viz targets and viz publish. Offline, on temporary homes and repositories."""
 import ast
 import datetime
 import hashlib
@@ -24,10 +24,15 @@ SANDBOX = Path(tempfile.mkdtemp(prefix='viz-core-'))
 BASE_ENV = {
     'HOME': str(SANDBOX / 'home'), 'VIZ_DIR': str(SANDBOX / 'viz'), 'VIZ_STATE': str(SANDBOX / 'state'),
     'VIZ_CONFIG': str(SANDBOX / 'config'), 'XDG_RUNTIME_DIR': str(SANDBOX / 'run'),
+    # uv does not follow HOME to its cache: point it, and Playwright, into the sandbox, offline.
+    'UV_CACHE_DIR': str(SANDBOX / 'uv'), 'PLAYWRIGHT_BROWSERS_PATH': str(SANDBOX / 'browsers'), 'UV_OFFLINE': '1',
     'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': os.devnull,
     'GIT_AUTHOR_NAME': 'A. Person', 'GIT_AUTHOR_EMAIL': 'a.person@example.com',
     'GIT_COMMITTER_NAME': 'A. Person', 'GIT_COMMITTER_EMAIL': 'a.person@example.com',
 }
+# The browser tests reuse what this machine already has (see Look); read before HOME moves.
+REAL_UV_CACHE = os.environ.get('UV_CACHE_DIR') or str(Path('~/.cache/uv').expanduser())
+REAL_BROWSERS = os.environ.get('PLAYWRIGHT_BROWSERS_PATH') or str(Path('~/.cache/ms-playwright').expanduser())
 os.environ.update(BASE_ENV)
 for name in ('CLAUDE_CODE_SESSION_ID', 'VSCODE_IPC_HOOK_CLI', 'PROJECT_DIR'):
     os.environ.pop(name, None)
@@ -490,8 +495,8 @@ class PublishFile(Fresh):
                 self.assertIn(why, self.publish(str(folder), '--to', 'file', '--out', str(out), ok=False).stderr)
         self.assertEqual((foreign / 'keep.txt').read_text(), 'mine')
         self.assertIn('needs --out', self.publish(str(folder), '--to', 'file', ok=False).stderr)
-        self.assertIn('cannot make pdf from html',
-                      self.publish(str(folder), '--to', 'file', '--out', str(self.work / 'r.pdf'), '--format', 'pdf',
+        self.assertIn('cannot make pptx from html',
+                      self.publish(str(folder), '--to', 'file', '--out', str(self.work / 'r.pptx'), '--format', 'pptx',
                                    ok=False).stderr)
 
     def test_loose_html_and_single_pdf(self):
@@ -728,6 +733,71 @@ class Bundle(Fresh):
         self.assertIn('not a bundle viz wrote', viz('bundle', str(page.folder), '--out', str(mine)).stderr)
         self.assertEqual((mine / 'notes.txt').read_text(), 'keep')
         self.assertIn('inside the page', viz('bundle', str(page.folder), '--out', str(page.folder / 'b')).stderr)
+
+
+
+# viz look and html to pdf need uv, Playwright and a Chromium Playwright has downloaded. They run only with
+# VIZ_TEST_BROWSER=1, against uv's own cache and the browsers already on this machine (read before HOME was
+# moved into the sandbox), offline; CI has no Chromium and skips them.
+BROWSER_ENV = {'UV_CACHE_DIR': REAL_UV_CACHE, 'PLAYWRIGHT_BROWSERS_PATH': REAL_BROWSERS, 'UV_OFFLINE': '1'}
+BROWSER = os.environ.get('VIZ_TEST_BROWSER') == '1' and shutil.which('uv') and any(
+    Path(REAL_BROWSERS).glob('chromium*'))
+
+
+class Look(Fresh):
+    def test_wiring(self):
+        self.assertEqual(formats.exports('html'), ['pdf'])
+        for path in (REPO / 'lib' / 'viz').rglob('*.py'):
+            tree = ast.parse(path.read_text())
+            names = {a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
+            names |= {n.module or '' for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
+            self.assertFalse({'look', 'playwright', 'playwright.sync_api'} & names - ({'playwright.sync_api'}
+                             if path.name == 'look.py' else set()), f'{path.name} imports the browser side')
+        from viz import browser
+        command = browser.command(['page.html'])
+        self.assertEqual(command[command.index('--with') + 1], f'playwright=={browser.PLAYWRIGHT}')
+        self.assertTrue(command[-2].endswith('lib/viz/look.py'))
+
+    def test_without_uv(self):
+        folder = draft(self)
+        bare = SANDBOX / 'bin'
+        bare.mkdir(exist_ok=True)
+        python = bare / 'python3'
+        if not python.exists():
+            python.symlink_to(sys.executable)
+        result = viz('look', str(folder), PATH=str(bare))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('needs uv', result.stderr)
+        self.assertIn('shows html and svg', viz('look', str(draft(self, 'deck.pdf'))).stderr)
+
+    @unittest.skipUnless(BROWSER, 'set VIZ_TEST_BROWSER=1 on a machine with uv and a Playwright Chromium')
+    def test_look_and_portable(self):
+        folder = draft(self)
+        (folder / 'index.html').write_text('<!doctype html><body><h1>Look</h1>'
+                                           '<img src="https://example.com/x.png"></body>')
+        result = viz('look', str(folder), **BROWSER_ENV)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for theme in ('light', 'dark'):
+            self.assertTrue((folder / '.shots' / f'report-{theme}.png').stat().st_size > 1000)
+        self.assertIn('needs the network: example.com', result.stdout)
+        result = viz('look', '--portable', '--theme', 'light', str(folder), **BROWSER_ENV)
+        self.assertTrue((folder / '.shots' / 'report-portable-light.png').is_file(), result.stderr)
+        self.assertIn('bundle problem: index.html:1: loads https://example.com/x.png', result.stdout)
+        self.assertIn('blocked: a bundle must load nothing from outside', result.stdout)
+
+    @unittest.skipUnless(BROWSER, 'set VIZ_TEST_BROWSER=1 on a machine with uv and a Playwright Chromium')
+    def test_html_to_pdf(self):
+        folder = draft(self)
+        (folder / 'index.html').write_text('<!doctype html><link rel="stylesheet" href="style.css">'
+                                           '<body><h1>Printed</h1><p>One page.</p></body>')
+        out = self.work / 'report.pdf'
+        result = viz('publish', str(folder), '--to', 'file', '--out', str(out), '--format', 'pdf', **BROWSER_ENV)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(out.read_bytes().startswith(b'%PDF-'))
+        self.assertEqual(tomllib.loads(Path(str(out) + '.page.toml').read_text())['format'], 'pdf')
+        result = viz('bundle', str(folder), '--format', 'pdf', **BROWSER_ENV)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((SANDBOX / 'state' / 'bundles' / 'report' / 'report.pdf').is_file())
 
 
 class ServerNeverPublishes(unittest.TestCase):

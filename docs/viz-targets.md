@@ -100,6 +100,18 @@ Downloads are cached in `~/.cache/viz/`, so bundling again needs no network.
 A pdf is copied as it is, once viz has seen it has pages; an svg is checked
 for outside loads like html; other formats are copied as they are.
 
+`--format pdf` prints an html page to PDF: Chromium, the page's print CSS,
+the light theme, on A4 (or `paper = "Letter"` in `config.toml`). A target that
+takes pdf but not html gets the pdf without asking.
+
+`viz look PAGE` takes screenshots in light and dark into the page's hidden
+`.shots/` folder and lists what broke: script errors, failed loads, hosts the
+page needs the network for, sideways scroll. `viz look --portable PAGE`
+bundles first and looks at the bundle with the network blocked, which is what
+a teammate will see. Both run Chromium through Playwright under `uv`, with a
+pinned Playwright; the browser itself is a one-time download that `viz look`
+asks you to run.
+
 ## Built-in targets
 
 | Target | Who sees it | |
@@ -138,6 +150,7 @@ Optional, beside `targets.d/`:
 
 ```toml
 author = "A. Person"                 # default author in published manifests
+paper = "A4"                         # or "Letter", for html printed to pdf
 [provenance]
 env = ["ROLE"]                       # variables recorded in [source].env by viz path
 session_env = "CLAUDE_CODE_SESSION_ID"
