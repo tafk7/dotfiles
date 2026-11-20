@@ -689,6 +689,29 @@ class Bundle(Fresh):
         self.assertFalse(any('loads' in p.what for p in relaxed.problems), relaxed.problems)
         self.assertTrue(any('not an exact version' in p.what for p in relaxed.problems))
 
+    def test_downloads_stay_in_the_bundle(self):
+        # A CDN path that climbs out of vendor/, a vendored stylesheet's asset that does, and a font file
+        # named "..": each is a problem, and nothing is written outside the bundle.
+        escape = 'https://cdn.jsdelivr.net/npm/x@1.0.0/../../../escaped.js'
+        sheet = 'https://cdn.jsdelivr.net/npm/y@1.0.0/y.css'
+        fonts = 'https://fonts.googleapis.com/css2?family=Odd'
+        record(escape, '/* escaped */')
+        record(sheet, 'a{background:url(../../../../escaped-asset.png)} b{background:url(../z@1.0.0/ok.png)}')
+        record('https://cdn.jsdelivr.net/npm/escaped-asset.png', b'png')
+        record('https://cdn.jsdelivr.net/npm/z@1.0.0/ok.png', b'png')
+        record(fonts, "@font-face { font-family: 'Odd'; src: url(https://fonts.gstatic.com/s/odd/..); }")
+        record('https://fonts.gstatic.com/s/odd/..', b'wOF2odd')
+        report = self.bundle(self.page(f'<script src="{escape}"></script><link rel="stylesheet" href="{sheet}">'
+                                       f'<link rel="stylesheet" href="{fonts}">'))
+        self.assertFalse((self.work / 'escaped.js').exists())
+        self.assertEqual([p for p in self.work.rglob('escaped*')], [])
+        found = [str(p) for p in report.problems]
+        self.assertTrue(any('escaped.js' in f and 'outside its package' in f for f in found), found)
+        self.assertTrue(any('escaped-asset.png' in f and 'outside vendor/' in f for f in found), found)
+        self.assertTrue((self.out / 'vendor' / 'z@1.0.0' / 'ok.png').is_file())
+        self.assertTrue((self.out / 'fonts' / 'font').is_file())
+        self.assertIn('url(font)', (self.out / 'fonts' / 'fonts.css').read_text())
+
     def test_vendor_manifest_merge(self):
         page = self.page(f'<script src="{D3}"></script><script src="vendor/old.js"></script>')
         (page.folder / 'vendor').mkdir()

@@ -110,7 +110,9 @@ class Bundler:
                 except fetch.FetchError as error:
                     self.problems.append(Problem(face, f'cannot download the font: {error}'))
                     return match.group(0)
-                name = posixpath.basename(urllib.parse.urlsplit(face).path) or 'font'
+                name = posixpath.basename(urllib.parse.urlsplit(face).path)
+                if name in ('', '.', '..'):
+                    name = 'font'
                 if name in self.font_files.values():
                     name = f'{fetch.sha256(face.encode())[:8]}-{name}'
                 (self.out / 'fonts').mkdir(exist_ok=True)
@@ -178,13 +180,18 @@ class Bundler:
             self.problem(rel, text, pos, f'{url} names {package}@{version}, not an exact version: pin one '
                                          f'(like {package}@1.2.3), so the page is the same every time')
             return None
+        if any(part in ('.', '..') for part in rest.split('/')):
+            self.problem(rel, text, pos, f'{url} names a path outside its package ({rest}); viz will not save it')
+            return None
         try:
             data = fetch.fetch(url, 'vendor')
         except fetch.FetchError as error:
             self.problem(rel, text, pos, f'cannot download {url}: {error}')
             return None
         path = posixpath.join('vendor', f'{package.replace("/", "__")}@{version}', rest)
-        self.save(path, data)
+        if not self.save(path, data):
+            self.problem(rel, text, pos, f'{url} would be saved outside vendor/ ({path})')
+            return None
         self.vendored[url] = path
         self.vendor_manifest.append({'name': package, 'version': version, 'file': path.removeprefix('vendor/'),
                                      'url': url, 'sha256': fetch.sha256(data)})
@@ -204,7 +211,10 @@ class Bundler:
                 continue
             target = urllib.parse.urljoin(url, ref.split('#')[0].split('?')[0])
             local = posixpath.normpath(posixpath.join(posixpath.dirname(path), ref.split('#')[0].split('?')[0]))
-            if target in self.vendored or not local.startswith('vendor/'):
+            if target in self.vendored:
+                continue
+            if not self.within_vendor(local):
+                self.problems.append(Problem(path, f'names {ref}, outside vendor/; viz will not save it'))
                 continue
             try:
                 asset = fetch.fetch(target, 'vendor')
@@ -214,10 +224,21 @@ class Bundler:
             self.save(local, asset)
             self.vendored[target] = local
 
+    def within_vendor(self, path):
+        """Whether PATH (relative to the bundle) is a file under vendor/, as written and as resolved."""
+        parts = path.split('/')
+        if parts[0] != 'vendor' or len(parts) < 2 or any(p in ('', '.', '..') for p in parts):
+            return False
+        return (self.out / path).resolve().is_relative_to(self.out.resolve() / 'vendor')
+
     def save(self, path, data):
+        """Write DATA at PATH under vendor/; False, writing nothing, when PATH is not under vendor/."""
+        if not self.within_vendor(path):
+            return False
         dest = self.out / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
+        return True
 
     def rewrite_cdn(self, rel, text):
         def tag(match):
