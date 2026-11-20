@@ -144,6 +144,47 @@ author = "A. Person"
 cannot be redefined. A file that does not load is listed by `viz targets` and
 `viz status` with the reason, and cannot be published to.
 
+### The git type
+
+A `git` target publishes into a checkout of a repository that a static host
+serves (GitHub Pages and the like). viz never clones, switches branches,
+stashes or discards your work: the checkout is yours to make, and it must be
+on `branch` and clean, or viz refuses.
+
+```toml
+type = "git"
+description = "Team pages"
+audience = "Anyone on the company network"
+rules = "Work in progress is fine; nothing under embargo."
+checkout = "~/src/team-pages"                # a clone you made, on branch
+branch = "gh-pages"
+remote = "origin"                            # pulled before, pushed after
+folder = "{date}/{slug}"                     # also {project}, {year}
+url = "https://pages.example.com/team-pages/{folder}/"
+after = ["make", "index"]                    # optional; run in the checkout
+after_timeout = 600                          # seconds
+push = "ask"                                 # "auto", "ask" or "never"
+message = "Publish {folder}: {title}"
+```
+
+Under a lock in the checkout's git directory (a second publish waits), viz
+pulls with `--ff-only`, replaces `folder` with the page's portable form and
+its manifest, runs `after` (with `VIZ_PLACE`, `VIZ_URL` and `VIZ_TARGET` set),
+and commits whatever changed. If anything fails before the commit, the
+checkout is reset to where it was.
+
+Then `push` decides:
+
+- `auto` pushes. A rejected push is rebased once onto the remote and retried;
+  if that fails too, the commit stays in the checkout and viz says so.
+- `ask` shows the commit and asks at a terminal. Without one (an agent's
+  shell), viz commits and stops; a person pushes later with
+  `viz publish --to NAME --push`, which shows what waits and asks.
+- `never` commits only; pushing is yours.
+
+The record in the draft's `page.toml` names the place, the URL, the commit
+and whether it was pushed.
+
 ## config.toml
 
 Optional, beside `targets.d/`:

@@ -2,14 +2,18 @@
 """bin/viz beyond the server: viz path, page.toml, viz bundle and look, viz targets and viz publish. Offline, on temporary homes and repositories."""
 import ast
 import datetime
+import fcntl
 import hashlib
 import json
 import os
+import pty
 import re
+import select
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import urllib.parse
 from pathlib import Path
@@ -798,6 +802,275 @@ class Look(Fresh):
         result = viz('bundle', str(folder), '--format', 'pdf', **BROWSER_ENV)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue((SANDBOX / 'state' / 'bundles' / 'report' / 'report.pdf').is_file())
+
+
+
+def in_terminal(args, answer=None, timeout=60):
+    """Run bin/viz ARGS with stdin and stdout on a terminal; type ANSWER at its [y/N] prompt."""
+    leader, follower = pty.openpty()
+    proc = subprocess.Popen([sys.executable, str(VIZ), *args], cwd=SANDBOX, stdin=follower, stdout=follower,
+                            stderr=follower)
+    os.close(follower)
+    output, deadline = b'', time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        ready, _, _ = select.select([leader], [], [], 0.2)
+        if ready:
+            try:
+                chunk = os.read(leader, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            output += chunk
+            if answer is not None and b'[y/N]' in output:
+                os.write(leader, answer.encode() + b'\n')
+                answer = None
+        elif proc.poll() is not None:
+            break
+    proc.wait(timeout=10)
+    os.close(leader)
+    return proc.returncode, output.decode(errors='replace')
+
+
+class GitTarget(Fresh):
+    def setUp(self):
+        super().setUp()
+        self.bare = self.work / 'origin.git'
+        git(self.work, 'init', '-q', '--bare', '-b', 'gh-pages', str(self.bare))
+        self.pages = self.work / 'team-pages'
+        git(self.work, 'clone', '-q', str(self.bare), str(self.pages))
+        git(self.pages, 'checkout', '-q', '-b', 'gh-pages')
+        (self.pages / 'README.md').write_text('team pages\n')
+        git(self.pages, 'add', '-A')
+        git(self.pages, 'commit', '-q', '-m', 'start')
+        git(self.pages, 'push', '-q', '-u', 'origin', 'gh-pages')
+        self.other = self.work / 'other-clone'
+        git(self.work, 'clone', '-q', '-b', 'gh-pages', str(self.bare), str(self.other))
+        self.place = f'{TODAY}/report'
+
+    def target(self, **keys):
+        conf = {'type': 'git', 'description': 'Team pages', 'audience': 'Anyone on the company network',
+                'rules': 'Nothing secret.\n\nAsk A. Person first.', 'checkout': str(self.pages),
+                'branch': 'gh-pages', 'remote': 'origin', 'url': 'https://pages.example.com/me/team-pages/{folder}/',
+                'push': 'auto', **keys}
+        conf = {k: v for k, v in conf.items() if v is not None}
+        (targets_dir() / 'team.toml').write_text(manifest.dumps(conf))
+
+    def publish(self, folder, *args, ok=True):
+        result = viz('publish', str(folder), '--to', 'team', *args, cwd=self.work)
+        (self.assertEqual if ok else self.assertNotEqual)(result.returncode, 0, result.stdout + result.stderr)
+        return result
+
+    def remote_subjects(self):
+        return git(self.bare, 'log', '--format=%s', 'gh-pages').splitlines()
+
+    def head(self):
+        return git(self.pages, 'rev-parse', '--short', 'HEAD').strip()
+
+    def records(self, folder):
+        return tomllib.loads((folder / 'page.toml').read_text()).get('published', [])
+
+    def test_auto_publish_and_republish(self):
+        self.target(provenance=['commit', 'generator', 'remote'])
+        repo = make_repo(self.work / 'proj')
+        git(repo, 'remote', 'add', 'origin', 'git@example.com:me/proj.git')
+        folder = draft(self, cwd=repo)
+        result = self.publish(folder)
+        url = f'https://pages.example.com/me/team-pages/{self.place}/'
+        self.assertEqual(result.stdout.strip(), url)
+        placed = self.pages / self.place
+        self.assertEqual(sorted(p.name for p in placed.iterdir()), ['data', 'index.html', 'page.toml', 'style.css'])
+        published = tomllib.loads((placed / 'page.toml').read_text())
+        self.assertEqual(published['source']['remote'], 'git@example.com:me/proj.git')
+        self.assertNotIn('dir', published['source'])
+        self.assertEqual(self.remote_subjects()[0], f'Publish {self.place}: report')
+        record = self.records(folder)[-1]
+        self.assertEqual((record['target'], record['place'], record['url'], record['commit'], record['pushed']),
+                         ('team', self.place, url, self.head(), True))
+        self.assertEqual(git(self.pages, 'status', '--porcelain'), '')
+        # Republish: the same place, the folder replaced whole, one more commit.
+        (folder / 'style.css').unlink()
+        (folder / 'index.html').write_text('<p>second</p>')
+        self.assertEqual(self.publish(folder).stdout.strip(), url)
+        self.assertFalse((placed / 'style.css').exists())
+        self.assertEqual(len(self.remote_subjects()), 3)
+        self.assertEqual(self.publish(folder, '--as', 'renamed').stdout.strip(),
+                         f'https://pages.example.com/me/team-pages/{TODAY}/renamed/')
+        self.assertTrue((self.pages / TODAY / 'renamed' / 'index.html').is_file())
+        # Nothing new: no commit, and the record says so.
+        result = self.publish(folder, '--as', 'renamed')
+        self.assertIn('nothing changed', result.stderr)
+        self.assertEqual(len(self.remote_subjects()), 4)
+
+    def test_refuses_an_unclean_checkout(self):
+        self.target()
+        folder = draft(self)
+        before = (folder / 'page.toml').read_bytes()
+        (self.pages / 'README.md').write_text('edited\n')
+        self.assertIn('has changes', self.publish(folder, ok=False).stderr)
+        git(self.pages, 'checkout', '-q', 'README.md')
+        (self.pages / 'stray.txt').write_text('untracked')
+        self.assertIn('has changes', self.publish(folder, ok=False).stderr)
+        self.assertEqual((self.pages / 'stray.txt').read_text(), 'untracked')   # never cleaned away
+        (self.pages / 'stray.txt').unlink()
+        git(self.pages, 'checkout', '-q', '-b', 'elsewhere')
+        self.assertIn('is on elsewhere, not gh-pages', self.publish(folder, ok=False).stderr)
+        git(self.pages, 'checkout', '-q', 'gh-pages')
+        self.target(checkout=str(self.work / 'missing'))
+        self.assertIn('does not exist', self.publish(folder, ok=False).stderr)
+        self.target(checkout=str(self.pages / '.git'))
+        self.assertIn('not the top of a git working tree', self.publish(folder, ok=False).stderr)
+        self.assertEqual((folder / 'page.toml').read_bytes(), before)
+        self.assertEqual(self.remote_subjects(), ['start'])
+
+    def test_after(self):
+        self.target(after=['sh', '-c', 'echo "$VIZ_PLACE $VIZ_TARGET $VIZ_URL" > after.txt'])
+        folder = draft(self)
+        self.publish(folder)
+        self.assertEqual((self.pages / 'after.txt').read_text().split(),
+                         [self.place, 'team', f'https://pages.example.com/me/team-pages/{self.place}/'])
+        self.assertEqual(git(self.pages, 'show', '--format=', '--name-only', 'HEAD').count('after.txt'), 1)
+        start = self.head()
+        (folder / 'index.html').write_text('<p>changed</p>')
+        before = (folder / 'page.toml').read_bytes()
+        for after, timeout, said in ((['sh', '-c', 'echo junk > junk.txt; rm README.md; echo it broke; exit 3'], None,
+                                      'it broke'),
+                                     (['sleep', '5'], 1, 'ran past 1 s')):
+            with self.subTest(said=said):
+                self.target(after=after, after_timeout=timeout)
+                result = self.publish(folder, ok=False)
+                self.assertIn(said, result.stderr)
+                self.assertIn('the checkout is reset', result.stderr)
+                self.assertEqual(git(self.pages, 'status', '--porcelain'), '')
+                self.assertEqual(self.head(), start)
+                self.assertNotIn('changed', (self.pages / self.place / 'index.html').read_text())
+                self.assertEqual((folder / 'page.toml').read_bytes(), before)
+
+    def test_lock(self):
+        self.target()
+        folder = draft(self)
+        gitdir = Path(git(self.pages, 'rev-parse', '--absolute-git-dir').strip())
+        with open(gitdir / 'viz-publish.lock', 'a') as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            proc = subprocess.Popen([sys.executable, str(VIZ), 'publish', str(folder), '--to', 'team'],
+                                    cwd=self.work, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            time.sleep(2)
+            self.assertIsNone(proc.poll(), 'publish did not wait for the lock')
+            self.assertEqual(self.remote_subjects(), ['start'])
+        _out, err = proc.communicate(timeout=60)
+        self.assertEqual(proc.returncode, 0, err)
+        self.assertEqual(len(self.remote_subjects()), 2)
+        # The checkout is checked again once the lock is held: whoever held it may have left changes.
+        (folder / 'index.html').write_text('<p>waited</p>')
+        with open(gitdir / 'viz-publish.lock', 'a') as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            proc = subprocess.Popen([sys.executable, str(VIZ), 'publish', str(folder), '--to', 'team'],
+                                    cwd=self.work, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            time.sleep(2)
+            (self.pages / 'half-done.txt').write_text('another publish, interrupted')
+        _out, err = proc.communicate(timeout=60)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn('has changes', err)
+        self.assertEqual((self.pages / 'half-done.txt').read_text(), 'another publish, interrupted')
+        self.assertEqual(len(self.remote_subjects()), 2)
+
+    def test_push_never_and_ask_without_a_terminal(self):
+        self.target(push='never', remote=None)
+        folder = draft(self)
+        result = self.publish(folder)
+        self.assertIn('push = never', result.stderr)
+        self.assertEqual(self.remote_subjects(), ['start'])
+        self.assertIs(self.records(folder)[-1]['pushed'], False)
+        refused = viz('publish', '--to', 'team', '--push')
+        self.assertIn('by hand', refused.stderr)
+        git(self.pages, 'reset', '-q', '--hard', 'origin/gh-pages')
+        self.target(push='ask')
+        (folder / 'index.html').write_text('<p>asked</p>')
+        result = self.publish(folder)
+        self.assertIn('viz publish --to team --push', result.stderr)
+        self.assertEqual(self.remote_subjects(), ['start'])
+        self.assertIs(self.records(folder)[-1]['pushed'], False)
+        refused = viz('publish', '--to', 'team', '--push')
+        self.assertEqual(refused.returncode, 1)
+        self.assertIn('needs a terminal', refused.stderr)
+        self.assertEqual(self.remote_subjects(), ['start'])
+        code, out = in_terminal(['publish', '--to', 'team', '--push'], answer='n')
+        self.assertEqual((code, self.remote_subjects()), (1, ['start']), out)
+        code, out = in_terminal(['publish', '--to', 'team', '--push'], answer='y')
+        self.assertEqual(code, 0, out)
+        self.assertIn(f'{TODAY}/report/index.html', out)          # the stat shown before asking
+        self.assertEqual(len(self.remote_subjects()), 2)           # the never commit was reset away
+        code, out = in_terminal(['publish', '--to', 'team', '--push'])
+        self.assertIn('nothing waits', out)
+
+    def test_ask_at_a_terminal(self):
+        self.target(push='ask')
+        folder = draft(self)
+        code, out = in_terminal(['publish', str(folder), '--to', 'team'], answer='y')
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(self.remote_subjects()), 2)
+        (folder / 'index.html').write_text('<p>no</p>')
+        code, out = in_terminal(['publish', str(folder), '--to', 'team'], answer='n')
+        self.assertEqual(code, 0, out)
+        self.assertIn('not pushed', out)
+        self.assertEqual(len(self.remote_subjects()), 2)
+        self.assertIs(self.records(folder)[-1]['pushed'], False)
+
+    def race(self, path, text):
+        """An after command that pushes PATH from another clone while viz publishes: a rejected push."""
+        return ['sh', '-c', (f'cd {self.other} && git pull -q && mkdir -p "$(dirname "{path}")" && '
+                             f'echo {text} > "{path}" && git add -A && git commit -qm race && git push -q')]
+
+    def test_rejected_push(self):
+        self.target(after=self.race('race.txt', 'theirs'))
+        folder = draft(self)
+        self.publish(folder)
+        self.assertEqual(self.remote_subjects()[:2], [f'Publish {self.place}: report', 'race'])
+        self.assertIs(self.records(folder)[-1]['pushed'], True)
+        self.assertEqual(self.records(folder)[-1]['commit'], self.head())   # the rebased commit
+        # A conflicting push: the rebase fails, the commit stays here, unpushed, and no rebase is left open.
+        (folder / 'index.html').write_text('<p>ours</p>')
+        self.target(after=self.race(f'{self.place}/index.html', 'theirs'))
+        result = self.publish(folder)
+        self.assertIn('the commit is kept', result.stderr)
+        self.assertIs(self.records(folder)[-1]['pushed'], False)
+        self.assertEqual(git(self.pages, 'log', '-1', '--format=%s'), f'Publish {self.place}: report\n')
+        self.assertFalse((Path(git(self.pages, 'rev-parse', '--absolute-git-dir').strip()) / 'rebase-merge').exists())
+        self.assertEqual(git(self.pages, 'status', '--porcelain'), '')
+
+    def test_dry_run_listing_and_config(self):
+        self.target(required=['project'], after=['true'])
+        folder = draft(self)
+        self.assertIn('lacks project', self.publish(folder, ok=False).stderr)
+        text = (folder / 'page.toml').read_text().replace('kind = ""', 'kind = ""\nproject = "proj"', 1)
+        (folder / 'page.toml').write_text(text)
+        result = self.publish(folder, '--dry-run')
+        for expected in (f'place:    {self.place}', 'push:     auto', f'commit:   Publish {self.place}: report',
+                         'after:    true', 'pulls from origin'):
+            self.assertIn(expected, result.stdout)
+        self.assertEqual(self.remote_subjects(), ['start'])
+        self.assertFalse((self.pages / TODAY).exists())
+        shown = viz('targets', 'team').stdout
+        for expected in ('Anyone on the company network', 'Ask A. Person first.', 'push:        auto',
+                         'required:    title, summary, source.generator, project', 'checkout:'):
+            self.assertIn(expected, shown)
+        listed = viz('targets').stdout
+        self.assertIn('team', listed)
+        self.assertIn('git', listed)
+        for keys, error in (({'checkout': None}, 'checkout is required'), ({'push': 'sometimes'}, 'auto, ask or never'),
+                            ({'remote': None}, 'needs a remote'), ({'folder': '{nope}/{slug}'}, 'placeholder'),
+                            ({'after': 'make'}, 'after should be list'), ({'colour': 'red'}, "unknown key 'colour'")):
+            with self.subTest(error=error):
+                self.target(**keys)
+                self.assertIn(error, viz('targets').stdout)
+        self.target(folder='{project}/{slug}', url='https://pages.example.com/{project}/{slug}/',
+                    message='{project}: {title}')
+        self.assertEqual(self.publish(folder).stdout.strip(), 'https://pages.example.com/proj/report/')
+        self.assertTrue((self.pages / 'proj' / 'report' / 'index.html').is_file())
+        self.assertEqual(self.remote_subjects()[0], 'proj: report')
+        (folder / 'index.html').write_text('<p>again</p>')
+        self.publish(folder, '-m', 'Fix the {braces} in the legend')
+        self.assertEqual(self.remote_subjects()[0], 'Fix the {braces} in the legend')
 
 
 class ServerNeverPublishes(unittest.TestCase):
