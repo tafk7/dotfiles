@@ -127,6 +127,10 @@ tmux│Ctrl+a r│Reload tmux config│source-file ~/.tmux.conf
 tmux│Ctrl+a R│Force current window to attached-client size and resume automatic sizing│resize-window -A; setw window-size latest; refresh-client
 tmux│Ctrl+a Ctrl+l│Clear screen and scrollback history│send-keys C-l; clear-history
 tmux│Ctrl+a ?│List all keybindings│list-keys
+wezterm│Ctrl+Shift+A│Next tab (with two, toggles)│ActivateTabRelative(1)
+wezterm│Ctrl+Shift+1…9│Go to tab 1…9│ActivateTab(0…8)
+wezterm│Ctrl+Shift+T│New local PowerShell tab, even from an SSH tab│SpawnTab DefaultDomain
+wezterm│Ctrl+Shift+PgUp / PgDn│Move the tab left / right│MoveTabRelative(-1/1)
 wezterm│Ctrl+Shift+Enter│Fullscreen (F11 on other keyboards)│ToggleFullScreen
 wezterm│Ctrl+Shift+= / Ctrl+Shift+- / Ctrl+Shift+0│Font size up / down / reset│Increase/Decrease/ResetFontSize
 wezterm│Image key (Ctrl+Alt+V)│Upload the Windows clipboard image to the tab's SSH host and paste its path│paste_clipboard_image

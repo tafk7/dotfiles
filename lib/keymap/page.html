@@ -430,7 +430,7 @@ footer { color: var(--muted); font-size: 0.8rem; max-width: 80ch; }
     [/^copy last reply$/, () => 'last reply'], [/^enter copy mode/, () => 'copy mode'], [/^paste tmux buffer$/, () => 'paste buf'],
     [/^review transcript$/, () => 'review'], [/^prefix/, () => 'prefix'], [/^copy mode, page up$/, () => 'page ↑'],
     [/(\d) lines (up|down)/, m => m[1] + ' lines ' + (m[2] === 'up' ? '↑' : '↓')], [/^prompt in nvim/, () => 'nvim prompt'],
-    [/^ActivateTabRelative/, () => 'next tab'], [/^MoveTabRelative\(-1\)/, () => 'tab ←'], [/^MoveTabRelative\(1\)/, () => 'tab →'],
+    [/^ActivateTabRelative/, () => 'next tab'], [/^ActivateTab\((\d+)\)/, m => 'tab ' + (+m[1] + 1)], [/^MoveTabRelative\(-1\)/, () => 'tab ←'], [/^MoveTabRelative\(1\)/, () => 'tab →'],
     [/^SpawnTab/, () => 'new tab'], [/^SpawnWindow/, () => 'new window'], [/^CopyTo/, () => 'copy'], [/^PasteFrom/, () => 'paste'],
     [/^ActivateCommandPalette/, () => 'palette'], [/^Search/, () => 'find'], [/^ToggleFullScreen/, () => 'fullscreen'],
     [/^IncreaseFontSize/, () => 'font +'], [/^DecreaseFontSize/, () => 'font −'], [/^ResetFontSize/, () => 'font 0'],

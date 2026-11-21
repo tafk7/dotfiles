@@ -12,7 +12,7 @@ local config = wezterm.config_builder()
 -- This file's revision. With `SendEnv LC_TAFK_WEZTERM` in the Windows ssh
 -- config's Host block, `dotfiles verify` on the host says when this copy is
 -- out of date and needs copying again.
-local CONFIG_REVISION = '1a74981e9501'
+local CONFIG_REVISION = 'a3b228653ec3'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -397,7 +397,8 @@ config.disable_default_key_bindings = true
 
 config.keys = {
   -- Top-level tabs: usually one per SSH machine, rarely more than a few, so
-  -- one key cycles them (with two, it toggles). Alt is tmux's.
+  -- one key cycles them (with two, it toggles); Ctrl+Shift+1..9, after this
+  -- table, go to one by number. Alt is tmux's.
   {
     key = 'a',
     mods = 'CTRL|SHIFT',
@@ -599,5 +600,15 @@ config.keys = {
     action = act.ResetFontSize,
   },
 }
+
+-- Ctrl+Shift+1..9 go straight to tab 1..9, by physical key like Ctrl+Shift+0
+-- above. Ctrl+Shift+A still cycles.
+for i = 1, 9 do
+  table.insert(config.keys, {
+    key = 'phys:' .. i,
+    mods = 'CTRL|SHIFT',
+    action = act.ActivateTab(i - 1),
+  })
+end
 
 return config
