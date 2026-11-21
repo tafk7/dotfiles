@@ -26,7 +26,7 @@
     },
     {
       "name": "viz",
-      "description": "Skill for building visual pages (charts, diagrams, dashboards, reports, walkthroughs) designed for their subject, and showing them through bin/viz (browser viewer over ssh).",
+      "description": "Skill for building visual pages (charts, diagrams, dashboards, reports, walkthroughs) designed for their subject, showing them through bin/viz (browser viewer over ssh) and publishing them to viz targets.",
       "author": {
         "name": "tafk7"
       },
