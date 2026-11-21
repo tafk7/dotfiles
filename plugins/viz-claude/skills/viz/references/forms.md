@@ -69,8 +69,8 @@ Where things stand: progress since the last look, what is waiting on whom, what 
 - Time as a picture: a lane per workstream on a shared time axis, a now-line, events as marks
   labeled with what they were. Who or what each item waits on, encoded consistently.
 - Next steps with owners and conditions, not just a list.
-- If it will be refreshed, publish it as a live page (building.md) so the user keeps one tab at
-  one address.
+- If it will be refreshed, offer a live page (building.md) so the user keeps one tab at one
+  address.
 
 ## Dashboard or monitor
 
@@ -82,7 +82,7 @@ Many measures, scanned repeatedly.
   reproduces the view.
 - Charts sized by importance, sharing scales where they are compared; tables for detail, sorted
   by what matters, with the costliest or worst first.
-- Live data through a fetched JSON file a collector rewrites, as a live page (building.md).
+- Live data through a fetched JSON file a collector rewrites: offer a live page (building.md).
 
 ## Explorer or reference map
 

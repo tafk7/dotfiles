@@ -26,7 +26,7 @@ which the skill reads with `viz targets`.
 - `references/formats/`: one guide per format. `html.md` (tokens and themes in
   CSS, fonts, what keeps a page portable) and `pdf.md` (print CSS, printing a
   page with `viz bundle --format pdf`, looking at page one); `README.md` lists
-  the formats and keeps slots for those to come (pptx, typst, latex).
+  the formats and keeps slots for those to come (pptx, Typst, LaTeX).
 - `references/building.md`: generators, baked and live data, live pages and
   their collectors, libraries (inline, vendored, pinned CDN), interaction,
   pages outside `~/viz`, diffs.

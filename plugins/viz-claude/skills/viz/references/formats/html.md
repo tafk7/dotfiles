@@ -80,6 +80,14 @@ the page so it bundles cleanly:
 - **Nothing else from outside**: an API `fetch`, an image URL, an unpinned script, a font from a
   host other than Google's. Each is refused with its file and line, unless the target allows the
   network (`viz targets NAME` shows `network`). Links that navigate (`<a href>`) are fine.
+- **Fetched data and module scripts need a served target.** A published page opened from disk
+  (`file://`: a folder from the `file` target, an unpacked attachment) cannot `fetch()` its
+  `data.json` or load a module script from a file (`<script type="module" src>`, `import`):
+  the browser blocks both. `viz look --portable`
+  serves the bundle over http, so it does not show this. A page that may go to the `file`
+  target, or be opened from disk, embeds its data in the page (building.md) and uses classic
+  scripts; fetched data and modules are for targets that serve the page (`preview`, `live`, a
+  configured one).
 - **Relative links resolve inside the folder.** A link to a file that is missing, or not copied,
   is refused.
 - A loose html file (outside a folder page) is bundled alone, as `index.html`; anything it loads

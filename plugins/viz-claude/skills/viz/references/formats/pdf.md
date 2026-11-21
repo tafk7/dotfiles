@@ -29,10 +29,11 @@ Put it in one `@media print` block at the end of the page's styles, plus an `@pa
 - **Margins with `@page { margin: 18mm; }`.** Without it the content runs to the paper's edge.
   Leave out `@page { size: ... }`: viz sets the paper, and a size there prints the page at the
   wrong scale.
-- **Width.** Print lays the page out at the paper's width, about 800 CSS px for A4 or Letter,
-  so the layout between your phone and desktop breakpoints applies; check that it reads there.
-  Scripts ran first, in a 1280 px window: a chart sized in script from the window or its
-  container is drawn for the screen. Draw charts in SVG with a `viewBox` and size them in CSS
+- **Width.** Media queries see the paper's full width, about 794 CSS px for A4 (816 for
+  Letter), so the layout between your phone and desktop breakpoints applies; the text column
+  inside 18 mm margins is narrower, about 658 px on A4. Check that the page reads at that
+  width. Scripts ran first, in a 1280 px window: a chart sized in script from the window or
+  its container is drawn for the screen. Draw charts in SVG with a `viewBox` and size them in CSS
   (`width: 100%; height: auto`), so they fit the paper.
 - **Hide what only works on a screen**: navigation, a sticky rail, filters, buttons, the theme
   toggle, "copy" links. Show what is hidden behind them: content in a closed `<details>` or an

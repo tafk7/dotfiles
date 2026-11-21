@@ -44,7 +44,9 @@ tree's.
 - **Baked**, for a snapshot that will not change: embed the data in the page as
   `<script type="application/json" id="data">...</script>` and read it with
   `JSON.parse(document.getElementById('data').textContent)`, or `fetch('data.json')` from the
-  page's folder. Either way it publishes with the page.
+  page's folder. Either way it publishes with the page, but only embedded data works when the
+  page is opened from disk (`file://`), where the browser blocks `fetch()` and module scripts:
+  embed it in a page that may go to the `file` target or be opened from disk (formats/html.md).
 - **Live**, for a page the user keeps open (status, monitors, dashboards): the page
   `fetch('data.json')`es its data, and a collector rewrites `data.json` on a schedule (Live
   pages, below). viz tracks what a page loads, so rewriting the data file reloads the open page,
@@ -83,10 +85,11 @@ draft still reads in the fallback offline. Publishing downloads them into the pa
 A page that should stay current at one address, rewritten on a schedule, is published to the
 `live` target. It gets a fixed, undated folder, `~/viz/live/NAME/` (served at `/live/NAME/`), and
 a **collector**: a command `viz collect` runs every interval (the `viz-collect` user service runs
-it) that writes the page, or the data it loads, at `$VIZ_OUT`.
+it) that writes the page, or the data it loads, at `$VIZ_OUT`. The collector runs until someone
+removes it, so register one only when the user agrees (SKILL.md, Boundaries).
 
 ```sh
-viz publish --to live --as NAME --every 5m --cwd ~/src/proj \
+viz publish --to live --as NAME --every 5m --cwd ~/viz/2026-11-20/NAME \
     --summary "What the page shows." --run 'python3 build.py --out "$VIZ_OUT"'
 viz publish DRAFT --to live --as NAME      # the draft's page.toml has a [live] table
 ```
@@ -95,8 +98,12 @@ viz publish DRAFT --to live --as NAME      # the draft's page.toml has a [live] 
 [live]                        # in a draft's page.toml
 run = 'python3 build.py --out "$VIZ_OUT"'
 every = "5m"                  # 30s, 5m, 1h, 1d; at least 30s
-cwd = "~/src/proj"            # default: where viz publish ran
+cwd = "~/viz/2026-11-20/NAME" # where the generator is; default: where viz publish ran
 ```
+
+Set `cwd` to the folder that holds the generator and its inputs, usually the draft's: the
+command runs there, and only what a browser reads is copied into `~/viz/live/NAME/`, never the
+generator (`*.py`) itself.
 
 - Publishing runs the collector once, in the foreground, and puts the page in place only when
   that run succeeds; a broken command fails then, with its output.

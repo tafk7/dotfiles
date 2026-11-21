@@ -11,35 +11,37 @@ This folder holds one guide per format: how to build a page in it, check it, and
 | svg | html.md's rules for outside loads apply | checked for outside loads; `viz look` shoots it |
 | png, jpg, ... | none | copied as they are |
 | pptx | not written yet | copied as it is |
-| typst | not written yet | copied as it is |
-| latex | not written yet | copied as it is |
+| typ (Typst) | not written yet | copied as it is |
+| tex (LaTeX) | not written yet | copied as it is |
 
 ## A format viz has no guide for
 
 `viz path NAME.EXT` makes the folder and its `page.toml` as for any page, with `format` from the
-suffix. `viz bundle` and `viz publish` copy the entry file as it is, with its manifest, so the
-file itself must be portable: fonts embedded, images inside it, no links to your machine. Keep
-the source and the build command beside it (`deck.py`, `report.typ`) and name the command in
-`source.generator`. `viz open` shows html, svg and pdf in the browser; other files open in a
-connected VS Code window, or not at all.
+suffix (`report.typ` is `typ`, `paper.tex` is `tex`). `viz bundle` and `viz publish` copy the
+entry file as it is, with its manifest, so the file itself must be portable: fonts embedded,
+images inside it, no links to your machine. Keep the source and the build command beside it
+(`deck.py`, `report.typ`) and name the command in `source.generator`. `viz open` shows html, svg
+and pdf in the browser; other files open in a connected VS Code window, and images open in the
+browser when no VS Code window is connected. Anything else viz cannot show: give the user the
+path.
 
 The design guidance still applies: the plan (palette, faces, layout idea), the generic looks to
 avoid, the words. Only the mechanics change.
 
 ## Slots for formats to come
 
-Each will be a file here, `FORMAT.md`, covering: when to choose the format, how to build it from
-a generator, how to check it and look at it before handing it over, what makes it portable, and
-the mistakes it invites.
+Each will be a file here, named after the format (`pptx.md`, `typ.md`, `tex.md`), covering: when
+to choose the format, how to build it from a generator, how to check it and look at it before
+handing it over, what makes it portable, and the mistakes it invites.
 
 ### pptx
 
 Not written yet.
 
-### typst
+### typ (Typst)
 
 Not written yet.
 
-### latex
+### tex (LaTeX)
 
 Not written yet.
