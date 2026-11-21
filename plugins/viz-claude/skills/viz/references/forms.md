@@ -3,6 +3,8 @@
 Most requests are one of a few forms, or a blend with one dominant job. Pick the form first:
 it decides what the first frame shows, how the page is ordered and what the reader does with
 it. These are starting structures, not templates; the subject still sets the look (design.md).
+Record the form as the page's `kind` in `page.toml`: `answer`, `explainer`, `walkthrough`,
+`review`, `comparison`, `status`, `dashboard`, `explorer`, `report`, `tool`, `figure` or `set`.
 
 ## Answer
 
@@ -67,7 +69,8 @@ Where things stand: progress since the last look, what is waiting on whom, what 
 - Time as a picture: a lane per workstream on a shared time axis, a now-line, events as marks
   labeled with what they were. Who or what each item waits on, encoded consistently.
 - Next steps with owners and conditions, not just a list.
-- If it will be refreshed, make it a live page (building.md) so the user keeps one tab.
+- If it will be refreshed, publish it as a live page (building.md) so the user keeps one tab at
+  one address.
 
 ## Dashboard or monitor
 
@@ -79,7 +82,7 @@ Many measures, scanned repeatedly.
   reproduces the view.
 - Charts sized by importance, sharing scales where they are compared; tables for detail, sorted
   by what matters, with the costliest or worst first.
-- Live data through a fetched JSON file the page rereads on reload (building.md).
+- Live data through a fetched JSON file a collector rewrites, as a live page (building.md).
 
 ## Explorer or reference map
 
@@ -114,8 +117,8 @@ Something the reader operates: a calculator, a picker, a schedule, a playground.
 
 Several attempts at one hard figure, when the right picture is not obvious.
 
-- A directory with `attempt-1/`, `attempt-2/`, ..., each a page with its generator, and a
-  `NOTES.md` recording what each attempt tried, its strengths and its failures.
+- A folder (`viz path NAME`) with `attempt-1/`, `attempt-2/`, ..., each a page with its
+  generator, and a `NOTES.md` recording what each attempt tried, its strengths and its failures.
 - An index page that shows the attempts side by side at the same scale, so the user can choose.
 - The chosen one moves to `chosen/` and its generator becomes the source of truth.
 
@@ -123,8 +126,9 @@ Several attempts at one hard figure, when the right picture is not obvious.
 
 Several pages that belong together: a walkthrough in stages, review rounds, a hub over reports.
 
-- A directory with an `index.html` hub that says what the set is and links every page with a
-  line on what it holds; `viz open DIR` opens the hub.
+- A folder (`viz path NAME`, one `page.toml` for the set) with an `index.html` hub that says
+  what the set is and links every page with a line on what it holds; `viz open DIR` opens the
+  hub, and the set publishes as one.
 - One shared stylesheet (`style.css`) for the set's tokens and components; each page links it,
   and edits to it reload every open page.
 - The same navigation on every page: back to the hub, previous and next where the pages are a

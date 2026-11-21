@@ -5,6 +5,9 @@ for anyone else's. Make deliberate choices about palette, type and layout that c
 subject, and spend boldness where the brief earns it. The reader should come away understanding
 something, and the design is how they get there.
 
+This guide holds for every format. How a choice is written down in one (the CSS tokens and
+theme blocks of an html page, the print CSS of a pdf) is in [formats/](formats/README.md).
+
 ## Read the request
 
 Every page is designed; decide only the treatment.
@@ -38,8 +41,8 @@ not.
 
 ## Plan in two passes
 
-1. **Draft a compact system**, written into the page as the `:root` block at the top of its
-   `<style>`:
+1. **Draft a compact system**, written down before the page (in html, as the `:root` block at
+   the top of its `<style>`, formats/html.md):
    - Color: 4 to 6 named tokens (ground, surface, ink, muted, rule, accent) plus any semantic
      colors the content needs (good, warning, critical; series colors for charts).
    - Type: a display face and a body face, with their roles; a mono face only where code or
@@ -75,61 +78,53 @@ freedom on:
 
 ## Name
 
-The `<title>` is the page's name in the viz gallery and the browser tab. Give it a real name
-that picks this page out among dozens: a short noun phrase, typically two to four words, or the
-question itself for a page that answers one. No explanation after a dash or a colon. When
-trimming, keep the identifying word, not the generic one. When the user already has a name for
-the thing, use it.
+The page's name is its `title` in `page.toml`, which targets list it by, and its title in the
+page itself (the `<title>` of an html page, its browser tab). Use the same name in both. Give it
+a real name that picks this page out among dozens: a short noun phrase, typically two to four
+words, or the question itself for a page that answers one. No explanation after a dash or a
+colon. When trimming, keep the identifying word, not the generic one. When the user already has
+a name for the thing, use it.
 
 ## Type
 
 - Type carries the page's personality. One family or two; if two, make them clearly distinct.
   Use a display face with restraint and let its treatment (weight, width, size, setting) be part
   of the design, not a neutral vehicle.
-- Choose faces for this subject, not the ones you reach for on every page. Link Google Fonts
-  directly, and always declare a real fallback stack, since the page must read offline.
+- Choose faces for this subject, not the ones you reach for on every page, and always declare a
+  real fallback stack, since the page must read offline. Each format says where faces come from
+  (an html page links Google Fonts, and publishing downloads them: formats/html.md).
 - Set a type scale and keep to it, with intentional weights and spacing. Keep running text near
   65 characters (under 80); give serif body text a little more line-height than sans.
-- Give headings `text-wrap: balance`. Use `font-variant-numeric: tabular-nums` where digits line
-  up in columns.
+- Balance the lines of headings. Use tabular figures where digits line up in columns.
 - Avoid the commonest generated tells: accenting one word of a headline in italic, bold or
   color; all-caps labels; labels above content that say nothing the content doesn't.
 
 ## Color and themes
 
-viz serves the page as written and sets no theme: `prefers-color-scheme` from the user's browser
-decides light or dark. A `data-theme` attribute on `<html>` lets a toggle on the page, or the
-screenshot script, force one. Write all three blocks:
+A page read on a screen has two themes, light and dark, and the reader's own setting picks one;
+a print or a pdf is light. How an html page writes both is in formats/html.md.
 
-- Define the complete light palette as tokens in the bare `:root` block, before any media or
-  `[data-theme]` block redefines them; a color that exists only inside one of those blocks is
-  the classic unreadable-page bug.
-- Redefine the tokens under `@media (prefers-color-scheme: dark)`, guarded as
-  `:root:not([data-theme="light"])`, and again under `:root[data-theme="dark"]`. Set
-  `color-scheme: dark` wherever the dark palette applies, so form controls and scrollbars follow.
-- Style every element through the tokens, never directly inside those blocks. Color inline SVG
-  and chart text from the same tokens.
-- Set an explicit background on `html` and `body` from a token.
+- Define the complete palette as named tokens, a light set and a dark set with the same names,
+  and style every element, every diagram mark and every chart label through them.
 - Give the dark theme the same care: do not simply invert. Keep contrast legible and the accent
   working on both grounds; a saturated light-theme accent usually needs to be lighter and a
   little less saturated in dark.
 - Choose neutrals deliberately: a grey with a slight bias toward the accent reads as intended.
 - Semantic colors (good, warning, critical) are separate from the accent and do not count as
   it. Never encode meaning in color alone; pair it with a shape, a word or a position.
-- A page that commits to one visual world may stay single-theme by choice: omit the media and
-  `[data-theme]` blocks and set the background, every color and `color-scheme` explicitly.
+- A page that commits to one visual world may stay single-theme by choice, with every color set
+  for that one ground.
 
 ## Layout
 
 - Visual structure is information. Borders, fills, numbering, dividers, labels and position
   encode something true about the content. Numbered markers belong only to real sequences
   (steps, stages, a timeline); a rule separates things that differ.
-- Lay out sibling groups with flex or grid and `gap`, not per-element margins.
+- Space sibling groups by one gap between them, not by margins on each element.
 - Keep a side gutter of at least 16px at every width. Rows wrap or stack to one column at phone
   width, about 400px.
-- Give images `max-width: 100%`. Only wide tables, code and diagrams may exceed the screen; give
-  each `overflow-x: auto` on its own container, so the page body never scrolls sideways.
-- Size a one-screen app with `height: 100%` on `html` and `body`, not `100vh`.
+- Only wide tables, code and diagrams may exceed the screen, each scrolling in its own
+  container; the page itself never scrolls sideways.
 - Make repeated elements consistent: the same edges, baselines and padding on each card or row.
   Text that outgrows its box wraps or scrolls; clipped text is a bug.
 - Use borders, fills, radius and shadow by role, to set off the one element that needs it, with
@@ -154,7 +149,7 @@ reveal) lands better than scattered effects, and fade-and-slide entrances on eve
 hover lifts on every card read as generated. A section may animate in only from a visible
 resting state, never from `opacity: 0` waiting on an observer. Motion that answers the reader
 (opening, expanding, filtering, confirming) is welcome when it shows what changed. Respect
-`prefers-reduced-motion`.
+the reader's reduced-motion setting. A printed page has no motion, so nothing may depend on it.
 
 ## Pages that are scanned
 
@@ -191,14 +186,8 @@ Words are design content: each written element does one job.
 
 ## Build cleanly
 
-The quality floor, built without announcing it:
+The quality floor, built without announcing it (each format adds its own: formats/):
 
-- Responsive down to phone width; visible keyboard focus; `prefers-reduced-motion` respected;
-  text contrast at least 4.5:1 in both themes.
-- Close every non-void element, double-quote attributes, give every form control a stable `id`
-  and a label.
-- Watch selector specificity: a type selector (`.section`) and an element selector (`.cta`) can
-  silently undo each other's spacing. Prefer a few low-specificity rules and `gap`.
+- Text contrast at least 4.5:1 in every theme the page has.
 - Draw charts to one scale, with every label naming a value the chart reaches. Keep marks and
   labels clear of one another and inside the drawing's bounds.
-- For generative or decorative graphics, use Canvas, not long hand-written SVG paths.
