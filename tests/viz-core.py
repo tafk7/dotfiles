@@ -19,6 +19,7 @@ import time
 import unittest
 import urllib.parse
 from pathlib import Path
+from unittest import mock
 
 import tomllib
 
@@ -827,7 +828,13 @@ class Look(Fresh):
             self.assertFalse({'look', 'playwright', 'playwright.sync_api'} & names - ({'playwright.sync_api'}
                              if path.name == 'look.py' else set()), f'{path.name} imports the browser side')
         from viz import browser
-        command = browser.command(['page.html'])
+        # A stand-in uv, so the wiring is checked where uv is not installed (CI's runner has none).
+        stub = SANDBOX / 'stub-uv'
+        stub.mkdir(exist_ok=True)
+        (stub / 'uv').write_text('#!/bin/sh\nexit 0\n')
+        (stub / 'uv').chmod(0o755)
+        with mock.patch.dict(os.environ, {'PATH': f'{stub}{os.pathsep}{os.environ.get("PATH", "")}'}):
+            command = browser.command(['page.html'])
         self.assertEqual(command[command.index('--with') + 1], f'playwright=={browser.PLAYWRIGHT}')
         self.assertTrue(command[-2].endswith('lib/viz/look.py'))
 
