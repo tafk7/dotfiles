@@ -17,7 +17,7 @@
 #
 # A relative FILE is looked up in the current directory, then in each directory
 # of DL_PATH (colon-separated, like PATH; set it in ~/.shell.env), e.g.
-#   export DL_PATH="$HOME/dotfiles"     # dl configs/wezterm.lua, from anywhere
+#   export DL_PATH="$DOTFILES_DIR"      # dl configs/wezterm.lua, from anywhere
 #
 # Outside WezTerm nothing arrives; the printed scp command fetches it instead.
 set -euo pipefail

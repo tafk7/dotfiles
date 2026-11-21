@@ -188,7 +188,7 @@ yo <command>              # print output and copy it to the clipboard
   SSH host (so plain `ssh <host>` must log in without a prompt, as for
   Ctrl+Alt+V). A relative name not found in the current directory is looked up
   in `DL_PATH` (colon-separated; set it in `~/.shell.env`, e.g.
-  `export DL_PATH="$HOME/dotfiles"`). Outside WezTerm, `dl` prints the `scp`
+  `export DL_PATH="$DOTFILES_DIR"`). Outside WezTerm, `dl` prints the `scp`
   command to run from the laptop instead.
 - **WSL:** adds `pbcopy`/`pbpaste`, `cdwin`, and `open`. To use a Windows SSH
   agent such as Bitwarden or 1Password, run `./bin/ssh-bridge enable`.
