@@ -5,8 +5,8 @@ How a page is put together on disk, fed with data, given libraries, and kept reb
 ## On disk
 
 Every page is a folder: `viz path NAME.html` makes `~/viz/<today>/NAME/` with its manifest,
-`page.toml`, and prints the path of its `index.html`. The generator and everything else the page
-needs go in the same folder:
+`page.toml`, and prints the path of its `index.html` (`viz path NAME` makes the folder alone, for
+a set of pages). The generator and everything else the page needs go in the same folder:
 
 ```text
 NAME/
@@ -17,11 +17,16 @@ NAME/
   data/             inputs, as JSON or CSV: a snapshot of exactly what the page shows
   vendor/           pinned libraries, with MANIFEST.json
   style.css         shared tokens and components, for a set of pages
-  .shots/           screenshots from the look (hidden: viz neither lists nor serves them)
+  .shots/           screenshots from viz look (hidden: viz neither lists, serves nor publishes them)
 ```
 
 Keep it rebuildable: running the generator again reproduces the page. Note at the top of the
 generator what it reads and writes, and where its data came from (a command, a commit, a date).
+Record the same in `page.toml`: `source.generator` names the command that rebuilds the page
+(`"python3 build.py"`), and `source.data` may list its inputs (paths, URLs, query names) and
+`source.run` the run that produced them. viz records the directory, repository and commit
+`viz path` ran in; when the page is built from another tree, set `source.commit` to that
+tree's.
 
 ## Generators
 
@@ -38,13 +43,14 @@ generator what it reads and writes, and where its data came from (a command, a c
 
 - **Baked**, for a snapshot that will not change: embed the data in the page as
   `<script type="application/json" id="data">...</script>` and read it with
-  `JSON.parse(document.getElementById('data').textContent)`. The page is one file and opens
-  anywhere.
+  `JSON.parse(document.getElementById('data').textContent)`, or `fetch('data.json')` from the
+  page's folder. Either way it publishes with the page, but only embedded data works when the
+  page is opened from disk (`file://`), where the browser blocks `fetch()` and module scripts:
+  embed it in a page that may go to the `file` target or be opened from disk (formats/html.md).
 - **Live**, for a page the user keeps open (status, monitors, dashboards): the page
-  `fetch('data.json')`es its data, and a collector rewrites `data.json`. viz tracks what a page
-  loads, so rewriting the data file reloads the open page, with no need to regenerate the HTML.
-  Write the file atomically (write a temp file, then rename) so a reload never reads half of it.
-  Show when the data was collected on the page.
+  `fetch('data.json')`es its data, and a collector rewrites `data.json` on a schedule (Live
+  pages, below). viz tracks what a page loads, so rewriting the data file reloads the open page,
+  with no need to regenerate the HTML. Show when the data was collected on the page.
 - Large data (tens of MB) slows every reload: aggregate in the generator, ship what the page
   draws, and link to the raw data instead.
 
@@ -62,7 +68,8 @@ grid, a syntax highlighter), in order of preference:
    source URL and sha256. A set of pages shares one `vendor/`.
 3. **CDN**, only when neither works: one `<script src>` with an exact version
    (`d3@7.9.0` on jsDelivr, `d3/7.9.0/...` on cdnjs), never a range or tag (`@7`, `@latest`),
-   and tell the user the page needs the network.
+   and tell the user the draft needs the network. Publishing downloads it into `vendor/`
+   (formats/html.md); a range or tag is refused there.
 
 Pick versions at least two weeks old: any you knew before this conversation is old enough; if
 you look versions up, skip any from the last two weeks. Load a library before the inline script
@@ -70,7 +77,48 @@ that uses it. Don't paste a library's source into the page by hand or write your
 one that does the job.
 
 Fonts are the exception: link Google Fonts directly, with a real fallback stack, since the
-page still reads in the fallback offline.
+draft still reads in the fallback offline. Publishing downloads them into the page's `fonts/`
+(formats/html.md), so a published page needs no network for its faces.
+
+## Live pages
+
+A page that should stay current at one address, rewritten on a schedule, is published to the
+`live` target. It gets a fixed, undated folder, `~/viz/live/NAME/` (served at `/live/NAME/`), and
+a **collector**: a command `viz collect` runs every interval (the `viz-collect` user service runs
+it) that writes the page, or the data it loads, at `$VIZ_OUT`. The collector runs until someone
+removes it, so register one only when the user agrees (SKILL.md, Boundaries).
+
+```sh
+viz publish --to live --as NAME --every 5m --cwd ~/viz/2026-11-20/NAME \
+    --summary "What the page shows." --run 'python3 build.py --out "$VIZ_OUT"'
+viz publish DRAFT --to live --as NAME      # the draft's page.toml has a [live] table
+```
+
+```toml
+[live]                        # in a draft's page.toml
+run = 'python3 build.py --out "$VIZ_OUT"'
+every = "5m"                  # 30s, 5m, 1h, 1d; at least 30s
+cwd = "~/viz/2026-11-20/NAME" # where the generator is; default: where viz publish ran
+```
+
+Set `cwd` to the folder that holds the generator and its inputs, usually the draft's: the
+command runs there, and only what a browser reads is copied into `~/viz/live/NAME/`, never the
+generator (`*.py`) itself.
+
+- Publishing runs the collector once, in the foreground, and puts the page in place only when
+  that run succeeds; a broken command fails then, with its output.
+- The collector runs with a bare environment (`HOME`, `USER`, a short `PATH` of
+  `~/.local/bin` and the system directories, and a few more), not your shell's, and no ssh
+  agent: a command that needs more sets it up itself. It also gets `VIZ_OUT` (the page's
+  entry), `VIZ_PAGE_DIR` and `VIZ_LIVE_NAME`.
+- Write atomically (a temp file in the same folder, then a rename), so a reload never sees half
+  a page.
+- A live page is as private as the draft and may load from outside; a CDN script must still
+  name an exact version.
+- `viz status` shows each collector's last run; its output is in
+  `~/.local/state/viz/collect/NAME.log`. To change the command or the interval, edit `[live]` in
+  `~/viz/live/NAME/page.toml`; `paused = true` there stops collecting, and deleting the folder
+  retires the page.
 
 ## Interaction
 
@@ -99,6 +147,11 @@ A project's own reports open in place: `viz open path/to/reports/page.html` link
 into `~/viz/linked/`, keeps relative links working, and reloads open pages when a build rewrites
 them (see SKILL.md's boundaries for what viz refuses to link). Prefer this to copying a
 project's pages into `~/viz`, which leaves a stale copy.
+
+To publish one, it needs a manifest: a folder with its own `page.toml`, or for a loose file a
+sidecar named after the whole file (`report.html.page.toml`), with the fields `viz path` would
+have written (at least `title`, `summary` and `[source] generator`). A loose html file is bundled
+alone, so anything it loads beside it must be in a folder page instead.
 
 ## Diffs
 

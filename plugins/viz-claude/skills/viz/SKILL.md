@@ -1,113 +1,205 @@
 ---
 name: viz
 description: >
-  Build and deliver visual pages: charts, diagrams, dashboards, reports,
-  explainers, walkthroughs, reviews, comparisons, status pages, explorers and
-  small tools, each designed for its subject rather than templated. Covers
-  the design direction (palette, type, layout, themes, words), the page forms
-  and how to structure each, how to build them (generator scripts, data
-  files, libraries, page sets), one screenshot look before publishing, and
-  how to hand the user a URL with `viz open` when Claude runs over ssh/tmux
-  and the user reads in a browser on their own machine or in a connected VS
-  Code window. Use whenever you produce a visual artifact or an HTML page, or
+  Build, check and publish visual pages: charts, diagrams, dashboards,
+  reports, explainers, walkthroughs, reviews, status pages and small tools,
+  each designed for its subject rather than templated. Covers the design
+  direction (palette, type, layout, themes, words), the page forms, the
+  formats (html, and pdf printed from a page), how to build them (generators,
+  data, libraries, page sets, live pages), one look with `viz look`, handing
+  the user a URL with `viz open` when Claude runs over ssh/tmux, and
+  publishing to a target under its rules (`viz targets`, `viz publish`). Use
+  whenever you produce a visual artifact, an HTML page or a PDF report, or
   when a chart, diagram or page would explain data, results, architecture,
   progress or a decision better than text. Pair with the dataviz skill for
   chart design. TRIGGERS: visualize, chart, plot, graph, diagram, dashboard,
   show me, render, figure, report, page, walkthrough, explainer, write-up,
-  HTML, design.
-allowed-tools: Bash(viz:*)
+  HTML, PDF, publish, design.
+allowed-tools: Bash(viz path:*) Bash(viz look:*) Bash(viz open:*) Bash(viz bundle:*) Bash(viz targets:*) Bash(viz status:*)
 ---
 
 # Visual pages over ssh
 
-You build pages people read, scan or operate. The user's terminal cannot show
-them: you write a file, `viz` serves it, and the user opens the URL in the
-browser on their own machine through an ssh port forward. Every page is
-designed for its subject and audience; a status memo gets the same care as a
-showcase, in a quieter treatment.
+You build pages people read, scan or operate. The user's terminal cannot show them: you write a
+draft, `viz` serves it, and the user opens the URL in the browser on their own machine through
+an ssh port forward. When the page should reach anyone else, you publish it to a target. Every
+page is designed for its subject and audience; a status memo gets the same care as a showcase,
+in a quieter treatment.
+
+A page has three parts that change independently:
+
+- **Content and design**: what it says and how it looks, whatever the format.
+- **Format**: html (the default) or pdf, how each is built, checked and made portable.
+- **Target**: where it goes and who sees it: `preview` (the user's own browser), `file`, `live`,
+  or one configured on this machine. `viz targets` lists them with their rules.
 
 ## Before writing, read
 
-- [references/design.md](references/design.md) for every page: the direction, the plan in
-  `:root` tokens, the generic looks to steer away from, type, color and both themes, layout,
-  words, and the quality floor.
+- [references/design.md](references/design.md) for every page: the direction, the plan, the
+  generic looks to steer away from, type, color and both themes, layout, words, and the quality
+  floor.
 - [references/forms.md](references/forms.md) to pick the page's form (an answer, a walkthrough,
   a review, a comparison, a status page, a dashboard, an explorer, a tool, a figure study, a set
   of pages) and what each opens with.
+- [references/formats/](references/formats/README.md) for the format:
+  [html.md](references/formats/html.md) for every html page (tokens, themes, fonts, what keeps
+  it portable); [pdf.md](references/formats/pdf.md) when the page will be printed or handed
+  over as a pdf.
 - [references/diagrams.md](references/diagrams.md) for any diagram: draw the mechanism, label
   the arrows, inline SVG.
 - [references/building.md](references/building.md) when the page has a generator, data files,
-  a library, several pages, or lives outside `~/viz`.
+  a library, several pages, stays live, or lives outside `~/viz`.
 - The dataviz skill for any chart: form, color, marks, interaction.
 
 ## Work the brief
 
-1. **Read it.** Name the subject, the reader and the page's one job. Pick the form and the
-   treatment: utilitarian (most pages), editorial (something kept or shared), or instrument
-   (scanned and operated). The user's words come first, then their project's design system, then
-   your choices.
-2. **Plan.** Write the plan as the `:root` block at the top of the page's `<style>`: 4 to 6 named
-   colors, display and body faces, the layout idea as a one-line comment. Check the plan against
-   the generic looks in design.md, and revise any part you would have produced for any similar
-   page.
-3. **Build** from real content and data, never lorem ipsum. Compute numbers in code, not by hand.
-4. **Look once** (below), fix what the look shows, publish.
-5. **Hand over** the URL in one sentence. Unless the user asks about the design, say at most one
-   plain sentence on its direction, with no hex values or font names.
+1. **Read it.** Name the subject, the reader and the page's one job. Pick the form, the format
+   and the treatment: utilitarian (most pages), editorial (something kept or shared), or
+   instrument (scanned and operated). The user's words come first, then their project's design
+   system, then your choices. If the page is for anyone but the user, find out where it is going
+   now (`viz targets`, below): the target's audience and rules shape what the page may say.
+2. **Plan.** Write the plan down first (in html, the `:root` block at the top of the page's
+   `<style>`): 4 to 6 named colors, display and body faces, the layout idea as a one-line
+   comment. Check the plan against the generic looks in design.md, and revise any part you would
+   have produced for any similar page.
+3. **Draft** with `viz path` (below), from real content and data, never lorem ipsum. Compute
+   numbers in code, not by hand.
+4. **Look once** with `viz look` (below), fix what the look shows.
+5. **Hand over** the URL in one sentence, and publish if the user asked for more than a look.
+   Unless the user asks about the design, say at most one plain sentence on its direction, with
+   no hex values or font names.
 
-## Deliver with viz
+## Draft with viz path
 
 1. `viz path NAME.html` makes the folder `~/viz/<today>/NAME/` with a `page.toml` manifest and
-   prints `.../NAME/index.html` (`viz path NAME.pdf` prints `.../NAME/NAME.pdf`). Fill in the
-   manifest's `title`, `summary` and `source.generator`. Use the project's own directory instead
-   when the user wants the page there.
-2. Keep the source beside the output (`NAME.py`, its data) so the page can be rebuilt and edited.
-3. Render, look once, then `viz open PATH`. It prints a URL such as
-   `http://127.0.0.1:23526/2026-10-27/report/index.html`; pass it on, without describing the page at
-   length. If it adds that no browser has reached viz yet, tell the user to press Ctrl+Alt+P in
-   WezTerm, which forwards the port, and to run `viz open PATH` in their own terminal, which
-   opens the page signed in (without WezTerm: `viz status` for the ssh forward, `viz login` to
-   sign in).
-4. On revision, rewrite the same file. An open page reloads by itself when the page or anything
-   it loaded changes: CSS, scripts, images, and data it fetched. There is no need to open it
-   again.
+   prints `.../NAME/index.html`. `viz path NAME.pdf` prints `.../NAME/NAME.pdf`; `viz path NAME`
+   makes the folder alone, for a set of pages. `--title`, `--kind` (the form) and `--project`
+   fill the manifest on the way. Use the project's own directory instead when the user wants the
+   page there (building.md).
+2. Fill in the manifest: `title` (the page's name, design.md), `summary` (one or two sentences
+   on what it shows), `kind`, `audience` (who it is for, in words), and under `[source]`,
+   `generator` (the command that rebuilds the page, or "by hand"). `project` is viz's guess,
+   the repository's name (or one from config): correct it to the name the page's readers know,
+   since it is published with the page. viz has filled in the date, the directory, repository
+   and commit it ran in, and the host and session; leave those. viz never rewrites the file, and
+   publishing appends `[[published]]` records at its end: leave them too.
+3. Keep the source beside the output (`build.py`, its data) so the page can be rebuilt and
+   edited.
 
 ## Look once
 
-Take one look at the rendered page before publishing, with the script beside this file (this
-skill's base directory, `scripts/shoot.py`):
+Take one look at the rendered page before handing it over:
 
 ```sh
-uv run --no-project --with playwright python SKILL_DIR/scripts/shoot.py PAGE.html
+viz look PAGE              # PAGE: the folder, its page.toml, or the html or svg file
 ```
 
-It writes light and dark screenshots to `.shots/` beside the page (hidden, so viz neither lists
-nor serves them), prints their paths, and lists what broke: script errors, files that failed to
-load, hosts the page needs the network for, sideways scroll. Read the PNGs, then fix what they
-and the list show in one pass. Options: `--phone` adds a 390 px shot, `--full` the whole page,
-`--selector figure` one element, `--ready CSS` waits for an app that builds itself late, `--js`
-sets up a state (a tab, an open panel) first, `--root DIR` serves a page set from its top.
+It writes light and dark screenshots to `.shots/` in the page's folder (hidden, so viz neither
+lists, serves nor publishes them), prints their paths, and lists what broke: script errors,
+files that failed to load, hosts the page needs the network for, sideways scroll. Read the PNGs,
+then fix what they and the list show in one pass. Options: `--phone` adds a 390 px shot,
+`--full` the whole page, `--selector figure` one element, `--ready CSS` waits for an app that
+builds itself late, `--js CODE` sets up a state (a tab, an open panel) first, `--theme light`
+one theme. `--portable` looks at the page's portable form instead, with the network blocked:
+what a teammate will see once it is published.
+
+`viz look` shoots the page's entry (`index.html` for `viz path NAME.html`). For now it has two
+limits with several pages: in a folder from `viz path NAME.html`, naming another page still
+shoots `index.html`; in a set from `viz path NAME`, it shoots the page you name, but every
+page's shots have the set's name, so each look overwrites the last (read the PNGs before the
+next look). A pdf it cannot shoot: read its page one instead (formats/pdf.md).
 
 The look is one run, not a loop: no second screenshot, no DOM probes, no re-running a check that
-passed, since the user is waiting for a link. For a page that charts real numbers, spend the
+passed, since the user is waiting for a link. The one extra look allowed is
+`viz look --portable` just before publishing to a target other than `preview` or `live`. For a
+page that charts real numbers, spend the
 look on the chart: its data, scale and labels. A page whose point is logic (dates, money,
 scoring) may also get one run of its pure function. If the user reports something broken, fix
-that, look at most once more, and republish. If the script says Chromium is missing, it prints
-the one-time download; ask the user before running it, or skip the look.
+that, look at most once more, and hand it over again. `viz look` runs Chromium through
+Playwright under `uv`; if it says Chromium is missing, it prints the one-time download: ask the
+user before running it, or skip the look.
+
+## Hand over in the user's browser
+
+`viz open PATH` (the same as `viz publish PATH --to preview`) prints a URL such as
+`http://127.0.0.1:23526/2026-10-27/report/index.html`; pass it on, without describing the page
+at length.
+If it adds that no browser has reached viz yet, tell the user to press Ctrl+Alt+P in WezTerm,
+which forwards the port, and to run `viz open PATH` in their own terminal, which opens the page
+signed in (without WezTerm: `viz status` for the ssh forward, `viz login` to sign in).
+
+On revision, rewrite the same file. An open page reloads by itself when the page or anything it
+loaded changes: CSS, scripts, images, and data it fetched. There is no need to open it again.
+
+## Publish to a target
+
+Only the user's account sees a draft. Publishing copies the page's portable form somewhere
+others may see it, or (for `live`) registers a command that runs on a schedule, so publish only
+when the user asks for it, to the target they name or agree to.
+
+1. **Read the targets.** `viz targets` lists each target with who sees what is published there;
+   `viz targets NAME` shows its audience, the formats it takes and how to use it, and for a
+   configured target also its rules in full, whether a page may load from the network, the
+   `[source]` fields it keeps and the fields it requires. Follow the rules: what may go there,
+   what may not, who to ask. If the page breaks one, or no target fits the audience, say so
+   instead of publishing.
+2. **Check the page.** The manifest needs `title`, `summary` and `source.generator`, plus any
+   field the target requires. `viz bundle PAGE` makes the portable form and lists every problem
+   (outside loads, unpinned libraries, broken links) as if no target allowed the network; fix
+   each in the page (formats/html.md). `viz look --portable PAGE` shows what the reader will see.
+3. **Dry run, then publish.**
+
+   ```sh
+   viz publish PAGE --to NAME --dry-run   # the place, URL, files and published manifest
+   viz publish PAGE --to NAME             # prints the URL or the path
+   ```
+
+   The dry run is the check that follows the target: its network setting, its required fields.
+   Read the manifest it prints against the target's audience. Only `[source]` is filtered:
+   `title`, `summary`, `project`, `audience` and `[[links]]` go out as they are, so a private
+   name or an internal link in them reaches everyone the target reaches. Put values meant for
+   one target in a `[to.NAME]` table in `page.toml`, which overrides the draft's fields for that
+   target only.
+
+   `--format pdf` publishes the html page printed to pdf (formats/pdf.md); `--set KEY=VALUE`
+   sets a field of the published manifest only; `--as SLUG` picks a new place, since a republish
+   to the same target reuses the last one, so its address never moves. The published copy keeps
+   only the `[source]` fields the target allows: local paths, the host and the session stay in
+   the draft.
+4. **Hand over** the URL or path it printed, and what the target is ("published to NAME, which
+   ... can see").
+
+The built-in targets:
+
+| Target | Who sees it | |
+|---|---|---|
+| `preview` | the user, in their browser | `viz open PAGE`; nothing is copied |
+| `file` | whoever the file is handed to | `--out PATH`: a folder, or one `FILE.pdf` with `--format pdf` |
+| `live` | the user, at a fixed address | a page a collector keeps current (building.md, Live pages) |
+
+A configured target of the `git` type commits the page into a checkout of a repository a static
+host serves. Its `push` setting decides the rest: `auto` pushes; `never` leaves the commit for
+the user to push; `ask` asks at a terminal, and from your shell, which is not one, it commits and
+stops. Then tell the user that the commit waits and that `viz publish --to NAME --push`, run in
+their own terminal, shows it and asks. Never answer that question for them, by a pseudo-terminal
+or otherwise.
 
 ## Pick the format
 
 | Content | Format | Opens in |
 |---|---|---|
 | Page of any form: report, explainer, review, dashboard, tool | Self-contained `.html` | Browser |
-| Several related pages | A directory with `index.html` and relative links (building.md) | Browser; `viz open DIR` |
+| Several related pages | A folder with `index.html` and relative links (building.md) | Browser; `viz open DIR` |
+| A page that stays current | `.html` published to `live`, rewritten by a collector (building.md) | Browser, at one address |
+| Something printed, attached or filed | `.html` printed to pdf (formats/pdf.md) | Browser; any PDF reader |
 | Interactive chart | Plotly or hand-written SVG/Canvas in `.html` | Browser |
 | Static chart | `.svg` (or `.png` for dense rasters) | Browser (PNG: VS Code tab when connected) |
 | Architecture, flow, sequence, state | Inline SVG in an `.html` page (diagrams.md); Mermaid `.md` only when asked | Browser; Mermaid in VS Code |
 | Exploratory analysis with code and output | Executed `.ipynb` | VS Code notebook |
 
 Default to interactive HTML: hover, zoom, filters and deep links are the point of this setup,
-and the browser works without VS Code.
+and the browser works without VS Code. A format with no guide yet (pptx, Typst, LaTeX) is still
+a page: formats/README.md says what viz does with it.
 
 ## Render without installing anything
 
@@ -129,13 +221,24 @@ uv run --no-project --with jupyter --with plotly jupyter nbconvert --to notebook
 
 ## Boundaries
 
-- **Self-contained.** A page works through the forward without the internet: inline CSS and JS,
-  vendor large libraries beside the page, and only then a pinned CDN, telling the user the page
-  needs the network (building.md). Web fonts may be linked, always with a real fallback stack.
+- **Self-contained.** A draft works through the forward without the internet: inline CSS and
+  JS, vendor large libraries beside the page, and only then a pinned CDN, telling the user the
+  draft needs the network (building.md). Web fonts may be linked, always with a real fallback
+  stack. Publishing downloads fonts and pinned libraries into the page and refuses anything else
+  from outside (formats/html.md).
+- **Publishing is a command, and only on the user's word.** Run `viz targets NAME` and follow
+  its rules every time; never publish a draft to a shared target because it would be
+  convenient, never use `--set` or an edited manifest to get round a target's requirement, and
+  never push for the user where the target says `ask` or `never`. The viz server never
+  publishes: no page can. This skill does not pre-approve `viz publish`, `viz login`,
+  `viz stop` or `viz collect`, so each asks for permission when you run it.
+- **A live page only on the user's word, too.** `viz publish --to live` registers a command
+  that runs every interval, in the background, until someone removes it. Offer it; register it
+  when the user agrees. Leave starting `viz-collect` or running `viz collect` to the user.
 - Never run `viz login` or paste its link into your output: the link signs a browser in. The
   user runs it, or `viz open` in their terminal. Leave `forwards toggle` and `forwards close` to
   the user too: they close their tunnel. Your `viz open` only prints the URL; it, `viz status`,
-  `forwards` and `forwards status` print nothing secret.
+  `viz targets`, `forwards` and `forwards status` print nothing secret.
 - Never run `viz stop`: the server is the account's, shared by every session, and stopping it
   signs the user's browser out. If `viz open` says the running server "has another VIZ_DIR or
   secret", report it to the user and give the file's path; do not stop the server or change its

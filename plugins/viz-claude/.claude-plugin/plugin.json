@@ -1,7 +1,7 @@
 {
   "name": "viz",
-  "version": "2.0.0",
-  "description": "Skill for building visual pages (charts, diagrams, dashboards, reports, walkthroughs, reviews, tools) designed for their subject, and showing them through bin/viz (dotfiles' browser viewer over an ssh forward). Carries the design, page-form, building and diagram guides and a screenshot script for one look before publishing.",
+  "version": "2.1.0",
+  "description": "Skill for building visual pages (charts, diagrams, dashboards, reports, walkthroughs, reviews, tools) designed for their subject, showing them through bin/viz (dotfiles' browser viewer over an ssh forward) and publishing them to viz targets. Carries the design, page-form, building and diagram guides and one guide per format (html, pdf).",
   "author": { "name": "tafk7", "url": "https://github.com/tafk7" },
   "homepage": "https://github.com/tafk7/dotfiles/tree/main/plugins/viz-claude",
   "repository": "https://github.com/tafk7/dotfiles",
