@@ -5,7 +5,7 @@ repository's (`--name`, `--scenarios`), which uses this file as its plumbing.
     python3 tests/containers/run.py --list
     python3 tests/containers/run.py --out DIR [--only NAME…] [--slow] [--commit REV] [--baseline REV]
                                     [--claude PATH] [--codex PATH] [--opencode PATH] [--bd PATH] [--keep-images] [--jobs N]
-                                    [--name NAME --scenarios DIR] [--with NAME=PATH[@REV]…]
+                                    [--name NAME --scenarios DIR] [--with NAME=PATH[@REV]…] [--run-id 32-HEX]
 
 Another repository's scenarios run through this file: `--name` names the repository in the results,
 `--scenarios` is its scenario directory, `--repo` its checkout, and `--with` bundles further
@@ -24,6 +24,7 @@ import concurrent.futures
 import datetime
 import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -83,10 +84,18 @@ def run_one(module, make_context, out: Path, scrub=lambda text: text) -> dict:
     return results.scenario_line(name, result, time.monotonic() - started, scrub(detail).splitlines()[0][:300], log_rel)
 
 
+def caller_run_id(value: str) -> str:
+    """A caller's label for scoped cleanup; no shell syntax or path characters."""
+    if not re.fullmatch(r"[0-9a-f]{32}", value):
+        raise argparse.ArgumentTypeError("run id must be 32 lowercase hexadecimal characters")
+    return value
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--run-id", type=caller_run_id, help="caller-owned container/image cleanup label (32 hex)")
     parser.add_argument("--only", nargs="+", default=[])
     parser.add_argument("--slow", action="store_true", help="include the slow scenarios (network installs)")
     parser.add_argument("--repo", type=Path, default=REPO, help="the dotfiles repository (default: this one)")
@@ -128,7 +137,7 @@ def main(argv=None) -> int:
 
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    run_id = uuid.uuid4().hex[:10]
+    run_id = args.run_id or uuid.uuid4().hex[:10]
     binaries = {tool: path.resolve() for tool, path in
                 (("claude", args.claude), ("codex", args.codex), ("opencode", args.opencode), ("bd", args.bd))
                 if path}
