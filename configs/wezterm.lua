@@ -12,7 +12,7 @@ local config = wezterm.config_builder()
 -- This file's revision. With `SendEnv LC_TAFK_WEZTERM` in the Windows ssh
 -- config's Host block, `dotfiles verify` on the host says when this copy is
 -- out of date and needs copying again.
-local CONFIG_REVISION = 'df2957ab948c'
+local CONFIG_REVISION = '4415b660dd7b'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -152,6 +152,120 @@ local function paste_clipboard_image(window, pane)
 end
 
 -- ---------------------------------------------------------------------------
+-- Downloads from the SSH host
+-- ---------------------------------------------------------------------------
+
+-- `dl FILE` on the host (bin/dl) stages a copy as ~/.cache/dl/<id>/<name> and
+-- sets the user variable dl_fetch to "<id>/<name>"; this fetches it with scp
+-- from the tab's SSH host into DL_DEST, never overwriting a file there. Only
+-- that staging folder is fetched from, so output that sets the variable can't
+-- reach any other file. Like the image paste, plain `ssh <host>` must
+-- authenticate without a prompt.
+local DL_DEST = nil -- nil: %USERPROFILE%\Downloads
+local DL_REMOTE_DIR = '.cache/dl' -- relative to remote $HOME; bin/dl's STAGE_REL
+
+local function staged_name(value)
+  local id, name = (value or ''):match('^(%w+)/([%w%._%-]+)$')
+  if not id or name:match('^%.+$') then
+    return nil
+  end
+  return id .. '/' .. name, name
+end
+
+-- DIR\NAME, or DIR\STEM (n).EXT for the first n that is free.
+local function free_path(dir, name)
+  local stem, ext = name:match('^(.+)(%.[^.]+)$')
+  if not stem then
+    stem, ext = name, ''
+  end
+  local path, n = dir .. '\\' .. name, 1
+  while true do
+    local f = io.open(path, 'rb')
+    if not f then
+      return path
+    end
+    f:close()
+    path = string.format('%s\\%s (%d)%s', dir, stem, n, ext)
+    n = n + 1
+  end
+end
+
+local function scp_staged(host, staged, dest)
+  return wezterm.run_child_process {
+    'scp', '-q', '-o', 'BatchMode=yes', host .. ':' .. DL_REMOTE_DIR .. '/' .. staged, dest,
+  }
+end
+
+local function download_staged(window, pane, value)
+  local staged, name = staged_name(value)
+  if not staged then
+    return
+  end
+  local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
+  if not host then
+    return window:toast_notification('dl', 'No SSH host for this tab (set PASTE_FALLBACK_HOST).', nil, 5000)
+  end
+  local dest = free_path(DL_DEST or (os.getenv('USERPROFILE') .. '\\Downloads'), name)
+  local ok, _, err = scp_staged(host, staged, dest)
+  if ok then
+    window:toast_notification('dl', 'Saved ' .. dest, nil, 5000)
+  else
+    window:toast_notification('dl', 'Download from ' .. host .. ' failed: ' .. (err or ''):gsub('%s+$', ''), nil, 8000)
+  end
+end
+
+-- Command palette: replace this file with the SSH host's configs/wezterm.lua
+-- (`dl --wezterm-config` there stages it). The previous copy is kept as .bak,
+-- and WezTerm reloads the new one by itself.
+local function update_config_from_host(window, pane)
+  local function say(msg)
+    window:toast_notification('WezTerm config', msg, nil, 8000)
+  end
+  local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
+  if not host then
+    return say('No SSH host for this tab (set PASTE_FALLBACK_HOST).')
+  end
+  local ok, out, err = wezterm.run_child_process {
+    'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host, 'bash -lc "dl --wezterm-config"',
+  }
+  -- A login shell may print first; the staged name is the last line.
+  local staged = staged_name((out or ''):match('([^\r\n]+)[\r\n]*$'))
+  if not ok or not staged then
+    return say('Could not stage it on ' .. host .. ': ' .. (err or ''):gsub('%s+$', ''))
+  end
+  local target = wezterm.config_file
+  local new, bak = target .. '.new', target .. '.bak'
+  ok, _, err = scp_staged(host, staged, new)
+  local f = ok and io.open(new, 'rb')
+  local text = f and f:read('a') or ''
+  if f then
+    f:close()
+  end
+  local revision = text:match("\nlocal CONFIG_REVISION = '(%x+)'\n")
+  if not revision then
+    os.remove(new)
+    if not ok then
+      return say('Download from ' .. host .. ' failed: ' .. (err or ''):gsub('%s+$', ''))
+    end
+    return say('The file from ' .. host .. ' has no CONFIG_REVISION stamp; kept the current one.')
+  end
+  if revision == CONFIG_REVISION then
+    os.remove(new)
+    return say('Already current (' .. revision .. ').')
+  end
+  os.remove(bak)
+  if not os.rename(target, bak) then
+    os.remove(new)
+    return say('Could not move the current config aside to ' .. bak .. '.')
+  end
+  if not os.rename(new, target) then
+    os.rename(bak, target)
+    return say('Could not put the new config in place; kept the current one.')
+  end
+  say('Updated ' .. CONFIG_REVISION .. ' -> ' .. revision .. '; the previous copy is ' .. bak .. '.')
+end
+
+-- ---------------------------------------------------------------------------
 -- Port forwards for the remote shell tools
 -- ---------------------------------------------------------------------------
 
@@ -244,6 +358,9 @@ end
 -- set one, so WezTerm builds the URL itself, from a port Ctrl+Alt+P forwards
 -- and a path of URL characters only.
 wezterm.on('user-var-changed', function(window, pane, name, value)
+  if name == 'dl_fetch' then
+    return download_staged(window, pane, value)
+  end
   if name ~= 'viz_open' then
     return
   end
@@ -266,6 +383,7 @@ end)
 wezterm.on('augment-command-palette', function()
   return {
     { brief = 'Toggle the port forwards for shell tools (Ctrl+Alt+P)', action = wezterm.action_callback(forward_shell_tools) },
+    { brief = "Update this WezTerm config from the tab's SSH host", action = wezterm.action_callback(update_config_from_host) },
   }
 end)
 

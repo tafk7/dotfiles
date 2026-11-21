@@ -1,0 +1,117 @@
+#!/bin/bash
+# Download files from this machine to the computer you SSH in from, through WezTerm.
+#
+# Usage: dl FILE...             send each FILE to WezTerm's Downloads folder
+#        dl --print FILE        stage FILE and print its staged name only
+#        dl --wezterm-config    stage this checkout's configs/wezterm.lua and
+#                               print its staged name (WezTerm's own "Update
+#                               this WezTerm config" command runs this)
+#
+# The host can't reach the laptop, so the laptop fetches: dl copies each file to
+# a private ~/.cache/dl/<id>/<name> and sets the terminal user variable dl_fetch
+# to "<id>/<name>" (OSC 1337 SetUserVar, wrapped for tmux's passthrough).
+# WezTerm (configs/wezterm.lua) then runs `scp <the tab's ssh host>:.cache/dl/
+# <id>/<name>` into Downloads, without overwriting a file there. WezTerm fetches
+# only from that folder, so output that sets the variable by accident or design
+# can't reach any other file. Staged copies are pruned after a day.
+#
+# A relative FILE is looked up in the current directory, then in each directory
+# of DL_PATH (colon-separated, like PATH; set it in ~/.shell.env), e.g.
+#   export DL_PATH="$HOME/dotfiles"     # dl configs/wezterm.lua, from anywhere
+#
+# Outside WezTerm nothing arrives; the printed scp command fetches it instead.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STAGE_REL=".cache/dl"   # relative to $HOME: configs/wezterm.lua names it too
+STAGE="$HOME/$STAGE_REL"
+KEEP_MINUTES=1440
+
+die() { echo "dl: $*" >&2; exit 1; }
+
+usage() { sed -n '2,8s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; }
+
+# The file a FILE argument names: as given if absolute or found from here,
+# else the first DL_PATH directory that has it.
+resolve() {
+    local arg="$1" dir
+    if [[ "$arg" == /* || -e "$arg" ]]; then
+        printf '%s\n' "$arg"
+        return 0
+    fi
+    local -a dirs=()
+    IFS=: read -r -a dirs <<< "${DL_PATH:-}"
+    for dir in "${dirs[@]}"; do
+        [[ -n "$dir" && -e "$dir/$arg" ]] && { printf '%s\n' "$dir/$arg"; return 0; }
+    done
+    die "$arg: not found here${DL_PATH:+ or in DL_PATH ($DL_PATH)}"
+}
+
+# A name Windows and the WezTerm side accept: [A-Za-z0-9._-], no trailing dot.
+safe_name() {
+    local name="${1##*/}"
+    name="${name//[^A-Za-z0-9._-]/_}"
+    while [[ "$name" == *. ]]; do name="${name%.}"; done
+    [[ -n "$name" ]] || name='file'
+    printf '%s\n' "$name"
+}
+
+# Copy FILE into a fresh private directory; print "<id>/<name>".
+stage() {
+    local file="$1" dir name
+    [[ -f "$file" ]] || die "$file: not a regular file"
+    [[ -r "$file" ]] || die "$file: not readable"
+    umask 077
+    mkdir -p "$STAGE"
+    find "$STAGE" -mindepth 1 -maxdepth 1 -type d -mmin +"$KEEP_MINUTES" -exec rm -rf {} + 2>/dev/null || true
+    dir="$(mktemp -d "$STAGE/XXXXXXXXXXXX")"
+    name="$(safe_name "$file")"
+    cp -- "$file" "$dir/$name"
+    printf '%s/%s\n' "${dir##*/}" "$name"
+}
+
+# Ask the terminal's WezTerm to fetch STAGED. To the terminal itself when there
+# is one, so dl's stdout stays clean for pipes.
+signal() {
+    local value sequence out=/dev/stdout
+    value="$(printf '%s' "$1" | base64 | tr -d '\n')"
+    sequence=$'\e]1337;SetUserVar=dl_fetch='"$value"$'\a'
+    if [[ -n "${TMUX:-}" ]]; then
+        sequence=$'\ePtmux;'"${sequence//$'\e'/$'\e\e'}"$'\e\\'
+    fi
+    { : > /dev/tty; } 2>/dev/null && out=/dev/tty
+    printf '%s' "$sequence" > "$out"
+}
+
+human_size() {
+    local bytes
+    bytes="$(stat -c %s -- "$1")"
+    numfmt --to=iec --suffix=B "$bytes" 2>/dev/null || printf '%sB\n' "$bytes"
+}
+
+case "${1:-}" in
+    ''|-h|--help)
+        usage
+        [[ -n "${1:-}" ]] || exit 2
+        exit 0
+        ;;
+    --print)
+        [[ $# -eq 2 ]] || die "usage: dl --print FILE"
+        stage "$(resolve "$2")"
+        exit 0
+        ;;
+    --wezterm-config)
+        stage "$SCRIPT_DIR/../configs/wezterm.lua"
+        exit 0
+        ;;
+esac
+
+host="$(hostname -s 2>/dev/null || hostname)"
+for arg in "$@"; do
+    file="$(resolve "$arg")"
+    staged="$(stage "$file")"
+    signal "$staged"
+    echo "dl: sent ${staged#*/} ($(human_size "$file")) to WezTerm's Downloads; without WezTerm: scp $host:$STAGE_REL/$staged ." >&2
+    # One fetch at a time reads more clearly in WezTerm's notifications.
+    [[ "$arg" == "${*: -1}" ]] || sleep 0.2
+done
