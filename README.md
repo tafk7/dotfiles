@@ -129,21 +129,17 @@ yo <command>              # print output and copy it to the clipboard
   `Alt+Paste` pastes the tmux buffer. Every copy, including nvim yanks and
   shell cuts, also goes to the client clipboard over OSC 52 (up to 64 KiB);
   `<prefix> e` sends the newest buffer again. `<prefix> v` enters copy mode on
-  the screen as it is, and ScrollLock or `<prefix> f` reviews a
-  pane in copy mode with the same keys everywhere: a shell's history in place,
-  and the conversation of Claude, Codex, or OpenCode, as the agent exports it,
-  in a pane zoomed over the agent, which keeps working. In review, E/S/D/F
-  move, Shift selects as it does in a Windows text box, `h` toggles a
-  selection, Ctrl+E/D jump between prompts, `/` searches upward, `y` copies,
-  and `o` opens the text in nvim with the same keys. `<prefix> /`
-  reviews and searches at once; `<prefix> o` opens the conversation in nvim.
-  Codex panes name their session once Codex runs with the `terminal_title`
-  from `configs/codex.defaults.toml`. `<prefix> y` or Shift+Copy copies the
+  the screen as it is. In copy mode, E/S/D/F move, Shift selects as it does in
+  a Windows text box, `h` toggles a selection, Ctrl+E/D jump between a shell's
+  prompts, `/` searches upward, and `y` copies. Review (ScrollLock,
+  `<prefix> f`, `<prefix> /`, `<prefix> o`: an agent's whole conversation in
+  copy mode or nvim) is off; [issues/review-mode.md](issues/review-mode.md)
+  says why and how to turn it back on. `<prefix> y` or Shift+Copy copies the
   agent's last reply.
   The wheel and PgUp/PgDn page less (`glow -p`, `md`, bat, Git) and Claude's
   transcript. Shift+PgUp/PgDn scroll three lines everywhere: a shell (in
-  copy-mode), review and its nvim popup, and Claude, Codex, and OpenCode,
-  also from their compose pane (`@scroll-lines` sets the step).
+  copy-mode), and Claude, Codex, and OpenCode, also from their compose pane
+  (`@scroll-lines` sets the step).
   In Claude, `Ctrl+C` sends Esc, so it can't stop every background agent;
   `<prefix> Ctrl+C` sends the real key. Ctrl+Backspace/Delete delete a word
   and Alt+Backspace/Delete to the line's start or end there too, as in the

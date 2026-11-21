@@ -40,7 +40,7 @@ tmux│Alt+S / Alt+F│Move left / right between panes; at the edge, the previou
 tmux│Alt+Shift+S / Alt+Shift+F│First / last window│select-window -t {start} / {end}
 tmux│Alt+arrows│Same as Alt+ESDF (laptop)│select-pane or previous/next-window
 tmux│PgUp│Shell pane: copy mode a page up (exits at the bottom); apps scroll themselves│copy-mode -eu / send-keys PPage
-tmux│Shift+PgUp / Shift+PgDn│Scroll a few lines anywhere: shells, review, Claude, Codex, OpenCode, a compose pane's agent│bin/tmux-scroll (@scroll-lines, default 3)
+tmux│Shift+PgUp / Shift+PgDn│Scroll a few lines anywhere: shells, Claude, Codex, OpenCode, a compose pane's agent│bin/tmux-scroll (@scroll-lines, default 3)
 tmux│Ctrl+Home│Shell pane: copy mode at the top of history; apps get the key│copy-mode -e; history-top / send-keys C-Home
 tmux│Alt+1-0│Jump to window by number (no prefix)│select-window -t N
 tmux│Alt+Shift+W│Window picker tree view│choose-tree -Zw
@@ -93,23 +93,19 @@ tmux│Ctrl+a s│Session chooser tree view│choose-tree -Zs
 tmux│Ctrl+a d│Detach (session keeps running in background)│detach-client
 tmux│Ctrl+a ) / (│Next/previous session│switch-client -n/-p
 tmux│Ctrl+a $│Rename current session│command-prompt rename-session
-# Review (copy mode, vi keys)
+# Copy mode (vi keys). Review (ScrollLock, Ctrl+a f / / / o) is off: issues/review-mode.md
 tmux│Ctrl+a v│Copy mode on what the pane shows now (in an agent: the live screen and prompt)│copy-mode / cancel
-tmux│ScrollLock / Ctrl+a f│Review the pane in copy mode: a shell's history in place; an agent's conversation (Claude, Codex, OpenCode) in a review pane zoomed over it│Shift+F5 (firmware F17) → bin/tmux-review toggle
-tmux│Shift+ScrollLock / Ctrl+a /│Review the pane and search upward at once│bin/tmux-review search
-tmux│Ctrl+a o│Open the agent's conversation or the pane's history read-only in an nvim popup with review's keys (q closes)│bin/tmux-review edit
-tmux│e / s / d / f (and arrows)│Review: move up / left / down / right; drops a selection Shift started│cursor-up/-left/-down/-right
-tmux│E / S / D / F (and Shift+arrows)│Review: select as you move, as Shift does in a Windows text box│begin-selection; cursor-*
-tmux│Ctrl+Shift+E/S/D/F, Shift+Home/End, Ctrl+Shift+Home/End│Review: select by prompt or word, to the line's ends, to the history's ends│begin-selection; previous-prompt, previous-word, history-top, …
-tmux│Ctrl+s / Ctrl+f (and Ctrl+←/→)│Review: word left / right│previous-word / next-word-end
-tmux│Ctrl+e / Ctrl+d (and Ctrl+↑/↓)│Review: previous / next prompt (shell and review-pane OSC 133 marks)│previous-prompt / next-prompt
-tmux│Home / End│Review: start / end of the line│start-of-line / end-of-line
-tmux│PgUp / PgDn│Review: page up / down│page-up / page-down
-tmux│Ctrl+Home / Ctrl+End│Review: top / bottom of history│history-top / history-bottom
-tmux│/ and ? then n / N│Review: incremental search up / down, then next / previous result│search-backward-incremental / search-forward-incremental
-tmux│o│Review: open what review shows read-only in an nvim popup at this line, with review's keys (q closes)│bin/tmux-review open
-tmux│h│Review: toggle a selection that plain moves extend; h or Esc ends it│begin-selection / clear-selection (@select-toggle)
-tmux│Click (review)│Put the copy-mode cursor where you click, ready for Shift+E/S/D/F│send -X clear-selection
+tmux│e / s / d / f (and arrows)│Copy mode: move up / left / down / right; drops a selection Shift started│cursor-up/-left/-down/-right
+tmux│E / S / D / F (and Shift+arrows)│Copy mode: select as you move, as Shift does in a Windows text box│begin-selection; cursor-*
+tmux│Ctrl+Shift+E/S/D/F, Shift+Home/End, Ctrl+Shift+Home/End│Copy mode: select by prompt or word, to the line's ends, to the history's ends│begin-selection; previous-prompt, previous-word, history-top, …
+tmux│Ctrl+s / Ctrl+f (and Ctrl+←/→)│Copy mode: word left / right│previous-word / next-word-end
+tmux│Ctrl+e / Ctrl+d (and Ctrl+↑/↓)│Copy mode: previous / next prompt (the shell's OSC 133 marks)│previous-prompt / next-prompt
+tmux│Home / End│Copy mode: start / end of the line│start-of-line / end-of-line
+tmux│PgUp / PgDn│Copy mode: page up / down│page-up / page-down
+tmux│Ctrl+Home / Ctrl+End│Copy mode: top / bottom of history│history-top / history-bottom
+tmux│/ and ? then n / N│Copy mode: incremental search up / down, then next / previous result│search-backward-incremental / search-forward-incremental
+tmux│h│Copy mode: toggle a selection that plain moves extend; h or Esc ends it│begin-selection / clear-selection (@select-toggle)
+tmux│Click (copy mode)│Put the copy-mode cursor where you click, ready for Shift+E/S/D/F│send -X clear-selection
 tmux│Esc / q│Clear an active selection, otherwise exit / always exit transcript view│clear-selection or cancel / cancel
 tmux│Alt+Copy / y│Enter copy mode or copy the selection to the tmux buffer and clipboard│C-M-Insert / copy-pipe
 tmux│Copy│Copy the copy-mode selection to the tmux buffer and clipboard; in Claude and Codex, their own selection│C-Insert (WezTerm forwards it without a selection); Claude gets Ctrl+Shift+C, Codex the key itself
@@ -155,7 +151,7 @@ vim│,hu│Undo git hunk under cursor│:GitGutterUndoHunk
 vim│jk│Exit insert mode│imap jk <Esc>
 vim│Alt+Backspace / Alt+Delete│Insert and command line: delete to the start / end of the line, as in the shells│<C-u> / setline
 vim│Ctrl+Backspace / Ctrl+Delete│Insert mode: delete a word back / forward, as in the shells and agents│<C-w> / kill-word
-vim│Shift+PgUp / Shift+PgDn│Scroll a few lines (tmux @scroll-lines, default 3), as in tmux and review│<C-y> / <C-e>
+vim│Shift+PgUp / Shift+PgDn│Scroll a few lines (tmux @scroll-lines, default 3), as in tmux│<C-y> / <C-e>
 vim│Ctrl+Z│Undo in insert, normal, and visual mode (visual leaves the selection)│u
 vim│,/│Toggle comment on line/selection│:Commentary
 vim│gc│Comment out motion (e.g. gcap for paragraph)│gc{motion}

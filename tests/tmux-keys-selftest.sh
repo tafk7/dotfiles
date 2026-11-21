@@ -1,6 +1,6 @@
 #!/bin/bash
 # The raw-key harness against the bindings it was built for: the Copy key in
-# copy-mode, in Claude, in Codex, and in a shell; the review key; Break.
+# copy-mode, in Claude, in Codex, and in a shell; the review key (off); Break.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
@@ -65,17 +65,18 @@ tk_raw "${COPY}x"
 tk_until grep -q x "$app_log" || fail "app stub got no input"
 assert_eq "$(tk_input "$app_log")" 'x' "Copy key outside Claude"
 
-# The review key toggles copy-mode from either side.
+# The review key, while review is off (configs/tmux-review.conf): tmux takes it
+# and says so, and it neither enters copy-mode nor reaches the app.
 tk_raw "$REVIEW"
-tk_wait '#{pane_in_mode}' 1
-tk_raw "$REVIEW"
-tk_wait '#{pane_in_mode}' 0
-assert_eq "$(tk_input "$app_log")" 'x' "review key leaked to the app"
+tk_raw 'z'
+tk_until grep -q z "$app_log" || fail "app stub got no input"
+assert_eq "$(ti display-message -p '#{pane_in_mode}')" 0 "review key entered copy-mode"
+assert_eq "$(tk_input "$app_log")" 'xz' "review key leaked to the app"
 
 # Break (Pause, as WezTerm sends it) reaches a program that isn't an agent as
 # Ctrl+C, not as its own sequence.
 tk_raw "${BREAK}y"
 tk_until grep -q y "$app_log" || fail "app stub got no input"
-assert_eq "$(tk_input "$app_log")" 'x^Cy' "Break in a program that isn't an agent"
+assert_eq "$(tk_input "$app_log")" 'xz^Cy' "Break in a program that isn't an agent"
 
 printf 'tmux-keys-selftest: ok\n'

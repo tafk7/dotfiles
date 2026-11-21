@@ -2,7 +2,8 @@
 # Review (ScrollLock, prefix+f): a shell's history in place; an agent's
 # conversation, as the agent exports it, in a review pane zoomed over the agent;
 # the review key table; prefix+/ (review and search) and prefix+o and o (the
-# nvim popup).
+# nvim popup). Review is off by default (configs/tmux-review.conf, not sourced
+# by configs/tmux.conf); this test turns it on to keep bin/tmux-review working.
 set -euo pipefail
 # shellcheck source=tests/lib/tmux-keys.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/tmux-keys.sh"
@@ -11,6 +12,7 @@ REVIEW='\e[15;2~'
 PREFIX='\001'
 
 tk_start
+ti source-file "$TK_CHECKOUT/configs/tmux-review.conf"
 history_count() { ti capture-pane -p -S - -E - -t "$1" | grep -c -- "$2" || true; }
 no_review_files() { ! compgen -G "$TMPDIR/tmux-review.*" >/dev/null; }
 no_claude_files() { ! compgen -G "$TMPDIR/cc-transcript-*" >/dev/null; }

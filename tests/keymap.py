@@ -113,7 +113,7 @@ class Build(unittest.TestCase):
         self.assertEqual(t['ctrl+c']['claude']['delivered'], 'esc')  # tmux's Claude rule
         self.assertEqual(t['ctrl+c']['shell']['delivered'], 'ctrl+c')
         self.assertEqual(t['super+h']['shell']['hops'][0][0], 'windows')
-        self.assertEqual(t['scrolllock']['shell']['effects'][0][:2], ['tmux', 'review'])
+        self.assertEqual(t['scrolllock']['shell']['effects'][0][:2], ['tmux', 'info'])  # review is off (configs/tmux-review.conf)
         self.assertEqual(t['pause']['claude']['delivered'], 'esc')  # Break stops an agent's turn
         self.assertEqual(t['pause']['shell']['delivered'], 'ctrl+c')
 

@@ -12,7 +12,7 @@ local config = wezterm.config_builder()
 -- This file's revision. With `SendEnv LC_TAFK_WEZTERM` in the Windows ssh
 -- config's Host block, `dotfiles verify` on the host says when this copy is
 -- out of date and needs copying again.
-local CONFIG_REVISION = '4415b660dd7b'
+local CONFIG_REVISION = '1a74981e9501'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -544,8 +544,9 @@ config.keys = {
   },
 
   -- ScrollLock and Pause, by Windows key code (WezTerm has no names for them).
-  -- ScrollLock reviews the pane (Shift+F5 to tmux), with Shift reviews and
-  -- searches (Shift+F7); Pause, the Break key, stops whatever runs (Shift+F9).
+  -- ScrollLock is tmux's review key (Shift+F5; with Shift, Shift+F7), off for
+  -- now (configs/tmux-review.conf); Pause, the Break key, stops whatever runs
+  -- (Shift+F9).
   -- Shift+F keys, clear of the Shift+F1-F4 cut transport above.
   {
     key = 'raw:145',

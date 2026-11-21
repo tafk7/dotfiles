@@ -41,6 +41,9 @@ note's own **Status** line is the authority; this index is updated with it.
 
 ## Parked
 
+- [Review mode](review-mode.md): turned off 2026-11-20 (laggy, unreliable);
+  its keys are in `configs/tmux-review.conf`, unsourced. Measure the lag, then
+  fix or remove it.
 - [Compose AI cleanup](compose-ai-cleanup.md): could reuse Alt+I's model
   plumbing (`bin/ai-command`).
 - [Moonlight and Sunshine](moonlight-sunshine.md): revisit after the xrdp layer.
