@@ -4,6 +4,8 @@
 The scenarios themselves need Docker and run separately (tests/containers/README.md).
 """
 
+import contextlib
+import io
 import importlib.util
 import json
 import subprocess
@@ -14,6 +16,8 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTAINERS = ROOT / "tests" / "containers"
@@ -246,6 +250,42 @@ class Scenarios(unittest.TestCase):
         after["/home/test"] = ("d", "755", "4096", "2")
         changed = dry_run.unexpected_changes(before, after)
         self.assertEqual(len(changed), 2, changed)
+
+
+class CallerRunId(unittest.TestCase):
+    def test_invalid_run_id_is_refused_before_loading_scenarios(self):
+        harness = load(CONTAINERS / "run.py")
+        for value in ("", "a" * 31, "a" * 33, "A" * 32, "../escape", "--option"):
+            with self.subTest(value=value), mock.patch.object(harness, "load_scenarios") as scenarios, \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                harness.main(["--run-id=" + value, "--list"])
+            self.assertEqual(error.exception.code, 2)
+            scenarios.assert_not_called()
+
+    def test_supplied_id_labels_docker_and_is_retained_in_results(self):
+        harness = load(CONTAINERS / "run.py")
+        run_id = "a1" * 16
+        docker = SimpleNamespace(images={}, scrub=lambda text: text,
+                                 _call=lambda *a, **k: subprocess.CompletedProcess([], 0, "fixture", ""),
+                                 cleanup=lambda **k: [])
+        scenario = SimpleNamespace(SLOW=False)
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary) / "out"
+            row = results.scenario_line("fixture", "pass", 0.1, "done", "fixture.log")
+            with mock.patch.object(harness, "load_scenarios", return_value={"fixture": scenario}), \
+                    mock.patch.object(harness, "resolve", return_value="b" * 40), \
+                    mock.patch.object(harness, "make_bundle", return_value=Path(temporary) / "repo.bundle"), \
+                    mock.patch.object(harness, "run_one", return_value=row), \
+                    mock.patch.object(harness, "Docker", return_value=docker) as made, \
+                    mock.patch.object(harness.shutil, "which", return_value=None), \
+                    mock.patch.object(harness.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                code = harness.main(["--out", str(out), "--run-id", run_id])
+            self.assertEqual(code, 0)
+            self.assertEqual(made.call_args.args[0], run_id)
+            header, rows = results.read(out / "results.jsonl")
+            self.assertEqual(header["run"], run_id)
+            self.assertEqual(len(rows), 1)
 
 
 if __name__ == "__main__":
