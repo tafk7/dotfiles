@@ -82,10 +82,29 @@ cat >> "$transcript" <<'JSONL'
 {"type":"queue-operation","content":"/autocompact 833k"}
 {"type":"user","message":{"content":"<local-command-stdout>CLAUDE_CODE_AUTO_COMPACT_WINDOW is set and takes precedence.</local-command-stdout>"}}
 {"type":"user","message":{"content":"<local-command-stdout>Couldn't parse 'nonsense'</local-command-stdout>"}}
-{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 833k tokens, but a higher-priority override is active (533k tokens)</local-command-stdout>"}}
 {"type":"user","sessionId":"another-session","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 833k tokens</local-command-stdout>"}}
 JSONL
 marker 10 'only applied commands for this session count'
+
+# This response is emitted after saving the new user value, and Claude clears
+# its launch setting afterwards. Resolve the settings chain for that model.
+printf '{"modelSettings":{"claude-sonnet-5-5":{"autoCompactWindow":400000}}}\n' > "$HOME/.claude/settings.json"
+cat >> "$transcript" <<'JSONL'
+{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 400k tokens, but a higher-priority override is active (900k tokens)</local-command-stdout>"}}
+JSONL
+marker 7 'override response clears cached live tuning and resolves the new user setting'
+printf '{"autoCompactWindow":500000}\n' > "$project/.claude/settings.json"
+marker 9 'override response uses the project setting instead of the record'
+command_result 533000
+marker 10 'plain live tuning still takes precedence over the project setting'
+printf '{"modelSettings":{"claude-sonnet-5-5":{"autoCompactWindow":"auto"}}}\n' > "$HOME/.claude/settings.json"
+cat >> "$transcript" <<'JSONL'
+{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to auto in settings, but a higher-priority override is active (500k tokens)</local-command-stdout>"}}
+JSONL
+marker 9 'reset with an active project override resolves the settings chain'
+rm "$HOME/.claude/settings.json" "$project/.claude/settings.json"
+command_result 533000
+marker 10 'a later plain result replaces the settings-chain fallback'
 cat >> "$transcript" <<'JSONL'
 {"type":"user","message":4}
 {"type":"system","subtype":"local_command","commandRun":[],"content":"Auto-compact window for Sonnet 5.5 set to 833k tokens"}
@@ -240,6 +259,15 @@ line=$(STATUSLINE_INPUT="$input" STATUSLINE_SCRIPT="$TEST_REPO_ROOT/configs/ai/c
     "$TEST_ROOT/flag/claude" --autocompact 183000 | sed $'s/\033\\[[0-9;]*m//g')
 bar=${line%% *}; before=${bar%%│*}
 assert_eq "${#before}" 7 'native live command replaces foreground flag'
+printf '{"autoCompactWindow":400000}\n' > "$HOME/.claude/settings.json"
+cat >> "$transcript" <<'JSONL'
+{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 400k tokens, but a higher-priority override is active (900k tokens)</local-command-stdout>"}}
+JSONL
+line=$(STATUSLINE_INPUT="$input" STATUSLINE_SCRIPT="$TEST_REPO_ROOT/configs/ai/claude/statusline.sh" \
+    "$TEST_ROOT/flag/claude" --autocompact 183000 | sed $'s/\033\\[[0-9;]*m//g')
+bar=${line%% *}; before=${bar%%│*}
+assert_eq "${#before}" 7 'override response drops the foreground flag and reads settings'
+rm "$HOME/.claude/settings.json"
 rm "$transcript"
 
 # Desk discovery is only a fallback; it requires a [desk] table.

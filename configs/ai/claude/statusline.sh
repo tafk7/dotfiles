@@ -178,9 +178,12 @@ if (( win > 0 && auto )); then
                                      elif $n >= 100 and $n <= 1000 then $n * 1000 else $n end) |
                                     select(. >= 100000 and . <= 1000000) | floor | tostring) catch empty end;
                             def applied:
-                                capture("^<local-command-stdout>Auto-compact window(?: for (?<model>.+?))? set to (?<n>\\S+)(?: tokens(?: \\(capped to model limit of [^)]*\\))?)?</local-command-stdout>$") |
+                                capture("^<local-command-stdout>Auto-compact window(?: for (?<model>.+?))? set to (?<n>\\S+)(?: in settings)?(?: tokens(?: \\(capped to model limit of [^)]*\\))?)?(?<override>, but a higher-priority override is active \\([^)]* tokens\\))?</local-command-stdout>$") |
                                 (.n | window) as $value |
-                                {key: ((.model // $model) | model_key), value: $value};
+                                # Claude saves the value, then clears its launch
+                                # setting even when the reply reports an override.
+                                {key: ((.model // $model) | model_key),
+                                    value: (if .override then "auto" else $value end)};
                             def stdout:
                                 # Interactive results are user messages; print mode
                                 # uses system/local_command with the same stdout.
