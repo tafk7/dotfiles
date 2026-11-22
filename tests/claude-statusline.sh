@@ -41,10 +41,14 @@ write_record() {
         compact_pending: {trigger: 450000}, applied_to: "another-session"}' > "$record"
 }
 command_result() {
-    jq -nc --arg sid "$sid" --arg n "$1" '{sessionId: $sid, type: "system",
-        subtype: "local_command", commandRun: {command: "autocompact", args: $n},
-        content: ("<local-command-stdout>Auto-compact window for Sonnet 5.5 set to "
-          + $n + " tokens</local-command-stdout>")}' >> "$transcript"
+    # Real interactive transcript rows, with only the model/argument varied.
+    jq -c --arg sid "$sid" --arg n "$1" --arg model "${2:-Sonnet 5.5}" '
+        .sessionId = $sid |
+        if (.message.content | startswith("<command-name>")) then
+            .message.content |= sub("<command-args>[^<]*"; "<command-args>" + $n)
+        else .message.content = ("<local-command-stdout>Auto-compact window for " + $model +
+            " set to " + $n + (if $n == "auto" then "" else " tokens" end) + "</local-command-stdout>") end' \
+        "$TEST_REPO_ROOT/tests/fixtures/claude-autocompact.jsonl" >> "$transcript"
 }
 
 marker 19 'no record or live command: default 967k trigger'
@@ -53,6 +57,12 @@ marker 3 'record supplies the applied 150k trigger, ignoring pending tuning'
 write_record another-session
 marker 19 'a record for another session is ignored'
 write_record "$sid"
+original_input=$input
+input=$(printf '%s' "$input" | jq '.model={id:"claude-opus-5-5",display_name:"Opus 5.5"}')
+cat "$TEST_REPO_ROOT/tests/fixtures/claude-autocompact.jsonl" > "$transcript"
+marker 5 'verbatim interactive result replaces the recorded launch: 267k trigger'
+rm "$transcript"
+input=$original_input
 command_result 383k
 marker 7 'live 383k window overrides record: 350k trigger'
 command_result 533000
@@ -64,9 +74,10 @@ cat >> "$transcript" <<'JSONL'
 {"type":"assistant","message":{"content":"/autocompact 833k"}}
 {"type":"user","message":{"content":"please run /autocompact 833k"}}
 {"type":"queue-operation","content":"/autocompact 833k"}
-{"type":"system","subtype":"local_command","commandRun":{"command":"autocompact","args":"833k"},"content":"CLAUDE_CODE_AUTO_COMPACT_WINDOW is set and takes precedence."}
-{"type":"system","subtype":"local_command","commandRun":{"command":"autocompact","args":"nonsense"},"content":"Couldn't parse 'nonsense'"}
-{"type":"system","subtype":"local_command","sessionId":"another-session","commandRun":{"command":"autocompact","args":"833k"},"content":"Auto-compact window for Sonnet 5.5 set to 833k tokens"}
+{"type":"user","message":{"content":"<local-command-stdout>CLAUDE_CODE_AUTO_COMPACT_WINDOW is set and takes precedence.</local-command-stdout>"}}
+{"type":"user","message":{"content":"<local-command-stdout>Couldn't parse 'nonsense'</local-command-stdout>"}}
+{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 833k tokens, but a higher-priority override is active (533k tokens)</local-command-stdout>"}}
+{"type":"user","sessionId":"another-session","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 833k tokens</local-command-stdout>"}}
 JSONL
 marker 10 'only applied commands for this session count'
 cat >> "$transcript" <<'JSONL'
@@ -93,6 +104,10 @@ printf '\n' > "$transcript"
 marker 3 'truncated transcript invalidates the override cache'
 command_result auto
 marker 19 'native reset clears the recorded launch override'
+cat >> "$transcript" <<'JSONL'
+{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5: 183k tokens (from settings)\nAuto-compact summarizes the conversation when context usage approaches this limit. The actual threshold is the minimum of this setting and your model's maximum context window.\nThe auto setting picks a window tuned for your model and is strongly recommended for the best cost and performance.</local-command-stdout>"}}
+JSONL
+marker 19 'bare autocompact reports state and leaves the applied override alone'
 
 # A smaller model output reservation is used for live windows when recorded.
 printf '\n' > "$transcript"
@@ -104,14 +119,12 @@ export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50
 marker 1 'live window applies the native percent override'
 unset CLAUDE_AUTOCOMPACT_PCT_OVERRIDE
 
-# Older transcripts carry the command's XML and its local stdout without the
-# commandRun metadata. Ordinary content never counts as an executed command.
+# Applied stdout is sufficient even when the command arguments left the tail.
 printf '\n' > "$transcript"
 cat >> "$transcript" <<'JSONL'
-{"type":"user","message":{"content":"<command-name>/autocompact</command-name>\n<command-message>autocompact</command-message>\n<command-args>371k</command-args>"}}
-{"type":"system","subtype":"local_command","content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 371k tokens</local-command-stdout>"}
+{"type":"user","message":{"content":"<local-command-stdout>Auto-compact window for Sonnet 5.5 set to 371k tokens</local-command-stdout>"}}
 JSONL
-marker 7 'legacy command plus applied result: 350k trigger'
+marker 7 'applied interactive stdout alone: 350k trigger'
 command_result 0.271m
 marker 5 'decimal native shorthand: 250k trigger'
 

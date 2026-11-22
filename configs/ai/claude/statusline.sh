@@ -155,21 +155,23 @@ if (( win > 0 && auto )); then
                                 (if .u == "m" then $n * 1000000 elif .u == "k" then $n * 1000
                                  elif $n >= 100 and $n <= 1000 then $n * 1000 else $n end) |
                                 select(. >= 100000 and . <= 1000000) | floor | tostring) catch empty end;
-                        reduce inputs as $line ({arg: "", live: ""};
+                        def applied:
+                            capture("^<local-command-stdout>Auto-compact window( for .*)? set to (?<n>\\S+)( tokens( \\(capped to model limit of [^)]*\\))?)?</local-command-stdout>$") |
+                            .n | window;
+                        reduce inputs as $line ("";
                             (try ($line | fromjson) catch null) as $e |
                             . as $state | try (
                             if ($e | type) != "object" or ($e.sessionId // $sid) != $sid or $e.isSidechain == true then .
                             elif $e.type == "user" and ($e.message.content | type) == "string" then
-                                .arg = ([(try ($e.message.content |
-                                    capture("^<command-name>/autocompact</command-name>[\\s\\S]*<command-args>(?<a>[^<]*)</command-args>$").a) catch "")][0] // "")
+                                # Interactive results are user messages, not commands to execute.
+                                ([$e.message.content | applied][0] // "") as $w |
+                                if $w != "" then $w else . end
                             elif $e.type == "system" and $e.subtype == "local_command" and
-                                ($e.content | type) == "string" and
-                                ($e.content | test("^(<local-command-stdout>)?Auto-compact window .* set to ")) and
-                                ($e.content | contains("higher-priority override") | not) then
-                                (if $e.commandRun.command == "autocompact" then $e.commandRun.args else .arg end) as $a |
-                                ([(try ($a | window) catch empty)][0] // "") as $w |
-                                if $w != "" then .live = $w | .arg = "" else . end
-                            else . end) catch $state) | .live' 2>/dev/null)
+                                ($e.content | type) == "string" then
+                                # Print-mode local commands use a system entry with the same stdout.
+                                ([$e.content | applied][0] // "") as $w |
+                                if $w != "" then $w else . end
+                            else . end) catch $state)' 2>/dev/null)
                     [[ "$latest" == auto || "$latest" =~ ^[0-9]{6,7}$ ]] && live=$latest
                     # Atomic and best effort: a read-only cache never breaks the line.
                     if mkdir -p -- "$cache_dir" 2>/dev/null && tmp=$(mktemp "$cache_dir/.compact.XXXXXX" 2>/dev/null); then
