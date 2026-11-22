@@ -110,12 +110,15 @@ if (( win > 0 && auto )); then
     if [[ -n "$sid" ]]; then
         key=$(printf '%s' "$sid" | sha256sum 2>/dev/null); key=${key%% *}
         desk=${SCRIV_DESK:-}
-        # Sessions normally carry SCRIV_DESK, including background launches.
-        # Legacy sessions may still start inside a project desk directory.
-        if [[ -z "$desk" && "$proj" == /* ]]; then
+        # Tool subprocesses carry SCRIV_DESK, but a background session's status
+        # line may not, so fall back to the nearest ancestor desk that holds a
+        # record for this session. Walk past desks without one: a session that
+        # moved into a git worktree of its own desk sees the worktree's copy of
+        # project.toml first, and only the original desk has the record.
+        if [[ -z "$desk" && "$proj" == /* && "$key" =~ ^[0-9a-f]{64}$ ]]; then
             dir=$proj
             while [[ -n "$dir" ]]; do
-                if [[ -r "$dir/project.toml" ]] && \
+                if [[ -r "$dir/.runtime/compact/$key.json" && -r "$dir/project.toml" ]] && \
                     desk_table=$(sed -n '/^[[:space:]]*\[desk\][[:space:]]*\(#.*\)\?$/p' "$dir/project.toml" 2>/dev/null) && [[ -n "$desk_table" ]]; then
                     desk=$dir; break
                 fi

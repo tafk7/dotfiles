@@ -282,6 +282,13 @@ marker 3 'nearest project desk fallback'
 input=$(printf '%s' "$input" | jq --arg p "$project/nested" '.workspace.project_dir=$p')
 mkdir -p "$project/nested"
 marker 3 'desk fallback walks ancestors'
+# A session that entered a git worktree of its own desk: the worktree has the
+# desk's project.toml but no runtime records, so the walk continues upward.
+mkdir -p "$project/.claude/worktrees/topic"
+printf '[desk]\n' > "$project/.claude/worktrees/topic/project.toml"
+input=$(printf '%s' "$input" | jq --arg p "$project/.claude/worktrees/topic" '.workspace.project_dir=$p')
+marker 3 'desk fallback walks past a worktree copy of the desk'
+input=$(printf '%s' "$input" | jq --arg p "$project/nested" '.workspace.project_dir=$p')
 
 printf '{broken}\n' > "$record"
 marker 19 'malformed runtime record is ignored'
