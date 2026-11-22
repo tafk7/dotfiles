@@ -14,6 +14,8 @@ fi
 mapfile -t fields < <(jq -r '
     def text: if type == "string" and (test("[\\r\\n\\t]") | not) then . else "" end;
     def number: if type == "number" then . else 0 end;
+    def model_key: ascii_downcase | sub("^claude-"; "") | sub("-[0-9]{8}$"; "") |
+        gsub("[^a-z0-9]+"; "-") | gsub("^-|-$"; "");
     if type == "object" then . else {} end |
     (.context_window.used_percentage | number),
     (.context_window.total_output_tokens | number),
@@ -21,10 +23,14 @@ mapfile -t fields < <(jq -r '
     (.model.display_name | text),
     ((.workspace.current_dir // .cwd) | text),
     (.workspace.project_dir | text), (.transcript_path | text),
-    (.session_id | text), (.model.id | text)' <<< "$input" 2>/dev/null)
+    (.session_id | text), (.model.id | text),
+    ((.model.display_name | text) as $name |
+        (if $name != "" then $name else (.model.id | text) end) | model_key)' <<< "$input" 2>/dev/null)
 used=${fields[0]:-0}; out_tok=${fields[1]:-0}; win=${fields[2]:-0}
 model=${fields[3]:-unknown}; cur=${fields[4]:-}; proj=${fields[5]:-}
 tp=${fields[6]:-}; sid=${fields[7]:-}; mid=${fields[8]:-}
+main_model=${fields[9]:-}; subagent_view=0
+[[ "$tp" == */subagents/* ]] && subagent_view=1
 [[ "$out_tok" =~ ^[0-9]{1,12}$ ]] || out_tok=0
 [[ "$win" =~ ^[0-9]{1,9}$ ]] && win=$((10#$win)) || win=0
 
@@ -127,62 +133,92 @@ if (( win > 0 && auto )); then
                 (( 10#${compact[1]} >= 13000 && 10#${compact[1]} <= 33000 )) && reserve=$((10#${compact[1]}))
         fi
 
-        if [[ "$key" =~ ^[0-9a-f]{64}$ && -f "$tp" && -r "$tp" ]]; then
+        if [[ "$key" =~ ^[0-9a-f]{64}$ ]]; then
             # A byte bound matters: one tool-result line can be megabytes. Parse
             # JSONL independently so partial edge lines cannot poison the tail.
             # Cache an observed command so it survives leaving the 64 KiB tail;
-            # path/inode changes or truncation invalidate it. No transcript scan.
+            # path/inode changes or truncation invalidate it. A command can be
+            # missed if more than 64 KiB arrives before the next refresh.
             cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}/claude-statusline
             cache=$cache_dir/$key.json
-            stamp=$(stat -c '%d:%i %s %y %z' -- "$tp" 2>/dev/null)
-            file_id=${stamp%% *}; rest=${stamp#* }; size=${rest%% *}
-            cached_stamp=''
-            if [[ "$size" =~ ^[0-9]+$ ]]; then
-                mapfile -t cached < <(jq -r --arg sid "$sid" --arg tp "$tp" --arg mid "$mid" \
-                    --arg id "$file_id" --argjson size "$size" '
-                    select(.session == $sid and .transcript == $tp and .model == $mid and
-                        .file_id == $id and (.size | type) == "number" and .size >= 0 and .size <= $size) |
-                    (.live // ""), (.stamp // "")' "$cache" 2>/dev/null)
-                [[ "${cached[0]:-}" == auto || "${cached[0]:-}" =~ ^([1-9][0-9]{5}|1000000)$ ]] && live=${cached[0]}
-                cached_stamp=${cached[1]:-}
-                if [[ "$stamp" != "$cached_stamp" ]]; then
-                    latest=$(tail -c 65536 -- "$tp" 2>/dev/null | jq -Rrn --arg sid "$sid" '
-                        def window:
-                            ascii_downcase | gsub("^\\s+|\\s+$"; "") |
-                            if . == "auto" or . == "reset" or . == "unset" or . == "default" then "auto"
-                            else try (capture("^(?<n>[0-9]+(?:\\.[0-9]+)?)(?<u>[km]?)$") |
-                                (.n | tonumber) as $n |
-                                (if .u == "m" then $n * 1000000 elif .u == "k" then $n * 1000
-                                 elif $n >= 100 and $n <= 1000 then $n * 1000 else $n end) |
-                                select(. >= 100000 and . <= 1000000) | floor | tostring) catch empty end;
-                        def applied:
-                            capture("^<local-command-stdout>Auto-compact window( for .*)? set to (?<n>\\S+)( tokens( \\(capped to model limit of [^)]*\\))?)?</local-command-stdout>$") |
-                            .n | window;
-                        reduce inputs as $line ("";
-                            (try ($line | fromjson) catch null) as $e |
-                            . as $state | try (
-                            if ($e | type) != "object" or ($e.sessionId // $sid) != $sid or $e.isSidechain == true then .
-                            elif $e.type == "user" and ($e.message.content | type) == "string" then
-                                # Interactive results are user messages, not commands to execute.
-                                ([$e.message.content | applied][0] // "") as $w |
-                                if $w != "" then $w else . end
-                            elif $e.type == "system" and $e.subtype == "local_command" and
-                                ($e.content | type) == "string" then
-                                # Print-mode local commands use a system entry with the same stdout.
-                                ([$e.content | applied][0] // "") as $w |
-                                if $w != "" then $w else . end
-                            else . end) catch $state)' 2>/dev/null)
-                    [[ "$latest" == auto || "$latest" =~ ^[0-9]{6,7}$ ]] && live=$latest
-                    # Atomic and best effort: a read-only cache never breaks the line.
-                    if mkdir -p -- "$cache_dir" 2>/dev/null && tmp=$(mktemp "$cache_dir/.compact.XXXXXX" 2>/dev/null); then
-                        jq -n --arg sid "$sid" --arg tp "$tp" --arg mid "$mid" --arg id "$file_id" \
-                            --arg stamp "$stamp" --argjson size "$size" --arg live "$live" \
-                            '{session:$sid, transcript:$tp, model:$mid, file_id:$id, size:$size, stamp:$stamp, live:$live}' \
-                            > "$tmp" 2>/dev/null && mv -f -- "$tmp" "$cache" 2>/dev/null
-                        rm -f -- "$tmp" 2>/dev/null
+            if (( subagent_view )); then
+                # The input still names the main session/model. A subagent view
+                # reads its cached value without scanning or rewriting the cache.
+                live=$(jq -r --arg sid "$sid" --arg model "$main_model" '
+                    select(.session == $sid) | .models[$model] // empty' "$cache" 2>/dev/null)
+            elif [[ -f "$tp" && -r "$tp" ]]; then
+                stamp=$(stat -c '%d:%i %s %y %z' -- "$tp" 2>/dev/null)
+                file_id=${stamp%% *}; rest=${stamp#* }; size=${rest%% *}
+                cached_stamp=''
+                if [[ "$size" =~ ^[0-9]+$ ]]; then
+                    models='{}'
+                    mapfile -t cached < <(jq -r --arg sid "$sid" --arg tp "$tp" --arg model "$main_model" \
+                        --arg id "$file_id" --argjson size "$size" '
+                        select(.session == $sid and .transcript == $tp and
+                            .file_id == $id and (.size | type) == "number" and .size >= 0 and .size <= $size) |
+                        . as $cache | (.models | if type == "object" then . else {} end |
+                            with_entries(select(.value == "auto" or (.value | type == "string" and
+                                test("^([1-9][0-9]{5}|1000000)$"))))) |
+                        tojson, (.[$model] // ""), ($cache.stamp // "")' "$cache" 2>/dev/null)
+                    [[ "${cached[0]:-}" == \{* ]] && models=${cached[0]}
+                    live=${cached[1]:-}; cached_stamp=${cached[2]:-}
+                    if [[ "$stamp" != "$cached_stamp" ]]; then
+                        mapfile -t updated < <(tail -c 65536 -- "$tp" 2>/dev/null |
+                            jq -Rrn --arg sid "$sid" --arg model "$main_model" --argjson models "$models" '
+                            def model_key: ascii_downcase | sub("^claude-"; "") | sub("-[0-9]{8}$"; "") |
+                                gsub("[^a-z0-9]+"; "-") | gsub("^-|-$"; "");
+                            def window:
+                                ascii_downcase | gsub("^\\s+|\\s+$"; "") |
+                                if . == "auto" or . == "reset" or . == "unset" or . == "default" then "auto"
+                                else try (capture("^(?<n>[0-9]+(?:\\.[0-9]+)?)(?<u>[km]?)$") |
+                                    (.n | tonumber) as $n |
+                                    (if .u == "m" then $n * 1000000 elif .u == "k" then $n * 1000
+                                     elif $n >= 100 and $n <= 1000 then $n * 1000 else $n end) |
+                                    select(. >= 100000 and . <= 1000000) | floor | tostring) catch empty end;
+                            def applied:
+                                capture("^<local-command-stdout>Auto-compact window(?: for (?<model>.+?))? set to (?<n>\\S+)(?: tokens(?: \\(capped to model limit of [^)]*\\))?)?</local-command-stdout>$") |
+                                (.n | window) as $value |
+                                {key: ((.model // $model) | model_key), value: $value};
+                            def stdout:
+                                # Interactive results are user messages; print mode
+                                # uses system/local_command with the same stdout.
+                                if .type == "user" and (.message.content | type) == "string" then .message.content
+                                elif .type == "system" and .subtype == "local_command" and
+                                    (.content | type) == "string" then .content else empty end;
+                            reduce inputs as $line ($models;
+                                (try ($line | fromjson) catch null) as $e |
+                                . as $state | try (
+                                if ($e | type) != "object" or ($e.sessionId // $sid) != $sid or $e.isSidechain == true then .
+                                else ([$e | stdout | applied][0] // null) as $result |
+                                    if $result then .[$result.key] = $result.value else . end
+                                end) catch $state) | tojson, (.[$model] // "")' 2>/dev/null)
+                        if [[ "${updated[0]:-}" == \{* ]]; then
+                            models=${updated[0]}; live=${updated[1]:-}
+                        fi
+                        # Atomic and best effort: a read-only cache never breaks the line.
+                        if mkdir -p -- "$cache_dir" 2>/dev/null && tmp=$(mktemp "$cache_dir/.compact.XXXXXX" 2>/dev/null); then
+                            trap 'rm -f -- "$tmp" 2>/dev/null' EXIT
+                            jq -n --arg sid "$sid" --arg tp "$tp" --arg id "$file_id" \
+                                --arg stamp "$stamp" --argjson size "$size" --argjson models "$models" \
+                                '{session:$sid, transcript:$tp, file_id:$id, size:$size, stamp:$stamp, models:$models}' \
+                                > "$tmp" 2>/dev/null && mv -f -- "$tmp" "$cache" 2>/dev/null
+                            rm -f -- "$tmp" 2>/dev/null
+                            trap - EXIT
+                            # At most daily, only on a changed main transcript. The
+                            # marker check is constant work; pruning visits owned files.
+                            printf -v now '%(%s)T' -1
+                            pruned=$(stat -c '%Y' -- "$cache_dir/.pruned" 2>/dev/null)
+                            [[ "$pruned" =~ ^[0-9]+$ ]] || pruned=0
+                            if (( now - pruned >= 86400 )); then
+                                find "$cache_dir" -maxdepth 1 -type f -mtime +30 \
+                                    \( -name '*.json' -o -name '.compact.*' \) -delete 2>/dev/null &&
+                                    touch -- "$cache_dir/.pruned" 2>/dev/null
+                            fi
+                        fi
                     fi
                 fi
             fi
+            [[ "$live" == auto || "$live" =~ ^([1-9][0-9]{5}|1000000)$ ]] || live=''
         fi
     fi
     cfg=''
@@ -228,9 +264,9 @@ if (( win > 0 && auto )); then
         compact_window=$((10#$live))
         (( compact_window > win )) && compact_window=$win
     fi
-    # Verified in Claude Code 2.1.321: FO calls G4(Moe(model, window)).
-    # Moe subtracts min(model.maxOutputTokens, 20000); G4 subtracts the 13000
-    # summary reserve, or takes the smaller percent of Moe's result.
+    # Claude Code 2.1.321 transcript compactMetadata.preTokens: windows of
+    # 300k/350k/500k compact at about 269k/317-320k/468k; a recorded 150k trigger
+    # compacts at about 150.5k. Reserve = capped output plus 13000 summary tokens.
     thr=$(( compact_window - reserve ))
     ov=${CLAUDE_AUTOCOMPACT_PCT_OVERRIDE:-}
     if [[ "$ov" =~ ^[0-9]{1,3}$ ]] && (( 10#$ov > 0 && 10#$ov <= 100 )); then
@@ -240,6 +276,7 @@ if (( win > 0 && auto )); then
     # A native reset returns to settings/defaults. The recorded trigger is
     # authoritative only while no live command has replaced its launch setting.
     [[ -n "$recorded" && -z "$live" ]] && thr=$recorded
+    (( thr > win )) && thr=$win
     (( thr < 0 )) && thr=0
     thr_pct=$(( thr * 100 / win ))
     m=$(( thr_pct * bar_width / 100 )); (( m > bar_width - 1 )) && m=$(( bar_width - 1 ))

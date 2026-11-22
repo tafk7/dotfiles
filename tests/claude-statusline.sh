@@ -61,7 +61,7 @@ original_input=$input
 input=$(printf '%s' "$input" | jq '.model={id:"claude-opus-5-5",display_name:"Opus 5.5"}')
 cat "$TEST_REPO_ROOT/tests/fixtures/claude-autocompact.jsonl" > "$transcript"
 marker 5 'verbatim interactive result replaces the recorded launch: 267k trigger'
-rm "$transcript"
+rm "$transcript" "$XDG_CACHE_HOME/claude-statusline/$key.json"
 input=$original_input
 command_result 383k
 marker 7 'live 383k window overrides record: 350k trigger'
@@ -95,6 +95,34 @@ marker 10 'valid commands remain readable after malformed shapes'
 head -c 100000 /dev/zero | tr '\0' x >> "$transcript"
 printf '\n{broken}\n' >> "$transcript"
 marker 10 'cached override survives leaving the tail'
+
+# Viewing a subagent must neither rewrite the main cache nor forget its value.
+main_input=$input
+subagent="$TEST_ROOT/session/subagents/agent-1.jsonl"
+mkdir -p "${subagent%/*}"
+printf '{"type":"assistant","message":{"model":"claude-opus-5-5","usage":{"input_tokens":10000}}}\n' > "$subagent"
+input=$(printf '%s' "$main_input" | jq --arg tp "$subagent" '.transcript_path=$tp')
+cache="$XDG_CACHE_HOME/claude-statusline/$key.json"
+cache_before=$(sha256sum "$cache")
+marker 10 'subagent view reads the main live value'
+assert_eq "$(sha256sum "$cache")" "$cache_before" 'subagent view preserves the main cache bytes'
+input=$main_input
+marker 10 'main view retains its override after a subagent view'
+
+# Native overrides belong to their model, including when each command has
+# left the tail. A /model switch must preserve values for both models.
+input=$(printf '%s' "$main_input" | jq '.model={id:"claude-opus-5-5",display_name:"Opus 5.5"}')
+marker 3 'another model does not borrow the main model live value'
+command_result 383k 'Opus 5.5'
+marker 7 'second model receives its own live value'
+head -c 100000 /dev/zero | tr '\0' x >> "$transcript"
+printf '\n' >> "$transcript"
+marker 7 'second model value survives leaving the tail'
+input=$main_input
+marker 10 'returning to the first model restores its cached value'
+input=$(printf '%s' "$main_input" | jq '.model={id:"claude-opus-5-5",display_name:"Opus 5.5"}')
+marker 7 'returning to the second model restores its cached value'
+input=$main_input
 command_result 283k
 printf '{"unfinished":' >> "$transcript"
 marker 5 'valid command survives damaged JSONL: 250k trigger'
@@ -142,6 +170,36 @@ marker 7 'bounded read from a large transcript'
 marker 7 'unchanged transcript uses its cache'
 assert_eq "$(wc -l < "$STATUSLINE_TAIL_LOG")" 1 'no tail read on unchanged refresh'
 rm "$TEST_ROOT/bin/tail"
+
+# Cache housekeeping is limited to owned files and a daily sweep on a changed
+# main transcript. A second changed refresh does not repeat the sweep.
+cache_dir="$XDG_CACHE_HOME/claude-statusline"
+touch "$cache_dir/expired.json" "$cache_dir/.compact.expired" "$cache_dir/recent.json" "$cache_dir/unrelated"
+touch -d '31 days ago' "$cache_dir/expired.json" "$cache_dir/.compact.expired" "$cache_dir/unrelated"
+touch -d '2 days ago' "$cache_dir/.pruned"
+printf '\n' >> "$transcript"
+marker 7 'cache sweep keeps the live marker'
+[[ ! -e "$cache_dir/expired.json" && ! -e "$cache_dir/.compact.expired" ]] || fail 'expired cache files survived'
+[[ -e "$cache_dir/recent.json" && -e "$cache_dir/unrelated" ]] || fail 'cache sweep removed recent or unrelated files'
+touch -d '31 days ago' "$cache_dir/next-day.json"
+printf '\n' >> "$transcript"
+marker 7 'same-day refresh does not repeat the cache sweep'
+[[ -e "$cache_dir/next-day.json" ]] || fail 'cache sweep ran more than once per day'
+
+# Abort a refresh exactly at the cache write, after mktemp. Its EXIT trap must
+# remove the unfinished file, rather than leave debris until the next sweep.
+jq_bin=$(command -v jq)
+printf '#!/bin/bash\nif [[ "$1" == -n ]]; then kill -TERM "$PPID"; exit 1; fi\nexec %q "$@"\n' \
+    "$jq_bin" > "$TEST_ROOT/bin/jq"
+chmod +x "$TEST_ROOT/bin/jq"
+printf '\n' >> "$transcript"
+rc=0
+{ printf '%s\n' "$input" | bash "$TEST_REPO_ROOT/configs/ai/claude/statusline.sh" >/dev/null 2>/dev/null; } 2>/dev/null || rc=$?
+rm "$TEST_ROOT/bin/jq"
+assert_eq "$rc" 143 'the cache write was interrupted by TERM'
+for temporary in "$cache_dir"/.compact.*; do
+    [[ ! -e "$temporary" ]] || fail 'interrupted refresh left its temporary cache file'
+done
 
 rm "$record" "$transcript"
 printf '{"autoCompactWindow":183000}\n' > "$HOME/.claude/settings.json"
