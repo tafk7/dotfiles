@@ -10,12 +10,23 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 0
 fi
 
-used=$(echo "$input"    | jq -r '.context_window.used_percentage     // 0')
-out_tok=$(echo "$input" | jq -r '.context_window.total_output_tokens // 0')
-win=$(echo "$input"     | jq -r '.context_window.context_window_size  // 0')
-model=$(echo "$input"   | jq -r '.model.display_name                 // "unknown"')
-cur=$(echo "$input"     | jq -r '.workspace.current_dir // .cwd       // ""')
-proj=$(echo "$input"    | jq -r '.workspace.project_dir               // ""')
+# One parse per refresh; invalid fields and malformed JSON keep the line usable.
+mapfile -t fields < <(jq -r '
+    def text: if type == "string" and (test("[\\r\\n\\t]") | not) then . else "" end;
+    def number: if type == "number" then . else 0 end;
+    if type == "object" then . else {} end |
+    (.context_window.used_percentage | number),
+    (.context_window.total_output_tokens | number),
+    (.context_window.context_window_size | number),
+    (.model.display_name | text),
+    ((.workspace.current_dir // .cwd) | text),
+    (.workspace.project_dir | text), (.transcript_path | text),
+    (.session_id | text), (.model.id | text)' <<< "$input" 2>/dev/null)
+used=${fields[0]:-0}; out_tok=${fields[1]:-0}; win=${fields[2]:-0}
+model=${fields[3]:-unknown}; cur=${fields[4]:-}; proj=${fields[5]:-}
+tp=${fields[6]:-}; sid=${fields[7]:-}; mid=${fields[8]:-}
+[[ "$out_tok" =~ ^[0-9]{1,12}$ ]] || out_tok=0
+[[ "$win" =~ ^[0-9]{1,9}$ ]] && win=$((10#$win)) || win=0
 
 # Debug: STATUSLINE_DUMP=/path keeps the latest stdin JSON, to see what Claude
 # Code sends while a subagent transcript is open.
@@ -24,7 +35,6 @@ proj=$(echo "$input"    | jq -r '.workspace.project_dir               // ""')
 # Viewing a subagent: if transcript_path is a subagent transcript, take model and
 # context fill from its last assistant message instead of the main session's.
 # Best effort: window size is assumed to match the main session's.
-tp=$(echo "$input" | jq -r '.transcript_path // ""')
 if [[ "$tp" == */subagents/* && -r "$tp" ]]; then
     sub=$(tail -n 200 "$tp" | jq -rs '[.[] | select(.message.usage and .message.model)] | last
         | if . then [.message.model,
@@ -41,11 +51,9 @@ if [[ "$tp" == */subagents/* && -r "$tp" ]]; then
     fi
 fi
 
-[[ "$used"    =~ ^[0-9.]+$ ]] || used=0
-[[ "$out_tok" =~ ^[0-9]+$  ]] || out_tok=0
-[[ "$win"     =~ ^[0-9]+$  ]] || win=0
-
+[[ "$used" =~ ^[0-9]+([.][0-9]+)?$ && ${#used} -le 16 ]] || used=0
 used_int=$(printf "%.0f" "$used")
+(( used_int > 100 )) && used_int=100
 
 # Palette
 SAGE='\033[38;5;108m'; AMBER='\033[38;5;179m'; TERRA='\033[38;5;173m'
@@ -70,61 +78,168 @@ repeat() { local n=$1 s=$2 out=''; while (( n-- > 0 )); do out+=$s; done; printf
 bar_in=$(repeat    "$in_cells" '█')
 bar_empty=$(repeat "$empty"    '░')
 
-# Autocompact marker: a bright thin line where compaction starts. Window comes
-# from, highest first: CLAUDE_CODE_AUTO_COMPACT_WINDOW, modelSettings.<model>.
-# autoCompactWindow, autoCompactWindow (settings: user < project < local), capped
-# at the model's window. The --autocompact flag is invisible to us. With none
-# set, 1M models compact at ~967k; the 200k default (window - 33k) is a guess.
-# CLAUDE_AUTOCOMPACT_PCT_OVERRIDE lowers it by percent.
-mid=$(echo "$input" | jq -r '.model.id // ""')
+# Autocompact marker: applied live command > session runtime trigger > the
+# existing env/flag/settings/default lookup. Runtime triggers already include
+# the reserve; compact_pending and applied_to describe other launches.
 [[ -n "$sub_id" ]] && mid=$sub_id
 auto=1
 [[ "$DISABLE_AUTO_COMPACT" == 1 || "$DISABLE_AUTO_COMPACT" == true || "$DISABLE_COMPACT" == 1 ]] && auto=0
-[[ "$(jq -r '.autoCompactEnabled' "$HOME/.claude/settings.json" 2>/dev/null)" == false ]] && auto=0
+config_dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+[[ "$(jq -r '.autoCompactEnabled' "$config_dir/settings.json" 2>/dev/null)" == false ]] && auto=0
 if (( win > 0 && auto )); then
-    cfg=''
-    for f in "$HOME/.claude/settings.json" "$proj/.claude/settings.json" "$proj/.claude/settings.local.json"; do
-        [[ -r "$f" ]] || continue
-        # Gateway IDs come as "Claude-Fable-5.2": compare lowercased, dots as dashes.
-        v=$(jq -r --arg m "$mid" '
-            def norm: ascii_downcase | gsub("\\."; "-");
-            ((.modelSettings // {}) | to_entries | map(select(.key as $k | ($m | norm) | startswith($k | norm)))
-              | sort_by(.key | length) | last | .value.autoCompactWindow) // .autoCompactWindow // empty' "$f" 2>/dev/null)
-        [[ "$v" =~ ^[0-9]+$ ]] && cfg=$v
-    done
-    # --autocompact on the launching claude process (flag beats settings, loses to env)
-    pid=$PPID
-    for _ in 1 2 3 4; do
-        [[ -r /proc/$pid/cmdline ]] || break
-        mapfile -d '' -t argv < "/proc/$pid/cmdline"
-        for i in "${!argv[@]}"; do
-            case "${argv[i]}" in
-                --autocompact=*) fl=${argv[i]#*=} ;;
-                --autocompact)   fl=${argv[i+1]:-} ;;
-                *) continue ;;
-            esac
-            fl=${fl//[kK]/000}; fl=${fl//[mM]/000000}
-            if [[ "$fl" =~ ^[0-9]+$ ]]; then
-                (( fl >= 100 && fl <= 1000 )) && fl=$(( fl * 1000 ))
-                cfg=$fl
+    # Accept token counts and the CLI's k/M and bare-thousands shorthand.
+    # Limit digit length before bash arithmetic (including leading zeroes).
+    window_tokens() {
+        local v=${1,,} n suffix
+        [[ "$v" =~ ^([0-9]{1,9})([km]?)$ ]] || return 1
+        n=$((10#${BASH_REMATCH[1]})); suffix=${BASH_REMATCH[2]}
+        case "$suffix" in k) n=$((n * 1000));; m) n=$((n * 1000000));;
+            '') (( n >= 100 && n <= 1000 )) && n=$((n * 1000));; esac
+        (( n > 0 )) || return 1
+        printf '%s' "$n"
+    }
+
+    reserve=33000; recorded=''; live=''
+    if [[ -n "$sid" ]]; then
+        key=$(printf '%s' "$sid" | sha256sum 2>/dev/null); key=${key%% *}
+        desk=${SCRIV_DESK:-}
+        # Sessions normally carry SCRIV_DESK, including background launches.
+        # Legacy sessions may still start inside a project desk directory.
+        if [[ -z "$desk" && "$proj" == /* ]]; then
+            dir=$proj
+            while [[ -n "$dir" ]]; do
+                if [[ -r "$dir/project.toml" ]] && \
+                    desk_table=$(sed -n '/^[[:space:]]*\[desk\][[:space:]]*\(#.*\)\?$/p' "$dir/project.toml" 2>/dev/null) && [[ -n "$desk_table" ]]; then
+                    desk=$dir; break
+                fi
+                [[ "$dir" == / ]] && break
+                dir=${dir%/*}; [[ -n "$dir" ]] || dir=/
+            done
+        fi
+        if [[ "$key" =~ ^[0-9a-f]{64}$ && -n "$desk" ]]; then
+            mapfile -t compact < <(jq -r --arg sid "$sid" '
+                select(.session == $sid and (.harness == "claude" or .harness == "claude-sdk")) |
+                .compaction | (.trigger // ""), (.reservation // "")' \
+                "$desk/.runtime/compact/$key.json" 2>/dev/null)
+            [[ "${compact[0]:-}" =~ ^[0-9]{1,7}$ ]] && \
+                (( 10#${compact[0]} > 0 )) && recorded=$((10#${compact[0]}))
+            [[ "${compact[1]:-}" =~ ^[0-9]{1,5}$ ]] && \
+                (( 10#${compact[1]} >= 13000 && 10#${compact[1]} <= 33000 )) && reserve=$((10#${compact[1]}))
+        fi
+
+        if [[ "$key" =~ ^[0-9a-f]{64}$ && -f "$tp" && -r "$tp" ]]; then
+            # A byte bound matters: one tool-result line can be megabytes. Parse
+            # JSONL independently so partial edge lines cannot poison the tail.
+            # Cache an observed command so it survives leaving the 64 KiB tail;
+            # path/inode changes or truncation invalidate it. No transcript scan.
+            cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}/claude-statusline
+            cache=$cache_dir/$key.json
+            stamp=$(stat -c '%d:%i %s %y %z' -- "$tp" 2>/dev/null)
+            file_id=${stamp%% *}; rest=${stamp#* }; size=${rest%% *}
+            cached_stamp=''
+            if [[ "$size" =~ ^[0-9]+$ ]]; then
+                mapfile -t cached < <(jq -r --arg sid "$sid" --arg tp "$tp" --arg mid "$mid" \
+                    --arg id "$file_id" --argjson size "$size" '
+                    select(.session == $sid and .transcript == $tp and .model == $mid and
+                        .file_id == $id and (.size | type) == "number" and .size >= 0 and .size <= $size) |
+                    (.live // ""), (.stamp // "")' "$cache" 2>/dev/null)
+                [[ "${cached[0]:-}" == auto || "${cached[0]:-}" =~ ^([1-9][0-9]{5}|1000000)$ ]] && live=${cached[0]}
+                cached_stamp=${cached[1]:-}
+                if [[ "$stamp" != "$cached_stamp" ]]; then
+                    latest=$(tail -c 65536 -- "$tp" 2>/dev/null | jq -Rrn --arg sid "$sid" '
+                        def window:
+                            ascii_downcase | gsub("^\\s+|\\s+$"; "") |
+                            if . == "auto" or . == "reset" or . == "unset" or . == "default" then "auto"
+                            else try (capture("^(?<n>[0-9]+(?:\\.[0-9]+)?)(?<u>[km]?)$") |
+                                (.n | tonumber) as $n |
+                                (if .u == "m" then $n * 1000000 elif .u == "k" then $n * 1000
+                                 elif $n >= 100 and $n <= 1000 then $n * 1000 else $n end) |
+                                select(. >= 100000 and . <= 1000000) | floor | tostring) catch empty end;
+                        reduce inputs as $line ({arg: "", live: ""};
+                            (try ($line | fromjson) catch null) as $e |
+                            . as $state | try (
+                            if ($e | type) != "object" or ($e.sessionId // $sid) != $sid or $e.isSidechain == true then .
+                            elif $e.type == "user" and ($e.message.content | type) == "string" then
+                                .arg = ([(try ($e.message.content |
+                                    capture("^<command-name>/autocompact</command-name>[\\s\\S]*<command-args>(?<a>[^<]*)</command-args>$").a) catch "")][0] // "")
+                            elif $e.type == "system" and $e.subtype == "local_command" and
+                                ($e.content | type) == "string" and
+                                ($e.content | test("^(<local-command-stdout>)?Auto-compact window .* set to ")) and
+                                ($e.content | contains("higher-priority override") | not) then
+                                (if $e.commandRun.command == "autocompact" then $e.commandRun.args else .arg end) as $a |
+                                ([(try ($a | window) catch empty)][0] // "") as $w |
+                                if $w != "" then .live = $w | .arg = "" else . end
+                            else . end) catch $state) | .live' 2>/dev/null)
+                    [[ "$latest" == auto || "$latest" =~ ^[0-9]{6,7}$ ]] && live=$latest
+                    # Atomic and best effort: a read-only cache never breaks the line.
+                    if mkdir -p -- "$cache_dir" 2>/dev/null && tmp=$(mktemp "$cache_dir/.compact.XXXXXX" 2>/dev/null); then
+                        jq -n --arg sid "$sid" --arg tp "$tp" --arg mid "$mid" --arg id "$file_id" \
+                            --arg stamp "$stamp" --argjson size "$size" --arg live "$live" \
+                            '{session:$sid, transcript:$tp, model:$mid, file_id:$id, size:$size, stamp:$stamp, live:$live}' \
+                            > "$tmp" 2>/dev/null && mv -f -- "$tmp" "$cache" 2>/dev/null
+                        rm -f -- "$tmp" 2>/dev/null
+                    fi
+                fi
             fi
-            break 2
-        done
-        pid=$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null); [[ "$pid" =~ ^[0-9]+$ ]] && (( pid > 1 )) || break
-    done
-    ew=${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-}
-    ew=${ew//[kK]/000}; ew=${ew//[mM]/000000}
-    [[ "$ew" =~ ^[0-9]+$ ]] && cfg=$ew
-    if [[ -n "$cfg" ]]; then
-        thr=$cfg
-        (( thr < 100000 )) && thr=100000
-        (( thr > win )) && thr=$win
-    elif (( win >= 1000000 )); then thr=967000
-    else thr=$(( win - 33000 ))
+        fi
     fi
-    thr_pct=$(( thr * 100 / win ))
+    cfg=''
+    # The runtime/live sources are sufficient on most managed refreshes.
+    if [[ ( -z "$recorded" && -z "$live" ) || "$live" == auto ]]; then
+        for f in "$config_dir/settings.json" "$proj/.claude/settings.json" "$proj/.claude/settings.local.json"; do
+            [[ -r "$f" ]] || continue
+            # Gateway IDs come as "Claude-Fable-5.2": compare lowercased, dots as dashes.
+            v=$(jq -r --arg m "$mid" '
+                def norm: ascii_downcase | gsub("\\."; "-");
+                ((.modelSettings // {}) | to_entries | map(select(.key as $k | ($m | norm) | startswith($k | norm)))
+                  | sort_by(.key | length) | last | .value.autoCompactWindow) // .autoCompactWindow // empty' "$f" 2>/dev/null)
+            [[ "$v" =~ ^[0-9]{1,9}$ ]] && cfg=$((10#$v))
+        done
+        # --autocompact on the launching claude process (flag beats settings, loses to env)
+        pid=$PPID
+        for _ in 1 2 3 4; do
+            [[ -n "$live" ]] && break # native /autocompact clears the launch flag
+            [[ -r /proc/$pid/cmdline ]] || break
+            mapfile -d '' -t argv < "/proc/$pid/cmdline"
+            for i in "${!argv[@]}"; do
+                case "${argv[i]}" in
+                    --autocompact=*) fl=${argv[i]#*=} ;;
+                    --autocompact)   fl=${argv[i+1]:-} ;;
+                    *) continue ;;
+                esac
+                fl=$(window_tokens "$fl") && cfg=$fl
+                break 2
+            done
+            pid=$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null); [[ "$pid" =~ ^[0-9]+$ ]] && (( pid > 1 )) || break
+        done
+        ew=${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-}
+        ew=$(window_tokens "$ew") && cfg=$ew
+    fi
+    if [[ -n "$cfg" ]]; then
+        compact_window=$cfg
+        (( compact_window < 100000 )) && compact_window=100000
+        (( compact_window > win )) && compact_window=$win
+    elif (( win >= 1000000 )); then compact_window=1000000
+    else compact_window=$win
+    fi
+    if [[ -n "$live" && "$live" != auto ]]; then
+        compact_window=$((10#$live))
+        (( compact_window > win )) && compact_window=$win
+    fi
+    # Verified in Claude Code 2.1.321: FO calls G4(Moe(model, window)).
+    # Moe subtracts min(model.maxOutputTokens, 20000); G4 subtracts the 13000
+    # summary reserve, or takes the smaller percent of Moe's result.
+    thr=$(( compact_window - reserve ))
     ov=${CLAUDE_AUTOCOMPACT_PCT_OVERRIDE:-}
-    [[ "$ov" =~ ^[0-9]+$ ]] && (( ov > 0 && ov < 100 )) && thr_pct=$(( thr_pct * ov / 100 ))
+    if [[ "$ov" =~ ^[0-9]{1,3}$ ]] && (( 10#$ov > 0 && 10#$ov <= 100 )); then
+        pct_thr=$(( (compact_window - reserve + 13000) * 10#$ov / 100 ))
+        (( pct_thr < thr )) && thr=$pct_thr
+    fi
+    # A native reset returns to settings/defaults. The recorded trigger is
+    # authoritative only while no live command has replaced its launch setting.
+    [[ -n "$recorded" && -z "$live" ]] && thr=$recorded
+    (( thr < 0 )) && thr=0
+    thr_pct=$(( thr * 100 / win ))
     m=$(( thr_pct * bar_width / 100 )); (( m > bar_width - 1 )) && m=$(( bar_width - 1 ))
     if (( m < in_cells )); then
         bar_in="$(repeat "$m" '█')${MARK}│${COLOR}$(repeat $(( in_cells - m - 1 )) '█')"
