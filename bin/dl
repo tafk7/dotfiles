@@ -2,10 +2,11 @@
 # Download files from this machine to the computer you SSH in from, through WezTerm.
 #
 # Usage: dl FILE...             send each FILE to WezTerm's Downloads folder
+#        dl --wezterm           send this checkout's configs/wezterm.lua to
+#                               WezTerm, which asks, then replaces its config
 #        dl --print FILE        stage FILE and print its staged name only
-#        dl --wezterm-config    stage this checkout's configs/wezterm.lua and
-#                               print its staged name (WezTerm's own "Update
-#                               this WezTerm config" command runs this)
+#        dl --wezterm-config    stage configs/wezterm.lua, print its staged name
+#                               (WezTerm's "Update this WezTerm config" runs it)
 #
 # The host can't reach the laptop, so the laptop fetches: dl copies each file to
 # a private ~/.cache/dl/<id>/<name> and sets the terminal user variable dl_fetch
@@ -29,7 +30,7 @@ KEEP_MINUTES=1440
 
 die() { echo "dl: $*" >&2; exit 1; }
 
-usage() { sed -n '2,8s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; }
+usage() { sed -n '2,9s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; }
 
 # The file a FILE argument names: as given if absolute or found from here,
 # else the first DL_PATH directory that has it.
@@ -70,12 +71,13 @@ stage() {
     printf '%s/%s\n' "${dir##*/}" "$name"
 }
 
-# Ask the terminal's WezTerm to fetch STAGED. To the terminal itself when there
-# is one, so dl's stdout stays clean for pipes.
+# Set WezTerm's user variable VAR to STAGED (dl_fetch: save it to Downloads;
+# dl_config: offer it as the config). To the terminal itself when there is one,
+# so dl's stdout stays clean for pipes.
 signal() {
-    local value sequence out=/dev/stdout
-    value="$(printf '%s' "$1" | base64 | tr -d '\n')"
-    sequence=$'\e]1337;SetUserVar=dl_fetch='"$value"$'\a'
+    local var="$1" value sequence out=/dev/stdout
+    value="$(printf '%s' "$2" | base64 | tr -d '\n')"
+    sequence=$'\e]1337;SetUserVar='"$var=$value"$'\a'
     if [[ -n "${TMUX:-}" ]]; then
         sequence=$'\ePtmux;'"${sequence//$'\e'/$'\e\e'}"$'\e\\'
     fi
@@ -104,13 +106,20 @@ case "${1:-}" in
         stage "$SCRIPT_DIR/../configs/wezterm.lua"
         exit 0
         ;;
+    --wezterm)
+        [[ $# -eq 1 ]] || die "usage: dl --wezterm"
+        staged="$(stage "$SCRIPT_DIR/../configs/wezterm.lua")"
+        signal dl_config "$staged"
+        echo "dl: sent configs/wezterm.lua to WezTerm; it asks before replacing its config (older WezTerm configs ignore this: copy it by hand once)" >&2
+        exit 0
+        ;;
 esac
 
 host="$(hostname -s 2>/dev/null || hostname)"
 for arg in "$@"; do
     file="$(resolve "$arg")"
     staged="$(stage "$file")"
-    signal "$staged"
+    signal dl_fetch "$staged"
     echo "dl: sent ${staged#*/} ($(human_size "$file")) to WezTerm's Downloads; without WezTerm: scp $host:$STAGE_REL/$staged ." >&2
     # One fetch at a time reads more clearly in WezTerm's notifications.
     [[ "$arg" == "${*: -1}" ]] || sleep 0.2

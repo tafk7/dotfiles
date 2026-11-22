@@ -12,7 +12,7 @@ local config = wezterm.config_builder()
 -- This file's revision. With `SendEnv LC_TAFK_WEZTERM` in the Windows ssh
 -- config's Host block, `dotfiles verify` on the host says when this copy is
 -- out of date and needs copying again.
-local CONFIG_REVISION = 'a3b228653ec3'
+local CONFIG_REVISION = 'df750f975ef9'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -214,16 +214,104 @@ local function download_staged(window, pane, value)
   end
 end
 
--- Command palette: replace this file with the SSH host's configs/wezterm.lua
--- (`dl --wezterm-config` there stages it). The previous copy is kept as .bak,
--- and WezTerm reloads the new one by itself.
-local function update_config_from_host(window, pane)
+-- Replacing this file with the SSH host's configs/wezterm.lua: from the
+-- command palette, or `dl --wezterm` on the host, which stages it and sets the
+-- user variable dl_config. A config is code that runs here, and any program
+-- in a pane can set a user variable, so that way asks first. The previous
+-- copy is kept as .bak, and WezTerm reloads the new one by itself.
+
+-- Fetch the staged config to <config>.new; return its path and revision, or
+-- nil and why not.
+local function fetch_config(host, staged)
+  local new = wezterm.config_file .. '.new'
+  local ok, _, err = scp_staged(host, staged, new)
+  local f = ok and io.open(new, 'rb')
+  local text = f and f:read('a') or ''
+  if f then
+    f:close()
+  end
+  local revision = text:match("\nlocal CONFIG_REVISION = '(%x+)'\n")
+  if revision then
+    return new, revision
+  end
+  os.remove(new)
+  if not ok then
+    return nil, 'Download from ' .. host .. ' failed: ' .. (err or ''):gsub('%s+$', '')
+  end
+  return nil, 'The file from ' .. host .. ' has no CONFIG_REVISION stamp; kept the current one.'
+end
+
+-- Put NEW in place of the config, keeping the old one as .bak.
+local function swap_config(new, revision)
+  local target = wezterm.config_file
+  local bak = target .. '.bak'
+  os.remove(bak)
+  if not os.rename(target, bak) then
+    os.remove(new)
+    return 'Could not move the current config aside to ' .. bak .. '.'
+  end
+  if not os.rename(new, target) then
+    os.rename(bak, target)
+    return 'Could not put the new config in place; kept the current one.'
+  end
+  return 'Updated ' .. CONFIG_REVISION .. ' -> ' .. revision .. '; the previous copy is ' .. bak .. '.'
+end
+
+local function install_config(window, pane, host, staged, ask)
   local function say(msg)
     window:toast_notification('WezTerm config', msg, nil, 8000)
   end
+  local new, revision = fetch_config(host, staged)
+  if not new then
+    return say(revision)
+  end
+  if revision == CONFIG_REVISION then
+    os.remove(new)
+    return say('Already current (' .. revision .. ').')
+  end
+  if not ask then
+    return say(swap_config(new, revision))
+  end
+  window:perform_action(act.InputSelector {
+    title = 'WezTerm config from ' .. host,
+    description = string.format(
+      '%s sent its WezTerm config (%s). Replace %s (%s) with it? The current copy is kept as .bak.',
+      host, revision, wezterm.config_file, CONFIG_REVISION
+    ),
+    choices = {
+      { id = 'yes', label = 'Replace it with ' .. host .. "'s (" .. revision .. ')' },
+      { id = 'no', label = 'Keep this one' },
+    },
+    action = wezterm.action_callback(function(_, _, id)
+      if id == 'yes' then
+        say(swap_config(new, revision))
+      else
+        os.remove(new)
+        say('Kept the current config (' .. CONFIG_REVISION .. ').')
+      end
+    end),
+  }, pane)
+end
+
+-- `dl --wezterm` on the host: dl_config names the staged configs/wezterm.lua.
+local function offer_config(window, pane, value)
+  local staged, name = staged_name(value)
+  if not staged or name ~= 'wezterm.lua' then
+    return
+  end
   local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
   if not host then
-    return say('No SSH host for this tab (set PASTE_FALLBACK_HOST).')
+    return window:toast_notification('WezTerm config', 'No SSH host for this tab (set PASTE_FALLBACK_HOST).', nil, 8000)
+  end
+  install_config(window, pane, host, staged, true)
+end
+
+-- Command palette: the palette is the confirmation, so no question.
+-- `dl --wezterm-config` on the host stages the file and prints its name.
+local function update_config_from_host(window, pane)
+  local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
+  if not host then
+    return window:toast_notification('WezTerm config', 'No SSH host for this tab (set PASTE_FALLBACK_HOST).', nil, 8000)
   end
   local ok, out, err = wezterm.run_child_process {
     'ssh', '-o', 'BatchMode=yes', '-o', 'ClearAllForwardings=yes', host, 'bash -lc "dl --wezterm-config"',
@@ -231,38 +319,10 @@ local function update_config_from_host(window, pane)
   -- A login shell may print first; the staged name is the last line.
   local staged = staged_name((out or ''):match('([^\r\n]+)[\r\n]*$'))
   if not ok or not staged then
-    return say('Could not stage it on ' .. host .. ': ' .. (err or ''):gsub('%s+$', ''))
+    return window:toast_notification('WezTerm config',
+      'Could not stage it on ' .. host .. ': ' .. (err or ''):gsub('%s+$', ''), nil, 8000)
   end
-  local target = wezterm.config_file
-  local new, bak = target .. '.new', target .. '.bak'
-  ok, _, err = scp_staged(host, staged, new)
-  local f = ok and io.open(new, 'rb')
-  local text = f and f:read('a') or ''
-  if f then
-    f:close()
-  end
-  local revision = text:match("\nlocal CONFIG_REVISION = '(%x+)'\n")
-  if not revision then
-    os.remove(new)
-    if not ok then
-      return say('Download from ' .. host .. ' failed: ' .. (err or ''):gsub('%s+$', ''))
-    end
-    return say('The file from ' .. host .. ' has no CONFIG_REVISION stamp; kept the current one.')
-  end
-  if revision == CONFIG_REVISION then
-    os.remove(new)
-    return say('Already current (' .. revision .. ').')
-  end
-  os.remove(bak)
-  if not os.rename(target, bak) then
-    os.remove(new)
-    return say('Could not move the current config aside to ' .. bak .. '.')
-  end
-  if not os.rename(new, target) then
-    os.rename(bak, target)
-    return say('Could not put the new config in place; kept the current one.')
-  end
-  say('Updated ' .. CONFIG_REVISION .. ' -> ' .. revision .. '; the previous copy is ' .. bak .. '.')
+  install_config(window, pane, host, staged, false)
 end
 
 -- ---------------------------------------------------------------------------
@@ -360,6 +420,9 @@ end
 wezterm.on('user-var-changed', function(window, pane, name, value)
   if name == 'dl_fetch' then
     return download_staged(window, pane, value)
+  end
+  if name == 'dl_config' then
+    return offer_config(window, pane, value)
   end
   if name ~= 'viz_open' then
     return

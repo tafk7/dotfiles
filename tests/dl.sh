@@ -1,7 +1,8 @@
 #!/bin/bash
 # bin/dl: lookup (here, then DL_PATH), staging into a private ~/.cache/dl with
 # names the WezTerm side accepts, the dl_fetch user variable (plain and wrapped
-# for tmux), pruning, and the --print / --wezterm-config forms WezTerm uses.
+# for tmux), pruning, the --print / --wezterm-config forms WezTerm uses,
+# --wezterm's dl_config, and shell/tools/dl.sh's bash completion.
 # configs/wezterm.lua's side is exercised by hand on Windows (see README).
 set -euo pipefail
 
@@ -17,9 +18,10 @@ dl="$ROOT/bin/dl"
 unset TMUX DL_PATH
 # No controlling terminal, so the user variable goes to stdout where we can read it.
 run() { setsid -w "$dl" "$@" 2>"$TEST_ROOT/err"; }
-uservar() {   # decode the dl_fetch value(s) in "$1"
-    grep -o 'SetUserVar=dl_fetch=[A-Za-z0-9+/=]*' <<< "$1" | while IFS= read -r v; do
-        printf '%s\n' "${v#SetUserVar=dl_fetch=}" | base64 -d; echo
+uservar() {   # decode the user variable ${2:-dl_fetch}'s value(s) in "$1"
+    local var="${2:-dl_fetch}"
+    grep -o "SetUserVar=$var=[A-Za-z0-9+/=]*" <<< "$1" | while IFS= read -r v; do
+        printf '%s\n' "${v#SetUserVar="$var"=}" | base64 -d; echo
     done
 }
 
@@ -74,6 +76,28 @@ done
 staged="$(run --wezterm-config)"
 [[ "$staged" =~ ^[A-Za-z0-9]{12}/wezterm\.lua$ ]] || fail "--wezterm-config: $staged"
 cmp -s "$HOME/.cache/dl/$staged" "$ROOT/configs/wezterm.lua" || fail "--wezterm-config content"
+
+# --- --wezterm sends it as dl_config (never dl_fetch), and takes no files.
+out="$(run --wezterm)"
+staged="$(uservar "$out" dl_config)"
+[[ "$staged" =~ ^[A-Za-z0-9]{12}/wezterm\.lua$ ]] || fail "--wezterm: $(printf %q "$out")"
+[[ -z "$(uservar "$out")" ]] || fail "--wezterm also set dl_fetch"
+cmp -s "$HOME/.cache/dl/$staged" "$ROOT/configs/wezterm.lua" || fail "--wezterm content"
+grep -q 'asks before replacing' "$TEST_ROOT/err" || fail "--wezterm message: $(cat "$TEST_ROOT/err")"
+run --wezterm a.txt >/dev/null && fail "--wezterm with a file accepted"
+
+# --- Completion: options after -, files here and through DL_PATH.
+mkdir -p "$TEST_ROOT/lib/sub"
+complete_dl() {   # print COMPREPLY for "dl $1", one per line
+    DL_PATH="$TEST_ROOT/lib" bash --norc --noprofile -c '
+        source "$1/shell/tools/dl.sh"
+        COMP_WORDS=(dl "$2"); COMP_CWORD=1; _dl_complete
+        printf "%s\n" "${COMPREPLY[@]}"' _ "$ROOT" "$1"
+}
+[[ "$(complete_dl --we | tr '\n' ' ')" == '--wezterm --wezterm-config ' ]] || fail "complete --we: $(complete_dl --we)"
+complete_dl configs/ | grep -qx 'configs/x.lua' || fail "complete through DL_PATH: $(complete_dl configs/)"
+complete_dl su | grep -qx 'sub/' || fail "a DL_PATH directory: $(complete_dl su)"
+complete_dl a. | grep -qx 'a.txt' || fail "complete here: $(complete_dl a.)"
 
 # --- Staged copies older than a day are pruned by the next run.
 old="$HOME/.cache/dl/OLDOLDOLDOLD"

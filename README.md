@@ -181,15 +181,16 @@ yo <command>              # print output and copy it to the clipboard
   `%USERPROFILE%\.wezterm.lua`, and add `SendEnv LC_TAFK_WEZTERM` to the Host
   block of your Windows `~/.ssh/config`: the copy then reports its revision
   over SSH, and `dotfiles verify` says when it needs copying again. After the
-  first copy, the command palette's "Update this WezTerm config from the tab's
-  SSH host" replaces it from the host and keeps the old one as `.bak`.
+  first copy, `dl --wezterm` on the host, or the command palette's "Update
+  this WezTerm config from the tab's SSH host", replaces it from the host
+  (`dl --wezterm` asks first) and keeps the old one as `.bak`.
 - **Downloads:** `dl FILE...` on the host saves files to your Windows
   Downloads folder through WezTerm, which fetches them with scp from the tab's
   SSH host (so plain `ssh <host>` must log in without a prompt, as for
   Ctrl+Alt+V). A relative name not found in the current directory is looked up
   in `DL_PATH` (colon-separated; set it in `~/.shell.env`, e.g.
-  `export DL_PATH="$DOTFILES_DIR"`). Outside WezTerm, `dl` prints the `scp`
-  command to run from the laptop instead.
+  `export DL_PATH="$DOTFILES_DIR"`); Tab completes those names too. Outside
+  WezTerm, `dl` prints the `scp` command to run from the laptop instead.
 - **WSL:** adds `pbcopy`/`pbpaste`, `cdwin`, and `open`. To use a Windows SSH
   agent such as Bitwarden or 1Password, run `./bin/ssh-bridge enable`.
 
