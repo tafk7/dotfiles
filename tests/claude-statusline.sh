@@ -41,7 +41,7 @@ write_record() {
         compact_pending: {trigger: 450000}, applied_to: "another-session"}' > "$record"
 }
 command_result() {
-    # Real interactive transcript rows, with only the model/argument varied.
+    # Trimmed real interactive rows, with only the model/argument varied.
     jq -c --arg sid "$sid" --arg n "$1" --arg model "${2:-Sonnet 5.5}" '
         .sessionId = $sid |
         if (.message.content | startswith("<command-name>")) then
@@ -60,7 +60,13 @@ write_record "$sid"
 original_input=$input
 input=$(printf '%s' "$input" | jq '.model={id:"claude-opus-5-5",display_name:"Opus 5.5"}')
 cat "$TEST_REPO_ROOT/tests/fixtures/claude-autocompact.jsonl" > "$transcript"
-marker 5 'verbatim interactive result replaces the recorded launch: 267k trigger'
+marker 5 'trimmed real interactive result replaces the recorded launch: 267k trigger'
+input=$(printf '%s' "$input" | jq '.model={id:"claude-opus-5-5[1m]",display_name:"Opus 5.5 (1M context)"}')
+marker 5 '1M display suffix matches the canonical live model key'
+input=$(printf '%s' "$input" | jq '.model={id:"claude-opus-5-5-20260101[1m]",display_name:"Opus 5.5 (1M context)"}')
+marker 5 'dated 1M model retains the same live key'
+input=$(printf '%s' "$input" | jq 'del(.model.display_name)')
+marker 5 'model-id fallback removes the date and 1M suffix'
 rm "$transcript" "$XDG_CACHE_HOME/claude-statusline/$key.json"
 input=$original_input
 command_result 383k

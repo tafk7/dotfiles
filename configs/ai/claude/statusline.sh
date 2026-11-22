@@ -14,7 +14,8 @@ fi
 mapfile -t fields < <(jq -r '
     def text: if type == "string" and (test("[\\r\\n\\t]") | not) then . else "" end;
     def number: if type == "number" then . else 0 end;
-    def model_key: ascii_downcase | sub("^claude-"; "") | sub("-[0-9]{8}$"; "") |
+    def model_key: ascii_downcase | sub(" \\([^)]*\\)$"; "") | sub("\\[1m\\]$"; "") |
+        sub("^claude-"; "") | sub("-[0-9]{8}$"; "") |
         gsub("[^a-z0-9]+"; "-") | gsub("^-|-$"; "");
     if type == "object" then . else {} end |
     (.context_window.used_percentage | number),
@@ -165,7 +166,8 @@ if (( win > 0 && auto )); then
                     if [[ "$stamp" != "$cached_stamp" ]]; then
                         mapfile -t updated < <(tail -c 65536 -- "$tp" 2>/dev/null |
                             jq -Rrn --arg sid "$sid" --arg model "$main_model" --argjson models "$models" '
-                            def model_key: ascii_downcase | sub("^claude-"; "") | sub("-[0-9]{8}$"; "") |
+                            def model_key: ascii_downcase | sub(" \\([^)]*\\)$"; "") | sub("\\[1m\\]$"; "") |
+                                sub("^claude-"; "") | sub("-[0-9]{8}$"; "") |
                                 gsub("[^a-z0-9]+"; "-") | gsub("^-|-$"; "");
                             def window:
                                 ascii_downcase | gsub("^\\s+|\\s+$"; "") |
