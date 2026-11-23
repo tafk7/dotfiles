@@ -1,6 +1,8 @@
 # shellcheck shell=bash
-# Tab completion for bin/dl in bash: its options after "-", else files here and
-# the relative names it would find through DL_PATH. (zsh completes files.)
+# Tab completion in bash for bin/dl: its options after "-", else files here and
+# the relative names it would find through DL_PATH; and for bin/up, its DEST
+# (its first word is a Windows path, which this machine can't see). zsh
+# completes files.
 
 [[ -n "${BASH_VERSION:-}" ]] || return 0
 
@@ -27,3 +29,15 @@ _dl_complete() {
     return 0
 }
 complete -o filenames -F _dl_complete dl
+
+_up_complete() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=()
+    if (( COMP_CWORD == 2 )); then
+        mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+    elif (( COMP_CWORD == 1 )) && [[ "$cur" == -* ]]; then
+        mapfile -t COMPREPLY < <(compgen -W '--help' -- "$cur")
+    fi
+    return 0
+}
+complete -o filenames -F _up_complete up

@@ -12,7 +12,7 @@ local config = wezterm.config_builder()
 -- This file's revision. With `SendEnv LC_TAFK_WEZTERM` in the Windows ssh
 -- config's Host block, `dotfiles verify` on the host says when this copy is
 -- out of date and needs copying again.
-local CONFIG_REVISION = 'df750f975ef9'
+local CONFIG_REVISION = 'b77f26eccd08'
 config.set_environment_variables = { LC_TAFK_WEZTERM = CONFIG_REVISION }
 
 -- ---------------------------------------------------------------------------
@@ -326,6 +326,176 @@ local function update_config_from_host(window, pane)
 end
 
 -- ---------------------------------------------------------------------------
+-- Uploads to the SSH host
+-- ---------------------------------------------------------------------------
+
+-- `up [WINPATH [DEST]]` on the host (bin/up) makes a private slot
+-- ~/.cache/up/<id> and sets the user variable up_request to
+-- "<id>\n<WINPATH>\n<host:DEST>". Any program in a pane can set it, so nothing
+-- leaves this computer unless you confirm the file shown, or pick one. Then
+-- this scps it into the slot, and last a .status file (ok, cancel or
+-- "fail: why") that up waits for before moving the file to DEST.
+local UP_SOURCE = nil -- nil: %USERPROFILE%\Downloads, for bare names and the picker
+local UP_REMOTE_DIR = '.cache/up' -- relative to remote $HOME; bin/dl's UP_REL
+
+local function up_source_dir()
+  return UP_SOURCE or (os.getenv('USERPROFILE') .. '\\Downloads')
+end
+
+-- The full path WINPATH names, or nil and why not: C:\x or C:/x as is, ~\x in
+-- the home folder, anything else in UP_SOURCE. Never a network or device path
+-- (opening one would already reach out), and no . or .. so what the question
+-- shows is the file sent.
+local function up_resolve(src)
+  local p = src:gsub('/', '\\')
+  if p:match('^\\\\') then
+    return nil, 'Network and device paths are not uploaded: ' .. src
+  end
+  if p == '~' or p:match('^~\\') then
+    p = os.getenv('USERPROFILE') .. p:sub(2)
+  elseif not p:match('^%a:\\') then
+    if p:match('^\\') or p:match('^%a:') then
+      return nil, 'Give a full path, like C:\\Users\\you\\file: ' .. src
+    end
+    p = up_source_dir() .. '\\' .. p
+  end
+  p = p:gsub('\\+', '\\')
+  for seg in p:gmatch('[^\\]+') do
+    if seg == '.' or seg == '..' then
+      return nil, 'No . or .. in the path: ' .. src
+    end
+  end
+  return p
+end
+
+local function file_size(path)
+  local f = io.open(path, 'rb')
+  local size = f and f:seek('end')
+  if f then
+    f:close()
+  end
+  return size
+end
+
+local function human_size(n)
+  for _, unit in ipairs { 'B', 'KB', 'MB', 'GB' } do
+    if n < 1024 or unit == 'GB' then
+      return (unit == 'B' and '%d %s' or '%.1f %s'):format(n, unit)
+    end
+    n = n / 1024
+  end
+end
+
+-- What up reads last: TEXT as <slot>/.status on HOST.
+local function up_status(host, id, text)
+  local tmp = (os.getenv('TEMP') or os.getenv('USERPROFILE')) .. '\\wezterm-up-' .. id .. '.status'
+  local f = io.open(tmp, 'wb')
+  if not f then
+    return
+  end
+  f:write(text)
+  f:close()
+  wezterm.run_child_process {
+    'scp', '-q', '-o', 'BatchMode=yes', tmp, host .. ':' .. UP_REMOTE_DIR .. '/' .. id .. '/.status',
+  }
+  os.remove(tmp)
+end
+
+-- Up to 200 file names in DIR, newest first.
+local function newest_files(dir)
+  local ok, out = wezterm.run_child_process {
+    'powershell.exe', '-NoProfile', '-NonInteractive', '-Command',
+    '[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-ChildItem -File -LiteralPath '
+      .. "'" .. dir:gsub("'", "''") .. "'"
+      .. ' | Sort-Object LastWriteTime -Descending | Select-Object -First 200 -ExpandProperty Name',
+  }
+  local names = {}
+  for line in ((ok and out) or ''):gmatch('[^\r\n]+') do
+    table.insert(names, line)
+  end
+  return names
+end
+
+local function upload_requested(window, pane, value)
+  local id, src, dest = (value or ''):match('^(%w+)\n([^\n]*)\n([^\n]*)$')
+  if not id or #id ~= 12 then
+    return
+  end
+  local function say(msg)
+    window:toast_notification('up', msg, nil, 8000)
+  end
+  local host = ssh_host_of(pane) or PASTE_FALLBACK_HOST
+  if not host then
+    return say('No SSH host for this tab (set PASTE_FALLBACK_HOST); up times out.')
+  end
+  dest = dest:gsub('%c', ''):sub(1, 200)
+  local function fail(why)
+    up_status(host, id, 'fail: ' .. why)
+    say(why)
+  end
+  local function send(path)
+    local name = (path:match('([^\\]+)$') or ''):gsub('[^%w%._%-]', '_'):gsub('%.+$', '')
+    local ok, _, err = wezterm.run_child_process {
+      'scp', '-q', '-o', 'BatchMode=yes', path,
+      host .. ':' .. UP_REMOTE_DIR .. '/' .. id .. '/' .. (name ~= '' and name or 'file'),
+    }
+    if not ok then
+      return fail('Upload to ' .. host .. ' failed: ' .. (err or ''):gsub('%s+$', ''))
+    end
+    up_status(host, id, 'ok')
+    say('Sent ' .. path .. ' to ' .. dest)
+  end
+  local function cancel()
+    up_status(host, id, 'cancel')
+  end
+
+  if src == '' then
+    local dir = up_source_dir()
+    local choices = {}
+    for _, name in ipairs(newest_files(dir)) do
+      table.insert(choices, { id = name, label = name })
+    end
+    if #choices == 0 then
+      return fail('No files in ' .. dir .. '.')
+    end
+    return window:perform_action(act.InputSelector {
+      title = 'Upload to ' .. dest,
+      description = 'Pick a file from ' .. dir .. ' to send to ' .. dest .. '. Esc cancels.',
+      fuzzy = true,
+      choices = choices,
+      action = wezterm.action_callback(function(_, _, picked)
+        if picked then
+          send(dir .. '\\' .. picked)
+        else
+          cancel()
+        end
+      end),
+    }, pane)
+  end
+
+  local path, why = up_resolve(src)
+  local size = path and file_size(path)
+  if not size then
+    return fail(why or ('No such file: ' .. path))
+  end
+  window:perform_action(act.InputSelector {
+    title = 'Upload to ' .. host,
+    description = ('Send %s (%s) to %s?'):format(path, human_size(size), dest),
+    choices = {
+      { id = 'yes', label = 'Send it' },
+      { id = 'no', label = 'Cancel' },
+    },
+    action = wezterm.action_callback(function(_, _, answer)
+      if answer == 'yes' then
+        send(path)
+      else
+        cancel()
+      end
+    end),
+  }, pane)
+end
+
+-- ---------------------------------------------------------------------------
 -- Port forwards for the remote shell tools
 -- ---------------------------------------------------------------------------
 
@@ -423,6 +593,9 @@ wezterm.on('user-var-changed', function(window, pane, name, value)
   end
   if name == 'dl_config' then
     return offer_config(window, pane, value)
+  end
+  if name == 'up_request' then
+    return upload_requested(window, pane, value)
   end
   if name ~= 'viz_open' then
     return

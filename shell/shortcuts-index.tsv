@@ -227,6 +227,7 @@ shell│keymap open│Map every key across the Defy, Windows, WezTerm, tmux and 
 shell│keymap why│Trace one chord through every layer, e.g. keymap why shift+tab│bin/keymap why <chord> [program...]
 shell│dl FILE...│Save files from the SSH host to Windows' Downloads, through WezTerm (Tab completes DL_PATH names)│bin/dl
 shell│dl --wezterm│Send the host's WezTerm config to WezTerm, which asks, then replaces its own│bin/dl --wezterm
+shell│up [WINDOWS-PATH [DEST]]│Send a file from Windows to the SSH host through WezTerm, which shows it and asks (no path: pick from Downloads)│bin/up
 shell│keymap free│Chords the keyboard sends that nothing binds, e.g. keymap free alt│bin/keymap free <mods>
 # Archive
 shell│extract│Extract any archive format (.tar.gz, .zip, etc.)│extract <file>

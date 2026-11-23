@@ -191,6 +191,12 @@ yo <command>              # print output and copy it to the clipboard
   in `DL_PATH` (colon-separated; set it in `~/.shell.env`, e.g.
   `export DL_PATH="$DOTFILES_DIR"`); Tab completes those names too. Outside
   WezTerm, `dl` prints the `scp` command to run from the laptop instead.
+- **Uploads:** `up WINDOWS-PATH [DEST]` on the host has WezTerm send a file
+  from Windows, after it shows you the file and you confirm: `up report.pdf`
+  (a bare or relative name is in Downloads), `up ~/Desktop/x.txt` (your
+  Windows home), `up 'C:\data\a.csv' sub/` (quote backslashes, or use `/`).
+  Plain `up` picks from Downloads. DEST, here by default, is a directory or a
+  new name; nothing is overwritten. Network paths are refused.
 - **WSL:** adds `pbcopy`/`pbpaste`, `cdwin`, and `open`. To use a Windows SSH
   agent such as Bitwarden or 1Password, run `./bin/ssh-bridge enable`.
 

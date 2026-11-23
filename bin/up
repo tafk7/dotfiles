@@ -1,0 +1,16 @@
+#!/bin/bash
+# Upload a file from the computer you SSH in from to this machine, through WezTerm.
+#
+# Usage: up WINDOWS-PATH [DEST]   WezTerm shows the file and asks, then sends it
+#        up                       pick a file from your Windows Downloads
+#
+# WINDOWS-PATH: C:\Users\you\file.pdf (quote it: bash eats unquoted
+# backslashes) or C:/Users/you/file.pdf; ~/Desktop/x.txt (quoted or not)
+# for your Windows home; a bare or relative name for your Downloads folder.
+# DEST, here by default: a directory keeps the name, anything else names the
+# file. A taken name becomes "name (1).ext", never overwritten. Uses bin/dl.
+set -euo pipefail
+case "${1:-}" in
+    -h|--help) sed -n '2,11s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+esac
+exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dl" --up "$@"

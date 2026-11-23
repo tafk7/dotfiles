@@ -7,6 +7,7 @@
 #        dl --print FILE        stage FILE and print its staged name only
 #        dl --wezterm-config    stage configs/wezterm.lua, print its staged name
 #                               (WezTerm's "Update this WezTerm config" runs it)
+#        dl --up [WINPATH [DEST]]   what bin/up runs: the other direction
 #
 # The host can't reach the laptop, so the laptop fetches: dl copies each file to
 # a private ~/.cache/dl/<id>/<name> and sets the terminal user variable dl_fetch
@@ -21,16 +22,26 @@
 #   export DL_PATH="$DOTFILES_DIR"      # dl configs/wezterm.lua, from anywhere
 #
 # Outside WezTerm nothing arrives; the printed scp command fetches it instead.
+#
+# Uploads (bin/up) run the other way: up makes a private slot ~/.cache/up/<id>
+# and sets up_request to "<id>\n<windows path>\n<host:destination>" (an empty
+# path: pick from Downloads). WezTerm shows the file it resolved and asks, then
+# scps it into the slot, and last a .status file: ok, cancel or "fail: why".
+# up waits for that, then moves the file to the destination without
+# overwriting. WezTerm uploads only what you confirm or pick, since any output
+# can set the variable.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STAGE_REL=".cache/dl"   # relative to $HOME: configs/wezterm.lua names it too
 STAGE="$HOME/$STAGE_REL"
+UP_REL=".cache/up"      # relative to $HOME: configs/wezterm.lua names it too
+UP_DIR="$HOME/$UP_REL"
 KEEP_MINUTES=1440
 
 die() { echo "dl: $*" >&2; exit 1; }
 
-usage() { sed -n '2,9s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; }
+usage() { sed -n '2,10s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; }
 
 # The file a FILE argument names: as given if absolute or found from here,
 # else the first DL_PATH directory that has it.
@@ -57,14 +68,19 @@ safe_name() {
     printf '%s\n' "$name"
 }
 
+# Make DIR, and remove what is in it from more than a day ago.
+prune() {
+    mkdir -p "$1"
+    find "$1" -mindepth 1 -maxdepth 1 -type d -mmin +"$KEEP_MINUTES" -exec rm -rf {} + 2>/dev/null || true
+}
+
 # Copy FILE into a fresh private directory; print "<id>/<name>".
 stage() {
     local file="$1" dir name
     [[ -f "$file" ]] || die "$file: not a regular file"
     [[ -r "$file" ]] || die "$file: not readable"
     umask 077
-    mkdir -p "$STAGE"
-    find "$STAGE" -mindepth 1 -maxdepth 1 -type d -mmin +"$KEEP_MINUTES" -exec rm -rf {} + 2>/dev/null || true
+    prune "$STAGE"
     dir="$(mktemp -d "$STAGE/XXXXXXXXXXXX")"
     name="$(safe_name "$file")"
     cp -- "$file" "$dir/$name"
@@ -91,7 +107,90 @@ human_size() {
     numfmt --to=iec --suffix=B "$bytes" 2>/dev/null || printf '%sB\n' "$bytes"
 }
 
+# DIR/NAME, or DIR/STEM (n).EXT for the first n that is free (as WezTerm names
+# downloads).
+free_name() {
+    local dir="$1" name="$2" stem ext n=1 path
+    if [[ "$name" == ?*.* ]]; then
+        stem="${name%.*}" ext=".${name##*.}"
+    else
+        stem="$name" ext=""
+    fi
+    path="$dir/$name"
+    while [[ -e "$path" || -L "$path" ]]; do
+        path="$dir/$stem ($n)$ext"
+        n=$((n + 1))
+    done
+    printf '%s\n' "$path"
+}
+
+# up [WINPATH [DEST]]: ask WezTerm for a file from the laptop; see the header.
+upload() {
+    local src="" dest="." dir name="" slot status shown keep_umask target
+    local -a files=()
+    case $# in
+        0) ;;
+        1) src="$1" ;;
+        2) src="$1" dest="$2" ;;
+        *) die "usage: up [WINDOWS-PATH [DEST]]" ;;
+    esac
+    [[ "$src" != *[[:cntrl:]]* ]] || die "the Windows path has a control character"
+    # An unquoted ~/x reaches here as this machine's $HOME/x; ~ is Windows' home.
+    local tilde='~'
+    [[ "$src" == "$HOME"/* ]] && src="$tilde/${src#"$HOME"/}"
+    # DEST is a directory, which keeps the file's name, or a new name in one.
+    if [[ -d "$dest" ]]; then
+        dir="$dest"
+    elif [[ "$dest" == */ ]]; then
+        die "$dest: no such directory"
+    else
+        dir="$(dirname -- "$dest")" name="$(basename -- "$dest")"
+        [[ -d "$dir" ]] || die "$dir: no such directory"
+    fi
+    [[ -w "$dir" ]] || die "$dir: not writable"
+    dir="$(cd -- "$dir" && pwd)"
+    keep_umask="$(umask)"
+    umask 077
+    prune "$UP_DIR"
+    slot="$(mktemp -d "$UP_DIR/XXXXXXXXXXXX")"
+    # shellcheck disable=SC2064  # the slot is fixed now
+    trap "rm -rf '$slot'" EXIT
+    trap 'exit 130' INT TERM HUP
+    shown="${dir/#"$HOME"/\~}/$name"
+    signal up_request "${slot##*/}"$'\n'"$src"$'\n'"$host:$shown"
+    echo "up: asked WezTerm for ${src:-a file from Downloads}; waiting for it (Ctrl+C cancels)" >&2
+    local timeout="${UP_TIMEOUT:-600}" deadline
+    deadline=$((SECONDS + timeout))
+    until [[ -s "$slot/.status" ]]; do
+        (( SECONDS < deadline )) || die "no answer from WezTerm in ${timeout}s; from the laptop instead: scp FILE $host:${dir#"$HOME"/}/$name"
+        sleep 0.2
+    done
+    status="$(< "$slot/.status")"
+    case "$status" in
+        ok) ;;
+        cancel) die "cancelled" ;;
+        *) die "${status#fail: }" ;;
+    esac
+    shopt -s nullglob
+    files=("$slot"/*)
+    shopt -u nullglob
+    [[ ${#files[@]} -eq 1 && -f "${files[0]}" ]] || die "WezTerm said ok, but no file arrived"
+    target="$(free_name "$dir" "${name:-${files[0]##*/}}")"
+    mv -n -- "${files[0]}" "$target"
+    [[ ! -e "${files[0]}" ]] || die "$target: appeared meanwhile; not overwritten"
+    # The mode a new file gets here, as cp would give it.
+    chmod "$(printf '%o' $(( 0666 & ~8#$keep_umask )))" -- "$target"
+    echo "up: saved $target ($(human_size "$target"))" >&2
+}
+
+host="$(hostname -s 2>/dev/null || hostname)"
+
 case "${1:-}" in
+    --up)
+        shift
+        upload "$@"
+        exit 0
+        ;;
     ''|-h|--help)
         usage
         [[ -n "${1:-}" ]] || exit 2
@@ -115,7 +214,6 @@ case "${1:-}" in
         ;;
 esac
 
-host="$(hostname -s 2>/dev/null || hostname)"
 for arg in "$@"; do
     file="$(resolve "$arg")"
     staged="$(stage "$file")"
