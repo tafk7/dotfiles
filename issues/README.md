@@ -21,6 +21,10 @@ note's own **Status** line is the authority; this index is updated with it.
   nothing is set up.
 - [Compose box](compose-agent-box.md): built for Claude, Codex and OpenCode; in
   testing.
+- [Remote vault mirror](remote-vault-mirror.md): Obsidian on the laptop on a
+  local mirror of a vault on the host, synced by our own plugin and helper
+  through Ctrl+Alt+P's tunnel; works with key and password-only hosts. A design
+  proposal; nothing built.
 
 ## Implemented (kept as the record of what was decided)
 
