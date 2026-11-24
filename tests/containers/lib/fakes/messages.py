@@ -8,11 +8,12 @@ No model is called and no credential is needed.
 
 Every request is logged (method, path, model, whether it streams, the session header, the
 request's headers without credentials). Every turn is answered with REPLY as text, except a
-scripted one: when a request offers tools and its session has a script with commands left, the
-answer is a Bash tool call running the script's next line. A session's script is
+scripted one: when a request offers tools and its session has a script with entries left, the
+answer is the script's next tool call. A JSON line {"name": "Edit", "input": {...}} selects a
+tool and its input; any other line is a Bash command, preserved verbatim. A session's script is
 DIR/session-SESSION_ID if that file exists (Claude sends the id in X-Claude-Code-Session-Id),
 else DIR/NAME when the conversation's first user message contains `[[testbed:NAME]]`. Each line
-of a script is one command, used once per session.
+of a script is one tool call, used once per session.
 """
 
 import argparse
@@ -76,6 +77,18 @@ def answered_tool(messages) -> bool:
     return isinstance(last, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in last)
 
 
+def scripted_tool(line: str) -> dict:
+    """Accept a named tool with object input, keeping plain Bash scripts compatible."""
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        entry = None
+    if (isinstance(entry, dict) and isinstance(entry.get("name"), str) and entry["name"].strip()
+            and isinstance(entry.get("input"), dict)):
+        return {"name": entry["name"], "input": entry["input"]}
+    return {"name": "Bash", "input": {"command": line, "description": "scripted by the testbed"}}
+
+
 def make_handler(log_path: Path, reply: str, scripts: Scripts):
     log_lock = threading.Lock()
 
@@ -128,8 +141,7 @@ def make_handler(log_path: Path, reply: str, scripts: Scripts):
             usage = {"input_tokens": 10, "output_tokens": 3, "cache_creation_input_tokens": 0,
                      "cache_read_input_tokens": 0}
             if command is not None:
-                block = {"type": "tool_use", "id": f"toolu_testbed_{turn}", "name": "Bash",
-                         "input": {"command": command, "description": "scripted by the testbed"}}
+                block = {"type": "tool_use", "id": f"toolu_testbed_{turn}", **scripted_tool(command)}
                 stop = "tool_use"
             else:
                 block = {"type": "text", "text": reply}

@@ -42,7 +42,9 @@ point them at stand-in servers inside the container (`lib/fakes/`):
 `messages.py` answers the Messages API, `responses.py` the Responses API. No
 model is called and no credential is used; `ANTHROPIC_API_KEY=dummy`. The
 Messages stand-in can also script a session: a request that offers tools gets
-the next line of the session's script as a Bash tool call (see its docstring).
+the next line of the session's script as a tool call (see its docstring). JSON
+lines such as `{"name": "Write", "input": {"file_path": "/tmp/note", "content": "hello"}}`
+select any tool and its input. Plain lines stay Bash commands, passed verbatim.
 
 ## Writing a scenario
 

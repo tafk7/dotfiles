@@ -222,6 +222,53 @@ class Stand_ins(unittest.TestCase):
             self.assertEqual(refused.exception.code, 400)
             self.assertEqual(json.loads(refused.exception.read())["error"]["message"], 'too many "images"')
 
+    def test_messages_json_tool_scripts_streaming_and_nonstreaming(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = Path(tmp) / "scripts"
+            scripts.mkdir()
+            edit = {"name": "Edit", "input": {"file_path": "/tmp/tracked.txt", "old_string": "start\n",
+                                               "new_string": "edited\n"}}
+            write = {"name": "Write", "input": {"file_path": "/tmp/tracked.txt", "content": "written\n"}}
+            (scripts / "session-tool-session").write_text(json.dumps(edit) + "\n" + json.dumps(write) + "\n")
+            url = self.serve(messages.serve(0, Path(tmp) / "log.jsonl", "done", scripts)) + "/v1/messages"
+            session = {"X-Claude-Code-Session-Id": "tool-session"}
+            request = {"model": "m", "tools": [{"name": "Edit"}, {"name": "Write"}],
+                       "messages": [{"role": "user", "content": "edit the file"}]}
+            kind, body = self.post(url, request, session)
+            result = json.loads(body)
+            block = result['content'][0]
+            self.assertEqual((block['name'], block['input']), (edit['name'], edit['input']))
+            self.assertEqual(result['stop_reason'], 'tool_use')
+
+            kind, body = self.post(url, {**request, "stream": True}, session)
+            self.assertEqual(kind, 'text/event-stream')
+            events = [json.loads(line[6:]) for line in body.splitlines() if line.startswith('data: ')]
+            start = next(e['content_block'] for e in events if e['type'] == 'content_block_start')
+            data = ''.join(e['delta']['partial_json'] for e in events
+                           if e['type'] == 'content_block_delta')
+            self.assertEqual(start['name'], write['name'])
+            self.assertEqual(json.loads(data), write['input'])
+            self.assertTrue(any(e.get('delta', {}).get('stop_reason') == 'tool_use' for e in events))
+
+            kind, body = self.post(url, request, session)
+            self.assertEqual(json.loads(body)['content'][0]['text'], 'done')
+
+    def test_messages_plain_commands_remain_bash_even_when_valid_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = Path(tmp) / "scripts"
+            scripts.mkdir()
+            lines = ['  echo one  ', '{"plain": "line"}', '{"name": "Write"}',
+                     '{"name": "Write", "input": null}', '{"name": "", "input": {}}', '[]']
+            (scripts / "worker").write_text('\n'.join(lines) + '\n')
+            url = self.serve(messages.serve(0, Path(tmp) / "log.jsonl", "done", scripts)) + "/v1/messages"
+            request = {"model": "m", "tools": [{"name": "Bash"}],
+                       "messages": [{"role": "user", "content": "[[testbed:worker]]"}]}
+            for line in lines:
+                kind, body = self.post(url, request, {"X-Claude-Code-Session-Id": "plain-session"})
+                block = json.loads(body)['content'][0]
+                self.assertEqual(block['name'], 'Bash')
+                self.assertEqual(block['input'], {'command': line, 'description': 'scripted by the testbed'})
+
 
 class Scenarios(unittest.TestCase):
     def test_listing_and_interface(self):
