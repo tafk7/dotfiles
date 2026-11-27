@@ -25,6 +25,10 @@ note's own **Status** line is the authority; this index is updated with it.
   local mirror of a vault on the host, synced by our own plugin and helper
   through Ctrl+Alt+P's tunnel; works with key and password-only hosts. A design
   proposal; nothing built.
+- [Antigravity CLI](antigravity-cli.md): `agy` as an opt-in AI tool
+  (`--antigravity`), installed from the vendor manifest with a sha512 check,
+  settings merged by `ai-config`, self-update off; neutral about accounts and
+  gateways. A design proposal; nothing built.
 
 ## Implemented (kept as the record of what was decided)
 
