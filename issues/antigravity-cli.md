@@ -24,8 +24,10 @@ The installer also coexists with a machine's launcher earlier on PATH:
 install, upgrade, observation, verification and ledger recording use
 `~/.local/bin/agy`, while interactive calls keep the launcher in front.
 The installer saves the caller's PATH before dotfiles adds its own tools and
-reads the candidate file without running it. A launcher must be a readable
-script starting with `#!` and contain the exact line
+keeps that snapshot only within the capturing process's live tree, including
+re-execs and child installers. It reads the candidate file without running
+it. A launcher must be a readable script starting with `#!` and contain the
+exact line
 `# dotfiles-launcher: agy` within its first ten lines. This declares that it
 sets up the environment and defers to `~/.local/bin/agy`. It is accepted when
 earlier on that PATH or when the managed directory is not on PATH yet; a

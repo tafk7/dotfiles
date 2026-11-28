@@ -9,8 +9,32 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 export DOTFILES_DIR
 
 # Child installers need the caller's command order before setup adds tools.
-# Keep the first snapshot across the operation's re-execs and child processes.
-export DOTFILES_CALLER_PATH="${DOTFILES_CALLER_PATH-$PATH}"
+# Keep it across re-execs and children only while the taking process remains
+# in this process's ancestry. Start ticks prevent reuse of an expired PID.
+_dotfiles_capture_caller_path() {
+    local pid="$BASHPID" stat owner_pid owner_ticks
+    local -a fields
+    if [[ -n "${DOTFILES_CALLER_PATH+x}" && "${DOTFILES_CALLER_PATH_OWNER:-}" =~ ^([0-9]+):([0-9]+)$ ]]; then
+        owner_pid="${BASH_REMATCH[1]}" owner_ticks="${BASH_REMATCH[2]}"
+        while [[ "$pid" =~ ^[0-9]+$ && "$pid" != 0 ]]; do
+            IFS= read -r stat 2>/dev/null < "/proc/$pid/stat" || break
+            # After '(comm) ', field 1 is ppid and field 19 is starttime.
+            IFS=' ' read -ra fields <<< "${stat##*) }"
+            if [[ "$pid" == "$owner_pid" && "${fields[19]:-}" == "$owner_ticks" ]]; then
+                return 0
+            fi
+            pid="${fields[1]:-0}"
+        done
+    fi
+    export DOTFILES_CALLER_PATH="$PATH"
+    unset DOTFILES_CALLER_PATH_OWNER
+    if IFS= read -r stat 2>/dev/null < "/proc/$BASHPID/stat"; then
+        IFS=' ' read -ra fields <<< "${stat##*) }"
+        export DOTFILES_CALLER_PATH_OWNER="$BASHPID:${fields[19]}"
+    fi
+}
+_dotfiles_capture_caller_path
+unset -f _dotfiles_capture_caller_path
 
 # Ensure ~/.local/bin is in PATH
 [[ -d "$HOME/.local/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && \

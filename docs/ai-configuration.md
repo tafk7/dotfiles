@@ -62,7 +62,9 @@ Antigravity (`agy`) and Oh My Pi (`omp`) can have a machine's launcher before
 that binary. Interactive shell calls still use the earlier launcher. The
 installer saves the caller's PATH before adding its own tools and reads the
 candidate file without running it, so setup can finish before the launcher's
-environment is ready. A launcher must be a readable script starting with
+environment is ready. The PATH snapshot follows re-execs and child installers
+within the capturing process's live tree; a later unrelated operation takes
+a new snapshot. A launcher must be a readable script starting with
 `#!`, with the exact line `# dotfiles-launcher: agy` (or
 `# dotfiles-launcher: omp`) within its first ten lines. The marker declares
 that it sets up the environment and defers to the corresponding binary in
