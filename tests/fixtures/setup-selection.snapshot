@@ -51,6 +51,10 @@ OPTIONAL AI TOOLS (only their own flags install them; they add to --ai):
                         needs Node >=22.19 (the work tier's pinned Node);
                         without it, the request fails with instructions rather
                         than pulling in a toolchain.
+    --omp               Oh My Pi, a coding agent forked from Pi, with the IDE
+                        wired in: one release binary, checked against the
+                        release's SHA-256 sums, into ~/.local/bin. No Node
+                        needed.
 
 CAPABILITIES (orthogonal - combine with any tier):
     --rdp               The xrdp RDP server with an XFCE session. Never implied
@@ -766,6 +770,56 @@ AI CLIs: core (claude, codex, opencode) plus pi
 claude codex jq opencode pi 
 -- install
 eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   dotfiles verify
+
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --omp
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: omp
+
+-- components
+omp 
+-- install
+omp
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl

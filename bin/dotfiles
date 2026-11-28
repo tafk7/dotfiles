@@ -57,9 +57,10 @@ Commands:
     --force             Both of the above.
     --upgrade           Also upgrade what is not pinned: the selection's APT
                         packages (apt's simulated transaction first; held ones
-                        skipped), the AI CLIs and Pi, and rustup itself.
+                        skipped), the AI CLIs, and rustup itself.
     --no-refresh        Skip the refresh that ends every apply.
-  upgrade CLI[,CLI]     Update installed AI CLIs (claude, codex, opencode, pi)
+  upgrade CLI[,CLI]     Update installed AI CLIs (claude, codex, opencode, pi,
+                        omp)
                         now, through their official updaters, then run their
                         configure steps. A one-off: the profile is left as it
                         is, so this never makes dotfiles manage a CLI (profile

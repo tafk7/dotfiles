@@ -105,7 +105,7 @@ parse_arguments() {
                 SELECTED_CAPABILITIES[ai]=all
                 shift
                 ;;
-            --claude|--codex|--opencode|--pi)
+            --claude|--codex|--opencode|--pi|--omp)
                 SELECTED_AI_TOOLS+=("${1#--}")
                 [[ "${SELECTED_CAPABILITIES[ai]:-}" == all ]] || SELECTED_CAPABILITIES[ai]=some
                 shift
@@ -322,6 +322,7 @@ help_components() {
 optional_ai_help() {
     case "$1" in
         pi) echo "Pi, a minimal terminal coding agent. An npm package: it needs Node >=22.19 (the work tier's pinned Node); without it, the request fails with instructions rather than pulling in a toolchain." ;;
+        omp) echo "Oh My Pi, a coding agent forked from Pi, with the IDE wired in: one release binary, checked against the release's SHA-256 sums, into ~/.local/bin. No Node needed." ;;
         *) echo "Only $1." ;;
     esac
 }

@@ -47,7 +47,7 @@ automatic updater and makes `$.http.fetch` fail in Claude Code mods (use
 `$.process.run` instead). opencode only notifies about
 new releases and never shares sessions: its own updater reruns the upstream
 installer without `--no-modify-path`, which would append to the repo-owned
-`~/.bashrc`. Use `dotfiles upgrade claude` (or `codex`, `opencode`, `pi`) to
+`~/.bashrc`. Use `dotfiles upgrade claude` (or `codex`, `opencode`, `pi`, `omp`) to
 update explicitly: it runs `setup.sh --CLI --only CLI --upgrade`, the official
 installer's update path followed by the CLI's configure steps, and leaves the
 machine profile alone, so updating a CLI does not make dotfiles manage it. A

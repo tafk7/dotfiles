@@ -1,6 +1,6 @@
 # AI CLIs: data egress & hardening
 
-What Claude Code, Codex, opencode, and Pi send to third parties by default, and
+What Claude Code, Codex, opencode, Pi, and Oh My Pi send to third parties by default, and
 how we harden each. All findings verified against each tool's own docs/source
 (not memory). None of these tools is air-gapped by default.
 
@@ -137,6 +137,35 @@ would edit shell rc files and can sudo-install Node — see that script's header
 
 ---
 
+## Oh My Pi
+
+Checked against the v19.2.1 source (`packages/coding-agent/src/modes/settings.ts`,
+`docs/environment-variables.md`):
+
+- **Update check** — on interactive startup, a request to the build service
+  (`build.stencil.so`, or `PI_BUILD_URL`) for the latest release. Off with
+  `startup.checkUpdate: false` in `~/.omp/agent/config.yml`; there is no
+  environment variable for it. Installing updates in the background
+  (`update.auto`) is off by default.
+- **Plugin update check** — `marketplace.autoUpdate` defaults to `notify`
+  (check on startup, install nothing); `off` stops it.
+- **Telemetry** — OpenTelemetry export only when an `OTEL_EXPORTER_OTLP_*`
+  endpoint is set; none by default.
+- **Grammars** — tree-sitter grammars download on demand from GitHub, each
+  checked against a pinned SHA-256.
+
+Dotfiles ships no omp config: `~/.omp` is the user's (settings, credentials,
+sessions, worktrees). `installers/install-omp.sh` installs the release binary
+itself rather than piping `omp.sh/install` to `sh`; see `docs/supply-chain.md`.
+
+Opening a repository loads its project inputs by design: settings,
+extensions, hooks, tools, commands, skills, rules and project MCP servers,
+including those in `.claude`, `.codex`, `.opencode` and `.agents`. Other
+tools' home configs are never read. Treat an untrusted checkout as code omp
+will run.
+
+---
+
 ## The network allowlist (the actual guarantee)
 
 Egress-allowlist the host/process; deny everything else. Then verify with a
@@ -149,7 +178,7 @@ auto-update / managed settings) · `api.github.com` + `github.com` +
 `registry.npmjs.org` (OpenCode update check and explicit updates).
 
 **Deny:** `ab.chatgpt.com` (Codex Statsig metrics) · `models.dev` (opencode) ·
-`pi.dev` (Pi version check + install
+`build.stencil.so` (Oh My Pi update check) · `pi.dev` (Pi version check + install
 telemetry; also `registry.npmjs.org` if you don't want `pi update` / `pi
 install` to reach npm) · everything else.
 
