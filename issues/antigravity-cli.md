@@ -32,13 +32,15 @@ exact line
 sets up the environment and defers to `~/.local/bin/agy`. It is accepted when
 earlier on that PATH or when the managed directory is not on PATH yet; a
 script after the managed directory is refused to avoid shadowing it.
-Unmarked scripts and separate ELF executables, including the vendor's
-compiled binary, are refused wherever they appear: dotfiles does not install
-a hidden second copy behind them. Unknown or unreadable files are preserved
-too; the refusal explains the launcher declaration. An alias of the managed
-file is the same copy and can be upgraded. The rule needs no working launcher
-environment or version response; installing other tools preserves existing
-PATH order.
+Creating or forcibly reinstalling a copy refuses unmarked scripts and
+separate ELF executables, including the vendor's compiled binary: dotfiles
+does not install a hidden second copy behind them. Unknown or unreadable
+files are preserved too; the refusal explains the launcher declaration.
+A working managed copy is kept or upgraded by absolute path even with an
+unmarked script or ELF earlier on PATH, so upgrades do not depend on when
+the launcher adds its marker. An alias of the managed file is the same copy
+and can be upgraded. The rule needs no working launcher environment or
+version response; installing other tools preserves existing PATH order.
 
 ## User need
 
@@ -171,8 +173,9 @@ The pattern to copy is codex and pi.
 
 - `installers/install-antigravity.sh`, new, the usual shape: `lib/install.sh`,
   `--observe` through `observe_component antigravity`, `--force`, `--update`;
-  refuse a separate ELF install or a script after the managed directory
-  (exit 2), keep an earlier declared script launcher in front, skip a working install,
+  when creating or forcibly reinstalling, refuse separate installs and
+  launchers after the managed directory (exit 2); keep an earlier declared
+  launcher in front, retain or upgrade a working managed copy,
   verify by absolute path (`~/.local/bin/agy --version`).
 - **Read the manifest directly; skip the vendor script.** Fetch the manifest
   JSON, download `url`, check `sha512`, extract `antigravity` into a temporary

@@ -70,13 +70,14 @@ a new snapshot. A launcher must be a readable script starting with
 that it sets up the environment and defers to the corresponding binary in
 `~/.local/bin`. It is accepted when earlier on the caller's PATH or when the
 managed directory is not on PATH yet. A script after that directory is
-refused because installation would shadow it. Unmarked scripts, separate
-ELF executables and unknown or unreadable files are preserved and refused;
-the refusal explains how a launcher declares itself. An alias of the managed
-file is the same copy and can be upgraded. Oh My Pi keeps its existing
-behavior: `--update` runs the managed copy's own updater even with a separate
-install earlier on PATH; its external-install check applies when creating or
-replacing a copy. Installing other tools keeps existing PATH order.
+refused because installation would shadow it. When creating or forcibly
+reinstalling a copy, unmarked scripts, separate ELF executables and unknown
+or unreadable files are preserved and refused; the refusal explains how a
+launcher declares itself. An alias of the managed file is the same copy and
+can be upgraded. Both installers retain a working managed copy and run
+`--update` by absolute path even with a separate install earlier on PATH.
+Oh My Pi uses its own updater for that copy. Installing other tools keeps
+existing PATH order.
 
 Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
 not part of the installers: setup runs them after each selected AI CLI's

@@ -6,7 +6,8 @@ launcher_install_cases() {
     local -a scenarios=(missing-bin-dir missing-bin-path eget-before-ai alias earlier-elf absent-path-elf
         unmarked-no-dir unmarked-ahead unmarked-after wrong-marker late-marker no-shebang bom execute-only empty
         marked-after marker-at-ten symlink-marked)
-    [[ "$component" != omp ]] || scenarios+=(managed-elf-update)
+    scenarios+=(managed-elf-update)
+    [[ "$component" != antigravity ]] || scenarios+=(managed-unmarked-update)
     for scenario in "${scenarios[@]}"; do
         if (launcher_install_case "$component" "$binary" "$installer" "$scenario" "$release_dir"); then
             printf 'launcher case: %s %s ok\n' "$binary" "$scenario"
@@ -95,15 +96,37 @@ EOF
             [[ $rc -eq 2 && ! -e "$target" && "$out" == *"externally-managed $binary"* ]] \
                 || fail "$binary $scenario: rc=$rc $out"
             ;;
-        managed-elf-update)
+        managed-elf-update|managed-unmarked-update)
+            if [[ "$component" == antigravity ]]; then make_release 1.5.18; else make_release 19.2.1; fi
             export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
             "$installer" >/dev/null 2>&1 || fail "$binary update fixture install"
-            cp -- /bin/false "$entry"
+            if [[ "$scenario" == managed-elf-update ]]; then
+                cp -- /bin/false "$entry"
+            else
+                sed -i '/^# dotfiles-launcher:/d' "$entry"
+            fi
             export PATH="$case_root/launcher:$HOME/.local/bin:$TEST_SYSTEM_PATH"
-            printf '19.2.2\n' > "$TEST_ROOT/next"
+            local rerun_rc=0 rerun_out expected
+            rerun_out="$("$installer" 2>&1)" || rerun_rc=$?
+            if [[ "$component" == antigravity ]]; then
+                make_release 1.6.0
+                expected='agy 1.6.0'
+            else
+                printf '19.2.2\n' > "$TEST_ROOT/next"
+                expected='omp 19.2.2'
+            fi
             out="$("$installer" --update 2>&1)" || rc=$?
-            [[ $rc -eq 0 && "$("$target" --version)" == 'omp 19.2.2' ]] \
+            [[ $rc -eq 0 && "$(AGY_CLI_DISABLE_AUTO_UPDATE=true "$target" --version)" == "$expected" ]] \
                 || fail "$binary $scenario: rc=$rc $out"
+            [[ $rerun_rc -eq 2 && "$rerun_out" == *'already installed'* ]] \
+                || fail "$binary $scenario rerun: rc=$rerun_rc $rerun_out"
+            rc=0; out="$("$installer" --update 2>&1)" || rc=$?
+            [[ $rc -eq 2 && "$out" == *'current'* ]] || fail "$binary $scenario current: rc=$rc $out"
+            # Forced replacement still preserves the separate install, as omp
+            # does; the bypass applies to retaining/updating a working copy.
+            rc=0; out="$("$installer" --force 2>&1)" || rc=$?
+            [[ $rc -eq 2 && "$out" == *"externally-managed $binary"* ]] \
+                || fail "$binary $scenario force: rc=$rc $out"
             ;;
         unmarked-*|wrong-marker|late-marker|no-shebang|bom|execute-only|empty|marked-after)
             case "$scenario" in
