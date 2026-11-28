@@ -8,6 +8,10 @@ _DOTFILES_RUNTIME_LOADED=1
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 export DOTFILES_DIR
 
+# Child installers need the caller's command order before setup adds tools.
+# Keep the first snapshot across the operation's re-execs and child processes.
+export DOTFILES_CALLER_PATH="${DOTFILES_CALLER_PATH-$PATH}"
+
 # Ensure ~/.local/bin is in PATH
 [[ -d "$HOME/.local/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && \
     export PATH="$HOME/.local/bin:$PATH"

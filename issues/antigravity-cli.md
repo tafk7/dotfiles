@@ -23,12 +23,16 @@ the questions under [Open](#open).
 The installer also coexists with a machine's launcher earlier on PATH:
 install, upgrade, observation, verification and ledger recording use
 `~/.local/bin/agy`, while interactive calls keep the launcher in front.
-The installer decides by PATH order without running the earlier command.
-An external command after `~/.local/bin` is refused because a new binary
-there would shadow it; an earlier command stays in front, whether it is a
-launcher or a separate install. If the managed directory is absent from
-PATH, an external command is refused too. This rule needs no launcher
-format, working environment or version response.
+The installer saves the caller's PATH before dotfiles adds its own tools and
+reads the candidate file without running it. A shebang script is accepted as
+a launcher when earlier on that PATH or when the managed directory is not on
+PATH yet; a script after the managed directory is refused to avoid shadowing
+it. A separate ELF executable, including the vendor's compiled binary, is
+refused wherever it appears: dotfiles does not install a hidden second copy
+behind it. Unknown or unreadable files are preserved too. An alias of the
+managed file is the same copy and can be upgraded. The rule needs no working
+launcher environment or version response; installing other tools preserves
+existing PATH order.
 
 ## User need
 
@@ -161,9 +165,9 @@ The pattern to copy is codex and pi.
 
 - `installers/install-antigravity.sh`, new, the usual shape: `lib/install.sh`,
   `--observe` through `observe_component antigravity`, `--force`, `--update`;
-  refuse to shadow an external `agy` after the managed directory (exit 2),
-  keep an earlier launcher in front, skip a working install, verify by
-  absolute path (`~/.local/bin/agy --version`).
+  refuse a separate ELF install or a script after the managed directory
+  (exit 2), keep an earlier script launcher in front, skip a working install,
+  verify by absolute path (`~/.local/bin/agy --version`).
 - **Read the manifest directly; skip the vendor script.** Fetch the manifest
   JSON, download `url`, check `sha512`, extract `antigravity` into a temporary
   directory and install it atomically as `~/.local/bin/agy`. No vendor script

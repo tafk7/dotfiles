@@ -60,11 +60,14 @@ Antigravity (`agy`) and Oh My Pi (`omp`) can have a machine's launcher before
 `~/.local/bin` on PATH. Install and upgrade maintain the binary in
 `~/.local/bin`; observation, verification and the component ledger report
 that binary. Interactive shell calls still use the earlier launcher. The
-installer checks PATH order without running it, so setup can finish before
-the launcher's environment is ready. An external command after the managed
-directory is refused because installation would shadow it; one before it
-stays in front. An external command is also refused when the managed
-directory is absent from PATH.
+installer saves the caller's PATH before adding its own tools and reads the
+candidate file without running it, so setup can finish before the launcher's
+environment is ready. A shebang script earlier on PATH, or with no managed
+directory on PATH yet, is treated as a launcher. A script after the managed
+directory is refused because installation would shadow it. A separate ELF
+executable is an external install and is refused wherever it appears, as are
+unknown or unreadable files. An alias of the managed file is the same copy
+and can be upgraded. Installing other tools keeps existing PATH order.
 
 Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
 not part of the installers: setup runs them after each selected AI CLI's

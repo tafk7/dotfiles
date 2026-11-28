@@ -46,6 +46,9 @@ export PATH="$launcher:$PATH"
 
 # A fresh install verifies, installs and records the binary.
 make_release 1.5.18
+source "$ROOT/tests/lib/launcher-cases.sh"
+launcher_install_cases antigravity agy install_agy "$release"
+make_release 1.5.18
 out="$(install_agy 2>&1)" || fail "fresh install failed: $out"
 assert_eq "$(bin_version)" "agy 1.5.18" "installed version"
 grep -q "^antigravity	yes	dotfiles	installed	" "$XDG_STATE_HOME/dotfiles/components.tsv" || fail "the install was not recorded"
@@ -118,12 +121,8 @@ rc=0; out="$(install_agy 2>&1)" || rc=$?
 [[ $rc -eq 2 && ! -e "$bin" && "$out" == *"externally-managed agy"* ]] || fail "shadowed an external agy: $rc $out"
 rm -f "$TEST_ROOT/bin/agy"
 
-# An external install is also protected when ~/.local/bin is absent from PATH.
-printf '#!/bin/sh\necho "agy 9.9.9"\n' > "$TEST_ROOT/bin/agy"
-chmod +x "$TEST_ROOT/bin/agy"
-rc=0; out="$(PATH="$TEST_ROOT/bin:$TEST_SYSTEM_PATH" install_agy --force 2>&1)" || rc=$?
-[[ $rc -eq 2 && ! -e "$bin" ]] || fail "shadowed an external install with no managed PATH entry: $rc $out"
-rm -f "$TEST_ROOT/bin/agy"
+# The absent-path external case above starts without ~/.local/bin, so runtime
+# cannot prepend it and hide the caller's PATH shape.
 
 # The shell wrapper refuses agy update and agy install and passes the rest.
 make_release 1.7.0

@@ -43,6 +43,9 @@ export PATH="$launcher:$PATH"
 
 # A fresh install verifies, installs and records the binary.
 make_release 19.2.1
+source "$ROOT/tests/lib/launcher-cases.sh"
+launcher_install_cases omp omp install_omp "$release"
+make_release 19.2.1
 out="$(install_omp 2>&1)" || fail "fresh install failed: $out"
 assert_eq "$("$bin" --version)" "omp 19.2.1" "installed version"
 [[ "$out" == *"Installing Oh My Pi v19.2.1"* ]] || fail "install did not name the release: $out"

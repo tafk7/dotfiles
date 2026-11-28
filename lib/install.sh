@@ -24,10 +24,12 @@ DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
 # Whether directory A's first PATH entry precedes directory B's. Installing
 # into B cannot shadow a command in A in that case. Resolve directory aliases
 # and relative entries, and treat an empty entry as the current directory.
-# If B is absent, there is no guarantee about the next shell's PATH: refuse.
+# Read the caller's PATH, before setup's own additions. If B is absent,
+# precedence alone cannot decide; the caller may inspect the command's file.
 path_precedes() {
-    local first second entry remaining="${PATH}:" seen=false
+    local first second entry remaining="${DOTFILES_CALLER_PATH-$PATH}:" seen=false
     first="$(realpath -m -- "$1")" second="$(realpath -m -- "$2")"
+    [[ "$first" != "$second" ]] || return 0
     while [[ "$remaining" == *:* ]]; do
         entry="${remaining%%:*}" remaining="${remaining#*:}"
         entry="$(realpath -m -- "${entry:-.}")"
@@ -38,6 +40,28 @@ path_precedes() {
         [[ "$entry" != "$first" ]] || seen=true
     done
     return 1
+}
+
+# Print the external command an installer must preserve, or nothing. A
+# resolved alias of the managed file is the same copy. An external ELF (the
+# standalone vendor binaries) is a separate install, even earlier on PATH.
+# A shebang script can be a launcher, including before its environment is
+# ready: allow it unless installation would shadow it on the caller's PATH.
+# Unknown or unreadable files are preserved; no candidate is executed.
+external_install_path() {
+    local binary="$1" target="$2" path magic
+    path="$(PATH="${DOTFILES_CALLER_PATH-$PATH}" command -v "$binary" 2>/dev/null || true)"
+    [[ -n "$path" ]] || return 0
+    [[ "$(realpath -m -- "$path")" != "$(realpath -m -- "$target")" ]] || return 0
+    magic=""
+    if [[ -f "$path" ]]; then
+        magic="$(head -c 4 -- "$path" 2>/dev/null | od -An -tx1 || true)"
+    fi
+    magic="${magic//[[:space:]]/}"
+    if [[ "$magic" == 2321* ]] && ! path_precedes "$(dirname "$target")" "$(dirname "$path")"; then
+        return 0
+    fi
+    printf '%s\n' "$path"
 }
 
 INSTALL_OK=()
@@ -1243,8 +1267,9 @@ install_eget_tools() {
             any_missing=true
             continue
         fi
-        PATH="$HOME/.local/bin:$PATH"
-        export PATH
+        if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
         hash -r
         rm -rf "$stage_home"
         # Check our prefix, not command -v: ~/.local/bin may not be on PATH yet.

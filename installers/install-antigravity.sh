@@ -8,8 +8,8 @@
 # member, `antigravity`, as ~/.local/bin/agy. It never runs `agy install` or
 # `agy update`. --update (setup --upgrade, dotfiles upgrade antigravity) is the
 # same fetch when the manifest names another version; shell/env.sh turns the
-# CLI's own update check off. It keeps a launcher earlier on PATH in front
-# and refuses to shadow an agy after ~/.local/bin.
+# CLI's own update check off. It keeps an earlier script launcher in front
+# and refuses a separate ELF install anywhere on the caller's PATH.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,14 +33,12 @@ AGY_MANIFEST_BASE="https://antigravity-cli-auto-updater-974169037036.us-central1
 # --version contacts nothing; the variable makes sure no update check runs.
 agy_version() { AGY_CLI_DISABLE_AUTO_UPDATE=true "$1" --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1; }
 
-# An earlier PATH entry stays in front of the managed binary, including a
-# launcher that cannot run yet. No execution or content test can establish
-# that precedence more reliably. Refuse if installation would shadow agy.
-EXTERNAL_AGY="$(command -v agy 2>/dev/null || true)"
-if [[ -n "$EXTERNAL_AGY" && "$EXTERNAL_AGY" != "$AGY_BIN" ]] \
-   && ! path_precedes "$(dirname "$EXTERNAL_AGY")" "$(dirname "$AGY_BIN")"; then
+# Inspect the caller's command before setup changed PATH: scripts may be
+# launchers; standalone ELF binaries are external installs, wherever they sit.
+EXTERNAL_AGY="$(external_install_path agy "$AGY_BIN")"
+if [[ -n "$EXTERNAL_AGY" ]]; then
     warn "Found an externally-managed agy on PATH: $EXTERNAL_AGY"
-    warn "Skipping install to avoid a shadow copy at $AGY_BIN."
+    warn "Skipping install to avoid a second copy at $AGY_BIN."
     warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
     exit 2
 fi

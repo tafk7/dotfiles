@@ -28,7 +28,7 @@ fixture_init() {
     export DOTFILES_BACKUP_PREFIX="$TEST_ROOT/backups"
     export DOTFILES_SETUP_LOG=0
     # Toolchain homes and selections from the caller would point outside HOME.
-    unset NVM_DIR NVM_BIN NVM_INC CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN
+    unset NVM_DIR NVM_BIN NVM_INC CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN DOTFILES_CALLER_PATH
 }
 
 # For a test whose result depends on what the machine has, as `dotfiles verify`
