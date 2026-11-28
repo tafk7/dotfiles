@@ -6,8 +6,9 @@
 # ~/.local/state/dotfiles/profile is schema-versioned TSV with these keys:
 #   tier            config | bash | dev | work
 #   capabilities    comma-separated orthogonal selections (rdp, tail, azure, ...)
-#   ai              all | comma-separated AI tools | - (none)
-#   ai.exclude      AI tools left out of `all` (dotfiles profile --remove)
+#   ai              comma-separated AI tools, where all stands for the core
+#                   ones (--ai; optional ones are named: all,pi) | - (none)
+#   ai.exclude      core AI tools left out of all (dotfiles profile --remove)
 #   opt-outs        no-git, no-hooks
 # Feature toggles (theme, agent-badge) stay in preferences.tsv.
 #
@@ -51,6 +52,45 @@ profile_ai_tool_names() { tools_for_capability ai; }
 
 _profile_in_list() { [[ ",$1," == *",$2,"* ]]; }
 
+# Whether the profile selects the core AI tools as all.
+profile_ai_all() { _profile_in_list "${PROFILE[ai]}" all; }
+
+# The core AI tools as all; the optional ones named stay.
+profile_ai_set_all() {
+    local item list=all
+    for item in ${PROFILE[ai]//,/ }; do
+        [[ -z "${TOOL_OPTIONAL[$item]:-}" ]] || list+=",$item"
+    done
+    PROFILE[ai]="$list" PROFILE[ai.exclude]=""
+}
+
+# profile_ai_add TOOL / profile_ai_remove TOOL: manage one AI tool or stop,
+# under all through ai.exclude for a core one.
+profile_ai_add() {
+    if profile_ai_all && [[ -z "${TOOL_OPTIONAL[$1]:-}" ]]; then
+        PROFILE[ai.exclude]="$(_profile_list_remove "${PROFILE[ai.exclude]}" "$1")"
+    else
+        PROFILE[ai]="$(_profile_list_add "${PROFILE[ai]}" "$1")"
+    fi
+}
+
+profile_ai_remove() {
+    if profile_ai_all && [[ -z "${TOOL_OPTIONAL[$1]:-}" ]]; then
+        PROFILE[ai.exclude]="$(_profile_list_add "${PROFILE[ai.exclude]}" "$1")"
+    else
+        PROFILE[ai]="$(_profile_list_remove "${PROFILE[ai]}" "$1")"
+    fi
+}
+
+# The optional AI tools named beside all, comma-separated.
+_profile_ai_extras() {
+    local item out=""
+    for item in ${PROFILE[ai]//,/ }; do
+        [[ "$item" == all || -z "${TOOL_OPTIONAL[$item]:-}" ]] || out+="${out:+,}$item"
+    done
+    printf '%s' "$out"
+}
+
 _profile_list_add() {
     local list="$1" item="$2"
     _profile_in_list "$list" "$item" && { printf '%s' "$list"; return; }
@@ -78,12 +118,11 @@ profile_check() {
     for item in ${PROFILE[capabilities]//,/ }; do
         [[ "$known" == *",$item,"* ]] || { printf 'unknown capability: %s\n' "$item"; return 1; }
     done
-    known=",$(profile_ai_tool_names | paste -sd, -),"
-    if [[ "${PROFILE[ai]}" != all ]]; then
-        for item in ${PROFILE[ai]//,/ }; do
-            [[ "$known" == *",$item,"* ]] || { printf 'unknown AI tool: %s\n' "$item"; return 1; }
-        done
-    fi
+    known=",$(profile_ai_tool_names | paste -sd, -),all,"
+    for item in ${PROFILE[ai]//,/ }; do
+        [[ "$known" == *",$item,"* ]] || { printf 'unknown AI tool: %s\n' "$item"; return 1; }
+    done
+    known="${known%all,}"
     for item in ${PROFILE[ai.exclude]//,/ }; do
         [[ "$known" == *",$item,"* ]] || { printf 'unknown AI tool: %s\n' "$item"; return 1; }
     done
@@ -112,8 +151,7 @@ profile_load() {
 profile_save() {
     local problem key
     problem="$(profile_check)" || { printf 'Error: refusing to save an invalid profile: %s\n' "$problem" >&2; return 1; }
-    for key in capabilities ai.exclude opt-outs; do PROFILE[$key]="$(_profile_list_sorted "${PROFILE[$key]}")"; done
-    [[ "${PROFILE[ai]}" == all ]] || PROFILE[ai]="$(_profile_list_sorted "${PROFILE[ai]}")"
+    for key in capabilities ai ai.exclude opt-outs; do PROFILE[$key]="$(_profile_list_sorted "${PROFILE[$key]}")"; done
     local content
     content="$(
         printf 'schema\t%s\n' "$DOTFILES_PROFILE_SCHEMA"
@@ -134,14 +172,15 @@ profile_save() {
 # The AI tools the profile selects, one per line.
 profile_ai_tools() {
     local tool
-    case "${PROFILE[ai]}" in
-        all)
-            while IFS= read -r tool; do
-                _profile_in_list "${PROFILE[ai.exclude]}" "$tool" || printf '%s\n' "$tool"
-            done < <(profile_ai_tool_names)
-            ;;
-        *) [[ -z "${PROFILE[ai]}" ]] || printf '%s\n' "${PROFILE[ai]//,/$'\n'}" ;;
-    esac
+    if profile_ai_all; then
+        while IFS= read -r tool; do
+            _profile_in_list "${PROFILE[ai.exclude]}" "$tool" || printf '%s\n' "$tool"
+        done < <(ai_core_tools)
+        tool="$(_profile_ai_extras)"
+        [[ -z "$tool" ]] || printf '%s\n' "${tool//,/$'\n'}"
+    elif [[ -n "${PROFILE[ai]}" ]]; then
+        printf '%s\n' "${PROFILE[ai]//,/$'\n'}"
+    fi
 }
 
 # The setup.sh arguments that apply the whole profile, one per line.
@@ -149,8 +188,10 @@ profile_setup_args() {
     local item
     printf -- '--%s\n' "${PROFILE[tier]}"
     for item in ${PROFILE[capabilities]//,/ }; do printf -- '--%s\n' "$item"; done
-    if [[ "${PROFILE[ai]}" == all && -z "${PROFILE[ai.exclude]}" ]]; then
+    if profile_ai_all && [[ -z "${PROFILE[ai.exclude]}" ]]; then
         printf -- '--ai\n'
+        item="$(_profile_ai_extras)"
+        [[ -z "$item" ]] || printf -- '--%s\n' "${item//,/$'\n--'}"
     else
         while IFS= read -r item; do printf -- '--%s\n' "$item"; done < <(profile_ai_tools)
     fi
@@ -158,8 +199,12 @@ profile_setup_args() {
 }
 
 profile_describe() {
-    local ai="${PROFILE[ai]:-none}"
-    [[ "$ai" != all || -z "${PROFILE[ai.exclude]}" ]] || ai="all except ${PROFILE[ai.exclude]//,/, }"
+    local ai="${PROFILE[ai]:-none}" extras
+    if profile_ai_all; then
+        ai=all extras="$(_profile_ai_extras)"
+        [[ -z "${PROFILE[ai.exclude]}" ]] || ai="all except ${PROFILE[ai.exclude]//,/, }"
+        [[ -z "$extras" ]] || ai+=" plus ${extras//,/, }"
+    fi
     printf 'tier            %s\n' "${PROFILE[tier]}"
     printf 'capabilities    %s\n' "$(printf '%s' "${PROFILE[capabilities]:-none}" | sed 's/,/, /g')"
     printf 'ai              %s\n' "$(printf '%s' "$ai" | sed 's/,/, /g')"
@@ -169,7 +214,8 @@ profile_describe() {
 # profile_merge TIER CAPABILITIES AI_MODE AI_TOOLS OPT_OUTS: fold one setup
 # run's flags into PROFILE. Flags only add: a higher tier raises it,
 # capabilities and AI tools join (and leave ai.exclude), opt-outs set.
-# Nothing is lowered or removed. AI_MODE is all, some, or empty. Each addition
+# Nothing is lowered or removed. AI_MODE is all (--ai, with any per-tool
+# flags in AI_TOOLS), some, or empty. Each addition
 # is appended to PROFILE_CHANGES as "+ X".
 PROFILE_CHANGES=()
 profile_merge() {
@@ -185,17 +231,16 @@ profile_merge() {
         PROFILE[capabilities]="$(_profile_list_add "${PROFILE[capabilities]}" "$item")"
     done
     if [[ "$ai_mode" == all ]]; then
-        if [[ "${PROFILE[ai]}" != all || -n "${PROFILE[ai.exclude]}" ]]; then PROFILE_CHANGES+=("+ ai (all)"); fi
-        PROFILE[ai]=all PROFILE[ai.exclude]=""
-    elif [[ "$ai_mode" == some ]]; then
+        if ! profile_ai_all || [[ -n "${PROFILE[ai.exclude]}" ]]; then PROFILE_CHANGES+=("+ ai (all)"); fi
+        profile_ai_set_all
+    fi
+    if [[ -n "$ai_mode" ]]; then
+        local selected
+        selected=",$(profile_ai_tools | paste -sd, -),"
         for item in ${ai_tools//,/ }; do
-            if [[ "${PROFILE[ai]}" == all ]]; then
-                _profile_in_list "${PROFILE[ai.exclude]}" "$item" || continue
-                PROFILE[ai.exclude]="$(_profile_list_remove "${PROFILE[ai.exclude]}" "$item")"
-            else
-                _profile_in_list "${PROFILE[ai]}" "$item" && continue
-                PROFILE[ai]="$(_profile_list_add "${PROFILE[ai]}" "$item")"
-            fi
+            [[ "$selected" != *",$item,"* ]] || continue
+            profile_ai_add "$item"
+            selected+="$item,"
             PROFILE_CHANGES+=("+ $item")
         done
     fi
@@ -233,11 +278,8 @@ profile_propose() {
         done
     done < <(printf '%s\n' "${!TOOL_BINARY[@]}" | LC_ALL=C sort)
     PROFILE[tier]="$tier"
-    if (( ${#ai_present[@]} )); then
-        if (( ${#ai_present[@]} == $(profile_ai_tool_names | wc -l) )); then
-            PROFILE[ai]=all
-        else
-            for tool in "${ai_present[@]}"; do PROFILE[ai]="$(_profile_list_add "${PROFILE[ai]}" "$tool")"; done
-        fi
-    fi
+    local core=0
+    for tool in "${ai_present[@]}"; do [[ -n "${TOOL_OPTIONAL[$tool]:-}" ]] || core=$((core + 1)); done
+    (( core == 0 || core != $(ai_core_tools | wc -l) )) || PROFILE[ai]=all
+    for tool in "${ai_present[@]}"; do profile_ai_add "$tool"; done
 }

@@ -33,7 +33,8 @@ The following selections combine with any tier:
 
 | Flag | Adds |
 |---|---|
-| `--ai`, or `--claude` `--codex` `--opencode` `--pi` | AI CLIs: all four, or only the ones you name |
+| `--ai`, or `--claude` `--codex` `--opencode` | The core AI CLIs: all three, or only the ones you name |
+| `--pi` | Optional AI CLI: only its own flag installs it, alone or beside `--ai` |
 | `--full` | Same as `--work --ai` |
 | `--tail` | Tailscale package and service; does not enroll the machine |
 | `--rdp` | xrdp server with an XFCE session |
@@ -70,6 +71,7 @@ shows it and changes it:
 ```bash
 dotfiles profile                  # tier, capabilities, AI CLIs, opt-outs
 dotfiles profile --add rdp        # save, show the plan, apply on confirmation
+dotfiles profile --add pi         # also manage an optional AI CLI
 dotfiles profile --remove pi      # stop managing pi; it stays installed
 dotfiles profile --tier dev       # lowering uninstalls nothing
 dotfiles profile --propose        # derive one from what is installed

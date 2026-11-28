@@ -21,7 +21,7 @@ use_default_node() { :; }
 run_installer() { calls+=" $1"; }
 feature_enabled() { return 1; }
 
-reset_selection; INSTALL_TIER=work; SELECTED_CAPABILITIES=([ai]=all [tail]=yes [gcloud]=yes)
+reset_selection; INSTALL_TIER=work; SELECTED_CAPABILITIES=([ai]=all [tail]=yes [gcloud]=yes) SELECTED_AI_TOOLS=(pi)
 # setup.sh is sourced above; ShellCheck 0.9 otherwise binds these calls to the
 # failure-injection override near the end of this test instead of the sourced
 # production function.

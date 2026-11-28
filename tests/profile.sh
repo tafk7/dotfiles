@@ -24,9 +24,21 @@ assert_eq "${PROFILE[tier]}/${PROFILE[capabilities]}/${PROFILE[ai]}/${PROFILE[op
 profile_merge bash "" some claude ""
 assert_eq "${PROFILE[tier]}/${PROFILE[ai]}" "work/all" "a lower tier or one AI tool lowered the profile"
 (( ${#PROFILE_CHANGES[@]} == 0 )) || fail "a no-op merge reported changes: ${PROFILE_CHANGES[*]}"
-PROFILE[ai.exclude]=pi
-profile_merge config "" some pi ""
+PROFILE[ai.exclude]=codex
+profile_merge config "" some codex ""
 assert_eq "${PROFILE[ai.exclude]}" "" "an explicit AI flag did not lift its exclusion"
+# Optional AI tools (pi) are not in all: they are named beside it, and --ai
+# keeps them.
+profile_merge config "" some pi ""
+assert_eq "${PROFILE[ai]}/${PROFILE[ai.exclude]}/${PROFILE_CHANGES[*]}" "all,pi//+ pi" "an optional tool under all"
+assert_eq "$(profile_ai_tools | paste -sd ' ')" "claude codex opencode pi" "the tools all,pi selects"
+assert_eq "$(profile_setup_args | paste -sd ' ')" "--work --tail --ai --pi --no-git" "setup arguments for all,pi"
+assert_eq "$(profile_describe | sed -n 's/^ai  *//p')" "all plus pi" "all,pi shown"
+profile_merge config "" all "" ""
+assert_eq "${PROFILE[ai]}/${#PROFILE_CHANGES[@]}" "all,pi/0" "--ai dropped an optional tool"
+profile_reset
+profile_merge config "" all "claude,pi" ""
+assert_eq "${PROFILE[ai]}" "all,pi" "--ai --claude --pi"
 profile_reset
 profile_merge dev gcloud some "claude,codex" ""
 assert_eq "${PROFILE[ai]}" "claude,codex" "per-tool AI flags"
@@ -51,12 +63,16 @@ assert_eq "$(profile_value opt-outs)" "no-git,no-hooks" "a later run without an 
 printf 'schema\t1\ntier\twork\ncapabilities\ttail\nai\tall\nai.exclude\t-\nopt-outs\t-\neditor-plugins\tno\n' > "$DOTFILES_PROFILE_FILE"
 shown="$(dotfiles profile)"
 [[ "$shown" == *"tier            work"* && "$shown" == *"ai              all"* ]] || fail "profile display: $shown"
-out="$(dotfiles profile --remove pi)"
-assert_eq "$(profile_value ai)/$(profile_value ai.exclude)" "all/pi" "removing one tool under ai=all"
+out="$(dotfiles profile --remove codex)"
+assert_eq "$(profile_value ai)/$(profile_value ai.exclude)" "all/codex" "removing one tool under ai=all"
 ! grep -q '^editor-plugins' "$DOTFILES_PROFILE_FILE" || fail "a retired key survived a save"
-[[ "$out" == *"uninstall-tool pi"* ]] || fail "removal did not print the uninstall command: $out"
+[[ "$out" == *"uninstall-tool codex"* ]] || fail "removal did not print the uninstall command: $out"
 profile_load
-assert_eq "$(profile_setup_args | paste -sd ' ')" "--work --tail --claude --codex --opencode" "an exclusion in the setup arguments"
+assert_eq "$(profile_setup_args | paste -sd ' ')" "--work --tail --claude --opencode" "an exclusion in the setup arguments"
+dotfiles profile --add pi --no-apply >/dev/null
+assert_eq "$(profile_value ai)/$(profile_value ai.exclude)" "all,pi/codex" "adding an optional tool under ai=all"
+dotfiles profile --remove pi >/dev/null
+assert_eq "$(profile_value ai)/$(profile_value ai.exclude)" "all/codex" "removing an optional tool under ai=all"
 out="$(dotfiles profile --add gcloud --no-apply)"
 assert_eq "$(profile_value capabilities)" "gcloud,tail" "adding a capability"
 [[ "$out" == *"plan:"*"Would install nvm"* && "$out" == *"not applied"* ]] || fail "add did not show the plan: $out"

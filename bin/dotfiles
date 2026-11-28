@@ -92,11 +92,11 @@ Commands:
     --all               Also check every other component that applies here;
                         one that is not installed is a note.
     --tail, --rdp, --azure, --gcloud, --aws, --ai
-                        Also expect a capability's components (--ai: every AI
-                        CLI). One that cannot apply here needs you.
+                        Also expect a capability's components (--ai: the core
+                        AI CLIs). One that cannot apply here needs you.
   profile               Show this machine's profile: what dotfiles manages here.
   profile --add X       Manage X: a capability (rdp, tail, azure, gcloud, aws),
-                        ai (every AI CLI) or one AI CLI, or an opt-out
+                        ai (the core AI CLIs) or one AI CLI, or an opt-out
                         (no-git, no-hooks). Saved, then applied.
   profile --remove X    Stop managing X. Nothing is uninstalled; the commands
                         that would remove it are printed.
@@ -138,13 +138,9 @@ add_item() {
     if is_capability "$item"; then
         PROFILE[capabilities]="$(_profile_list_add "${PROFILE[capabilities]}" "$item")"
     elif [[ "$item" == ai ]]; then
-        PROFILE[ai]=all PROFILE[ai.exclude]=""
+        profile_ai_set_all
     elif is_ai_tool "$item"; then
-        if [[ "${PROFILE[ai]}" == all ]]; then
-            PROFILE[ai.exclude]="$(_profile_list_remove "${PROFILE[ai.exclude]}" "$item")"
-        else
-            PROFILE[ai]="$(_profile_list_add "${PROFILE[ai]}" "$item")"
-        fi
+        profile_ai_add "$item"
     elif is_opt_out "$item"; then
         PROFILE[opt-outs]="$(_profile_list_add "${PROFILE[opt-outs]}" "$item")"
     fi
@@ -159,14 +155,11 @@ remove_item() {
         PROFILE[capabilities]="$(_profile_list_remove "${PROFILE[capabilities]}" "$item")"
         readarray -t -O "${#UNMANAGED[@]}" UNMANAGED < <(tools_for_capability "$item")
     elif [[ "$item" == ai ]]; then
+        # Every AI CLI, the optional ones named too.
         readarray -t -O "${#UNMANAGED[@]}" UNMANAGED < <(profile_ai_tools)
         PROFILE[ai]="" PROFILE[ai.exclude]=""
     elif is_ai_tool "$item"; then
-        if [[ "${PROFILE[ai]}" == all ]]; then
-            PROFILE[ai.exclude]="$(_profile_list_add "${PROFILE[ai.exclude]}" "$item")"
-        else
-            PROFILE[ai]="$(_profile_list_remove "${PROFILE[ai]}" "$item")"
-        fi
+        profile_ai_remove "$item"
         UNMANAGED+=("$item")
     elif is_opt_out "$item"; then
         PROFILE[opt-outs]="$(_profile_list_remove "${PROFILE[opt-outs]}" "$item")"

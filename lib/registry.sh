@@ -16,7 +16,7 @@ declare -A TOOL_EGET_REPO=() TOOL_UPDATE_SOURCE=() TOOL_RELATIVE_BINARY=()
 declare -A TOOL_VERSION_FLAG=() TOOL_TIMEOUT=() TOOL_COMPANIONS=()
 declare -A TOOL_OWNERSHIP_ROOTS=() TOOL_UPDATE_CONTRACT=() TOOL_PATHS=()
 declare -A TOOL_REMOVAL_MODE=() TOOL_REMOVAL_REQUIRES_SUDO=() TOOL_REMOVAL_INSTRUCTIONS=()
-declare -A TOOL_NEEDS=() TOOL_POLICY=() TOOL_INSTALL=() TOOL_CONFIGURE=()
+declare -A TOOL_NEEDS=() TOOL_POLICY=() TOOL_INSTALL=() TOOL_CONFIGURE=() TOOL_OPTIONAL=()
 # The install order (components and package sets), package sets' tiers, and
 # the orthogonal capabilities.
 declare -a REGISTRY_ORDER=() CAPABILITY_NAMES=()
@@ -120,6 +120,8 @@ aws-cli         aws             installer  -     aws           -              - 
 #                          runs after the install step when the component
 #                          applies, whether or not the install changed
 #                          anything; each gets the component name
+#   optional               yes: an AI CLI only its own flag selects; --ai and
+#                          --full (the core AI CLIs) leave it out
 _REGISTRY_OVERRIDES="
 eget       install                bootstrap
 zsh        install                packages:dev
@@ -139,6 +141,7 @@ codex      policy                 vendor
 codex      configure              configure_ai_settings configure_agent_badge update_agent_badge
 opencode   policy                 vendor
 opencode   configure              configure_opencode_settings
+pi         optional               yes
 pi         policy                 vendor
 pi         needs                  node
 pi         configure              configure_pi_settings configure_ai_settings
@@ -243,7 +246,7 @@ work  work
 # only: a feature preference (--agent-badge / --no-agent-badge), not a
 # selection.
 _REGISTRY_CAPABILITIES="
-ai|curl|AI CLIs|Every AI CLI, into ~/.local/bin. Leave it off where an organization manages them; the shell shortcuts load either way.
+ai|curl|AI CLIs|The core AI CLIs, into ~/.local/bin. Leave it off where an organization manages them; the shell shortcuts load either way.
 rdp|ubuntu apt sudo systemd|RDP server (xrdp)|The xrdp RDP server with an XFCE session. Never implied by --full, since it opens a listener: localhost:3390 on WSL, port 3389 elsewhere (keep it behind a VPN or firewall). See docs/history/xrdp-remote-desktop.md.
 tail|ubuntu curl apt sudo applicable|Tailscale|Tailscale and its systemd service. No enrollment, routes, SSH, or firewall changes.
 azure|ubuntu curl apt sudo applicable|Azure CLI|Azure CLI from Microsoft's signed APT repository. The Azure DevOps Git credential helper is parked; see bin/git-credential-azdo.
@@ -321,6 +324,7 @@ _registry_load() {
             policy) TOOL_POLICY[$name]="$value" ;;
             install) TOOL_INSTALL[$name]="$value" ;;
             configure) TOOL_CONFIGURE[$name]="$value" ;;
+            optional) TOOL_OPTIONAL[$name]="$value" ;;
             *) REGISTRY_ERRORS+=("$name: unknown field $field") ;;
         esac
     done
@@ -366,6 +370,10 @@ _registry_load() {
             [[ -n "${position[$need]:-}" ]] || { REGISTRY_ERRORS+=("$name: needs unknown $need"); continue; }
             (( position[$need] < position[$name] )) || REGISTRY_ERRORS+=("$name: needs $need, which comes later")
         done
+        if [[ -n "${TOOL_OPTIONAL[$name]:-}" ]]; then
+            [[ "${TOOL_OPTIONAL[$name]}" == yes ]] || REGISTRY_ERRORS+=("$name: optional is yes or absent")
+            [[ ",${TOOL_CAPABILITIES[$name]:-}," == *,ai,* ]] || REGISTRY_ERRORS+=("$name: optional, but not an AI CLI")
+        fi
         case "${TOOL_POLICY[$name]}" in converge|present|vendor) ;; *) REGISTRY_ERRORS+=("$name: unknown policy ${TOOL_POLICY[$name]}") ;; esac
         case "${TOOL_INSTALL[$name]}" in
             eget|installer|bootstrap|function:?*) ;;
@@ -409,6 +417,22 @@ tools_for_capability() {
         tool_has_capability "$name" "$capability" && printf '%s\n' "$name"
     done
     return 0
+}
+
+# The AI CLIs --ai selects (the core ones), in install order.
+ai_core_tools() {
+    local name
+    while IFS= read -r name; do
+        [[ -n "${TOOL_OPTIONAL[$name]:-}" ]] || printf '%s\n' "$name"
+    done < <(tools_for_capability ai)
+}
+
+# The AI CLIs only their own flags select, in install order.
+ai_optional_tools() {
+    local name
+    while IFS= read -r name; do
+        [[ -z "${TOOL_OPTIONAL[$name]:-}" ]] || printf '%s\n' "$name"
+    done < <(tools_for_capability ai)
 }
 
 tool_in_cumulative_tier() {

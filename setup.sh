@@ -15,11 +15,13 @@ source "$SCRIPT_DIR/lib/profile.sh"
 
 INSTALL_TIER="config"  # Base when only orthogonal flags are given: config, bash, dev, work
 
-# Selected capabilities. ai is "all" for --ai / --full (every registry tool
-# with the ai capability), else "some" for the per-tool flags recorded in
-# SELECTED_AI_TOOLS. rdp opens a network listener and is never implied by --full.
+# Selected capabilities. ai is "all" for --ai / --full (the core AI CLIs:
+# registry tools with the ai capability that are not optional), else "some"
+# for the per-tool flags recorded in SELECTED_AI_TOOLS, which also add
+# optional ones to "all". rdp opens a network listener and is never implied
+# by --full.
 declare -A SELECTED_CAPABILITIES=()
-declare -a SELECTED_AI_TOOLS=() # --claude / --codex / --opencode / --pi, in flag order.
+declare -a SELECTED_AI_TOOLS=() # --claude, --pi, ...: one per AI CLI, in flag order.
 THEME_REQUEST=""       # Empty preserves preference; enabled/disabled are explicit changes.
 AGENT_BADGE_REQUEST=""
 FORCE_OVERWRITE=false
@@ -238,17 +240,15 @@ selected_capabilities_need() {
 }
 
 # Whether this run selects component $1: its tier, a selected capability, or
-# for AI CLIs --ai or its own flag. jq comes with the AI CLIs agent-badge
-# decorates.
+# for AI CLIs its own flag or, for a core one, --ai. jq comes with the AI CLIs
+# agent-badge decorates.
 component_selected() {
     local name="$1" capability
     tool_in_cumulative_tier "$name" "$INSTALL_TIER" && return 0
     if tool_has_capability "$name" ai; then
-        case "${SELECTED_CAPABILITIES[ai]:-}" in
-            all) return 0 ;;
-            some) [[ " ${SELECTED_AI_TOOLS[*]} " == *" $name "* ]] && return 0 ;;
-        esac
-        return 1
+        [[ "${SELECTED_CAPABILITIES[ai]:-}" == all && -z "${TOOL_OPTIONAL[$name]:-}" ]] && return 0
+        [[ " ${SELECTED_AI_TOOLS[*]} " == *" $name "* ]]
+        return
     fi
     if tool_has_capability "$name" agent-badge; then
         feature_enabled agent-badge && { component_selected claude || component_selected codex; }
@@ -318,9 +318,17 @@ help_components() {
     printf '%s' "$out"
 }
 
+# The help line for an optional AI CLI.
+optional_ai_help() {
+    case "$1" in
+        pi) echo "Pi, a minimal terminal coding agent. An npm package: it needs Node >=22.19 (the work tier's pinned Node); without it, the request fails with instructions rather than pulling in a toolchain." ;;
+        *) echo "Only $1." ;;
+    esac
+}
+
 show_help() {
     local ai_tools name capability text
-    ai_tools="$(tools_for_capability ai | paste -sd, - | sed 's/,/, /g')"
+    ai_tools="$(ai_core_tools | paste -sd, - | sed 's/,/, /g')"
     cat << 'EOF'
 Dotfiles Installation Script - Tiered Installation System
 
@@ -343,14 +351,19 @@ EOF
     echo
     help_entry --work "Dev + local development and agent execution. Requires sudo. Adds $(help_components work), at the versions versions.lock pins; sbx brings KVM host access. Where sbx does not apply (WSL, 22.04) it is skipped and the rest installs. AI, Tailscale, RDP, and cloud CLIs stay orthogonal; leave AI off where an organization manages those CLIs."
     echo
-    help_entry --full "Work tier plus all AI CLIs. Requires sudo. Equivalent to: --work --ai"
+    help_entry --full "Work tier plus the core AI CLIs. Requires sudo. Equivalent to: --work --ai"
     echo
     echo "AI TOOLING (orthogonal - combines with any tier):"
     help_entry --ai "${CAPABILITY_HELP[ai]} ($ai_tools)"
-    for name in $(tools_for_capability ai); do
+    for name in $(ai_core_tools); do
         help_entry "--$name" "Only $name."
     done
-    help_entry "" "Per-tool flags combine: --claude --opencode installs just those two; --ai and --full install all of them. Pi is an npm package, so it needs Node >=22.19 (the work tier's pinned Node); without it, the request fails with instructions rather than pulling in a toolchain."
+    help_entry "" "Per-tool flags combine: --claude --opencode installs just those two; --ai and --full install all three."
+    echo
+    echo "OPTIONAL AI TOOLS (only their own flags install them; they add to --ai):"
+    for name in $(ai_optional_tools); do
+        help_entry "--$name" "$(optional_ai_help "$name")"
+    done
     echo
     echo "CAPABILITIES (orthogonal - combine with any tier):"
     for capability in "${CAPABILITY_NAMES[@]}"; do
@@ -377,7 +390,7 @@ OPTIONS:
     --upgrade           Also upgrade what is not pinned: the selection's APT
                         packages (only-upgrade, never removing; apt's simulated
                         transaction is shown first; held packages are skipped),
-                        the AI CLIs and Pi through their updaters, and rustup
+                        the AI CLIs through their updaters, and rustup
                         itself. Pinned tools move only with versions.lock.
     --theme             Enable tmux themes (default).
     --no-theme          Persistently disable tmux themes.
@@ -394,7 +407,8 @@ EXAMPLES:
     ./setup.sh --config              # Reconcile symlinks to installed tools
     ./setup.sh --bash                # Modern shell experience, NO sudo
     ./setup.sh --dev                 # Development setup (no AI CLIs)
-    ./setup.sh --dev --ai            # Development setup + all AI CLIs
+    ./setup.sh --dev --ai            # Development setup + the core AI CLIs
+    ./setup.sh --full --pi           # Everything above, plus Pi
     ./setup.sh --dev --claude        # Development setup + only Claude Code
     ./setup.sh --claude --opencode   # Config + just those two AI CLIs
     ./setup.sh --work                # Local work environment, AI stays separate
@@ -888,7 +902,13 @@ main() {
     echo "Target: Ubuntu (including WSL)"
     echo "Tier: $INSTALL_TIER"
     case "${SELECTED_CAPABILITIES[ai]:-}" in
-        all) echo "${CAPABILITY_LABEL[ai]}: all ($(tools_for_capability ai | paste -sd, - | sed 's/,/, /g'))" ;;
+        all)
+            local extra="" name
+            for name in "${SELECTED_AI_TOOLS[@]}"; do
+                [[ -z "${TOOL_OPTIONAL[$name]:-}" ]] || extra+=", $name"
+            done
+            echo "${CAPABILITY_LABEL[ai]}: core ($(ai_core_tools | paste -sd, - | sed 's/,/, /g'))${extra:+ plus ${extra#, }}"
+            ;;
         some) echo "${CAPABILITY_LABEL[ai]}: ${SELECTED_AI_TOOLS[*]}" ;;
         *) echo "${CAPABILITY_LABEL[ai]}: none" ;;
     esac

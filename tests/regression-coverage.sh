@@ -61,7 +61,13 @@ source "$ROOT/setup.sh"
     parse_arguments --claude --ai
     installed=""
     install_selection >/dev/null
-    assert_eq "$installed" " claude codex opencode pi" "--ai with a per-tool flag"
+    assert_eq "$installed" " claude codex opencode" "--ai with a per-tool flag"
+    # Optional AI CLIs (pi) come only with their own flag, --ai or not.
+    SELECTED_CAPABILITIES=() SELECTED_AI_TOOLS=()
+    parse_arguments --pi --ai
+    installed=""
+    install_selection >/dev/null
+    assert_eq "$installed" " claude codex opencode pi" "--ai with an optional AI CLI"
 )
 
 # --- External installs are recorded as such and never replaced.

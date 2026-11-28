@@ -33,22 +33,24 @@ TIERS (cumulative - each tier includes all previous tiers):
                         Tailscale, RDP, and cloud CLIs stay orthogonal; leave
                         AI off where an organization manages those CLIs.
 
-    --full              Work tier plus all AI CLIs. Requires sudo. Equivalent
-                        to: --work --ai
+    --full              Work tier plus the core AI CLIs. Requires sudo.
+                        Equivalent to: --work --ai
 
 AI TOOLING (orthogonal - combines with any tier):
-    --ai                Every AI CLI, into ~/.local/bin. Leave it off where an
-                        organization manages them; the shell shortcuts load
-                        either way. (claude, codex, opencode, pi)
+    --ai                The core AI CLIs, into ~/.local/bin. Leave it off where
+                        an organization manages them; the shell shortcuts load
+                        either way. (claude, codex, opencode)
     --claude            Only claude.
     --codex             Only codex.
     --opencode          Only opencode.
-    --pi                Only pi.
                         Per-tool flags combine: --claude --opencode installs
-                        just those two; --ai and --full install all of them. Pi
-                        is an npm package, so it needs Node >=22.19 (the work
-                        tier's pinned Node); without it, the request fails with
-                        instructions rather than pulling in a toolchain.
+                        just those two; --ai and --full install all three.
+
+OPTIONAL AI TOOLS (only their own flags install them; they add to --ai):
+    --pi                Pi, a minimal terminal coding agent. An npm package: it
+                        needs Node >=22.19 (the work tier's pinned Node);
+                        without it, the request fails with instructions rather
+                        than pulling in a toolchain.
 
 CAPABILITIES (orthogonal - combine with any tier):
     --rdp               The xrdp RDP server with an XFCE session. Never implied
@@ -82,7 +84,7 @@ OPTIONS:
     --upgrade           Also upgrade what is not pinned: the selection's APT
                         packages (only-upgrade, never removing; apt's simulated
                         transaction is shown first; held packages are skipped),
-                        the AI CLIs and Pi through their updaters, and rustup
+                        the AI CLIs through their updaters, and rustup
                         itself. Pinned tools move only with versions.lock.
     --theme             Enable tmux themes (default).
     --no-theme          Persistently disable tmux themes.
@@ -99,7 +101,8 @@ EXAMPLES:
     ./setup.sh --config              # Reconcile symlinks to installed tools
     ./setup.sh --bash                # Modern shell experience, NO sudo
     ./setup.sh --dev                 # Development setup (no AI CLIs)
-    ./setup.sh --dev --ai            # Development setup + all AI CLIs
+    ./setup.sh --dev --ai            # Development setup + the core AI CLIs
+    ./setup.sh --full --pi           # Everything above, plus Pi
     ./setup.sh --dev --claude        # Development setup + only Claude Code
     ./setup.sh --claude --opencode   # Config + just those two AI CLIs
     ./setup.sh --work                # Local work environment, AI stays separate
@@ -349,12 +352,12 @@ Dotfiles Installation
 ====================================
 Target: Ubuntu (including WSL)
 Tier: work
-AI CLIs: all (claude, codex, opencode, pi)
+AI CLIs: core (claude, codex, opencode)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls jq lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gdu gh glow harper-ls jq lazygit neovim node nvm opencode ripgrep rust sbx sd shellcheck starship tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[sbx] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -407,12 +410,12 @@ Dotfiles Installation
 ====================================
 Target: Ubuntu (including WSL)
 Tier: config
-AI CLIs: all (claude, codex, opencode, pi)
+AI CLIs: core (claude, codex, opencode)
 
 -- components
-claude codex jq opencode pi 
+claude codex jq opencode 
 -- install
-eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -557,12 +560,12 @@ Dotfiles Installation
 ====================================
 Target: Ubuntu (including WSL)
 Tier: config
-AI CLIs: all (claude, codex, opencode, pi)
+AI CLIs: core (claude, codex, opencode)
 
 -- components
-claude codex jq opencode pi 
+claude codex jq opencode 
 -- install
-eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -607,12 +610,12 @@ Dotfiles Installation
 ====================================
 Target: Ubuntu (including WSL)
 Tier: config
-AI CLIs: all (claude, codex, opencode, pi)
+AI CLIs: core (claude, codex, opencode)
 
 -- components
-claude codex jq opencode pi 
+claude codex jq opencode 
 -- install
-eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -713,6 +716,56 @@ AI CLIs: pi opencode
 opencode pi 
 -- install
 opencode +settings pi +settings +settings
+-- verify
+ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-24.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-24.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=none rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+ubuntu-20.04 missing=git rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=apt-get rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=sudo rc=0 probes=[curl git] applicable=[] 
+ubuntu-20.04 missing=systemctl rc=0 probes=[curl git] applicable=[] 
+debian missing=none rc=0 probes=[curl git] applicable=[] 
+debian missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
+debian missing=git rc=0 probes=[curl git] applicable=[] 
+debian missing=apt-get rc=0 probes=[curl git] applicable=[] 
+debian missing=sudo rc=0 probes=[curl git] applicable=[] 
+debian missing=systemctl rc=0 probes=[curl git] applicable=[] 
+-- success
+
+[SUCCESS] Dotfiles installation complete! (tier: config +ai)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Next Steps:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Verify installation:
+   dotfiles verify
+
+2. Set your Git identity (commits are refused until one is set):
+   git profile add NAME --default    # gh login, SSH key, signing
+   (or set user.name and user.email in ~/.gitconfig.local)
+
+3. Switch theme (default: gruvbox):
+   ./bin/theme-switcher
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+== --ai --pi
+-- banner
+Dotfiles Installation
+====================================
+Target: Ubuntu (including WSL)
+Tier: config
+AI CLIs: core (claude, codex, opencode) plus pi
+
+-- components
+claude codex jq opencode pi 
+-- install
+eget[jq] claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git] applicable=[] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl
@@ -1070,14 +1123,14 @@ Dotfiles Installation
 ====================================
 Target: Ubuntu (including WSL)
 Tier: work
-AI CLIs: all (claude, codex, opencode, pi)
+AI CLIs: core (claude, codex, opencode)
 Tailscale: yes (--tail)
 Google Cloud CLI: yes (--gcloud)
 
 -- components
-bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow harper-ls jq lazygit neovim node nvm opencode pi ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
+bat btop claude codex delta direnv docker eget eza fd fzf gcloud gdu gh glow harper-ls jq lazygit neovim node nvm opencode ripgrep rust sbx sd shellcheck starship tailscale tmux uv wsl2-ssh-agent zoxide zsh 
 -- install
-eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings pi +settings +settings tailscale +tailscaled gcloud
+eget[starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv sd shellcheck harper-ls wsl2-ssh-agent jq] packages:dev tmux neovim packages:work docker +docker-access sbx +kvm +kits-builder nvm node +node-path rust claude +settings +badge +badge-update codex +settings +badge +badge-update opencode +settings tailscale +tailscaled gcloud
 -- verify
 ubuntu-24.04 missing=none rc=0 probes=[curl git apt-get sudo] applicable=[sbx tailscale gcloud] 
 ubuntu-24.04 missing=curl rc=1 probes=[curl] applicable=[] [ERROR] Required command not found: curl

@@ -20,7 +20,7 @@ printf 'ID=debian\nVERSION_ID="13"\n' > "$TEST_ROOT/debian"
 MATRIX=(
     "--config" "--bash" "--dev" "--work" "--full"
     "--ai" "--claude" "--claude --codex" "--claude --ai" "--ai --claude" "--claude --claude"
-    "--pi --opencode"
+    "--pi --opencode" "--ai --pi"
     "--rdp" "--tail" "--azure" "--gcloud" "--aws" "--azure --aws"
     "--full --tail --gcloud" "--dev --rdp" "--work --claude --codex --tail"
     "--bash --pi --rdp --tail --azure --gcloud --aws"

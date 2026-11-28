@@ -24,7 +24,7 @@ VERIFY_SMOKE=false
 verify_requested_components() {
     local capability
     for capability in ${VERIFY_CAPABILITIES//,/ }; do
-        tools_for_capability "$capability"
+        if [[ "$capability" == ai ]]; then ai_core_tools; else tools_for_capability "$capability"; fi
     done
 }
 
