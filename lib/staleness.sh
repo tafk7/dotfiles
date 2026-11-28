@@ -11,7 +11,7 @@ _DOTFILES_STALENESS_LOADED=1
 
 # Programs whose processes are checked against their consumer's change event:
 # consumer, then the process names (comm) that run it.
-STALE_PROGRAMS=("claude claude" "codex codex" "opencode opencode" "neovim nvim" "tmux tmux:")
+STALE_PROGRAMS=("claude claude" "codex codex" "opencode opencode" "antigravity agy" "neovim nvim" "tmux tmux:")
 # Stale processes a restart in a pane does not reach: consumer, a pattern in
 # the command line, and how to restart them. Codex's app-server daemon serves
 # new sessions with the config it loaded and outlives tmux.

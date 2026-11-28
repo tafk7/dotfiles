@@ -28,7 +28,8 @@ note's own **Status** line is the authority; this index is updated with it.
 - [Antigravity CLI](antigravity-cli.md): `agy` as an opt-in AI tool
   (`--antigravity`), installed from the vendor manifest with a sha512 check,
   settings merged by `ai-config`, self-update off; neutral about accounts and
-  gateways. A design proposal; nothing built.
+  gateways. Installer, settings and shell built; tmux and keys, the
+  container scenarios and kits still open.
 
 ## Implemented (kept as the record of what was decided)
 

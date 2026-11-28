@@ -78,6 +78,7 @@ codex           -               installer  -     ai            -              - 
 opencode        -               installer  -     ai            -              -       -                  -                 -
 pi              -               installer  -     ai            -              -       -                  -                 runs
 omp             -               installer  -     ai            -              -       -                  -                 runs
+antigravity     agy             installer  -     ai            -              -       -                  -                 runs
 xrdp            -               apt        -     rdp           -              -       -                  xrdp              service-active xrdp
 zsh             -               apt        dev   -             -              -       -                  zsh               -
 docker          -               apt        work  -             -              -       22.04,24.04,26.04  docker-ce         -
@@ -148,6 +149,9 @@ pi         needs                  node
 pi         configure              configure_pi_settings configure_ai_settings
 omp        optional               yes
 omp        policy                 vendor
+antigravity optional              yes
+antigravity policy                vendor
+antigravity configure             configure_ai_settings
 xrdp       install                function:install_rdp_packages
 tailscale  configure              configure_tailscaled
 gh         eget-repo              cli/cli
@@ -206,6 +210,12 @@ omp        ownership-roots        $HOME/.local/bin
 omp        update-contract        vendor-binary-in-place
 omp        paths                  $HOME/.local/bin/omp
 omp        removal-instructions   $HOME/.omp sessions, settings, credentials, and worktrees are preserved
+# agy is one binary from the release manifest; ~/.gemini also belongs to
+# Gemini CLI, so uninstall never touches it.
+antigravity ownership-roots       $HOME/.local/bin
+antigravity update-contract       vendor-manifest-in-place
+antigravity paths                 $HOME/.local/bin/agy
+antigravity removal-instructions  $HOME/.gemini (shared with Gemini CLI) is preserved: settings, sign-in, and conversations
 # A service is present only while it runs, not merely when its binary exists.
 xrdp       update-contract        apt-and-service-in-place
 xrdp       removal-mode           manual
@@ -234,7 +244,7 @@ starship eza fzf zoxide delta btop gdu glow lazygit gh uv bat fd ripgrep direnv 
 shellcheck harper-ls wsl2-ssh-agent
 packages:dev zsh tmux neovim
 packages:work docker sbx nvm node rust
-jq claude codex opencode pi omp
+jq claude codex opencode pi omp antigravity
 xrdp tailscale azure-cli gcloud aws-cli
 "
 

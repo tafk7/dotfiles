@@ -96,6 +96,32 @@ custom_binding = "ctrl-k"
         result = self.run_config('pi', '--check', ok=False)
         self.assertIn('CHECK: ' + str(self.home / '.pi/agent/keybindings.json'), result.stdout)
 
+    def test_antigravity_settings_merge_and_survive_its_rewrites(self):
+        # agy rewrites its settings.json itself, keeping unknown keys and
+        # dropping values equal to its defaults; ai-config merges into it.
+        settings = self.put('.gemini/antigravity-cli/settings.json',
+                            '{"trustedWorkspaces": ["/w"], "showFeedbackSurvey": true, "model": "m"}')
+        gemini_cli = self.put('.gemini/settings.json', '{"theme": "x"}')
+        self.run_config('antigravity')
+        data = json.loads(settings.read_text())
+        self.assertEqual(data['trustedWorkspaces'], ['/w'])
+        self.assertEqual(data['model'], 'm')
+        self.assertIs(data['showFeedbackSurvey'], False)
+        self.assertEqual(data['altScreenMode'], 'never')
+        self.assertEqual(data['permissions'], {'deny': ['command(agent-trust)']})
+        self.assertEqual(settings.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(gemini_cli.read_text(), '{"theme": "x"}')
+        # The CLI rewrites the file: a changed default and a dropped one stay
+        # the machine's; the enforced key comes back.
+        data.update(altScreenMode='always', showFeedbackSurvey=True)
+        del data['permissions']
+        settings.write_text(json.dumps(data))
+        self.run_config('antigravity')
+        data = json.loads(settings.read_text())
+        self.assertEqual((data['altScreenMode'], data['showFeedbackSurvey'], 'permissions' in data),
+                         ('always', False, False))
+        self.run_config('antigravity', '--check')
+
     def record_entry(self, component, target):
         record_path = self.home / f'.local/state/dotfiles/ai/{component}.json'
         record = json.loads(record_path.read_text())

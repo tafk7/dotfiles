@@ -60,7 +60,7 @@ Commands:
                         skipped), the AI CLIs, and rustup itself.
     --no-refresh        Skip the refresh that ends every apply.
   upgrade CLI[,CLI]     Update installed AI CLIs (claude, codex, opencode, pi,
-                        omp)
+                        omp, antigravity)
                         now, through their official updaters, then run their
                         configure steps. A one-off: the profile is left as it
                         is, so this never makes dotfiles manage a CLI (profile

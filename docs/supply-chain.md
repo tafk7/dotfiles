@@ -28,6 +28,7 @@ downloads.
 | opencode | moving official installer | HTTPS-trusted installer file with `--no-modify-path`; verified owned binary and launcher |
 | Pi | npm package | npm registry trust, isolated prefix, lifecycle scripts disabled, verified launcher; one exact known transitive `node-domexception@1.0.0` deprecation line is filtered while all other npm diagnostics remain visible |
 | Oh My Pi | latest GitHub release binary | `omp-linux-<arch>` SHA-256 verified against `SHA256SUMS.txt` from the same release tag; executable check before atomic replacement; updates through `omp update`, which verifies its download's size and SHA-256 |
+| Antigravity CLI (`agy`) | moving vendor release manifest | the manifest (HTTPS, Google Cloud Run) names the version, tarball URL and SHA-512; the tarball (Google Cloud Storage) is verified against it, its one `antigravity` member extracted, run, and checked to report the manifest's version before atomic replacement; no detached signature; the vendor script and `agy install`/`agy update` never run |
 | Ubuntu/Docker/Azure packages | APT | package-manager in-place transaction; Docker and Microsoft repository keys are fingerprint checked |
 | Docker Sandboxes | Docker signed APT repository; version pinned in `versions.lock` and held | `docker-sbx`; executable check; sandbox state and credentials preserved |
 | Tailscale | Tailscale signed APT repository | release-specific official keyring/list; no enrollment or auth-key handling |

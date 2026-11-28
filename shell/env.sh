@@ -84,6 +84,10 @@ export RIPGREP_CONFIG_PATH="$HOME/.ripgreprc"
 # `gh help telemetry`).
 export PI_TELEMETRY=0
 export GH_TELEMETRY=false
+# Antigravity's agy checks for and installs updates at every start; dotfiles
+# upgrade antigravity owns its updates (an explicit `agy update` ignores this,
+# so shell/tools/antigravity.sh refuses it).
+export AGY_CLI_DISABLE_AUTO_UPDATE=true
 
 # Node.js
 # NODE_OPTIONS is deliberately not set: every node process would inherit it,

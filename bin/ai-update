@@ -5,7 +5,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 case "${1:-}" in
-    -h|--help) echo "Usage: ai-update claude|codex|opencode|pi|omp  (runs: dotfiles upgrade CLI)"; exit 0 ;;
-    claude|codex|opencode|pi|omp) exec "$ROOT/bin/dotfiles" upgrade "$1" ;;
-    *) echo 'Usage: ai-update claude|codex|opencode|pi|omp' >&2; exit 64 ;;
+    -h|--help) echo "Usage: ai-update claude|codex|opencode|pi|omp|antigravity  (runs: dotfiles upgrade CLI)"; exit 0 ;;
+    claude|codex|opencode|pi|omp|antigravity) exec "$ROOT/bin/dotfiles" upgrade "$1" ;;
+    *) echo 'Usage: ai-update claude|codex|opencode|pi|omp|antigravity' >&2; exit 64 ;;
 esac

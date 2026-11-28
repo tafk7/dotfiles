@@ -212,6 +212,15 @@ verify_sha256() {
     return 1
 }
 
+# Fail unless FILE's SHA-512 is EXPECTED. Args: file expected
+verify_sha512() {
+    local actual
+    actual="$(sha512sum "$1" | awk '{print $1}')"
+    [[ "$actual" == "$2" ]] && return 0
+    error "Checksum mismatch for $(basename "$1"): expected $2, got $actual"
+    return 1
+}
+
 download_installer_script() {
     local url="$1" destination="$2"
     download_https "$url" "$destination" || return 1

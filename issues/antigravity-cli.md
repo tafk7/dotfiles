@@ -1,8 +1,24 @@
 # Antigravity's terminal CLI (`agy`) as an opt-in AI tool
 
-**Status:** open, design proposal (2026-11-27). Nothing is built. The design
-rests on research and hands-on checks of `agy` 1.5.14 (2026-11-22), against
-dotfiles `2bb6126`; paths below were rechecked at `8da3082`.
+**Status:** open, partly built (2026-11-28). The design rests on research and
+hands-on checks of `agy` 1.5.14 (2026-11-22), against dotfiles `2bb6126`;
+paths below were rechecked at `8da3082`.
+
+Built: `installers/install-antigravity.sh` (manifest, SHA-512, no vendor
+script; a real install of 1.5.18 checked), `verify_sha512`, the registry row
+(an optional AI CLI: `--antigravity`, never `--ai` or `--full`),
+`bin/ai-update`, `dotfiles upgrade`, staleness, `shell/tools/antigravity.sh`
+(refuses `agy update` and `agy install`), `AGY_CLI_DISABLE_AUTO_UPDATE=true`
+in `shell/env.sh`, the `ai-config` merge (`configs/antigravity-cli.json`:
+`showFeedbackSurvey: false`; defaults `altScreenMode: "never"` and Claude's
+`agent-trust` deny rule; `toolPermission` is left at the CLI's default,
+`request-review`), docs, and `tests/install-antigravity.sh` and
+`tests/ai-config.py`. The wrapper does not add `$AGY_FLAGS`: flags before a
+subcommand (`acp`, `models`) could break it.
+
+Still open: tmux and keys (the agent regex, keymap, compose, review,
+last-reply, the badge), the container scenarios and the chat fake, kits, and
+the questions under [Open](#open).
 
 ## User need
 
@@ -235,8 +251,10 @@ The pattern to copy is codex and pi.
 ## Open
 
 - The `tmux` parity level (none, keys only, or `ai-update` and the badge first).
-- Whether merged `ai-config` keys survive the CLI's rewrites and upgrades
-  (check in `ai-config`'s tests).
+- Whether merged `ai-config` keys survive the CLI's rewrites and upgrades.
+  Simulated in `tests/ai-config.py` (the enforced key comes back; a default
+  the CLI changed or dropped stays the machine's); not yet watched across a
+  real `agy` upgrade.
 - Whether old build-numbered tarball URLs stay downloadable (decides whether a
   pin is practical).
 - `agy acp` and `stream-json` input were not run.

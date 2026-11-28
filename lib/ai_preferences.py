@@ -178,6 +178,12 @@ def desired(component, home, record=None):
             directory = config_home / 'opencode'
             target = directory / 'opencode.json'
             source = ROOT / 'configs/opencode.json'
+        elif component == 'antigravity':
+            # agy rewrites this file itself (0600, unknown keys kept), so it is
+            # merged into, never linked. ~/.gemini is shared with Gemini CLI.
+            directory = home / '.gemini/antigravity-cli'
+            target = directory / 'settings.json'
+            source = ROOT / 'configs/antigravity-cli.json'
         else:
             directory = Path(os.environ.get('CLAUDE_CONFIG_DIR', directory)) if home == Path.home() else directory
             target = directory / 'settings.json'
@@ -301,7 +307,7 @@ def check_plugin(component, directory):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('component', choices=['codex', 'claude', 'opencode', 'pi', 'all'], nargs='?', default='all')
+    parser.add_argument('component', choices=['codex', 'claude', 'opencode', 'pi', 'antigravity', 'all'], nargs='?', default='all')
     parser.add_argument('--home', type=Path, default=Path.home())
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--check', action='store_true')
@@ -314,7 +320,7 @@ def main():
         return 0 if check_plugin(args.component, desired(args.component, args.home)[0]) else 1
     # Validate every document and target before writing any of them.
     plans = []
-    for c in (['codex', 'claude', 'opencode', 'pi'] if args.component == 'all' else [args.component]):
+    for c in (['codex', 'claude', 'opencode', 'pi', 'antigravity'] if args.component == 'all' else [args.component]):
         record = load_record(c, args.home)
         plans.append((c, record, *desired(c, args.home, record)))
     ok = True
@@ -364,6 +370,8 @@ def main():
         if component == 'opencode':
             print('info: opencode notifies about updates; install them with dotfiles upgrade opencode.'
                   if load_json(ROOT / 'configs/opencode.json').get('update') == 'notify' else 'info: opencode updater follows its configuration.')
+        if component == 'antigravity':
+            print('info: agy updates only through dotfiles upgrade antigravity (shell/env.sh sets AGY_CLI_DISABLE_AUTO_UPDATE=true).')
     return 0 if ok else 1
 
 

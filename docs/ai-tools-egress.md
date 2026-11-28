@@ -1,6 +1,6 @@
 # AI CLIs: data egress & hardening
 
-What Claude Code, Codex, opencode, Pi, and Oh My Pi send to third parties by default, and
+What Claude Code, Codex, opencode, Pi, Oh My Pi, and Antigravity's CLI send to third parties by default, and
 how we harden each. All findings verified against each tool's own docs/source
 (not memory). None of these tools is air-gapped by default.
 
@@ -166,6 +166,32 @@ will run.
 
 ---
 
+## Antigravity CLI (`agy`)
+
+Measured with `agy` 1.5.14 (issues/antigravity-cli.md):
+
+| Destination | What | When |
+|---|---|---|
+| the updater manifest host (Cloud Run) | update check | every start, unless `AGY_CLI_DISABLE_AUTO_UPDATE=true`; always on `agy update` |
+| `play.googleapis.com` | Clearcut telemetry | signed-in or unconfigured runs; none in gateway mode |
+| `accounts.google.com`, `oauth2.googleapis.com` | sign-in | without a gateway |
+| `www.gstatic.com` | plugin marketplace | TUI start; closed only by admin settings or a proxy |
+| `raw.githubusercontent.com` | release notes | `agy changelog` only |
+| `storage.googleapis.com` | the tarball | install and upgrade only |
+| the model provider or gateway | model calls | every prompt |
+
+`shell/env.sh` exports `AGY_CLI_DISABLE_AUTO_UPDATE=true`: `dotfiles upgrade
+antigravity` owns updates. An explicit `agy update` ignores the variable, so
+`shell/tools/antigravity.sh` refuses it (and `agy install`, which edits the
+shell profile). Telemetry is an **account** setting ("always off for business
+accounts"); no file key or variable turns it off. A model gateway
+(`AGY_LLM_GATEWAY_*`) sends none, and dotfiles sets no gateway, account or
+model: that is each machine's own setup. Its HTTP clients honour
+`HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`. `/etc/antigravity/admin_settings.json`
+(root) overrides all of this where present; dotfiles does not write it.
+
+---
+
 ## The network allowlist (the actual guarantee)
 
 Egress-allowlist the host/process; deny everything else. Then verify with a
@@ -178,7 +204,7 @@ auto-update / managed settings) · `api.github.com` + `github.com` +
 `registry.npmjs.org` (OpenCode update check and explicit updates).
 
 **Deny:** `ab.chatgpt.com` (Codex Statsig metrics) · `models.dev` (opencode) ·
-`build.stencil.so` (Oh My Pi update check) · `pi.dev` (Pi version check + install
+`build.stencil.so` (Oh My Pi update check) · `play.googleapis.com` (agy telemetry) · `pi.dev` (Pi version check + install
 telemetry; also `registry.npmjs.org` if you don't want `pi update` / `pi
 install` to reach npm) · everything else.
 

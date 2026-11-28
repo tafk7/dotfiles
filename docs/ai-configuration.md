@@ -10,6 +10,7 @@ when invoking an installer through another path. Python 3.11+ is required.
 | `configs/claude-settings.json`, `.defaults.json` | Declared keys in `~/.claude/settings.json` |
 | `configs/opencode.json` | Declared keys in `~/.config/opencode/opencode.json` |
 | `configs/opencode-cli.json`, `.defaults.json` | Declared keys in `~/.config/opencode/cli.json`, once the V2 CLI is installed |
+| `configs/antigravity-cli.json`, `.defaults.json` | Declared keys in `~/.gemini/antigravity-cli/settings.json` |
 | `configs/ai/codex/` | Corresponding portable asset files under `~/.codex/` |
 | `configs/ai/claude/` | Corresponding portable asset files under `~/.claude/` |
 
@@ -17,9 +18,9 @@ Each source holds two kinds of key, both in the user's own files, so this works
 without root and touches no other user:
 
 - Enforced keys (`codex.toml`, `claude-settings.json`, `opencode.json`,
-  `opencode-cli.json`) are the same on every machine: telemetry and metrics
-  off, no commit attribution, Claude's status line, opencode's sharing and
-  update policy. Every apply puts them back, and verify reports a difference.
+  `opencode-cli.json`, `antigravity-cli.json`) are the same on every machine:
+  telemetry and metrics off, no commit attribution, Claude's status line,
+  opencode's sharing and update policy, agy's feedback survey off. Every apply puts them back, and verify reports a difference.
 - Defaults (the `.defaults` siblings) are where each machine starts: model,
   effort, theme, key bindings, approval and sandbox policy. A default is
   written where the key is absent, and kept up to date with the repo while
@@ -47,7 +48,7 @@ automatic updater and makes `$.http.fetch` fail in Claude Code mods (use
 `$.process.run` instead). opencode only notifies about
 new releases and never shares sessions: its own updater reruns the upstream
 installer without `--no-modify-path`, which would append to the repo-owned
-`~/.bashrc`. Use `dotfiles upgrade claude` (or `codex`, `opencode`, `pi`, `omp`) to
+`~/.bashrc`. Use `dotfiles upgrade claude` (or `codex`, `opencode`, `pi`, `omp`, `antigravity`) to
 update explicitly: it runs `setup.sh --CLI --only CLI --upgrade`, the official
 installer's update path followed by the CLI's configure steps, and leaves the
 machine profile alone, so updating a CLI does not make dotfiles manage it. A
@@ -75,8 +76,16 @@ values, and Pi's seed-once settings stay the user's. A key listed in
 record without touching its value, so a setting dotfiles stops managing keeps
 whatever each machine has.
 
+Antigravity's `agy` rewrites its own settings file (at 0600, keeping keys it
+does not know, dropping values equal to its defaults), so it is merged into,
+never linked, and its defaults (`altScreenMode: "never"` for tmux scrollback,
+the same `agent-trust` deny rule as Claude's) are only set where the key is
+absent. Nothing about models, providers, gateways or accounts is written;
+`~/.gemini` also belongs to Gemini CLI and is otherwise left alone.
+
 Before changes, files are copied into private, uniquely named subdirectories of
-`~/.claude/backups`, `~/.codex/backups` or `~/.config/opencode/backups`. Alternate configuration homes use their
+`~/.claude/backups`, `~/.codex/backups`, `~/.config/opencode/backups` or
+`~/.gemini/antigravity-cli/backups`. Alternate configuration homes use their
 own `backups` subdirectory. A semantic no-op retains original bytes and creates no
 backup. TOML formatting and comments normalize on a change; parsed values remain.
 Invalid JSON/TOML, incompatible object shapes, and symlinked targets fail before

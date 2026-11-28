@@ -34,7 +34,7 @@ The following selections combine with any tier:
 | Flag | Adds |
 |---|---|
 | `--ai`, or `--claude` `--codex` `--opencode` | The core AI CLIs: all three, or only the ones you name |
-| `--pi` `--omp` | Optional AI CLIs (Pi, Oh My Pi): only their own flags install them, alone or beside `--ai` |
+| `--pi` `--omp` `--antigravity` | Optional AI CLIs (Pi, Oh My Pi, Antigravity's `agy`): only their own flags install them, alone or beside `--ai` |
 | `--full` | Same as `--work --ai` |
 | `--tail` | Tailscale package and service; does not enroll the machine |
 | `--rdp` | xrdp server with an XFCE session |
@@ -43,7 +43,7 @@ The following selections combine with any tier:
 `--full` never adds RDP, Tailscale, or cloud CLIs; you always choose those
 explicitly. RDP in particular opens a network listener. Leave AI off where your
 organization manages those CLIs. The shell helpers work with whatever `claude`, `codex`,
-`opencode`, `pi`, or `omp` is on `PATH`.
+`opencode`, `pi`, `omp`, or `agy` is on `PATH`.
 
 Setup options:
 
@@ -223,7 +223,7 @@ asks again there; `--revoke`, `--list` and `--prune` (entries of folders that
 are gone) manage the rest. It asks on your terminal and refuses to run in an
 agent's shell. See [folder trust](docs/customization.md#folder-trust-agent-trust).
 
-`dotfiles upgrade` updates installed CLIs (claude, codex, opencode, pi, omp) and
+`dotfiles upgrade` updates installed CLIs (claude, codex, opencode, pi, omp, antigravity) and
 leaves the machine profile alone; `dotfiles profile --add CLI` is what makes
 dotfiles install and manage one. `bin/ai-update` is its older name.
 

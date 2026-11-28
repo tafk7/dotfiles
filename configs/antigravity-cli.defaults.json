@@ -1,0 +1,8 @@
+{
+  "altScreenMode": "never",
+  "permissions": {
+    "deny": [
+      "command(agent-trust)"
+    ]
+  }
+}
