@@ -113,6 +113,19 @@ Setup reconciles an incomplete artifact journal before starting another
 install; verification reports a pending journal as a failure. The checkout is
 not the machine-state database.
 
+The machine profile is schema 2: `ai all` selects Claude, Codex and OpenCode;
+optional tools are named beside it, such as `all,pi`. Schema 1 profiles are
+accepted and converted in memory. Because `all` used to include Pi, a legacy
+`all` retains Pi when the ledger records an existing dotfiles-owned Pi
+binary (a regular executable file) in its ownership roots, its status is
+not `removed`, and Pi was not excluded. Missing, removed or external Pi
+is not added. A legacy Pi exclusion is honored and then dropped because
+Pi is now optional. Reads, verification and dry runs write nothing; the next
+normal profile save persists schema 2. Removing Pi after that save leaves it
+installed and does not add it again. Schema 1 was also used briefly after Pi
+became optional, so an installed managed Pi beside `all` is treated as intent
+to keep it; `dotfiles profile --remove pi` makes stopping management explicit.
+
 ## Configuration ownership
 
 `lib/config.sh` maps each source to `target:type:owner`. Base configuration is

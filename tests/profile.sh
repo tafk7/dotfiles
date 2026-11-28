@@ -17,6 +17,76 @@ source "$ROOT/lib/profile.sh"
 profile_value() { awk -F '\t' -v key="$1" '$1 == key { print $2 }' "$DOTFILES_PROFILE_FILE"; }
 dotfiles() { "$ROOT/bin/dotfiles" "$@"; }
 
+# Schema 1's all included Pi. Preserve that intent only for an existing
+# dotfiles-owned install, without writing during load, show, or preview.
+legacy_profile() {
+    printf 'schema\t1\ntier\tconfig\ncapabilities\t-\nai\t%s\nai.exclude\t%s\nopt-outs\t-\n' "${1:-all}" "${2:--}" > "$DOTFILES_PROFILE_FILE"
+}
+mkdir -p "$HOME/.pi/agent/install/bin" "$HOME/.local/bin"
+fake_command "$HOME/.pi/agent/install/bin/pi" true
+ln -s "$HOME/.pi/agent/install/bin/pi" "$HOME/.local/bin/pi"
+ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+invalid_pi_failed=false
+for invalid_pi in directory removed; do
+    if (
+        legacy_profile
+        if [[ "$invalid_pi" == directory ]]; then
+            ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install" npm-prefix-in-place
+        else
+            ledger_record pi yes dotfiles removed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+        fi
+        profile_load
+        assert_eq "${PROFILE[ai]}" all "legacy $invalid_pi Pi was retained"
+    ); then :; else invalid_pi_failed=true; fi
+done
+[[ "$invalid_pi_failed" == false ]] || fail "invalid Pi migration cases failed"
+ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+legacy_profile
+before="$(fixture_managed_snapshot)"
+profile_load
+assert_eq "${PROFILE[ai]}" all,pi "legacy all dropped managed Pi"
+assert_eq "$(profile_setup_args | paste -sd ' ')" "--config --ai --pi" "legacy upgrade selection"
+shown="$(dotfiles profile)"
+[[ "$shown" == *"ai              all plus pi"* ]] || fail "legacy display: $shown"
+# --only pi may report its absent Node dependency, but still must not write.
+rc=0; dotfiles apply --dry-run --only pi --no-refresh >/dev/null 2>&1 || rc=$?
+[[ $rc -eq 0 || $rc -eq 1 ]] || fail "legacy preview: $rc"
+assert_eq "$(fixture_managed_snapshot)" "$before" "a legacy profile read or preview wrote state"
+bash -c 'source "$1/lib/install.sh"; source "$1/lib/profile.sh"; source "$1/lib/verify.sh"; verify_expected_components' _ "$ROOT" \
+    | grep -Fxq pi || fail "legacy verification omitted Pi"
+profile_save
+assert_eq "$(profile_value schema)/$(profile_value ai)" "2/all,pi" "converted profile save"
+dotfiles profile --remove pi >/dev/null
+profile_load
+assert_eq "${PROFILE[ai]}" all "schema 2 re-added removed Pi"
+dotfiles profile --add pi --no-apply >/dev/null
+assert_eq "$(profile_value ai)" all,pi "adding Pi after conversion"
+legacy_profile all pi
+profile_load
+assert_eq "${PROFILE[ai]}/${PROFILE[ai.exclude]}" "all/" "legacy Pi exclusion"
+profile_save
+dotfiles profile --add pi --no-apply >/dev/null
+assert_eq "$(profile_value ai)/$(profile_value ai.exclude)" "all,pi/-" "adding formerly excluded Pi"
+legacy_profile claude
+profile_load
+assert_eq "${PROFILE[ai]}" claude "a tool list acquired Pi"
+legacy_profile
+ledger_record pi yes external present 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+profile_load
+assert_eq "${PROFILE[ai]}" all "external Pi was adopted"
+ledger_record pi yes dotfiles installed 1 "$TEST_ROOT/bin/pi" npm-prefix-in-place
+fake_command "$TEST_ROOT/bin/pi" true
+profile_load
+assert_eq "${PROFILE[ai]}" all "Pi outside owned paths was adopted"
+ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+rm -f "$HOME/.pi/agent/install/bin/pi"
+profile_load
+assert_eq "${PROFILE[ai]}" all "missing Pi was installed by migration"
+rm -f "$DOTFILES_LEDGER_FILE" "$TEST_ROOT/bin/pi"
+profile_load
+assert_eq "${PROFILE[ai]}" all "unrecorded Pi was adopted"
+rm -f "$DOTFILES_PROFILE_FILE" "$HOME/.local/bin/pi"
+
 # --- Merge rules: flags only add.
 profile_reset
 profile_merge work tail all "" no-git

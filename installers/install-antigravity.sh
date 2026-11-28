@@ -8,12 +8,18 @@
 # member, `antigravity`, as ~/.local/bin/agy. It never runs `agy install` or
 # `agy update`. --update (setup --upgrade, dotfiles upgrade antigravity) is the
 # same fetch when the manifest names another version; shell/env.sh turns the
-# CLI's own update check off. It refuses to shadow an agy already on PATH.
+# CLI's own update check off. An earlier readable shebang script declaring
+# '# dotfiles-launcher: agy' in its first ten lines stays in front. Creating
+# or forcibly reinstalling a copy refuses separate installs, including
+# unmarked scripts and ELF binaries. A working managed copy keeps updating
+# by absolute path even with a separate install earlier on PATH.
 set -euo pipefail
 
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="${DOTFILES_DIR:-$(dirname "$INSTALLER_DIR")}"
 export DOTFILES_DIR
+# Also covers the common artifact helpers' version probes after replacement.
+export AGY_CLI_DISABLE_AUTO_UPDATE=true
 source "$DOTFILES_DIR/lib/install.sh"
 # Observation reports what is installed and changes nothing, so it branches
 # before any provisioning below (lib/observe.sh).
@@ -30,16 +36,6 @@ AGY_MANIFEST_BASE="https://antigravity-cli-auto-updater-974169037036.us-central1
 # --version contacts nothing; the variable makes sure no update check runs.
 agy_version() { AGY_CLI_DISABLE_AUTO_UPDATE=true "$1" --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -n1; }
 
-# Don't shadow an externally managed agy (one the vendor installer put
-# elsewhere, or a machine's own launcher): ~/.local/bin comes first on PATH.
-EXTERNAL_AGY="$(command -v agy 2>/dev/null || true)"
-if [[ -n "$EXTERNAL_AGY" && "$EXTERNAL_AGY" != "$AGY_BIN" ]]; then
-    warn "Found an externally-managed agy on PATH: $EXTERNAL_AGY"
-    warn "Skipping install to avoid a shadow copy at $AGY_BIN."
-    warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
-    exit 2
-fi
-
 installed=""
 [[ -x "$AGY_BIN" ]] && installed="$(agy_version "$AGY_BIN" || true)"
 
@@ -48,6 +44,16 @@ installed=""
 if [[ "$FORCE" != true && "$UPDATE" != true && -n "$installed" ]]; then
     success "Antigravity CLI already installed ($installed); dotfiles upgrade antigravity updates it."
     exit 2
+fi
+
+# Retaining/updating a working managed copy creates no second copy. Inspect
+# PATH only when creating or forcibly replacing it, as the omp installer does.
+if [[ -z "$installed" || "$FORCE" == true ]]; then
+    EXTERNAL_AGY="$(external_install_path agy "$AGY_BIN")"
+    if [[ -n "$EXTERNAL_AGY" ]]; then
+        warn_external_install agy "$EXTERNAL_AGY" "$AGY_BIN"
+        exit 2
+    fi
 fi
 
 case "$(uname -m)" in

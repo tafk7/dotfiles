@@ -20,6 +20,28 @@ Still open: tmux and keys (the agent regex, keymap, compose, review,
 last-reply, the badge), the container scenarios and the chat fake, kits, and
 the questions under [Open](#open).
 
+The installer also coexists with a machine's launcher earlier on PATH:
+install, upgrade, observation, verification and ledger recording use
+`~/.local/bin/agy`, while interactive calls keep the launcher in front.
+The installer saves the caller's PATH before dotfiles adds its own tools and
+keeps that snapshot only within the capturing process's live tree, including
+re-execs and child installers. It reads the candidate file without running
+it. A launcher must be a readable script starting with `#!` and contain the
+exact line
+`# dotfiles-launcher: agy` within its first ten lines. This declares that it
+sets up the environment and defers to `~/.local/bin/agy`. It is accepted when
+earlier on that PATH or when the managed directory is not on PATH yet; a
+script after the managed directory is refused to avoid shadowing it.
+Creating or forcibly reinstalling a copy refuses unmarked scripts and
+separate ELF executables, including the vendor's compiled binary: dotfiles
+does not install a hidden second copy behind them. Unknown or unreadable
+files are preserved too; the refusal explains the launcher declaration.
+A working managed copy is kept or upgraded by absolute path even with an
+unmarked script or ELF earlier on PATH, so upgrades do not depend on when
+the launcher adds its marker. An alias of the managed file is the same copy
+and can be upgraded. The rule needs no working launcher environment or
+version response; installing other tools preserves existing PATH order.
+
 ## User need
 
 Google Antigravity is a family of agent tools: a desktop App, an IDE (a VS Code
@@ -139,8 +161,9 @@ Observed behaviour that differs from the documentation:
 - An unset gateway means sign-in and telemetry. A machine that must use only a
   gateway needs that enforced outside dotfiles (a launcher earlier on PATH,
   admin settings, a proxy). dotfiles' part is to not undercut it: call `agy`
-  through PATH, never run `agy update` or `agy install`, never write gateway or
-  model keys.
+  through PATH for interactive use, never run `agy update` or `agy install`,
+  never write gateway or model keys. Management probes use the managed
+  binary's absolute path with its auto-update check disabled.
 
 ## Proposed design
 
@@ -150,8 +173,10 @@ The pattern to copy is codex and pi.
 
 - `installers/install-antigravity.sh`, new, the usual shape: `lib/install.sh`,
   `--observe` through `observe_component antigravity`, `--force`, `--update`;
-  refuse to shadow an external `agy` (exit 2), skip a working install, verify
-  by absolute path (`~/.local/bin/agy --version`).
+  when creating or forcibly reinstalling, refuse separate installs and
+  launchers after the managed directory (exit 2); keep an earlier declared
+  launcher in front, retain or upgrade a working managed copy,
+  verify by absolute path (`~/.local/bin/agy --version`).
 - **Read the manifest directly; skip the vendor script.** Fetch the manifest
   JSON, download `url`, check `sha512`, extract `antigravity` into a temporary
   directory and install it atomically as `~/.local/bin/agy`. No vendor script

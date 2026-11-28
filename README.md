@@ -77,6 +77,12 @@ dotfiles profile --tier dev       # lowering uninstalls nothing
 dotfiles profile --propose        # derive one from what is installed
 ```
 
+Older profiles whose `ai all` included Pi keep an existing dotfiles-owned Pi
+managed, unless Pi was excluded. The next profile save records it explicitly
+as `all,pi`; missing and external Pi are not added. New profiles keep Pi
+optional. `dotfiles profile --remove pi` stops managing it and leaves it
+installed.
+
 Every run, including `--dry-run`, writes a log to
 `~/.local/state/dotfiles/logs/` (`latest.log` is the newest; the last 30 are
 kept). It records the command, the checkout revision, the full output, and the

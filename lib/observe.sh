@@ -76,14 +76,14 @@ observe_component() {
     fi
 
     # Where the component is: the managed copy first for eget tools, nvm's
-    # default release for Node, then PATH, then a registered path for
-    # components with no command (nvm).
+    # default release for Node, the standalone agy/omp behind any launcher,
+    # then PATH, then a registered path for components with no command (nvm).
     if [[ "$method" == eget && -x "$HOME/.local/bin/$binary" ]]; then
         path="$HOME/.local/bin/$binary"
     elif [[ "$name" == node ]]; then
         path="$(node_default_dir 2>/dev/null)/bin/node" || path=""
     else
-        path="$(command -v "$binary" 2>/dev/null || true)"
+        path="$(tool_binary_path "$name" 2>/dev/null || true)"
     fi
     if [[ -z "$path" && "${TOOL_VERIFY[$name]:-}" == file-nonempty* ]]; then
         line="${TOOL_VERIFY[$name]#file-nonempty }"

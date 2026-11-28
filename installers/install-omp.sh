@@ -3,7 +3,9 @@
 #
 # omp updates itself (`omp update`), so this only ensures it is present;
 # --force reinstalls the newest release and --update (setup --upgrade) runs
-# omp's own updater. It refuses to shadow an omp already on PATH elsewhere.
+# omp's own updater, even with a separate install earlier on PATH. Installing
+# a new copy permits only an earlier readable shebang script declaring
+# '# dotfiles-launcher: omp' in its first ten lines; other installs are kept.
 #
 # Not the official installer (omp.sh/install): that pipes a script to sh. The
 # release's standalone binary is checked against the release's SHA256SUMS.txt,
@@ -50,13 +52,12 @@ if [[ "$FORCE" != true && -x "$OMP_BIN" ]] && omp_version "$OMP_BIN" >/dev/null;
     exit 2
 fi
 
-# Don't shadow an externally managed omp (Homebrew, bun, mise, Nix):
-# ~/.local/bin comes first on PATH.
-EXTERNAL_OMP="$(command -v omp 2>/dev/null || true)"
-if [[ -n "$EXTERNAL_OMP" && "$EXTERNAL_OMP" != "$OMP_BIN" ]]; then
-    warn "Found an externally-managed omp on PATH: $EXTERNAL_OMP"
-    warn "Skipping install to avoid a shadow copy at $OMP_BIN."
-    warn "Move/remove the external installation explicitly before installing a dotfiles-owned copy."
+# Preserve separate installs when creating/replacing our copy. A declared
+# launcher need not run before setup completes. Updating an existing managed
+# copy above keeps omp's original absolute-path update behavior.
+EXTERNAL_OMP="$(external_install_path omp "$OMP_BIN")"
+if [[ -n "$EXTERNAL_OMP" ]]; then
+    warn_external_install omp "$EXTERNAL_OMP" "$OMP_BIN"
     exit 2
 fi
 

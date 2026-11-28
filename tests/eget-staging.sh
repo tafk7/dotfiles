@@ -97,6 +97,7 @@ artifact rg "ripgrep 15.2.0"
 lock ripgrep 15.2.0
 install_eget_tools >/dev/null
 [[ -x "$HOME/.local/bin/rg" ]] || fail "private Codex rg suppressed managed ripgrep"
+assert_eq "$(command -v rg)" "$private_bin/rg" "eget reordered existing PATH entries"
 assert_eq "$("$HOME/.local/bin/rg" --version)" "ripgrep 15.2.0"
 tool_is_present ripgrep || fail "managed ripgrep was hidden by private PATH entry"
 tool ripgrep rg

@@ -464,23 +464,36 @@ tool_in_cumulative_tier() {
     esac
 }
 
+# The command to use for a component's management checks.
+tool_binary_path() {
+    local name="$1" binary="${TOOL_BINARY[$1]:-}"
+    [[ -n "$binary" ]] || return 1
+    # These standalone binaries may have a machine's launcher ahead on PATH.
+    # Management checks the binary itself; interactive calls keep the launcher.
+    if [[ ( "$name" == antigravity || "$name" == omp ) && -x "$HOME/.local/bin/$binary" ]]; then
+        printf '%s\n' "$HOME/.local/bin/$binary"
+    else
+        command -v "$binary"
+    fi
+}
+
 # Whether a tool is present and working, per its verify type (see the core
 # table). Prints nothing.
 tool_is_present() {
-    local name="$1" binary="${TOOL_BINARY[$1]:-}" type arg companion
+    local name="$1" binary="${TOOL_BINARY[$1]:-}" type arg companion path
     [[ -n "$binary" ]] || return 1
     read -r type arg <<< "${TOOL_VERIFY[$name]:-command}"
     case "$type" in
         command|runs)
-            command -v "$binary" >/dev/null 2>&1 || return 1
+            path="$(tool_binary_path "$name" 2>/dev/null)" || return 1
             for companion in ${TOOL_COMPANIONS[$name]:-} $arg; do
                 command -v "$companion" >/dev/null 2>&1 || return 1
             done
             [[ "$type" == runs ]] || return 0
             if [[ -n "${TOOL_TIMEOUT[$name]:-}" ]]; then
-                probe_quietly timeout --foreground "${TOOL_TIMEOUT[$name]}" "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
+                probe_quietly timeout --foreground "${TOOL_TIMEOUT[$name]}" "$path" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
             else
-                probe_quietly "$binary" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
+                probe_quietly "$path" "${TOOL_VERSION_FLAG[$name]:---version}" >/dev/null 2>&1
             fi
             ;;
         service-active) systemctl is-active --quiet "$arg" 2>/dev/null ;;

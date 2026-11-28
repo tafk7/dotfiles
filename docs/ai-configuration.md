@@ -56,6 +56,29 @@ CLI that is not installed is refused; `dotfiles profile --add CLI` installs and
 manages one. `dotfiles apply --upgrade` updates the CLIs the profile selects.
 `bin/ai-update CLI` is the older name.
 
+Antigravity (`agy`) and Oh My Pi (`omp`) can have a machine's launcher before
+`~/.local/bin` on PATH. Install and upgrade maintain the binary in
+`~/.local/bin`; observation, verification and the component ledger report
+that binary. Interactive shell calls still use the earlier launcher. The
+installer saves the caller's PATH before adding its own tools and reads the
+candidate file without running it, so setup can finish before the launcher's
+environment is ready. The PATH snapshot follows re-execs and child installers
+within the capturing process's live tree; a later unrelated operation takes
+a new snapshot. A launcher must be a readable script starting with
+`#!`, with the exact line `# dotfiles-launcher: agy` (or
+`# dotfiles-launcher: omp`) within its first ten lines. The marker declares
+that it sets up the environment and defers to the corresponding binary in
+`~/.local/bin`. It is accepted when earlier on the caller's PATH or when the
+managed directory is not on PATH yet. A script after that directory is
+refused because installation would shadow it. When creating or forcibly
+reinstalling a copy, unmarked scripts, separate ELF executables and unknown
+or unreadable files are preserved and refused; the refusal explains how a
+launcher declares itself. An alias of the managed file is the same copy and
+can be upgraded. Both installers retain a working managed copy and run
+`--update` by absolute path even with a separate install earlier on PATH.
+Oh My Pi uses its own updater for that copy. Installing other tools keeps
+existing PATH order.
+
 Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
 not part of the installers: setup runs them after each selected AI CLI's
 install step, whether it installed the CLI, found it current, or found an
