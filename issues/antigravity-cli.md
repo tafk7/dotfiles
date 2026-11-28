@@ -20,6 +20,16 @@ Still open: tmux and keys (the agent regex, keymap, compose, review,
 last-reply, the badge), the container scenarios and the chat fake, kits, and
 the questions under [Open](#open).
 
+The installer also coexists with a machine's launcher earlier on PATH:
+install, upgrade, observation, verification and ledger recording use
+`~/.local/bin/agy`, while interactive calls keep the launcher in front.
+The installer decides by PATH order without running the earlier command.
+An external command after `~/.local/bin` is refused because a new binary
+there would shadow it; an earlier command stays in front, whether it is a
+launcher or a separate install. If the managed directory is absent from
+PATH, an external command is refused too. This rule needs no launcher
+format, working environment or version response.
+
 ## User need
 
 Google Antigravity is a family of agent tools: a desktop App, an IDE (a VS Code
@@ -139,8 +149,9 @@ Observed behaviour that differs from the documentation:
 - An unset gateway means sign-in and telemetry. A machine that must use only a
   gateway needs that enforced outside dotfiles (a launcher earlier on PATH,
   admin settings, a proxy). dotfiles' part is to not undercut it: call `agy`
-  through PATH, never run `agy update` or `agy install`, never write gateway or
-  model keys.
+  through PATH for interactive use, never run `agy update` or `agy install`,
+  never write gateway or model keys. Management probes use the managed
+  binary's absolute path with its auto-update check disabled.
 
 ## Proposed design
 
@@ -150,8 +161,9 @@ The pattern to copy is codex and pi.
 
 - `installers/install-antigravity.sh`, new, the usual shape: `lib/install.sh`,
   `--observe` through `observe_component antigravity`, `--force`, `--update`;
-  refuse to shadow an external `agy` (exit 2), skip a working install, verify
-  by absolute path (`~/.local/bin/agy --version`).
+  refuse to shadow an external `agy` after the managed directory (exit 2),
+  keep an earlier launcher in front, skip a working install, verify by
+  absolute path (`~/.local/bin/agy --version`).
 - **Read the manifest directly; skip the vendor script.** Fetch the manifest
   JSON, download `url`, check `sha512`, extract `antigravity` into a temporary
   directory and install it atomically as `~/.local/bin/agy`. No vendor script

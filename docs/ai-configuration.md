@@ -56,6 +56,16 @@ CLI that is not installed is refused; `dotfiles profile --add CLI` installs and
 manages one. `dotfiles apply --upgrade` updates the CLIs the profile selects.
 `bin/ai-update CLI` is the older name.
 
+Antigravity (`agy`) and Oh My Pi (`omp`) can have a machine's launcher before
+`~/.local/bin` on PATH. Install and upgrade maintain the binary in
+`~/.local/bin`; observation, verification and the component ledger report
+that binary. Interactive shell calls still use the earlier launcher. The
+installer checks PATH order without running it, so setup can finish before
+the launcher's environment is ready. An external command after the managed
+directory is refused because installation would shadow it; one before it
+stays in front. An external command is also refused when the managed
+directory is absent from PATH.
+
 Settings and the agent-badge plugin are configure steps (`lib/configure.sh`),
 not part of the installers: setup runs them after each selected AI CLI's
 install step, whether it installed the CLI, found it current, or found an

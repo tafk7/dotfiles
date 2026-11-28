@@ -21,6 +21,25 @@ DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
 # Install Result Tracking
 # ==============================================================================
 
+# Whether directory A's first PATH entry precedes directory B's. Installing
+# into B cannot shadow a command in A in that case. Resolve directory aliases
+# and relative entries, and treat an empty entry as the current directory.
+# If B is absent, there is no guarantee about the next shell's PATH: refuse.
+path_precedes() {
+    local first second entry remaining="${PATH}:" seen=false
+    first="$(realpath -m -- "$1")" second="$(realpath -m -- "$2")"
+    while [[ "$remaining" == *:* ]]; do
+        entry="${remaining%%:*}" remaining="${remaining#*:}"
+        entry="$(realpath -m -- "${entry:-.}")"
+        if [[ "$entry" == "$second" ]]; then
+            [[ "$seen" == true ]]
+            return
+        fi
+        [[ "$entry" != "$first" ]] || seen=true
+    done
+    return 1
+}
+
 INSTALL_OK=()
 INSTALL_SKIP=()
 INSTALL_FAIL=()
@@ -53,7 +72,7 @@ record_component_outcome() {
     elif [[ "$name" == node ]]; then
         path="$(node_default_dir 2>/dev/null)/bin/node" || path=""
     else
-        path="$(command -v "$binary" 2>/dev/null || true)"
+        path="$(tool_binary_path "$name" 2>/dev/null || true)"
     fi
     [[ -n "$path" ]] && path="$(component_path "$path")"
     if [[ -z "$path" && "$result" != fail ]]; then
@@ -120,7 +139,8 @@ observed_component_version() {
     fi
 
     if [[ -z "$version" && -n "$path" && -x "$path" ]]; then
-        version="$("$path" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null | version_line || true)"
+        # A managed agy version check must not start its own updater.
+        version="$(AGY_CLI_DISABLE_AUTO_UPDATE=true "$path" "${TOOL_VERSION_FLAG[$name]:---version}" 2>/dev/null | version_line || true)"
     fi
     printf '%s\n' "$version"
 }
@@ -135,7 +155,7 @@ reconcile_observed_components() {
             continue
         }
         tool_is_present "$name" || continue
-        path="$(command -v "${TOOL_BINARY[$name]}" 2>/dev/null || true)"
+        path="$(tool_binary_path "$name" 2>/dev/null || true)"
         [[ -n "$path" ]] && path="$(component_path "$path")"
         version="$(observed_component_version "$name" "$path")"
         ownership=unknown

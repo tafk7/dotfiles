@@ -34,12 +34,24 @@ EOF
 install_omp() { DOTFILES_OMP_RELEASE_DIR="$release" "$ROOT/installers/install-omp.sh" "$@"; }
 bin="$HOME/.local/bin/omp"
 
+# A launcher earlier on PATH cannot be shadowed and need not run before setup.
+launcher="$TEST_ROOT/launcher"
+mkdir -p "$launcher"
+printf '#!/bin/sh\necho called >> "%s/launcher-calls"\nexit 97\n' "$TEST_ROOT" > "$launcher/omp"
+chmod +x "$launcher/omp"
+export PATH="$launcher:$PATH"
+
 # A fresh install verifies, installs and records the binary.
 make_release 19.2.1
 out="$(install_omp 2>&1)" || fail "fresh install failed: $out"
 assert_eq "$("$bin" --version)" "omp 19.2.1" "installed version"
 [[ "$out" == *"Installing Oh My Pi v19.2.1"* ]] || fail "install did not name the release: $out"
 grep -q "^omp	yes	dotfiles	installed	" "$XDG_STATE_HOME/dotfiles/components.tsv" || fail "the install was not recorded"
+
+observed="$("$ROOT/installers/install-omp.sh" --observe)"
+[[ "$observed" == *"path=$bin"* && "$observed" == *"owner=dotfiles"* && "$observed" == *"ready=yes"* ]] || fail "observed the launcher: $observed"
+bash -c 'source "$1/lib/install.sh"; tool_is_present omp; record_component_outcome omp skip' _ "$ROOT" \
+    || fail "presence or outcome recording followed the launcher"
 
 # A working install is kept: exit 2, nothing downloaded.
 make_release 19.3.0
@@ -53,6 +65,8 @@ assert_eq "$rc/$("$bin" --version)" "0/omp 19.4.0" "--update"
 printf '19.4.0\n' > "$TEST_ROOT/next"
 rc=0; install_omp --update >/dev/null 2>&1 || rc=$?
 assert_eq "$rc" 2 "--update when current"
+[[ ! -e "$TEST_ROOT/launcher-calls" ]] || fail "probed a launcher during install or update"
+export PATH="$HOME/.local/bin:$TEST_ROOT/bin:$TEST_SYSTEM_PATH"
 
 # A checksum mismatch installs nothing; the working binary stays.
 make_release 19.5.0

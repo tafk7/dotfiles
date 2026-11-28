@@ -121,7 +121,7 @@ verify_binary() {
 # there. Returns the command's status.
 probe_quietly() {
     local scratch rc=0
-    local -a sandbox=(DO_NOT_TRACK=1 NVIM_LOG_FILE=/dev/null)
+    local -a sandbox=(DO_NOT_TRACK=1 NVIM_LOG_FILE=/dev/null AGY_CLI_DISABLE_AUTO_UPDATE=true)
     if scratch="$(mktemp -d /tmp/dotfiles-probe.XXXXXX 2>/dev/null)"; then
         sandbox+=(XDG_CONFIG_HOME="$scratch" XDG_CACHE_HOME="$scratch" XDG_STATE_HOME="$scratch"
                   XDG_DATA_HOME="$scratch" XDG_RUNTIME_DIR="$scratch" TMPDIR="$scratch"
