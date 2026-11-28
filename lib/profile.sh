@@ -18,7 +18,7 @@
 _DOTFILES_PROFILE_LOADED=1
 
 DOTFILES_PROFILE_FILE="$DOTFILES_STATE_DIR/profile"
-DOTFILES_PROFILE_SCHEMA=1
+DOTFILES_PROFILE_SCHEMA=2
 PROFILE_KEYS=(tier capabilities ai ai.exclude opt-outs)
 # Keys an earlier profile may hold, ignored on load and dropped on the next
 # save: editor-plugins (the dev tier includes the plugins now).
@@ -135,8 +135,8 @@ profile_check() {
 profile_load() {
     profile_reset
     profile_exists || return 0
-    local key value problem
-    { IFS=$'\t' read -r key value && [[ "$key" == schema && "$value" == "$DOTFILES_PROFILE_SCHEMA" ]]; } \
+    local key value problem schema
+    { IFS=$'\t' read -r key schema && [[ "$key" == schema && ( "$schema" == 1 || "$schema" == "$DOTFILES_PROFILE_SCHEMA" ) ]]; } \
         < "$DOTFILES_PROFILE_FILE" || { printf 'Error: unsupported profile schema: %s\n' "$DOTFILES_PROFILE_FILE" >&2; return 1; }
     while IFS=$'\t' read -r key value; do
         [[ "$key" == schema || -z "$key" || " ${PROFILE_RETIRED_KEYS[*]} " == *" $key "* ]] && continue
@@ -145,6 +145,25 @@ profile_load() {
         PROFILE[$key]="$value"
     done < "$DOTFILES_PROFILE_FILE"
     problem="$(profile_check)" || { printf 'Error: invalid profile: %s\n' "$problem" >&2; return 1; }
+    [[ "$schema" != 1 ]] || _profile_migrate_v1
+}
+
+# Schema 1's all included Pi before it became optional. Keep an installed
+# copy dotfiles owns selected, but never adopt external Pi or install it just
+# because all was selected. Reads convert only in memory; the next normal
+# save writes schema 2, so removing Pi thereafter cannot re-add it.
+_profile_migrate_v1() {
+    local line owner path
+    if profile_ai_all && ! _profile_in_list "${PROFILE[ai.exclude]}" pi; then
+        line="$(ledger_line pi 2>/dev/null || true)"
+        IFS=$'\t' read -r _ _ owner _ _ path _ _ <<< "$line" || true
+        if [[ "$owner" == dotfiles && -x "$path" ]] && tool_owned_path pi "$path"; then
+            profile_ai_add pi
+        fi
+    fi
+    # Pi is optional now: an old exclusion must not block an explicit add or
+    # remain after this conversion. Its intent was honored above.
+    PROFILE[ai.exclude]="$(_profile_list_remove "${PROFILE[ai.exclude]}" pi)"
 }
 
 # Write PROFILE atomically.
