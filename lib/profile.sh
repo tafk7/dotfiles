@@ -153,11 +153,11 @@ profile_load() {
 # because all was selected. Reads convert only in memory; the next normal
 # save writes schema 2, so removing Pi thereafter cannot re-add it.
 _profile_migrate_v1() {
-    local line owner path
+    local line owner status path
     if profile_ai_all && ! _profile_in_list "${PROFILE[ai.exclude]}" pi; then
         line="$(ledger_line pi 2>/dev/null || true)"
-        IFS=$'\t' read -r _ _ owner _ _ path _ _ <<< "$line" || true
-        if [[ "$owner" == dotfiles && -x "$path" ]] && tool_owned_path pi "$path"; then
+        IFS=$'\t' read -r _ _ owner status _ path _ _ <<< "$line" || true
+        if [[ "$owner" == dotfiles && "$status" != removed && -f "$path" && -x "$path" ]] && tool_owned_path pi "$path"; then
             profile_ai_add pi
         fi
     fi

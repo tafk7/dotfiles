@@ -26,6 +26,21 @@ mkdir -p "$HOME/.pi/agent/install/bin" "$HOME/.local/bin"
 fake_command "$HOME/.pi/agent/install/bin/pi" true
 ln -s "$HOME/.pi/agent/install/bin/pi" "$HOME/.local/bin/pi"
 ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+invalid_pi_failed=false
+for invalid_pi in directory removed; do
+    if (
+        legacy_profile
+        if [[ "$invalid_pi" == directory ]]; then
+            ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install" npm-prefix-in-place
+        else
+            ledger_record pi yes dotfiles removed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
+        fi
+        profile_load
+        assert_eq "${PROFILE[ai]}" all "legacy $invalid_pi Pi was retained"
+    ); then :; else invalid_pi_failed=true; fi
+done
+[[ "$invalid_pi_failed" == false ]] || fail "invalid Pi migration cases failed"
+ledger_record pi yes dotfiles installed 1 "$HOME/.pi/agent/install/bin/pi" npm-prefix-in-place
 legacy_profile
 before="$(fixture_managed_snapshot)"
 profile_load
