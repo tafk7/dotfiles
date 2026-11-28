@@ -3,7 +3,11 @@
 # the caller supplies a local release and its install function.
 launcher_install_cases() {
     local component="$1" binary="$2" installer="$3" release_dir="$4" scenario failed=false
-    for scenario in missing-bin-dir missing-bin-path eget-before-ai alias earlier-elf absent-path-elf; do
+    local -a scenarios=(missing-bin-dir missing-bin-path eget-before-ai alias earlier-elf absent-path-elf
+        unmarked-no-dir unmarked-ahead unmarked-after wrong-marker late-marker no-shebang bom execute-only empty
+        marked-after marker-at-ten symlink-marked)
+    [[ "$component" != omp ]] || scenarios+=(managed-elf-update)
+    for scenario in "${scenarios[@]}"; do
         if (launcher_install_case "$component" "$binary" "$installer" "$scenario" "$release_dir"); then
             printf 'launcher case: %s %s ok\n' "$binary" "$scenario"
         else
@@ -18,15 +22,22 @@ launcher_install_case() {
     local case_root="$TEST_ROOT/launcher-cases/$binary/$scenario" rc=0 out target entry
     export HOME="$case_root/home" XDG_STATE_HOME="$case_root/state"
     export XDG_CONFIG_HOME="$case_root/config" XDG_DATA_HOME="$case_root/data" XDG_CACHE_HOME="$case_root/cache"
-    unset DOTFILES_CALLER_PATH
+    unset DOTFILES_CALLER_PATH DOTFILES_CALLER_PATH_OWNER
     mkdir -p "$HOME" "$case_root/launcher"
     target="$HOME/.local/bin/$binary" entry="$case_root/launcher/$binary"
-    printf '#!/bin/sh\necho called >> "%s/calls"\nexit 97\n' "$case_root" > "$entry"
+    printf '#!/bin/sh\n# dotfiles-launcher: %s\necho called >> "%s/calls"\nexit 97\n' "$binary" "$case_root" > "$entry"
     chmod +x "$entry"
     export PATH="$case_root/launcher:$TEST_SYSTEM_PATH"
     case "$scenario" in
         missing-bin-dir) [[ ! -d "$HOME/.local/bin" ]] || fail "fixture has a managed directory" ;;
         missing-bin-path) mkdir -p "$HOME/.local/bin" ;;
+        marker-at-ten)
+            { printf '#!/bin/sh\n'; printf '# padding\n%.0s' {1..8}; printf '# dotfiles-launcher: %s\nexit 97\n' "$binary"; } > "$entry"
+            ;;
+        symlink-marked)
+            mv "$entry" "$case_root/launcher-script"
+            ln -s ../launcher-script "$entry"
+            ;;
         eget-before-ai)
             mkdir -p "$HOME/.local/bin"
             export PATH="$case_root/launcher:$HOME/.local/bin:$TEST_SYSTEM_PATH"
@@ -84,8 +95,46 @@ EOF
             [[ $rc -eq 2 && ! -e "$target" && "$out" == *"externally-managed $binary"* ]] \
                 || fail "$binary $scenario: rc=$rc $out"
             ;;
+        managed-elf-update)
+            export PATH="$HOME/.local/bin:$TEST_SYSTEM_PATH"
+            "$installer" >/dev/null 2>&1 || fail "$binary update fixture install"
+            cp -- /bin/false "$entry"
+            export PATH="$case_root/launcher:$HOME/.local/bin:$TEST_SYSTEM_PATH"
+            printf '19.2.2\n' > "$TEST_ROOT/next"
+            out="$("$installer" --update 2>&1)" || rc=$?
+            [[ $rc -eq 0 && "$("$target" --version)" == 'omp 19.2.2' ]] \
+                || fail "$binary $scenario: rc=$rc $out"
+            ;;
+        unmarked-*|wrong-marker|late-marker|no-shebang|bom|execute-only|empty|marked-after)
+            case "$scenario" in
+                unmarked-*) sed -i '/^# dotfiles-launcher:/d' "$entry" ;;
+                wrong-marker) sed -i 's/^# dotfiles-launcher:.*/# dotfiles-launcher: another-tool/' "$entry" ;;
+                late-marker)
+                    { printf '#!/bin/sh\n'; printf '# padding\n%.0s' {1..9}; printf '# dotfiles-launcher: %s\nexit 97\n' "$binary"; } > "$entry"
+                    ;;
+                no-shebang) sed -i '1d' "$entry" ;;
+                bom) sed -i '1s/^/\xEF\xBB\xBF/' "$entry" ;;
+                execute-only) sed -i '/^# dotfiles-launcher:/d' "$entry"; chmod 111 "$entry" ;;
+                empty) : > "$entry" ;;
+            esac
+            case "$scenario" in
+                unmarked-ahead)
+                    mkdir -p "$HOME/.local/bin"
+                    export PATH="$case_root/launcher:$HOME/.local/bin:$TEST_SYSTEM_PATH"
+                    ;;
+                unmarked-after|marked-after)
+                    mkdir -p "$HOME/.local/bin"
+                    export PATH="$HOME/.local/bin:$case_root/launcher:$TEST_SYSTEM_PATH"
+                    ;;
+            esac
+            out="$("$installer" 2>&1)" || rc=$?
+            [[ $rc -eq 2 && ! -e "$target" && "$out" == *"externally-managed $binary"* ]] \
+                || fail "$binary $scenario installed an external script: rc=$rc $out"
+            [[ "$out" == *"# dotfiles-launcher: $binary"* && "$out" == *'#!'* && "$out" == *'readable'* && "$out" == *'first 10 lines'* ]] \
+                || fail "$binary $scenario refusal did not explain the declaration: $out"
+            ;;
     esac
-    if [[ "$scenario" == missing-bin-* ]]; then
+    if [[ "$scenario" == missing-bin-* || "$scenario" == marker-at-ten || "$scenario" == symlink-marked ]]; then
         out="$("$installer" 2>&1)" || rc=$?
         [[ $rc -eq 0 && -f "$target" ]] || fail "$binary $scenario: rc=$rc $out"
     fi

@@ -40,7 +40,7 @@ for rc in .bashrc .profile .zshrc; do printf '# mine\n' > "$HOME/$rc"; done
 # must never be run to decide whether the managed binary can be installed.
 launcher="$TEST_ROOT/launcher"
 mkdir -p "$launcher"
-printf '#!/bin/sh\necho called >> "%s/launcher-calls"\nexit 97\n' "$TEST_ROOT" > "$launcher/agy"
+printf '#!/bin/sh\n# dotfiles-launcher: agy\necho called >> "%s/launcher-calls"\nexit 97\n' "$TEST_ROOT" > "$launcher/agy"
 chmod +x "$launcher/agy"
 export PATH="$launcher:$PATH"
 

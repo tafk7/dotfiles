@@ -24,15 +24,19 @@ The installer also coexists with a machine's launcher earlier on PATH:
 install, upgrade, observation, verification and ledger recording use
 `~/.local/bin/agy`, while interactive calls keep the launcher in front.
 The installer saves the caller's PATH before dotfiles adds its own tools and
-reads the candidate file without running it. A shebang script is accepted as
-a launcher when earlier on that PATH or when the managed directory is not on
-PATH yet; a script after the managed directory is refused to avoid shadowing
-it. A separate ELF executable, including the vendor's compiled binary, is
-refused wherever it appears: dotfiles does not install a hidden second copy
-behind it. Unknown or unreadable files are preserved too. An alias of the
-managed file is the same copy and can be upgraded. The rule needs no working
-launcher environment or version response; installing other tools preserves
-existing PATH order.
+reads the candidate file without running it. A launcher must be a readable
+script starting with `#!` and contain the exact line
+`# dotfiles-launcher: agy` within its first ten lines. This declares that it
+sets up the environment and defers to `~/.local/bin/agy`. It is accepted when
+earlier on that PATH or when the managed directory is not on PATH yet; a
+script after the managed directory is refused to avoid shadowing it.
+Unmarked scripts and separate ELF executables, including the vendor's
+compiled binary, are refused wherever they appear: dotfiles does not install
+a hidden second copy behind them. Unknown or unreadable files are preserved
+too; the refusal explains the launcher declaration. An alias of the managed
+file is the same copy and can be upgraded. The rule needs no working launcher
+environment or version response; installing other tools preserves existing
+PATH order.
 
 ## User need
 
@@ -166,7 +170,7 @@ The pattern to copy is codex and pi.
 - `installers/install-antigravity.sh`, new, the usual shape: `lib/install.sh`,
   `--observe` through `observe_component antigravity`, `--force`, `--update`;
   refuse a separate ELF install or a script after the managed directory
-  (exit 2), keep an earlier script launcher in front, skip a working install,
+  (exit 2), keep an earlier declared script launcher in front, skip a working install,
   verify by absolute path (`~/.local/bin/agy --version`).
 - **Read the manifest directly; skip the vendor script.** Fetch the manifest
   JSON, download `url`, check `sha512`, extract `antigravity` into a temporary

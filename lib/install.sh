@@ -29,7 +29,6 @@ DOTFILES_BACKUP_PREFIX="${DOTFILES_BACKUP_PREFIX:-$DOTFILES_STATE_DIR/backups}"
 path_precedes() {
     local first second entry remaining="${DOTFILES_CALLER_PATH-$PATH}:" seen=false
     first="$(realpath -m -- "$1")" second="$(realpath -m -- "$2")"
-    [[ "$first" != "$second" ]] || return 0
     while [[ "$remaining" == *:* ]]; do
         entry="${remaining%%:*}" remaining="${remaining#*:}"
         entry="$(realpath -m -- "${entry:-.}")"
@@ -45,8 +44,9 @@ path_precedes() {
 # Print the external command an installer must preserve, or nothing. A
 # resolved alias of the managed file is the same copy. An external ELF (the
 # standalone vendor binaries) is a separate install, even earlier on PATH.
-# A shebang script can be a launcher, including before its environment is
-# ready: allow it unless installation would shadow it on the caller's PATH.
+# A readable shebang script declares a launcher with an exact
+# '# dotfiles-launcher: BINARY' line among its first ten lines. Allow that
+# launcher unless installation would shadow it on the caller's PATH.
 # Unknown or unreadable files are preserved; no candidate is executed.
 external_install_path() {
     local binary="$1" target="$2" path magic
@@ -54,14 +54,29 @@ external_install_path() {
     [[ -n "$path" ]] || return 0
     [[ "$(realpath -m -- "$path")" != "$(realpath -m -- "$target")" ]] || return 0
     magic=""
-    if [[ -f "$path" ]]; then
+    if [[ -f "$path" && -r "$path" ]]; then
         magic="$(head -c 4 -- "$path" 2>/dev/null | od -An -tx1 || true)"
     fi
     magic="${magic//[[:space:]]/}"
-    if [[ "$magic" == 2321* ]] && ! path_precedes "$(dirname "$target")" "$(dirname "$path")"; then
+    if [[ "$magic" == 2321* ]] && \
+        awk -v marker="# dotfiles-launcher: $binary" '
+            NR <= 10 && $0 == marker { found = 1 }
+            NR == 10 { exit }
+            END { exit !found }
+        ' "$path" 2>/dev/null && ! path_precedes "$(dirname "$target")" "$(dirname "$path")"; then
         return 0
     fi
     printf '%s\n' "$path"
+}
+
+# Explain the opt-in without executing or modifying an external candidate.
+warn_external_install() {
+    local binary="$1" path="$2" target="$3"
+    warn "Found an externally-managed $binary on PATH: $path"
+    warn "Skipping install to avoid a second copy at $target."
+    warn "If this is a launcher, make it a readable script starting with #! and add the exact line '# dotfiles-launcher: $binary' within its first 10 lines."
+    warn "That declaration means it sets up the environment and defers to $target; keep the launcher before $(dirname "$target") on PATH."
+    warn "Otherwise, move/remove the external installation explicitly before installing a dotfiles-owned copy."
 }
 
 INSTALL_OK=()

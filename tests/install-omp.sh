@@ -37,7 +37,7 @@ bin="$HOME/.local/bin/omp"
 # A launcher earlier on PATH cannot be shadowed and need not run before setup.
 launcher="$TEST_ROOT/launcher"
 mkdir -p "$launcher"
-printf '#!/bin/sh\necho called >> "%s/launcher-calls"\nexit 97\n' "$TEST_ROOT" > "$launcher/omp"
+printf '#!/bin/sh\n# dotfiles-launcher: omp\necho called >> "%s/launcher-calls"\nexit 97\n' "$TEST_ROOT" > "$launcher/omp"
 chmod +x "$launcher/omp"
 export PATH="$launcher:$PATH"
 
